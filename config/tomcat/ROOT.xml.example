@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  External Tomcat Context descriptor for the ROOT web application.
+
+  Copy this file to:
+  %CATALINA_BASE%\conf\Catalina\localhost\ROOT.xml
+
+  Database credentials are intentionally not stored here. Tomcat replaces
+  DND_DB_USERNAME and DND_DB_PASSWORD from process environment variables after
+  EnvironmentPropertySource is enabled by the local startup configuration.
+-->
+<Context>
+    <!--
+      The application looks up this resource as:
+      java:comp/env/jdbc/DndToolSE
+
+      Connector/J must be installed in %CATALINA_BASE%\lib because the pool is
+      created by Tomcat rather than by the web application's class loader.
+    -->
+    <Resource
+        name="jdbc/DndToolSE"
+        auth="Container"
+        type="javax.sql.DataSource"
+        factory="org.apache.tomcat.dbcp.dbcp2.BasicDataSourceFactory"
+        driverClassName="com.mysql.cj.jdbc.Driver"
+        url="jdbc:mysql://127.0.0.1:3306/dnd_tool_se?connectionTimeZone=UTC&amp;forceConnectionTimeZoneToSession=true&amp;characterEncoding=UTF-8&amp;connectTimeout=3000&amp;socketTimeout=5000"
+        username="${DND_DB_USERNAME}"
+        password="${DND_DB_PASSWORD}"
+        initialSize="1"
+        minIdle="1"
+        maxIdle="5"
+        maxTotal="10"
+        maxWaitMillis="3000"
+        validationQuery="SELECT 1"
+        validationQueryTimeout="3"
+        testWhileIdle="true"
+        timeBetweenEvictionRunsMillis="60000"
+        minEvictableIdleTimeMillis="300000" />
+</Context>

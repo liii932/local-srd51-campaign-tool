@@ -1,0 +1,10 @@
+@echo off
+rem Enable Tomcat XML placeholders backed by process environment variables.
+rem DND_DB_PASSWORD is supplied by the launching PowerShell process. The launcher
+rem validates it before startup; setenv must also remain usable by shutdown.bat.
+rem Never append the password to JAVA_OPTS, CATALINA_OPTS or a Java argument file:
+rem Tomcat logs JVM arguments during startup.
+set "DND_DB_USERNAME=dnd_tool_se_app"
+rem A missing launch-time password leaves the JNDI resource unavailable and the
+rem application fails closed, without putting a secret in a JVM argument.
+set "CATALINA_OPTS=%CATALINA_OPTS% -Dorg.apache.tomcat.util.digester.PROPERTY_SOURCE=org.apache.tomcat.util.digester.EnvironmentPropertySource"

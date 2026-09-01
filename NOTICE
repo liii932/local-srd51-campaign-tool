@@ -1,0 +1,22 @@
+Local 5E Campaign Tool
+Copyright 2026 liii932
+
+The original source code and other original repository materials are licensed
+under the Apache License, Version 2.0, as stated in LICENSE, except for the
+SRD-derived portions identified below.
+
+Portions of the built-in rules documentation and seed data are adapted from
+SRD 5.1 and are distributed under the Creative Commons Attribution 4.0
+International License. Those portions include Chinese translations,
+selection, simplification, data modeling, and implementation-specific stable
+keys added by this project.
+
+This work includes material taken from the System Reference Document 5.1
+(“SRD 5.1”) by Wizards of the Coast LLC and available at
+https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is
+licensed under the Creative Commons Attribution 4.0 International License
+available at https://creativecommons.org/licenses/by/4.0/legalcode.
+
+Dungeons & Dragons and D&D are trademarks of Wizards of the Coast LLC. This
+project is not affiliated with, endorsed, sponsored, or approved by Wizards of
+the Coast LLC.
