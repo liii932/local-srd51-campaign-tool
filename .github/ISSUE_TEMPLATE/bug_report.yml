@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible problem without private campaign data or secrets.
+title: "Bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not include database passwords, tokens, private keys, real campaign saves, logs with private table contents, or exploitable security details. Use the private security reporting link for vulnerabilities.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Minimal reproduction steps
+      description: Use synthetic data when possible.
+      placeholder: |
+        1. Start from ...
+        2. Send/click ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Host UI/API
+        - Character rules
+        - Checks/dice/effects
+        - Campaign archive/import/export
+        - Database/migrations/grants
+        - Deployment/configuration
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Commit SHA, tag, or branch name if known.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Paste only minimal sanitized logs, stack traces, or HTTP details. Redact secrets and private campaign content.
+      render: text

@@ -177,6 +177,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [数据库](./docs/database.md) | 迁移不可变性、账号职责与稳定合同 |
 | [安全](./docs/security.md) | 请求边界、权威输入、最小权限与秘密处理 |
 | [测试](./docs/testing.md) | 定向测试、完整验证、集成测试和 WAR 审计 |
+| [公开仓库发布检查清单](./docs/public-release-checklist.md) | 私有迁移仓库公开前的内容审计与 GitHub 设置确认 |
 | [部署](./docs/deployment.md) | 可回滚的 Tomcat 根上下文部署与验收 |
 | [备份与恢复](./docs/backup-and-restore.md) | 应用存档和数据库级恢复边界 |
 | [故障排查](./docs/troubleshooting.md) | 启动、数据库、请求和测试常见故障 |

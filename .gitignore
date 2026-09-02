@@ -2,6 +2,12 @@
 /migr/
 /.pi/
 *.war
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
 
 /.idea/
 /.vscode/
@@ -11,6 +17,16 @@
 .settings/
 .DS_Store
 Thumbs.db
+
+# Editor and office document temporary files
+*~
+*.swp
+*.swo
+*.tmp
+~$*
+.~lock.*#
+*.asd
+*.wbk
 
 .env
 .env.*
@@ -38,4 +54,14 @@ dnd-tool-se-agent.cnf
 *.log
 /local-data/
 /backups/
+/backup/
+/restore/
+/captures/
+/private/
+/tmp/
+*.bak
+*.backup
+*.dump
+*.sql.gz
+*.sql.zip
 campaign-save*.json

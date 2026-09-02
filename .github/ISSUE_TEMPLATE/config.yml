@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability report
+    url: https://github.com/liii932/local-srd51-campaign-tool/security/advisories/new
+    about: Please report exploitable security details privately instead of opening a public issue.
