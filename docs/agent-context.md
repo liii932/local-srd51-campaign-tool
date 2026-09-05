@@ -18,8 +18,8 @@
 | `dnd5e2014_srd51_se_v1` | 1 | 1 | 1 | `RELEASED`；冻结简化版；当前新战役默认 |
 | `dnd5e2014_srd51_se` | 1 | 2 | 2 | `DRAFT`；完整规则族的开发身份；不可绑定战役或启用存档 |
 
-- V001—V017 是不可修改的迁移历史；仓库中的迁移不证明任何数据库已经执行。
-- V011—V016 建立角色目录、一级创建、升级/生命骰、职业特性生命周期、多职业/ASI/专长及初始熟练基线的 DRAFT 基础；V017 为 format 2 当前状态恢复增加显式来源与事件闭包约束。多职业施法和 Grappler 战斗效果仍阻断。
+- V001—V018 是不可修改的迁移历史；仓库中的迁移不证明任何数据库已经执行。
+- V011—V016 建立角色目录、一级创建、升级/生命骰、职业特性生命周期、多职业/ASI/专长及初始熟练基线的 DRAFT 基础；V017 为 format 2 当前状态恢复增加显式来源与事件闭包约束；V018 固定十二职业的多职业施法贡献并提供共享法术位上限计算基础。法术权威状态/升级事务集成和 Grappler 战斗效果仍阻断。
 - DRAFT 代码、目录、schema 或测试存在不代表功能已经发布、部署或可由正式业务入口执行。
 - 完整规则族在角色、装备/冒险、战斗/状态、法术、怪物/魔法物品完成跨领域整合前保持 DRAFT。
 - archive format 2 可以在开发中逐步实现和测试，但只在跨领域发布候选验收后激活和冻结。
@@ -52,7 +52,7 @@
 - 静态规则目录与运行状态分离目标：[`rule-database-separation.md`](rule-database-separation.md)
 - 测试与 WAR 审计：[`testing.md`](testing.md)
 - 部署与回滚：[`deployment.md`](deployment.md)
-- 当前角色 DRAFT 合同：`docs/rules/*-v2.md` 与 [`rules/archive-format-2-character-state.md`](rules/archive-format-2-character-state.md)
+- 当前角色 DRAFT 合同：`docs/rules/*-v2.md` 与 [`rules/archive-format-2-character-state.md`](rules/archive-format-2-character-state.md)，包括 [`rules/multiclass-spell-slots-v2.md`](rules/multiclass-spell-slots-v2.md)
 
 ## 本机命令环境
 

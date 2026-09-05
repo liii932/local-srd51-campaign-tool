@@ -18,7 +18,8 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
   映射，但该身份仍为 `DRAFT`，不能创建战役、读取目录或导入存档；
 - 已在该 DRAFT 身份下建立 12 职业/子职业的 236 项特性三态矩阵，以及职业资源的类型化
   容量/休息恢复边界，并建立多职业先决条件/熟练增量、ASI 和可扩展专长状态（当前仅
-  Grappler）的 DRAFT 角色切片；多职业施法和 Grappler 战斗效果仍阻断。该内部规则基础不
+  Grappler）的 DRAFT 角色切片；V018 进一步固定十二职业的多职业施法贡献，并提供共享法术位
+  上限计算基础，但法术权威状态、升级事务集成和 Grappler 战斗效果仍阻断。该内部规则基础不
   等于发布或开放可达业务入口，完整规则族会保持 DRAFT，直到主要规则领域完成跨领域发布候选验收；
 - 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
 - 执行普通、优势和劣势 d20 检定，并保存候选骰、修正、DC、结果和内部事件；
@@ -125,7 +126,7 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 5. 将已构建并审计的 WAR 部署为 `ROOT.war`；
 6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
 
-现有 V001—V017 迁移一旦应用即不可修改或重跑。不要把数据库口令放入命令行、Git、WAR、
+现有 V001—V018 迁移一旦应用即不可修改或重跑。不要把数据库口令放入命令行、Git、WAR、
 日志或 Java 启动参数。先阅读[数据库说明](./docs/database.md)与[配置说明](./docs/configuration.md)，
 再按[部署指南](./docs/deployment.md)执行可回滚部署。可参考以下无秘密示例配置：
 
@@ -152,7 +153,7 @@ src/main/java/com/dndtool/
   service/         业务验证、事务、幂等和存档服务
   web/             Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V017 只增不改数据库迁移
+                    V001—V018 只增不改数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
@@ -172,6 +173,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |
 | [冻结 v1 规则规范](./docs/rules/srd-5.1.md) | 现有稳定键、算法、范围、规范化和模组关系 |
 | [职业特性 v2](./docs/rules/class-features-v2.md) | 12 职业/子职业特性矩阵、资源恢复与阻断边界 |
+| [多职业共享法术位 v2](./docs/rules/multiclass-spell-slots-v2.md) | DRAFT 职业贡献、共享位上限与未完成边界 |
 | [Archive format 2 角色投影](./docs/rules/archive-format-2-character-state.md) | DRAFT 稳定事件闭包、严格 codec 与恢复来源 |
 | [配置](./docs/configuration.md) | JNDI、数据库凭据与 loopback Connector |
 | [数据库](./docs/database.md) | 迁移不可变性、账号职责与稳定合同 |

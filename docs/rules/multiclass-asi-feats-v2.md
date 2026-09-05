@@ -1,7 +1,7 @@
 # Canonical v2 多职业、ASI 与专长 DRAFT 合同
 
 本合同属于 `dnd5e2014_srd51_se` release `1` 当前 DRAFT、canonical format `2`、archive format `2`
-设计。V015—V017 不发布该身份、不激活 archive format 2，也不改变新战役默认发布版。
+设计。V015—V018 不发布该身份、不激活 archive format 2，也不改变新战役默认发布版。
 
 ## 目录与选择
 
@@ -27,8 +27,9 @@ SRD `feat.grappler`，要求力量 13；同一角色不能重复获得同一专�
 与升级事件共同提交。
 
 多职业施法位、Pact Magic 组合及其他法术状态明确保存为
-`BLOCKED_PENDING_SPELL_SYSTEM`；V015 不推断或伪造施法资源合并。待法术系统完成后，必须通过新的
-前向迁移和协调规则替换该 DRAFT 阻断状态。
+`BLOCKED_PENDING_SPELL_SYSTEM`；V015 不推断或伪造施法资源合并。V018 只固定职业贡献并提供共享
+法术位上限计算基础，尚未建立权威法术位状态或接入升级事务，因此不替换该持久化阻断状态。待法术
+状态与事务闭环完成后，必须通过新的前向迁移和协调规则替换该 DRAFT 阻断状态。
 
 ## 摘要、状态与事务
 

@@ -9,9 +9,9 @@
 
 ## 迁移合同
 
-正式迁移位于 `src/main/resources/db/migration/`。V001—V017 均是不可变迁移历史；V011—V017
-依次建立角色目录、一级创建、升级与生命骰、职业特性生命周期、多职业/ASI/专长及 format 2
-角色状态来源的 DRAFT 前向状态：
+正式迁移位于 `src/main/resources/db/migration/`。V001—V018 均是不可变迁移历史；V011—V018
+依次建立角色目录、一级创建、升级与生命骰、职业特性生命周期、多职业/ASI/专长、format 2
+角色状态来源及多职业共享法术位计算目录基础的 DRAFT 前向状态：
 
 - 不修改、合并、重命名或重跑已应用迁移；
 - 新 schema 变更使用下一个编号的前向迁移；
@@ -46,8 +46,8 @@
   追加职业特性执行矩阵、子职业选择等级、固定执行/恢复 profile 和五个空生命周期表；V015
   增加多职业/ASI/专长目录 profile、扩展升级约束及四个事件关联状态表；V016 追加可重建的
   一级职业武器、护甲、盾牌与工具熟练基线；V017 为专长和多职业熟练增加 `ADVANCEMENT` 与
-  `ARCHIVE_RESTORE` 显式来源，并用触发器分别验证正常升级父记录或重建事件。后续使用下一个
-  可用编号，不修改 V001—V017；
+  `ARCHIVE_RESTORE` 显式来源，并用触发器分别验证正常升级父记录或重建事件；V018 为十二职业
+  增加多职业施法贡献属性，不建立法术运行状态。后续使用下一个可用编号，不修改 V001—V018；
 - 先批准新的发布身份、稳定键、封闭算法和规范逻辑投影，再插入 `DRAFT` 数据；
 - 使用新的规范格式表达新增分区，不能向 `canonical_format_version=1` 的 23 个分区隐式追加字段；
 - DRAFT 定义和运行模型可通过后续前向迁移及协调的代码、测试和文档继续演进；迁移文件不可变不代表未发布业务语义需要兼容，除非存在明确要求保留的真实数据；
@@ -76,6 +76,7 @@ V014 的五个 canonical-v2 生命周期表保存子职业、特性、选择、D
 V015 的 `character_advancement_choice_v2`、`character_ability_score_change_v2`、
 `character_feat_state_v2` 与 `character_multiclass_proficiency_v2` 保存多职业、ASI、专长和熟练增量；
 迁移本身保持这些表为空，并保持完整规则版为 `DRAFT`。V017 不激活 format 2，只建立当前状态
-恢复所需的显式来源；核验脚本分别为 `database/verify/v014-class-feature-lifecycle.sql` 与
-`database/verify/v017-character-archive-v2-origin.sql`。稳定属性、矩阵计数与阻断边界见
-[职业、子职业与职业特性合同](rules/class-features-v2.md)。
+恢复所需的显式来源；V018 只增加共享法术位计算所需的冻结职业贡献，核验脚本为
+`database/verify/v018-multiclass-spell-slot-foundation.sql`，不表示迁移已执行。相关稳定边界见
+[职业、子职业与职业特性合同](rules/class-features-v2.md)与
+[多职业共享法术位合同](rules/multiclass-spell-slots-v2.md)。
