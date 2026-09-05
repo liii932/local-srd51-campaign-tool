@@ -40,6 +40,8 @@
 - 权威状态、根事件、快照、效果、字段/资源变化、版本和幂等结果共同提交或回滚。
 - 调用方拥有事务的 Repository 不得 commit 或 rollback。
 - 只允许 `/host/*`、`/api/host/*` 和安全的 `/health`；产品不信任 `X-Forwarded-*`。
+- 数据库自动化固定分工：本机 `dnd_tool_se`/`dnd_tool_se_app` 用于部署运行，`dnd_tool_se_agent` 只读核验，`dnd_tool_se_it` 用于临时表集成测试；V001—V018 只在物理隔离的 disposable MySQL 中以原名 `dnd_tool_se` 原样重放并由隔离只读账号验收；正式 migrator 只在单独批准的停服检查点使用。
+- 当前少量测试数据的 `dnd_tool_se` 可作为开发部署运行库，但不得成为集成测试或迁移重放目标；使用前仍需盘点、备份和可回滚边界。
 
 ## 权威资料
 
@@ -48,7 +50,7 @@
 - 产品、组件、信任和事务边界：[`architecture.md`](architecture.md)
 - 冻结 v1 稳定合同：[`rules/srd-5.1.md`](rules/srd-5.1.md)
 - 完整规则目标与发布门：[`rules/srd-5.1-complete.md`](rules/srd-5.1-complete.md)
-- 数据库与迁移：[`database.md`](database.md) 和 `src/main/resources/db/migration/`
+- 数据库、账号与自动化检查点：[`database.md`](database.md) 和 `src/main/resources/db/migration/`
 - 静态规则目录与运行状态分离目标：[`rule-database-separation.md`](rule-database-separation.md)
 - 测试与 WAR 审计：[`testing.md`](testing.md)
 - 部署与回滚：[`deployment.md`](deployment.md)
@@ -56,15 +58,15 @@
 
 ## 本机命令环境
 
-- Windows 仓库操作默认使用 PowerShell 7（`pwsh -NoLogo -NoProfile`）和 Windows 路径。
-- 优先使用 `use-local-tool-paths` 登记的已验证工具绝对路径；含空格路径通过 PowerShell 调用运算符执行。
-- 即使 Agent 工具接口名为 `bash`，也只把它作为启动 Windows `pwsh` 的传输层，不在 WSL 中执行 Git、Maven、文件搜索或仓库脚本，不使用 `/mnt/*` 路径。
-- 只有任务明确要求 Linux 语义时才能例外使用 WSL，并在执行前说明原因。
+- 先读取 `use-local-tool-paths` 注册表；Agent 位于 Linux/WSL 时优先直接使用已验证的原生 Linux Git、Maven、Java、Python、Node.js 和 ripgrep。
+- Linux/WSL 中使用 Bash 与挂载后的仓库路径，不通过 `wsl.exe` 或 Windows PowerShell 包装原生工具。
+- 只有 Windows 管理、明确指定 Windows 实现或必须与 Windows Tomcat/MySQL/脚本互操作时，才使用 PowerShell 7 和 Windows 工具路径，并在该边界内使用 PowerShell 语法。
+- 单个任务保持同一 Git 实现；`.gitattributes` 负责跨平台行尾合同，不为切换工具批量改写工作树。
 
 ## 新任务最小恢复流程
 
 1. 完整阅读根目录 `AGENTS.md` 和本文。
-2. 按上述规则进入 PowerShell 7，并使用已验证的 Windows 工具路径。
+2. 按上述规则选择已验证的原生工具；Linux/WSL Agent 默认直接使用 Linux 工具。
 3. 检查分支/HEAD/上游、staged、unstaged、untracked、实际 diff 和 remotes；所有既有修改均视为用户所有。
 4. 取得目标 Issue 或用户给出的验收标准；未经授权不访问或修改 GitHub。
 5. 只读取与任务最接近的生产代码、测试、迁移和权威文档章节。
@@ -72,4 +74,4 @@
 7. 测试优先完成一个最小领域切片；先定向测试，再按变更类型执行完整验证和 WAR 审计。
 8. stage、commit、fetch、push、PR、merge、数据库、部署和浏览器写入均按 `AGENTS.md` 的独立授权边界处理。
 
-项目级 Pi 模板位于 `.pi/prompts/`，可用 `/context-recovery`、`/issue-intake` 和 `/handoff` 统一执行上述流程。
+本机忽略目录 `.pi/harness/domain-json-rules/` 保存分域 JSON 规则复刻 harness；它不是项目级命令模板，也不进入 Git 或 WAR。

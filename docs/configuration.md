@@ -22,7 +22,11 @@ Connector/J 必须由 Tomcat 加载，因此应安装在 `%CATALINA_BASE%\lib`�
 
 ## 数据库凭据
 
-示例 Context 使用 `DND_DB_USERNAME` 与 `DND_DB_PASSWORD` 占位符。`DND_DB_USERNAME` 可在外部 `setenv.bat` 中固定为最小权限运行账号；口令应由启动 Tomcat 的交互式 PowerShell 进程临时提供。
+示例 Context 使用 `DND_DB_USERNAME` 与 `DND_DB_PASSWORD` 占位符。部署运行时
+`DND_DB_USERNAME` 固定为最小权限 `dnd_tool_se_app`，不能改用 `dnd_tool_se_migrator`、
+`dnd_tool_se_agent` 或测试账号。口令由启动 Tomcat 的已授权进程临时注入；交互式 Windows
+部署可在当前 PowerShell 会话安全读取，自动化部署只消费操作者预先注入的环境变量，不得读取、
+回显或持久化完整环境。当前没有批准把无人值守秘密存入仓库、XML、批处理或 JVM 参数。
 
 不要把口令放入：
 
@@ -31,7 +35,7 @@ Connector/J 必须由 Tomcat 加载，因此应安装在 `%CATALINA_BASE%\lib`�
 - 命令行、构建日志或问题报告；
 - WAR、Tomcat 展开目录或浏览器存档。
 
-Tomcat 必须启用 `EnvironmentPropertySource` 才能解析 XML 中的环境变量占位符。示例见 [setenv.bat.example](../config/tomcat/setenv.bat.example)。缺少口令时应用应失败关闭。
+Tomcat 必须启用 `EnvironmentPropertySource` 才能解析 XML 中的环境变量占位符。示例见 [setenv.bat.example](../config/tomcat/setenv.bat.example)。缺少口令时应用应失败关闭。测试、迁移、只读核验和操作系统部署身份的完整矩阵见[数据库说明](database.md)和[部署指南](deployment.md)。
 
 ## Web Connector
 

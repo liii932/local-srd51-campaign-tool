@@ -6,7 +6,7 @@
 
 修改生产代码前后先运行最相关的测试类，例如：
 
-```powershell
+```bash
 mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 ```
 
@@ -16,7 +16,7 @@ mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 
 代码、资源、迁移、构建或公开文档整理完成后运行：
 
-```powershell
+```bash
 mvn clean verify
 ```
 
@@ -34,26 +34,41 @@ mvn clean verify
 - Tomcat DBCP 连接借出/归还及连接状态恢复；
 - 权威检定、骰子、效果、事件、字段变化、版本和幂等结果的原子提交/回滚。
 
-只运行临时表套件时，可在数据库管理工具中审核并执行
-[database/test/create-integration-database.sql](../database/test/create-integration-database.sql)。同时验证迁移链时，使用
-[database/test/create-character-rules-validation-databases.sql](../database/test/create-character-rules-validation-databases.sql)
-建立彼此隔离的临时表账号、迁移账号和只读核验账号。只在未保存的编辑器缓冲区或仓库外临时副本
-替换密码占位符。这些引导脚本本身不执行 V001—V018 应用迁移。
+运行临时表套件时，可在数据库管理工具中审核并执行
+[database/test/create-integration-database.sql](../database/test/create-integration-database.sql)，建立专用
+`dnd_tool_se_it` schema 和临时表测试账号。只在未保存的编辑器缓冲区或仓库外临时副本替换密码
+占位符；该引导脚本不执行 V001—V018 应用迁移。完整迁移链验证不复用这个 schema 或账号，必须
+使用下面定义的物理隔离实例。
 
-在同一 PowerShell 会话中安全读取测试口令后执行：
+Linux/WSL Agent 使用已验证的原生 Maven，并在同一 Bash 会话中安全读取测试口令：
 
-```powershell
-$env:DND_MYSQL_INTEGRATION_PASSWORD = Read-Host -MaskInput 'MySQL integration password'
-mvn `
-  '-Ddnd.mysql.integration=true' `
-  '-Ddnd.mysql.integration.confirmWritable=true' `
-  '-Ddnd.mysql.integration.url=jdbc:mysql://127.0.0.1:3306/dnd_tool_se_it?connectionTimeZone=UTC' `
-  '-Ddnd.mysql.integration.user=dnd_tool_se_it' `
-  '-Dtest=MySqlIntegrationIT' test
-Remove-Item Env:DND_MYSQL_INTEGRATION_PASSWORD
+```bash
+(
+  read -r -s -p 'MySQL integration password: ' DND_MYSQL_INTEGRATION_PASSWORD; printf '\n'
+  export DND_MYSQL_INTEGRATION_PASSWORD
+  mvn \
+    '-Ddnd.mysql.integration=true' \
+    '-Ddnd.mysql.integration.confirmWritable=true' \
+    '-Ddnd.mysql.integration.url=jdbc:mysql://127.0.0.1:3306/dnd_tool_se_it?connectionTimeZone=UTC' \
+    '-Ddnd.mysql.integration.user=dnd_tool_se_it' \
+    '-Dtest=MySqlIntegrationIT' test
+)
 ```
 
-测试代码必须再次拒绝生产库名 `dnd_tool_se`。全部集成测试被跳过不构成验收；不要把测试口令或完整业务数据写入日志。
+Windows 专属操作可在同一安全边界内使用等价 PowerShell 环境变量语法。测试代码必须再次拒绝
+运行库名 `dnd_tool_se`；不得修改该保护来复用少量测试数据。全部集成测试被跳过不构成验收；
+不要打印完整环境，也不要把测试口令或完整业务数据写入日志。
+
+### 3.1 自动化数据库验证顺序
+
+1. 普通 `mvn clean verify` 不连接任何业务数据库。
+2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
+3. V001—V018 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
+5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
+6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
+
+账号/schema 合同及现有运行库的阶段性使用决策见[数据库说明](database.md)。
 
 ## 4. 迁移与规则测试
 

@@ -4,7 +4,7 @@
 -- edited copy or put the password in Maven arguments, logs, or chat.
 --
 -- This suite creates all required tables as TEMPORARY TABLE per test connection;
--- V001-V010 application migrations must not be run in this disposable database.
+-- V001-V018 application migrations must not be run in this disposable database.
 
 CREATE DATABASE IF NOT EXISTS `dnd_tool_se_it`
     CHARACTER SET utf8mb4
