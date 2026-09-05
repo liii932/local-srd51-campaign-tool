@@ -25,11 +25,11 @@ If these sources conflict, compare the relevant migration, frozen rules and curr
 
 ## Local command environment
 
-- On Windows, use PowerShell 7 (`pwsh -NoLogo -NoProfile`) as the default shell for repository inspection, builds, tests and scripts.
-- Consult the `use-local-tool-paths` registry when available and invoke its verified `pwsh`, Git, Maven, Java, Python, Node.js and ripgrep paths. Use PowerShell's call operator for executable paths containing spaces.
-- Write commands in PowerShell syntax and use Windows paths. Do not translate repository or tool paths to `/mnt/*` or rely on WSL command behavior.
-- If the agent harness exposes only a tool named `bash`, use that tool only as a transport to start the registered Windows `pwsh`; execute the repository command itself inside PowerShell.
-- Use WSL or a POSIX shell only when the task explicitly requires Linux semantics and state that exception before running it. A missing Windows command is not by itself a reason to switch to WSL; use the verified local tool path or perform one narrow lookup.
+- Consult the `use-local-tool-paths` registry before invoking common tools. Prefer its verified native Linux Git, Maven, Java, Python, Node.js and ripgrep paths when the agent runs in Linux/WSL.
+- In Linux/WSL, run repository commands directly in Bash and use the mounted repository path. Do not wrap Linux tools in `wsl.exe` or route them through Windows PowerShell.
+- Use Windows PowerShell and Windows tool paths only for Windows-specific administration, an explicitly requested Windows implementation, or required interoperability with Tomcat/MySQL/Windows scripts. Use PowerShell syntax and its call operator within that boundary.
+- Keep one Git implementation for a task. Repository `.gitattributes` defines cross-platform line endings; do not normalize or bulk-rewrite the working tree merely to change tools.
+- If a registered native tool is missing, perform one narrow lookup and then use the documented fallback. Do not recursively scan drives or silently change proxy, DNS, firewall or package sources.
 
 ## Product and security boundaries
 

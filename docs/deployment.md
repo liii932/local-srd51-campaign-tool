@@ -25,7 +25,11 @@ mvn clean verify
 
 V001—V018 已应用后不可修改、合并、重命名或重跑。SQL 文件存在、迁移成功、授权成功和应用启动是四种不同证据。不要把广泛 schema 权限授给运行账号。
 
-数据库操作的原则与账号边界见[数据库文档](database.md)。
+数据库操作的原则与账号边界见[数据库文档](database.md)。当前无真实业务使用时，现有
+`dnd_tool_se` 被采纳为本地开发部署运行库，但仍须先做只读盘点、停服、完整备份，并在物理隔离、
+可销毁的 MySQL 实例内以原名 `dnd_tool_se` 原样重放完整迁移链；运行库不能作为
+`MySqlIntegrationIT` 或可重复迁移测试目标。少量可丢弃测试数据不等于可以跳过备份、重跑已记录
+迁移或绕过独立授权。
 
 ## 3. 外部配置
 
@@ -35,6 +39,22 @@ V001—V018 已应用后不可修改、合并、重命名或重跑。SQL 文件�
 - [config/tomcat/setenv.bat.example](../config/tomcat/setenv.bat.example) → `%CATALINA_BASE%\bin\setenv.bat`
 
 Tomcat Connector 只绑定 `127.0.0.1:8080`。Connector/J 位于 `%CATALINA_BASE%\lib`。数据库口令由启动进程交互提供，不写入 XML、批处理、JVM 参数或仓库。
+
+### 自动化部署身份
+
+采用独立的 Windows 本地部署身份 `dnd-tool-deployer` 作为目标合同。该名称记录的是待配置的
+操作系统账号，不表示账号已经创建。它只应获得以下能力：
+
+- 读取仓库和经审计的候选 WAR，写入仓库外候选/回滚目录；
+- 停止和启动唯一指定的 Tomcat 服务；
+- 备份、移除和替换该 Tomcat 实例的 `webapps\ROOT.war` 与 `webapps\ROOT`；
+- 读取该实例最新日志和本机 loopback listener 状态。
+
+该身份不得拥有通用本机管理员、任意服务控制、其他 Tomcat context、MySQL 账号管理或数据库
+DDL 权限。它不保存 `dnd_tool_se_migrator` 凭据；Tomcat 继续使用最小权限
+`dnd_tool_se_app`。Agent 可以自动完成构建、测试、WAR 审计和候选/活动哈希比较，但数据库
+备份、正式迁移、授权、停启服务、活动 WAR 替换及真实业务写入仍是独立授权检查点。自动化只
+消费操作者在当前维护进程中注入的秘密，不读取、回显或持久化完整环境。
 
 ## 4. 可回滚替换
 

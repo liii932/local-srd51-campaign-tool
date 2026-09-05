@@ -20,16 +20,62 @@
 
 只读验证脚本位于 [database/verify](../database/verify/)，最小授权脚本位于 [database/grants](../database/grants/)。移动和阅读这些文件不会执行 SQL。
 
-## 账号职责
+## 自动化数据库拓扑与账号职责
 
-| 角色 | 允许职责 |
-|---|---|
-| migrator | 按审核顺序执行 DDL/迁移；必要时执行独立备份/恢复流程 |
-| application | 可变业务表所需的最小 DML；不可变 `RELEASED` 模组目录只读 |
-| read-only verifier | 最小 `SELECT`、`SHOW`、`DESCRIBE` 与普通 `EXPLAIN SELECT` |
-| integration test | 仅在独立测试库中创建临时表并写入测试数据 |
+当前本机运行实例只承载部署运行 schema，以及明确创建时的临时表集成测试 schema。完整迁移链
+不再通过同一实例内改名 schema 来模拟，而是在物理隔离、可销毁的 MySQL 实例或容器内使用生产
+原名 `dnd_tool_se` 重放。名称和权限是职责合同，不表示数据库、账号、迁移或授权已经实际创建或
+执行：
 
-生产库与集成测试库必须分离。测试保护会拒绝把生产数据库 `dnd_tool_se` 当作可写测试目标。
+| 边界 | 用途 | Schema | MySQL 用户 | 允许职责 |
+|---|---|---|---|---|
+| 本机运行实例 | 本地部署运行 | `dnd_tool_se` | `dnd_tool_se_app` | 仅已审核的逐表 `SELECT`/最小 DML；无 DDL、账号管理或 `GRANT OPTION` |
+| 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
+| 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
+| 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
+| 独立 disposable 实例 | V001—V018 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
+| 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
+
+运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源
+账号。集成测试引导可同时创建 `@127.0.0.1` 与 `@localhost`，以兼容本机测试客户端的连接语义，
+但权限只限 `dnd_tool_se_it`。迁移重放实例不挂载持久 volume，默认不发布网络端口；只有执行只读
+JDBC 比较时才向 `127.0.0.1` 发布随机端口，并在验证完成或失败后销毁整个实例及其账号。MySQL 会
+按 `TRIGGER` 权限过滤触发器元数据，因此普通只读账号不负责完整触发器定义验收；需要该元数据的
+审核查询在迁移停止后由隔离实例内的迁移身份执行，且只能运行 `SELECT`/`SHOW`。
+
+账号管理员只负责一次性创建/轮换运行实例账号及应用审核过的授权，不能作为 Agent、Tomcat、测试
+或日常迁移连接。Agent 的常规运行库身份是 `dnd_tool_se_agent`；只有明确批准的迁移检查点才能向
+`dnd_tool_se_migrator` 提供当前维护进程可用的凭据。Tomcat 始终使用
+`dnd_tool_se_app`。密码只通过当前进程环境或经批准的外部秘密注入，不进入 Git、WAR、命令行、
+日志或报告；自动化不得打印完整环境。
+
+`database/test/create-integration-database.sql` 只引导 `dnd_tool_se_it` 及其临时表测试账号。
+迁移重放不使用仓库内管理员 SQL 创建同实例替代 schema；它必须在经授权的外部检查点内创建全新
+隔离实例，直接执行仓库原始迁移，并在结束时销毁。运行账号的逐表权限继续由
+`database/grants/` 中的审核脚本累加；这些脚本不创建账号，也不授予全局权限。
+
+## 现有运行库的阶段性使用
+
+当前没有真实业务使用且只含少量测试数据时，采纳 `dnd_tool_se` 作为本地开发部署和业务验收的
+运行库。它可以在完成只读盘点、停服、完整备份、迁移演练和明确授权后接收尚未安装的 V001—V018
+前向迁移。已有测试数据即使可丢弃，也不能被自动清空、覆盖或当作已经备份。
+
+`dnd_tool_se` 不得作为 `MySqlIntegrationIT` 的可写目标，测试保护会按数据库名拒绝它；事务、
+回滚和故障注入测试只使用 `dnd_tool_se_it`。完整迁移链的反复安装或重建只在物理隔离的 disposable
+MySQL 实例中使用原名 `dnd_tool_se`，不能靠重跑运行库迁移验证，也不能生成改名 SQL 副本。运行库
+只读目录/Harness 比较可以使用 `dnd_tool_se_agent`，部署后的真实业务写入验收仍需单独授权和恢复
+边界。
+
+一旦运行库保存需要保留的战役数据，就不再视为 disposable：后续迁移和部署必须保留完整备份、
+回滚候选及停服维护边界，不能因它曾用于开发而降低保护等级。
+
+## Agent 自动化检查点
+
+Agent 可以在既有授权范围内自动执行数据库无关测试、对 `dnd_tool_se_it` 的显式集成测试，以及
+在已单独授权后创建并销毁物理隔离实例来原样重放迁移、用隔离实例内的只读账号验证。以下仍是彼此
+独立的外部检查点：创建/删除 schema、实例或账号，改变授权，备份或恢复运行库，向运行实例的
+`dnd_tool_se` 应用迁移，启动或停止 Tomcat，替换活动 WAR 以及真实业务写入。一次授权不能被推断
+为后续所有检查点的永久授权。
 
 ## 稳定合同
 

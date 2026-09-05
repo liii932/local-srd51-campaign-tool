@@ -20,6 +20,7 @@ class V007CharacterCreationIdempotencySchemaTest {
         assertTrue(sql.contains("CONSTRAINT `fk_host_operation_character`"));
         assertTrue(sql.contains("REFERENCES `character_record` (`id`)"));
         assertTrue(sql.contains("'01f7bbc29a15e3708e48e8b9b1bac17096760a014a5829a8ae79fc27d87249ef'"));
+        assertFalse(sql.matches("(?ims).*^\\s*USE\\s+.*"));
         assertFalse(sql.matches("(?is).*INSERT\s+INTO\s+`character_record`.*"));
         assertFalse(sql.matches("(?is).*DELETE\s+FROM.*"));
         assertFalse(sql.matches("(?is).*GRANT\s+.*"));

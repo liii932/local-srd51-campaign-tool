@@ -1,0 +1,18 @@
+# Normalize repository text independently of each Git installation's core.autocrlf.
+* text=auto eol=lf
+
+# Windows-native operator scripts retain conventional Windows line endings.
+*.bat text eol=crlf
+*.bat.example text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Common binary artifacts must never undergo text conversion.
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.pdf binary
+*.png binary
+*.war binary
+*.zip binary

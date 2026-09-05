@@ -4,9 +4,10 @@
 
 ## 基本流程
 
-Windows 开发和自动化默认使用 PowerShell 7 与 Windows 工具路径。即使自动化接口名为 `bash`，
-也应只用它启动 `pwsh`，不得默认把仓库命令转到 WSL 或 `/mnt/*` 路径；只有任务明确需要 Linux
-语义时才例外说明并使用 WSL。
+开发和自动化先读取 `use-local-tool-paths` 注册表。Agent 位于 Linux/WSL 时优先直接使用原生
+Linux Git、Maven、Java、Python 与 ripgrep；Windows 管理、明确指定 Windows 实现或必须与
+Windows 脚本互操作时才使用 PowerShell 7。单个任务保持同一 Git 实现，跨平台行尾由
+`.gitattributes` 约束，不为切换工具批量改写工作树。
 
 1. 从当前工作树和待处理问题开始，保留无关的用户修改。
 2. 先检查最接近的生产代码、测试、迁移和稳定规则。

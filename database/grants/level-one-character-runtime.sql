@@ -1,4 +1,4 @@
--- Apply separately as an account administrator only after V017 is verified.
+-- Apply separately as an account administrator only after V018 is verified.
 -- This file does not create users and does not grant schema-changing privileges.
 GRANT SELECT ON `dnd_tool_se`.`module_catalog_definition_v2`
     TO 'dnd_tool_se_app'@'127.0.0.1';

@@ -50,7 +50,8 @@ final class V009CheckExecutionSchemaTest {
 
         assertTrue(payload.contains(
                 "ALTER TABLE `host_operation`\n"
-                        + "    ADD COLUMN `game_event_id` BIGINT UNSIGNED NULL"));
+                        + "    ADD COLUMN `game_event_id` BIGINT UNSIGNED NULL "
+                        + "AFTER `character_id`"));
         assertTrue(payload.contains("UNIQUE KEY `uq_host_operation_game_event`"));
         assertTrue(payload.contains("FOREIGN KEY (`game_event_id`, `campaign_id`)"));
         assertTrue(payload.contains("REFERENCES `game_event` (`id`, `campaign_id`)"));
@@ -180,7 +181,7 @@ final class V009CheckExecutionSchemaTest {
         int start = sql.indexOf("-- CHECKSUM-SCOPE-BEGIN");
         int end = sql.indexOf("-- CHECKSUM-SCOPE-END");
         assertTrue(start >= 0 && end > start);
-        return sql.substring(start, end);
+        return sql.substring(start, end).replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static int count(String value, String needle) {
