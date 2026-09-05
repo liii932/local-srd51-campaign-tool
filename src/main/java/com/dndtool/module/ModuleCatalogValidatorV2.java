@@ -41,6 +41,7 @@ final class ModuleCatalogValidatorV2 {
             "class.proficiency_bonus_profile",
             "class.multiclass_prerequisite",
             "class.multiclass_proficiency_profile",
+            "class.multiclass_spellcasting_progression",
             "class.asi_levels",
             "class.starting_proficiency_profile",
             "feature.level",
@@ -214,6 +215,10 @@ final class ModuleCatalogValidatorV2 {
                 if (!(row.value() instanceof ModuleCatalog.TextValue text)
                         || !validMulticlassProficiencyProfile(text.value())) reject();
             }
+            case "class.multiclass_spellcasting_progression" -> {
+                requireDefinitionType(row, "character.class");
+                requireIdentifier(row, Set.of("NONE", "FULL", "HALF_DOWN", "PACT_MAGIC"));
+            }
             case "class.asi_levels" -> {
                 requireDefinitionType(row, "character.class");
                 if (!(row.value() instanceof ModuleCatalog.TextValue text)
@@ -361,6 +366,8 @@ final class ModuleCatalogValidatorV2 {
                             attributes, identity, "class.multiclass_prerequisite", 1, 1);
                     requireAttributeCount(attributes, identity,
                             "class.multiclass_proficiency_profile", 1, 1);
+                    requireAttributeCount(attributes, identity,
+                            "class.multiclass_spellcasting_progression", 1, 1);
                     requireAttributeCount(attributes, identity, "class.asi_levels", 1, 1);
                     requireAttributeCount(
                             attributes, identity, "class.starting_proficiency_profile", 1, 1);

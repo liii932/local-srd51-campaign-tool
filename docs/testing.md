@@ -38,7 +38,7 @@ mvn clean verify
 [database/test/create-integration-database.sql](../database/test/create-integration-database.sql)。同时验证迁移链时，使用
 [database/test/create-character-rules-validation-databases.sql](../database/test/create-character-rules-validation-databases.sql)
 建立彼此隔离的临时表账号、迁移账号和只读核验账号。只在未保存的编辑器缓冲区或仓库外临时副本
-替换密码占位符。这些引导脚本本身不执行 V001—V017 应用迁移。
+替换密码占位符。这些引导脚本本身不执行 V001—V018 应用迁移。
 
 在同一 PowerShell 会话中安全读取测试口令后执行：
 
@@ -57,15 +57,15 @@ Remove-Item Env:DND_MYSQL_INTEGRATION_PASSWORD
 
 ## 4. 迁移与规则测试
 
-- V001—V017 是不可修改的迁移历史；V011 的角色 DRAFT 目录、V012 的一级创建 schema/profile、
+- V001—V018 是不可修改的迁移历史；V011 的角色 DRAFT 目录、V012 的一级创建 schema/profile、
   V013 的升级/生命骰 schema/profile、V014 的职业特性/恢复矩阵、V015 的多职业/ASI/专长框架、
-  V016 的初始熟练基线及 V017 的 format 2 状态来源由清单摘要、精确计数、关系、profile 语法和
-  canonical-v2 负例测试保护。
+  V016 的初始熟练基线、V017 的 format 2 状态来源及 V018 的多职业施法贡献由清单摘要、精确计数、
+  关系、profile 语法和 canonical-v2 负例测试保护。
 - `ImmutableLegacyMigrationContractTest` 固定 V001—V010 历史；
   `DeferredPublicSurfaceExclusionTest` 只保护永久延期的公开访问面，不再禁止新增 Host 规则领域。
 - 规则测试覆盖未知/重复/未发布数据、稳定键引用、范围、NFC、UTF-8 无符号排序、精确小数、规范字节流与内容摘要。
 - `RELEASED` 模组不可变，战役冻结值、实际目录摘要、发布摘要和应用清单必须一致，否则失败关闭。
-- V011—V017 文件及其中已持久化身份受历史测试保护，但完整规则族仍为 DRAFT：后续前向迁移可以协调改变未发布目录、运行模型、canonical/archive 投影和对应测试，不要求为被替代的 DRAFT 行为保留兼容层。
+- V011—V018 文件及其中已持久化身份受历史测试保护，但完整规则族仍为 DRAFT：后续前向迁移可以协调改变未发布目录、运行模型、canonical/archive 投影和对应测试，不要求为被替代的 DRAFT 行为保留兼容层。
 - archive format 2 的严格往返测试应随各领域渐进建立；只有跨领域发布候选才固定摘要、激活格式、切换默认发布版并运行完整发布门矩阵。
 
 一级创建的定向验证包括 `LevelOneRuleProfileTest`、`LevelOneCharacterRulesTest`、
@@ -84,7 +84,9 @@ DRAFT 发布门保持关闭。
 `ClassResourceRecoveryRulesTest`、`V014ClassFeatureCoverageMatrixTest`、
 `V014ClassFeatureLifecycleSchemaTest`、`CharacterAdvancementChoiceRulesTest` 和
 `V015MulticlassAsiFeatSchemaTest`、`V016StartingProficiencyBaselineSchemaTest` 与
-`V017CharacterArchiveV2OriginSchemaTest`。format 2 的角色投影另由
+`V017CharacterArchiveV2OriginSchemaTest`。V018 的职业贡献、共享施法者等级、半施法职业合并取整、
+Pact Magic 隔离、1—9 环上限及畸形目录由 `V018MulticlassSpellSlotFoundationSchemaTest` 与
+`MulticlassSpellSlotRulesTest` 覆盖。format 2 的角色投影另由
 `CampaignArchiveV2CharacterStateTest` 和 `JdbcCampaignArchiveV2CharacterStateImportRepositoryTest`
 覆盖规范写出/严格读取、稳定事件闭包、预览、调用方事务、失败回滚及无 commit/rollback 的
 Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业特性；规则
@@ -123,7 +125,7 @@ Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V017 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V018 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 

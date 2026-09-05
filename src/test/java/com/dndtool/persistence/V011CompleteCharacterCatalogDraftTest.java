@@ -98,10 +98,10 @@ class V011CompleteCharacterCatalogDraftTest {
     }
 
     @Test
-    void approvedManifestPreservesV011ThroughV017AsForwardOnlyHistory() throws Exception {
+    void approvedManifestPreservesV011ThroughV018AsForwardOnlyHistory() throws Exception {
         var expectations = SchemaMigrations.loadExpectations();
 
-        assertEquals(17, expectations.size());
+        assertEquals(18, expectations.size());
         assertEquals(11, expectations.get(10).version());
         assertEquals("V011__complete_character_catalog_draft.sql",
                 expectations.get(10).scriptName());
@@ -123,6 +123,9 @@ class V011CompleteCharacterCatalogDraftTest {
         assertEquals(17, expectations.get(16).version());
         assertEquals("V017__character_archive_v2_origin.sql",
                 expectations.get(16).scriptName());
+        assertEquals(18, expectations.get(17).version());
+        assertEquals("V018__multiclass_spell_slot_foundation.sql",
+                expectations.get(17).scriptName());
     }
 
     private static int countType(Set<String> identities, String type) {

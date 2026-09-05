@@ -44,7 +44,7 @@ If these sources conflict, compare the relevant migration, frozen rules and curr
 
 ## Stable contracts
 
-- Never edit, merge, rename or rerun an applied migration. V001—V017 are immutable history; add the next forward-only `V###` migration for an approved schema change.
+- Never edit, merge, rename or rerun an applied migration. V001—V018 are immutable history; add the next forward-only `V###` migration for an approved schema change.
 - Preserve the `RELEASED` `dnd5e2014_srd51_se_v1`, its canonical/archive format values, algorithm keys, field keys, event/effect types and persisted digest domains.
 - Existing DRAFT migration files and persisted identifiers remain immutable history, but an unpublished DRAFT is not a compatibility promise. Its catalog, runtime model, APIs, canonical/archive projection and tests may evolve cohesively through reviewed forward migrations until the cross-domain release candidate; do not add compatibility shims for obsolete DRAFT behavior unless an acceptance criterion identifies real data that must survive.
 - Keep `dnd5e2014_srd51_se` DRAFT, keep the legacy release as the new-campaign default and do not activate/freeze archive format 2 until the complete character, equipment/adventure, combat/condition, spell and monster/magic-item domains pass the cross-domain release gate.

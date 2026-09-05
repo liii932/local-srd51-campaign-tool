@@ -121,6 +121,8 @@ class ModuleCanonicalEncoderV2Test {
         builder.attributes.add(text("character.class", "class.fighter",
                 "class.starting_proficiency_profile",
                 "armor.heavy,armor.light,armor.medium,armor.shield,weapon.martial,weapon.simple"));
+        builder.attributes.add(identifier("character.class", "class.fighter",
+                "class.multiclass_spellcasting_progression", "NONE"));
         builder.attributes.add(integer(
                 "character.subclass", "subclass.champion", "source.page", 25));
         builder.attributes.add(integer("character.subclass", "subclass.champion",
@@ -155,6 +157,16 @@ class ModuleCanonicalEncoderV2Test {
                 "character.class", "class.fighter", 1));
 
         assertDoesNotThrow(() -> encoder.encode(builder.build()));
+
+        int progressionIndex = java.util.stream.IntStream.range(0, builder.attributes.size())
+                .filter(index -> "class.multiclass_spellcasting_progression".equals(
+                        builder.attributes.get(index).attributeKey()))
+                .findFirst().orElseThrow();
+        ModuleCatalog.CatalogAttribute progression = builder.attributes.get(progressionIndex);
+        builder.attributes.set(progressionIndex, identifier("character.class", "class.fighter",
+                "class.multiclass_spellcasting_progression", "CLIENT_DEFINED"));
+        assertRejected(builder);
+        builder.attributes.set(progressionIndex, progression);
 
         builder.attributes.removeIf(row -> "resource.recovery_profile".equals(
                 row.attributeKey()));

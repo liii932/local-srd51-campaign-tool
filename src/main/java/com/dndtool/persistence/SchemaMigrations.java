@@ -79,6 +79,10 @@ final class SchemaMigrations {
     static final String V017_SCRIPT_NAME = "V017__character_archive_v2_origin.sql";
     static final String V017_APPROVED_SHA256 =
             "6985a479484233a9dc478f09be4f64eea752f557c300d7d22842ff4ccc68c4a0";
+    static final int V018_VERSION = 18;
+    static final String V018_SCRIPT_NAME = "V018__multiclass_spell_slot_foundation.sql";
+    static final String V018_APPROVED_SHA256 =
+            "8b685a942e2784584ea9106594a8d33e9fdcbd840020daf770c15f9ff38f586a";
 
     private static final String RESOURCE_DIRECTORY = "/db/migration/";
     private static final String SCOPE_BEGIN = "-- CHECKSUM-SCOPE-BEGIN";
@@ -105,7 +109,8 @@ final class SchemaMigrations {
             new Definition(V014_VERSION, V014_SCRIPT_NAME, V014_APPROVED_SHA256),
             new Definition(V015_VERSION, V015_SCRIPT_NAME, V015_APPROVED_SHA256),
             new Definition(V016_VERSION, V016_SCRIPT_NAME, V016_APPROVED_SHA256),
-            new Definition(V017_VERSION, V017_SCRIPT_NAME, V017_APPROVED_SHA256));
+            new Definition(V017_VERSION, V017_SCRIPT_NAME, V017_APPROVED_SHA256),
+            new Definition(V018_VERSION, V018_SCRIPT_NAME, V018_APPROVED_SHA256));
 
     private SchemaMigrations() {
     }

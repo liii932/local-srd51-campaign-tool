@@ -149,8 +149,9 @@ V013 增加冻结的逐级熟练/资源 profile、生命骰资源、canonical-v2
 V014 为 236 个职业/子职业特性固定自动、有限 DM 裁决或阻断三态，为 12 个子职业固定选择
 等级，并为 16 个职业资源固定执行与恢复 profile。类型化资源恢复、裁决键和逐职业矩阵见
 `docs/rules/class-features-v2.md`。V015 增加多职业先决条件和熟练 profile、逐职业 ASI 等级、
-可扩展专长状态（当前仅 Grappler）、不同生命骰组合及事件关联选择；多职业施法合并与 Grappler
-战斗效果保持阻断，见 `docs/rules/multiclass-asi-feats-v2.md`。V017 和内部 DRAFT codec 使用
+可扩展专长状态（当前仅 Grappler）、不同生命骰组合及事件关联选择；V018 固定职业施法贡献并
+提供共享法术位上限计算基础，但法术权威状态/升级事务集成与 Grappler 战斗效果保持阻断，见
+`docs/rules/multiclass-asi-feats-v2.md` 与 `docs/rules/multiclass-spell-slots-v2.md`。V017 和内部 DRAFT codec 使用
 `eventSequence`/`eventTail` 为当前角色状态建立数据库 ID 无关的事件闭包，提供严格读取、规范写出、
 预览和调用方事务内恢复基础；它不接入 Host 路由或 released dispatcher。完整身份、archive
 format 2 和默认发布门继续保持关闭。
@@ -495,7 +496,7 @@ Java 使用 `MessageDigest` 计算 64 字符小写 SHA-256，并与应用随附�
 
 当前单 schema 和 `jdbc/DndToolSE` 仍是已实现基线。目标架构会先建立只读规则目录加载边界和
 进程内不可变注册表，再通过新增的规则 DataSource、稳定发布身份和前向迁移逐步分离规则目录与
-可变运行状态；它不改写 V001—V017、不引入规则热重载或跨数据库分布式事务。完整加载协议、
+可变运行状态；它不改写 V001—V018、不引入规则热重载或跨数据库分布式事务。完整加载协议、
 外键过渡、存档、权限和回滚要求见[静态规则目录与运行数据库分离设计](rule-database-separation.md)。
 
 ## 9. 本地存档、导入与恢复
