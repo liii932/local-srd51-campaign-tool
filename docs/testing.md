@@ -37,7 +37,7 @@ mvn clean verify
 运行临时表套件时，可在数据库管理工具中审核并执行
 [database/test/create-integration-database.sql](../database/test/create-integration-database.sql)，建立专用
 `dnd_tool_se_it` schema 和临时表测试账号。只在未保存的编辑器缓冲区或仓库外临时副本替换密码
-占位符；该引导脚本不执行 V001—V018 应用迁移。完整迁移链验证不复用这个 schema 或账号，必须
+占位符；该引导脚本不执行应用迁移。完整迁移链验证不复用这个 schema 或账号，必须
 使用下面定义的物理隔离实例。
 
 Linux/WSL Agent 使用已验证的原生 Maven，并在同一 Bash 会话中安全读取测试口令：
@@ -55,15 +55,30 @@ Linux/WSL Agent 使用已验证的原生 Maven，并在同一 Bash 会话中安�
 )
 ```
 
-Windows 专属操作可在同一安全边界内使用等价 PowerShell 环境变量语法。测试代码必须再次拒绝
-运行库名 `dnd_tool_se`；不得修改该保护来复用少量测试数据。全部集成测试被跳过不构成验收；
+Windows 专属操作可在同一安全边界内使用等价 PowerShell 环境变量语法。测试代码仅允许明确的
+专用目标 `dnd_tool_se_it`；`dnd_tool_se`、`dnd_tool_rules`、其他库及无法明确解析的目标均在
+连接前拒绝。不得修改该保护来复用少量测试数据。全部集成测试被跳过不构成验收；
 不要打印完整环境，也不要把测试口令或完整业务数据写入日志。
+
+允许的 URL 是普通单主机 `jdbc:mysql://HOST[:PORT]/dnd_tool_se_it`，可选且唯一的查询参数为
+`connectionTimeZone=UTC`。拒绝多主机、负载均衡/复制、用户信息、百分号编码、片段、额外路径及
+其他参数，避免驱动扩展属性覆盖连接目标或执行额外会话 SQL。
+
+连接保护本身使用无数据库回归：
+
+```bash
+mvn '-Dtest=MySqlIntegrationTestSupportTest' test
+```
+
+这组测试在显式启用、配置齐备且确认可写的条件下，分别经过 `open` 与 `pooledDataSource`
+的配置及目标检查路径，注入连接/池工厂核对非法目标的实际连接调用计数为零；正例证明专用
+目标能通过检查。它不连接真实数据库，也不扩大临时表账号或独立迁移验收路径的权限。
 
 ### 3.1 自动化数据库验证顺序
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V018 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V019 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -71,6 +86,97 @@ Windows 专属操作可在同一安全边界内使用等价 PowerShell 环境变
 账号/schema 合同及现有运行库的阶段性使用决策见[数据库说明](database.md)。
 
 ## 4. 迁移与规则测试
+
+[语言分区链路等价核验](rules/language-partition-equivalence.md) 的无数据库定向命令：
+
+```bash
+mvn '-Dtest=LanguagePartitionEquivalenceTest,MySqlIntegrationTestSupportTest' test
+```
+
+它从正式作者源经过生产离线安装、源只读适配、运行镜像写入和指定身份读取，在每个边界
+对照独立六字段矩阵、类型化投影和受审 canonical 字节向量，避免源与镜像共同遗漏仍让往返
+相等通过。覆盖内容/排序变化、同键不同快照、读取损坏和调用方事务回滚；源断开后的镜像
+读取只证明本分区不访问源库。事务 JDBC 代理及测试目标保护均不连接真实数据库，不能替代
+另行授权的隔离实例中原样迁移、安装、驱动、权限与持久化验收，也不提供完整规则就绪资格。
+
+真实语言 JDBC 验收入口为 `tools/rule-packages/verify-language-jdbc.py --execute-disposable`，
+须先获得隔离实例、迁移和测试写入授权。它先重验两组无数据库连接保护，再创建 tmpfs MySQL，
+原样迁移并等待独立现场结构/权限审计；实际用例为 `LanguagePartitionJdbcIT`，测试跳过不算
+成功。默认不带执行参数时只检查迁移清单。前置条件、账号、清理及故障注入边界见
+[隔离 JDBC 入口](rules/language-partition-equivalence.md#隔离-jdbc-入口)。
+
+[语言作者分区](rules/language-author-package.md) 的无数据库定向命令：
+
+```bash
+mvn '-Dtest=LanguageAuthorPackageReaderTest,ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,BuiltinModuleReleaseRegistryTest,CampaignArchiveCapabilityBoundaryTest' test
+```
+
+它核对正式作者源的 18 项独立字段矩阵、严格 JSON/UTF-8/整数、Unicode 码点/NFC、资源上限、
+准确键与分类集合、排序及独立 canonical 字节向量。只证明语言分区，不产生完整规则摘要或
+发布资格；目录/安装清单与源库事务验收见下面的离线安装边界。WAR 审计须确认纯模型/reader
+类存在，作者 JSON、说明/许可包与测试向量均不在 WAR 中。
+
+[离线语言安装](rules/offline-language-installation.md) 的无数据库定向命令（Linux/WSL）：
+
+```bash
+mvn '-Dtest=RuleArtifactTest,TicketStoreTest,SourceInstallationTest' test
+```
+
+它覆盖完整制品和独立指纹向量、持久票据与未决标记、单连接锁序、各写入点异常及影响行数
+错误、实际查询结果被篡改后的整笔回滚，以及提交/回滚/查证失败的分类。JDBC 代理测试不证明
+真实 MySQL 权限、触发器、并发屏障、响应丢失或介质断电耐久性；这些按操作说明在另行授权的
+隔离实例上验收。安装仍只产生 DRAFT 语言 PARTITION，不提供完整规则就绪或发布资格。
+WAR 必须排除 `com/dndtool/offline/` 全部类、安装工具、作者包、安装清单和测试向量。
+
+[源语言分区读取](rules/source-language-reading.md) 的无数据库定向命令：
+
+```bash
+mvn '-Dtest=JdbcSourceLanguageRepositoryTest,RuleDatabaseSchemaVerifierTest,LanguageAuthorPackageReaderTest,BuiltinModuleReleaseRegistryTest,CampaignArchiveCapabilityBoundaryTest' test
+```
+
+它核对同一只读事务中的准确源库/账本、当前 PARTITION 证据、18 项独立字段矩阵、严格 JDBC
+类型与 Unicode、有界固定 SELECT，以及失败时资源关闭和连接状态恢复。历史 COMPLETE 不得
+替代当前证据；超量或坏行失败关闭，不从旧目录或作者文件补齐。连接池、真实驱动类型、快照
+一致性和实际 SELECT-only 权限需另行授权隔离 MySQL 验收，不能用代理测试替代。新适配器
+进入 WAR，但不自动装配为生产规则加载入口，也不改变 DRAFT 发布门。
+
+[运行语言快照分区](rules/runtime-language-snapshot.md) 的无数据库定向命令：
+
+```bash
+mvn '-Dtest=JdbcRuntimeLanguageSnapshotRepositoryTest,V019RuntimeLanguageSnapshotSchemaTest,SchemaMigrationsTest,DatabaseDiagnosticsTest,V011CompleteCharacterCatalogDraftTest,RuleSchemaMigrationsTest,CampaignArchiveCapabilityBoundaryTest' test
+```
+
+它核对 UUIDv4 网络字节、永久身份冲突、跨快照拒绝、18 项语言分区的严格读取、实际 SELECT
+回读与调用方事务所有权，并用事务代理验证插入、回读及后续调用方失败后的整笔回滚。V019
+的结构和授权文件另有静态合同测试，旧迁移摘要保持不变。代理与静态测试不证明真实 MySQL
+的 CHECK、触发器、FK、权限或持久化回滚；这些需在独立授权的隔离实例上完成。只有语言的
+PARTITION 不接入新建、导入或执行视图，也不获得完整规则摘要或发布资格。
+
+[离线规则源 schema](rule-source-schema.md) 的无数据库定向命令：
+
+```bash
+mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSchemaVerifierTest' test
+```
+
+它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
+有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
+权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
+并核对追加 V019 后的完整运行清单。
+规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
+不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
+
+[规则发布身份合同](rules/module-release-identity.md) 的纯边界定向命令：
+
+```bash
+mvn '-Dtest=BuiltinModuleReleaseRegistryTest,BuiltinModuleHashManifestTest' test
+```
+
+这组测试分别验证精确 ASCII 身份与长度、四种解析状态、描述符格式/算法/状态/摘要组合、
+默认及重复拒绝、独立批准摘要查询。正整数格式结构不等于支持；expected 查询不等于来源
+状态、摘要相等或完整内容验证。Java `int` 测试不证明 JSON 原 token 的类型和词法已被验证。
+涉及该边界时继续运行 `ModuleCanonicalEncoderV1Test`、`ModuleCanonicalEncoderV2Test`、
+`CampaignArchiveCapabilityBoundaryTest` 及受影响消费者的拒绝回归，再按第 2 节完整验证；
+生产代码变化还须按第 6 节审计 WAR。这些纯测试无需启用 MySQL 集成测试。
 
 - V001—V018 是不可修改的迁移历史；V011 的角色 DRAFT 目录、V012 的一级创建 schema/profile、
   V013 的升级/生命骰 schema/profile、V014 的职业特性/恢复矩阵、V015 的多职业/ASI/专长框架、
@@ -140,7 +246,7 @@ Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V018 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V019 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 

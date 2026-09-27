@@ -9,7 +9,7 @@
 
 ## 迁移合同
 
-正式迁移位于 `src/main/resources/db/migration/`。V001—V018 均是不可变迁移历史；V011—V018
+运行链正式迁移位于 `src/main/resources/db/migration/`。V001—V018 均是不可变迁移历史；V011—V018
 依次建立角色目录、一级创建、升级与生命骰、职业特性生命周期、多职业/ASI/专长、format 2
 角色状态来源及多职业共享法术位计算目录基础的 DRAFT 前向状态：
 
@@ -19,6 +19,16 @@
 - 仓库中的辅助 SQL 不是已执行证明。
 
 只读验证脚本位于 [database/verify](../database/verify/)，最小授权脚本位于 [database/grants](../database/grants/)。移动和阅读这些文件不会执行 SQL。
+
+V019 在运行链末尾追加永久运行身份登记、不可变快照头和类型化语言镜像三张空表。它不复制旧
+规则目录或创建战役，当前 Repository 只接受 DRAFT 语言 PARTITION。身份、调用方事务、授权
+与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)。应用迁移清单预期
+V001—V019；仍停留在 V018 的数据库不能满足这个候选版本的 schema 诊断。
+
+独立 `RULES` 链位于 `database/rules/migration/`，目标为 `dnd_tool_rules.rule_schema_meta`，
+从本链 V001 开始，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
+六表空源、列约束、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)。
+该本地交付不改变当前单 schema 生产调用链，不建立第二个 JNDI 或执行任何外部迁移/授权。
 
 ## 自动化数据库拓扑与账号职责
 
@@ -33,15 +43,21 @@
 | 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
 | 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
 | 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
-| 独立 disposable 实例 | V001—V018 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
+| 独立 disposable 实例 | V001—V019 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
 | 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
 
 运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源
 账号。集成测试引导可同时创建 `@127.0.0.1` 与 `@localhost`，以兼容本机测试客户端的连接语义，
-但权限只限 `dnd_tool_se_it`。迁移重放实例不挂载持久 volume，默认不发布网络端口；只有执行只读
+但权限只限 `dnd_tool_se_it`。迁移重放实例不挂载持久 volume，默认不发布网络端口；执行只读
 JDBC 比较时才向 `127.0.0.1` 发布随机端口，并在验证完成或失败后销毁整个实例及其账号。MySQL 会
 按 `TRIGGER` 权限过滤触发器元数据，因此普通只读账号不负责完整触发器定义验收；需要该元数据的
 审核查询在迁移停止后由隔离实例内的迁移身份执行，且只能运行 `SELECT`/`SHOW`。
+
+[语言分区 JDBC 验收](rules/language-partition-equivalence.md#隔离-jdbc-入口)是另一条显式授权的
+disposable 路径：同一新实例内原样重放两条独立 schema 链，数据目录只用 tmpfs。为保持固定
+`@127.0.0.1` 账号语义，Linux 容器使用 host 网络且 MySQL 仅绑定 loopback 随机非默认端口。
+通过结构和权限审计后，分别使用源安装、源只读、运行写入和运行核验账号测试真实 JDBC；不允许
+传入现有实例，不复用部署库或临时表 IT 入口，完成或失败后销毁整个实例。
 
 账号管理员只负责一次性创建/轮换运行实例账号及应用审核过的授权，不能作为 Agent、Tomcat、测试
 或日常迁移连接。Agent 的常规运行库身份是 `dnd_tool_se_agent`；只有明确批准的迁移检查点才能向
@@ -57,7 +73,7 @@ JDBC 比较时才向 `127.0.0.1` 发布随机端口，并在验证完成或失�
 ## 现有运行库的阶段性使用
 
 当前没有真实业务使用且只含少量测试数据时，采纳 `dnd_tool_se` 作为本地开发部署和业务验收的
-运行库。它可以在完成只读盘点、停服、完整备份、迁移演练和明确授权后接收尚未安装的 V001—V018
+运行库。它可以在完成只读盘点、停服、完整备份、迁移演练和明确授权后接收正式清单中尚未安装的
 前向迁移。已有测试数据即使可丢弃，也不能被自动清空、覆盖或当作已经备份。
 
 `dnd_tool_se` 不得作为 `MySqlIntegrationIT` 的可写目标，测试保护会按数据库名拒绝它；事务、

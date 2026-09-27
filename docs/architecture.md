@@ -364,8 +364,8 @@ PC 和 NPC 都来自 `character_record`，都由本机 DM 控制，不存在玩�
 已发布的 `dnd5e2014_srd51_se_v1` 使用 `canonical_format_version=1`。规范编码按战役冻结身份
 解析注册表，再精确分派到对应编码器；未知、未发布或应用不支持的格式不会回退到 v1：
 
-- 稳定键和文本规范化为 Unicode NFC；
-- 换行统一为 LF；
+- 身份和稳定键使用精确 ASCII，不做 trim、NFC 或大小写转换；
+- `TEXT` 按冻结合同将换行统一为 LF，再执行 Unicode NFC；
 - 精确数值使用规范十进制表示；
 - 实体和字段使用明确固定顺序；
 - 无业务顺序的稳定键按无符号 UTF-8 字节排序；
@@ -373,6 +373,11 @@ PC 和 NPC 都来自 `character_record`，都由本机 DM 控制，不存在玩�
 - 数据库 ID、时间戳和插入顺序不进入规范字节流。
 
 Java 使用 `MessageDigest` 计算 64 字符小写 SHA-256，并与应用随附的预期哈希比较。只有完整校验成功的 `DRAFT` 能转为不可变 `RELEASED`。数据库权限和保护逻辑阻止已发布定义新增、修改或删除。
+
+身份词法、描述符和批准摘要以 [规则发布身份合同](rules/module-release-identity.md) 为准。
+注册表是独立批准来源：其 DRAFT 描述符摘要严格为 null，完整源投影的 DRAFT 观测摘要不受
+此批准值约束。正整数格式或合法摘要不证明已支持或已批准；manifest 返回 expected 值也不
+证明源状态、源摘要或完整 canonical 已通过验证。
 
 创建战役时从注册表的显式默认身份选择发布版，并且仅写入一行 `campaign_module`，冻结发布版
 和哈希；不使用数据库最大版本。既有战役始终从 `campaign_module` 和角色保存身份解析目录、

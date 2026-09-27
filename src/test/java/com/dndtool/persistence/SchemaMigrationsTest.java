@@ -8,10 +8,10 @@ import org.junit.jupiter.api.Test;
 
 class SchemaMigrationsTest {
     @Test
-    void packagedMigrationChainContainsApprovedV001ThroughV018() throws Exception {
+    void packagedMigrationChainContainsApprovedV001ThroughV019() throws Exception {
         List<SchemaMigrations.Expectation> expectations = SchemaMigrations.loadExpectations();
 
-        assertEquals(18, expectations.size());
+        assertEquals(19, expectations.size());
         assertExpectation(
                 expectations.get(0),
                 SchemaMigrations.V001_VERSION,
@@ -102,6 +102,11 @@ class SchemaMigrationsTest {
                 SchemaMigrations.V018_VERSION,
                 SchemaMigrations.V018_SCRIPT_NAME,
                 SchemaMigrations.V018_APPROVED_SHA256);
+        assertExpectation(
+                expectations.get(18),
+                SchemaMigrations.V019_VERSION,
+                SchemaMigrations.V019_SCRIPT_NAME,
+                SchemaMigrations.V019_APPROVED_SHA256);
     }
 
     @Test

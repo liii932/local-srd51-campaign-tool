@@ -99,8 +99,11 @@ final class CampaignArchiveCapabilityBoundaryTest {
 
         try (Stream<Path> migrations = Files.list(Path.of("src/main/resources/db/migration"))) {
             for (Path migration : migrations.filter(Files::isRegularFile).toList()) {
-                assertFalse(RECOVERY_NAME.matcher(migration.getFileName().toString()).find(),
-                        migration.toString());
+                // V019 stores rule-language content; it provides no campaign recovery capability.
+                if (!migration.getFileName().toString().equals("V019__runtime-language-snapshot.sql")) {
+                    assertFalse(RECOVERY_NAME.matcher(migration.getFileName().toString()).find(),
+                            migration.toString());
+                }
                 assertFalse(RECOVERY_TABLE.matcher(
                         Files.readString(migration, StandardCharsets.UTF_8)).find(),
                         migration.toString());

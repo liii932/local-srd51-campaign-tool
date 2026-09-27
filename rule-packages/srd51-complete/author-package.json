@@ -1,0 +1,15 @@
+{
+  "author_schema_version": 1,
+  "module_key": "dnd5e2014_srd51_se",
+  "release_version": "1",
+  "package_display_name": "SRD 5.1 language catalog (DRAFT)",
+  "canonical_format_version": 2,
+  "archive_format_version": 2,
+  "hash_algorithm": "SHA-256",
+  "partitions": [
+    {
+      "partition_key": "character.language",
+      "path": "character/languages.json"
+    }
+  ]
+}

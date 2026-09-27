@@ -28,9 +28,9 @@ final class DatabaseDiagnosticsTest {
         DatabaseSchemaStatus result = diagnostics.run();
 
         assertEquals(DatabaseSchemaStatus.State.READY, result.state());
-        assertEquals(SchemaMigrations.V018_VERSION, result.schemaVersion());
-        assertEquals(SchemaMigrations.V018_SCRIPT_NAME, result.scriptName());
-        assertEquals(SchemaMigrations.V018_APPROVED_SHA256, result.scriptSha256());
+        assertEquals(SchemaMigrations.V019_VERSION, result.schemaVersion());
+        assertEquals(SchemaMigrations.V019_SCRIPT_NAME, result.scriptName());
+        assertEquals(SchemaMigrations.V019_APPROVED_SHA256, result.scriptSha256());
         assertEquals(true, schemaCalled.get());
         assertEquals(true, moduleCalled.get());
     }

@@ -58,7 +58,9 @@ public final class BuiltinModuleReleaseRegistry {
         Objects.requireNonNull(defaultIdentity, "default identity");
         Map<Identity, Descriptor> indexed = new LinkedHashMap<>();
         for (Descriptor descriptor : definitions) {
-            validateDescriptor(descriptor);
+            if (descriptor == null) {
+                throw new IllegalArgumentException("Malformed built-in release descriptor");
+            }
             if (indexed.putIfAbsent(descriptor.identity(), descriptor) != null) {
                 throw new IllegalArgumentException("Duplicate built-in release identity");
             }
@@ -106,34 +108,23 @@ public final class BuiltinModuleReleaseRegistry {
 
     private static boolean validIdentity(String moduleKey, String releaseVersion) {
         return moduleKey != null && releaseVersion != null
+                && moduleKey.length() <= 128
                 && MODULE_KEY.matcher(moduleKey).matches()
                 && RELEASE_VERSION.matcher(releaseVersion).matches();
     }
 
-    private static void validateDescriptor(Descriptor descriptor) {
-        if (descriptor == null
-                || !validIdentity(
-                        descriptor.identity().moduleKey(),
-                        descriptor.identity().releaseVersion())
-                || descriptor.canonicalFormatVersion() <= 0
-                || descriptor.archiveFormatVersion() <= 0
-                || !"SHA-256".equals(descriptor.hashAlgorithm())) {
-            throw new IllegalArgumentException("Malformed built-in release descriptor");
-        }
-        boolean hasDigest = descriptor.contentSha256() != null
-                && SHA256.matcher(descriptor.contentSha256()).matches();
-        if ((descriptor.releaseStatus() == ReleaseStatus.RELEASED) != hasDigest) {
-            throw new IllegalArgumentException("Published release digest is invalid");
-        }
-    }
-
+    /** Exact ASCII identity; construction never normalizes or registers the input. */
     public record Identity(String moduleKey, String releaseVersion) {
         public Identity {
             Objects.requireNonNull(moduleKey, "module key");
             Objects.requireNonNull(releaseVersion, "release version");
+            if (!validIdentity(moduleKey, releaseVersion)) {
+                throw new IllegalArgumentException("Malformed built-in release identity");
+            }
         }
     }
 
+    /** Structurally valid approval value; construction alone does not add format support. */
     public record Descriptor(
             Identity identity,
             int canonicalFormatVersion,
@@ -145,6 +136,17 @@ public final class BuiltinModuleReleaseRegistry {
             Objects.requireNonNull(identity, "release identity");
             Objects.requireNonNull(hashAlgorithm, "hash algorithm");
             Objects.requireNonNull(releaseStatus, "release status");
+            if (canonicalFormatVersion <= 0 || archiveFormatVersion <= 0
+                    || !"SHA-256".equals(hashAlgorithm)) {
+                throw new IllegalArgumentException("Malformed built-in release descriptor");
+            }
+            if (releaseStatus == ReleaseStatus.RELEASED) {
+                if (contentSha256 == null || !SHA256.matcher(contentSha256).matches()) {
+                    throw new IllegalArgumentException("Published release digest is invalid");
+                }
+            } else if (contentSha256 != null) {
+                throw new IllegalArgumentException("Draft release must not have an approved digest");
+            }
         }
 
         public String moduleKey() {
