@@ -1,0 +1,146 @@
+[
+  {
+    "language_key": "language.abyssal",
+    "display_name": "Abyssal",
+    "description": "Abyssal is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 1
+  },
+  {
+    "language_key": "language.celestial",
+    "display_name": "Celestial",
+    "description": "Celestial is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 2
+  },
+  {
+    "language_key": "language.common",
+    "display_name": "Common",
+    "description": "Common is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 3
+  },
+  {
+    "language_key": "language.deep_speech",
+    "display_name": "Deep Speech",
+    "description": "Deep Speech is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 4
+  },
+  {
+    "language_key": "language.draconic",
+    "display_name": "Draconic",
+    "description": "Draconic is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 5
+  },
+  {
+    "language_key": "language.druidic",
+    "display_name": "Druidic",
+    "description": "Druidic is an SRD 5.1 language catalog entry.",
+    "category": "SECRET",
+    "source_page": 59,
+    "sort_order": 6
+  },
+  {
+    "language_key": "language.dwarvish",
+    "display_name": "Dwarvish",
+    "description": "Dwarvish is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 7
+  },
+  {
+    "language_key": "language.elvish",
+    "display_name": "Elvish",
+    "description": "Elvish is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 8
+  },
+  {
+    "language_key": "language.giant",
+    "display_name": "Giant",
+    "description": "Giant is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 9
+  },
+  {
+    "language_key": "language.gnomish",
+    "display_name": "Gnomish",
+    "description": "Gnomish is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 10
+  },
+  {
+    "language_key": "language.goblin",
+    "display_name": "Goblin",
+    "description": "Goblin is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 11
+  },
+  {
+    "language_key": "language.halfling",
+    "display_name": "Halfling",
+    "description": "Halfling is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 12
+  },
+  {
+    "language_key": "language.infernal",
+    "display_name": "Infernal",
+    "description": "Infernal is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 13
+  },
+  {
+    "language_key": "language.orc",
+    "display_name": "Orc",
+    "description": "Orc is an SRD 5.1 language catalog entry.",
+    "category": "STANDARD",
+    "source_page": 59,
+    "sort_order": 14
+  },
+  {
+    "language_key": "language.primordial",
+    "display_name": "Primordial",
+    "description": "Primordial is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 15
+  },
+  {
+    "language_key": "language.sylvan",
+    "display_name": "Sylvan",
+    "description": "Sylvan is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 16
+  },
+  {
+    "language_key": "language.thieves_cant",
+    "display_name": "Thieves Cant",
+    "description": "Thieves Cant is an SRD 5.1 language catalog entry.",
+    "category": "SECRET",
+    "source_page": 59,
+    "sort_order": 17
+  },
+  {
+    "language_key": "language.undercommon",
+    "display_name": "Undercommon",
+    "description": "Undercommon is an SRD 5.1 language catalog entry.",
+    "category": "EXOTIC",
+    "source_page": 59,
+    "sort_order": 18
+  }
+]

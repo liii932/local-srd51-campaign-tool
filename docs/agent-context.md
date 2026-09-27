@@ -1,77 +1,51 @@
-# Agent 项目上下文
+# Agent 项目地图
 
-本文为新 Agent 会话提供精简项目地图。它只负责定位，不替代架构、冻结规则、迁移、数据库、
-测试或部署文档。动态 Issue/PR 状态、历史测试计数和旧会话结论不在本文维护；每次任务必须从
-当前 Git、代码和经授权的外部证据重新确认。
+只负责定位，不替代 [AGENTS.md](../AGENTS.md) 或下表的权威合同。新会话通过
+[dnd-project-start](../.agents/skills/dnd-project-start/SKILL.md) 按需读取；不要递归加载全部链接。
+当前进度以 Git、代码、测试和经授权的外部证据为准，文件存在不证明功能发布、迁移执行或部署完成。
 
-## 产品与范围
+## 最小项目识别
 
-- 产品是 loopback-only、单 DM 的本机 Web 工具；唯一支持入口为 `http://127.0.0.1:8080`。
-- 技术栈为 Java 21、Tomcat 10.1、Servlet/JSP、原生 JavaScript、MySQL 8、JDBC/JNDI、Gson 和 Maven WAR。
-- 目标是完整覆盖 D&D 5e 2014 / SRD 5.1 的公开范围。
-- LAN/公网、HTTPS、玩家账号、`/display`、`/api/public/*`、公开投影、WebSocket/SSE、运行时脚本、模组上传和动态 DDL 均不在当前范围。
+- 本机、单 DM、唯一入口 `http://127.0.0.1:8080`；LAN/公网、HTTPS、玩家账号与公开 API 不在当前范围。
+- Java 21 / Maven WAR / Tomcat 10.1 / Servlet-JSP / 原生 JavaScript / MySQL 8 / JDBC-JNDI / Gson。
+- `dnd5e2014_srd51_se_v1` release 1、canonical/archive 1：`RELEASED`，新战役默认；既有持久化合同不可改写。
+- `dnd5e2014_srd51_se` release 1、canonical/archive 2：仍为 `DRAFT`；可协调演进，跨领域发布门前不可绑定战役或激活存档。发布门见 [完整规则目标](rules/srd-5.1-complete.md)。
+- 请求解析 → `web`；校验/事务 → `service`；JDBC → `persistence`；冻结目录/规范编码 → `module`；入口安全 → `security`。随机结果、版本推进与审计由服务器拥有，事务不得部分提交。
 
-## 发布与开发状态
+## 任务路由（只选相关行）
 
-| 身份 | release | canonical | archive | 状态与用途 |
-|---|---:|---:|---:|---|
-| `dnd5e2014_srd51_se_v1` | 1 | 1 | 1 | `RELEASED`；冻结简化版；当前新战役默认 |
-| `dnd5e2014_srd51_se` | 1 | 2 | 2 | `DRAFT`；完整规则族的开发身份；不可绑定战役或启用存档 |
+下表 Java 入口相对 `src/main/java/com/dndtool/`。测试从 `src/test/java/com/dndtool/` 下的
+同包同名 `*Test.java` 开始；没有同名测试时按表中测试族搜索。路径是搜索起点，不是要全部读取的清单。
 
-- V001—V018 是不可修改的迁移历史；仓库中的迁移不证明任何数据库已经执行。
-- V011—V016 建立角色目录、一级创建、升级/生命骰、职业特性生命周期、多职业/ASI/专长及初始熟练基线的 DRAFT 基础；V017 为 format 2 当前状态恢复增加显式来源与事件闭包约束；V018 固定十二职业的多职业施法贡献并提供共享法术位上限计算基础。法术权威状态/升级事务集成和 Grappler 战斗效果仍阻断。
-- DRAFT 代码、目录、schema 或测试存在不代表功能已经发布、部署或可由正式业务入口执行。
-- 完整规则族在角色、装备/冒险、战斗/状态、法术、怪物/魔法物品完成跨领域整合前保持 DRAFT。
-- archive format 2 可以在开发中逐步实现和测试，但只在跨领域发布候选验收后激活和冻结。
+| 任务关键词 | 先读合同的相关部分 | 生产入口 / 测试定位 |
+|---|---|---|
+| 规则目录、canonical、hash、发布身份 | [冻结 v1](rules/srd-5.1.md) §2/§11；[v2 目录](rules/character-catalog-v2.md) | `module/BuiltinModuleReleaseRegistry.java`、`module/ModuleCanonicalEncoderV1.java` / `module/ModuleCanonicalEncoderV2.java`；再找 `persistence/ModuleCatalog.java` |
+| 语言作者 JSON、严格读取、纯分区投影 | [语言作者分区](rules/language-author-package.md) | `module/LanguageAuthorPackageReader.java`、`module/LanguagePartition.java`；`LanguageAuthorPackageReaderTest`；正式作者源在仓库根 `rule-packages/srd51-complete/`，不入 WAR |
+| 源语言只读 JDBC、当前安装证据、连接归还 | [源语言分区读取](rules/source-language-reading.md) | `persistence/JdbcSourceLanguageRepository.java`；`JdbcSourceLanguageRepositoryTest`；仅返回语言分区，不接生产完整目录或运行就绪 |
+| 运行语言快照、run/snapshot 身份、调用方事务 | [运行语言快照分区](rules/runtime-language-snapshot.md) | `persistence/JdbcRuntimeLanguageSnapshotRepository.java`；`JdbcRuntimeLanguageSnapshotRepositoryTest`、`V019RuntimeLanguageSnapshotSchemaTest`；V019 仅建空表，语言 PARTITION 不提供执行资格 |
+| 离线语言安装、制品清单、操作票据、提交查证 | [离线语言安装](rules/offline-language-installation.md) | `offline/rules/RulePackageCli.java`、`offline/rules/SourceInstallation.java`、`offline/rules/JdbcRuleSource.java`；`RuleArtifactTest`、`TicketStoreTest`、`SourceInstallationTest`；离线类不入 WAR |
+| 语言链路等价、独立字段/字节期望、跨快照故障 | [语言分区链路核验](rules/language-partition-equivalence.md) | 测试目录 `offline/rules/LanguagePartitionEquivalenceTest.java`；连接作者、离线安装、源只读及运行分区仓储；代理证据与真实 JDBC 分开报告 |
+| v1 战役创建、角色创建、角色卡 | [冻结 v1](rules/srd-5.1.md) §3—5；[架构](architecture.md) §6 | `service/CampaignCreationService.java`、`service/CharacterCreationService.java`、`service/CharacterCardService.java` |
+| v2 一级创建、种族、背景、初始选择 | [一级创建](rules/character-creation-v2.md) | `service/LevelOneCharacterCreationService.java`；`LevelOneCharacterRulesTest` |
+| 升级、HP、生命骰 | [升级](rules/level-advancement-v2.md) | `service/LevelAdvancementService.java`；`LevelAdvancementRulesTest` |
+| 职业/子职业特性、休息、资源恢复 | [职业特性](rules/class-features-v2.md) | `service/ClassFeatureRules.java`、`service/CharacterLifecycleCommandService.java`；`ClassResourceRecoveryRulesTest` |
+| 多职业、ASI、专长、熟练 | [多职业与专长](rules/multiclass-asi-feats-v2.md) | `service/CharacterAdvancementChoiceRules.java`；`LevelAdvancementServiceTest` |
+| 多职业施法、共享法术位、Pact Magic | [共享法术位](rules/multiclass-spell-slots-v2.md)，含未完成边界 | `service/MulticlassSpellSlotRules.java`；`V018MulticlassSpellSlotFoundationSchemaTest` |
+| 检定、骰子、简单物品、事件效果 | [冻结 v1](rules/srd-5.1.md) §6/§8—9 | `service/CheckTransactionService.java`、`service/CheckEffectExecutionService.java` |
+| 节点地图、位置、最小遭遇 | [冻结 v1](rules/srd-5.1.md) §9 | `service/EntityPositionTransactionService.java`、`service/EncounterStateTransactionService.java` |
+| 存档、导入导出、恢复 | [架构](architecture.md) §9；[format 2 角色状态](rules/archive-format-2-character-state.md) | `service/CampaignArchiveFormatDispatcher.java`；按 `CampaignArchive*Test` 定位，v2 先看 `CampaignArchiveV2CharacterStateTest` |
+| JSP、JS、Host API、页面 | [架构](architecture.md) §7；对应领域合同 | `web/Host*Servlet.java`、`src/main/webapp/WEB-INF/views/`、`src/main/webapp/host/assets/`（后两项相对仓库根）；`web/Host*Test.java` |
+| loopback、Session、CSRF、安全头 | [架构](architecture.md) §5；[安全](security.md) | `security/HostBoundaryFilter.java`、`security/HostRequestSecurityFilter.java`；API 注册见 `src/main/webapp/WEB-INF/web.xml`（仓库根） |
+| schema、迁移、JDBC、权限、数据库诊断 | [数据库](database.md)；拆分设计仅需要时读 [规则/运行库分离](rule-database-separation.md) | `persistence/SchemaMigrations.java`、相关 `Jdbc*Repository.java`；`SchemaMigrationsTest` / `Jdbc*RepositoryTest`；SQL 在仓库根 `src/main/resources/db/migration/` 与 `database/` |
+| 独立规则库、来源账本、语言结构、来源权限 | [规则来源 schema](rule-source-schema.md)；[数据库](database.md) | `persistence/RuleSchemaMigrations.java`、`persistence/RuleDatabaseSchemaVerifier.java`；`RuleSourceSchemaContractTest`；SQL 在仓库根 `database/rules/migration/`、`database/grants/rule-source-*.sql` 与 `database/verify/rule-source-schema.sql` |
+| 构建、测试、WAR、部署、备份 | [测试](testing.md)；实际部署才读 [部署](deployment.md) / [备份恢复](backup-and-restore.md) | 仓库根 `pom.xml`、`config/`、`tools/`；MySQL 集成测试需独立授权与隔离目标 |
+| MySQL 测试连接目标保护 | [测试](testing.md) §3 | 测试目录 `persistence/MySqlIntegrationTestSupport.java`；`MySqlIntegrationTestSupportTest`，两入口在连接前仅允许专用测试目标 |
+| 新增完整规则领域、覆盖差距、发布门 | [完整规则目标](rules/srd-5.1-complete.md)；[架构](architecture.md) §2—3 | 先确认已有目录/运行模型/测试；没有入口不代表已实现，不为未来领域编造类名 |
+| Agent、skill、项目导航、文档 | [AGENTS.md](../AGENTS.md)、本文 | `.agents/skills/dnd-project-start/SKILL.md`（仓库根）；不预读业务源码 |
 
-## 兼容策略
+## 使用与维护
 
-- 始终保护已发布 v1、既有迁移文件、真实持久化身份、摘要域和旧战役解释。
-- 迁移文件不可变不等于 DRAFT 业务语义已发布；DRAFT 可通过新的前向迁移及协调的代码、测试和文档变更继续演进。
-- 不为已废弃的 DRAFT 行为默认增加兼容层。只有验收标准明确指出必须保留的真实数据或已发布合同才触发兼容工作。
-- 不在单个领域或少量 Issue 完成后切换默认发布版；最终发布、摘要固定、archive 2 激活和默认切换属于同一跨领域发布门。
-
-## 架构与安全不变量
-
-- Servlet/API 只做有界解析；Service 负责业务验证和事务；Repository 负责持久化；module 层负责冻结目录和规范编码。
-- 客户端不可信。骰点、候选集合、派生值、算法、规范身份、版本推进和审计结果由服务器决定。
-- 完整请求、冻结目录、目标集合和乐观版本必须在消耗随机性或写审计记录前验证。
-- Unicode 长度按 code point 计算；需要时规范化 NFC；拒绝 C0/C1 控制字符。
-- 权威状态、根事件、快照、效果、字段/资源变化、版本和幂等结果共同提交或回滚。
-- 调用方拥有事务的 Repository 不得 commit 或 rollback。
-- 只允许 `/host/*`、`/api/host/*` 和安全的 `/health`；产品不信任 `X-Forwarded-*`。
-- 数据库自动化固定分工：本机 `dnd_tool_se`/`dnd_tool_se_app` 用于部署运行，`dnd_tool_se_agent` 只读核验，`dnd_tool_se_it` 用于临时表集成测试；V001—V018 只在物理隔离的 disposable MySQL 中以原名 `dnd_tool_se` 原样重放并由隔离只读账号验收；正式 migrator 只在单独批准的停服检查点使用。
-- 当前少量测试数据的 `dnd_tool_se` 可作为开发部署运行库，但不得成为集成测试或迁移重放目标；使用前仍需盘点、备份和可回滚边界。
-
-## 权威资料
-
-按任务读取相关部分，不必每次完整加载全部文档：
-
-- 产品、组件、信任和事务边界：[`architecture.md`](architecture.md)
-- 冻结 v1 稳定合同：[`rules/srd-5.1.md`](rules/srd-5.1.md)
-- 完整规则目标与发布门：[`rules/srd-5.1-complete.md`](rules/srd-5.1-complete.md)
-- 数据库、账号与自动化检查点：[`database.md`](database.md) 和 `src/main/resources/db/migration/`
-- 静态规则目录与运行状态分离目标：[`rule-database-separation.md`](rule-database-separation.md)
-- 测试与 WAR 审计：[`testing.md`](testing.md)
-- 部署与回滚：[`deployment.md`](deployment.md)
-- 当前角色 DRAFT 合同：`docs/rules/*-v2.md` 与 [`rules/archive-format-2-character-state.md`](rules/archive-format-2-character-state.md)，包括 [`rules/multiclass-spell-slots-v2.md`](rules/multiclass-spell-slots-v2.md)
-
-## 本机命令环境
-
-- 先读取 `use-local-tool-paths` 注册表；Agent 位于 Linux/WSL 时优先直接使用已验证的原生 Linux Git、Maven、Java、Python、Node.js 和 ripgrep。
-- Linux/WSL 中使用 Bash 与挂载后的仓库路径，不通过 `wsl.exe` 或 Windows PowerShell 包装原生工具。
-- 只有 Windows 管理、明确指定 Windows 实现或必须与 Windows Tomcat/MySQL/脚本互操作时，才使用 PowerShell 7 和 Windows 工具路径，并在该边界内使用 PowerShell 语法。
-- 单个任务保持同一 Git 实现；`.gitattributes` 负责跨平台行尾合同，不为切换工具批量改写工作树。
-
-## 新任务最小恢复流程
-
-1. 完整阅读根目录 `AGENTS.md` 和本文。
-2. 按上述规则选择已验证的原生工具；Linux/WSL Agent 默认直接使用 Linux 工具。
-3. 检查分支/HEAD/上游、staged、unstaged、untracked、实际 diff 和 remotes；所有既有修改均视为用户所有。
-4. 取得目标 Issue 或用户给出的验收标准；未经授权不访问或修改 GitHub。
-5. 只读取与任务最接近的生产代码、测试、迁移和权威文档章节。
-6. 实施前报告当前差距、最小修改范围、受保护合同、验证方案及不会执行的外部操作。
-7. 测试优先完成一个最小领域切片；先定向测试，再按变更类型执行完整验证和 WAR 审计。
-8. stage、commit、fetch、push、PR、merge、数据库、部署和浏览器写入均按 `AGENTS.md` 的独立授权边界处理。
-
-本机忽略目录 `.pi/harness/domain-json-rules/` 保存分域 JSON 规则复刻 harness；它不是项目级命令模板，也不进入 Git 或 WAR。
+- Pi 在项目受信任且未禁用 skills 时发现 `.agents/skills/`，默认只把名称与描述放入上下文；`AGENTS.md` 引导 Agent 在首个任务加载本 skill。它不是自动执行的启动脚本。
+- 新增 skill 后可在已信任项目中 `/reload` 或重启；显式调用 `/skill:dnd-project-start 具体任务` 可确保加载。其他 Agent 也可按 `AGENTS.md` 的链接读取，无需 Pi 插件。
+- 入口变化时同步修正表中路径。规则正文、安全/事务不变量、账号职责、验证方法只在对应权威文档维护，不在 skill 中复制第二份。
+- 动态 Issue/PR、分支、历史测试结果和部署状态不缓存于本文。被忽略的 `.pi/harness/domain-json-rules/` 是本机分域 JSON harness，仅任务明确涉及它时读取，不进入 Git 或 WAR。

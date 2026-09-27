@@ -1,6 +1,9 @@
 /target/
 /migr/
 /.pi/
+# Local Codex harness (kept outside Git and the WAR, like .pi).
+/.codex/
+/.agents/skills/dnd-codex-harness/
 *.war
 *.zip
 *.7z
