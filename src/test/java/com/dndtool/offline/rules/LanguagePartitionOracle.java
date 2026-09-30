@@ -2,7 +2,7 @@ package com.dndtool.offline.rules;
 
 import com.dndtool.module.LanguagePartition;
 import com.dndtool.module.ModuleCanonicalEncoderV2;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;

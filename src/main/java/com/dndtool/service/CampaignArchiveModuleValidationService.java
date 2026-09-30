@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.BuiltinModuleHashManifest;
 import com.dndtool.module.ModuleContentHasher;
 import com.dndtool.module.ModuleHashManifest;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.math.BigDecimal;
 import java.sql.SQLException;

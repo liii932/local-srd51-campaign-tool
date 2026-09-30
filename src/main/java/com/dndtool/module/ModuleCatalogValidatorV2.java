@@ -1,6 +1,5 @@
 package com.dndtool.module;
 
-import com.dndtool.persistence.ModuleCatalog;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;

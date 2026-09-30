@@ -1,6 +1,6 @@
 package com.dndtool.service;
 
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

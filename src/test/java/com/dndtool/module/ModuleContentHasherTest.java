@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.dndtool.persistence.ModuleCatalog;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;

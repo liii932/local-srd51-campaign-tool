@@ -1,5 +1,6 @@
 package com.dndtool.persistence;
 
+import com.dndtool.module.ModuleCatalog;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.dndtool.persistence.ModuleCatalog;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;

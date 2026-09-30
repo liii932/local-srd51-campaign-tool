@@ -6,7 +6,7 @@ import com.dndtool.module.ModuleCanonicalException;
 import com.dndtool.module.ModuleContentHasher;
 import com.dndtool.module.ModuleHashManifest;
 import com.dndtool.persistence.CampaignCreationRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

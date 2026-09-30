@@ -153,11 +153,11 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 
 ```text
 src/main/java/com/dndtool/
-  module/          内置规则目录、规范编码与哈希校验
-  persistence/     JDBC Repository、模式诊断与持久化边界
+  module/          不可变规则模型、内置目录、规范编码与哈希校验
+  persistence/     JDBC Repository、模式查询与持久化边界
   security/        loopback 主机边界和请求安全过滤器
-  service/         业务验证、事务、幂等和存档服务
-  web/             Servlet、HTTP DTO 与页面支持
+  service/         业务验证、诊断编排、事务、幂等和存档服务
+  web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
                     V001—V018 只增不改数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript

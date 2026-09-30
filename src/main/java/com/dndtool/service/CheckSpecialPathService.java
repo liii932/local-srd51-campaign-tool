@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.persistence.CheckExecutionRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.NoteEventRepository;
 import java.util.HashMap;
 import java.util.HashSet;

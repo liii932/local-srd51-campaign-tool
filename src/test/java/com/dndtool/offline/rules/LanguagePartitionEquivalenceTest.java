@@ -7,7 +7,7 @@ import com.dndtool.module.ModuleCanonicalException;
 import com.dndtool.persistence.JdbcRuntimeLanguageSnapshotRepository;
 import com.dndtool.persistence.JdbcRuntimeLanguageSnapshotRepository.Identity;
 import com.dndtool.persistence.JdbcSourceLanguageRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
 import java.nio.file.Files;

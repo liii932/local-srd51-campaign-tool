@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.BuiltinModuleReleaseRegistry;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.EncounterStateRepository;
 import com.dndtool.persistence.EncounterStateRepository.Command;
 import com.dndtool.persistence.EncounterStateRepository.ParticipantPlacement;

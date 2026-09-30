@@ -8,7 +8,7 @@ import com.dndtool.module.BuiltinModuleHashManifest;
 import com.dndtool.module.BuiltinModuleReleaseRegistry;
 import com.dndtool.persistence.CampaignModuleBindingRepository;
 import com.dndtool.persistence.CharacterCreationRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.util.ArrayList;
 import java.util.List;

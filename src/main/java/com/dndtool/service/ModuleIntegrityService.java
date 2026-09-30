@@ -10,7 +10,7 @@ import com.dndtool.persistence.CharacterModuleBindingRepository;
 import com.dndtool.persistence.JdbcCampaignModuleBindingRepository;
 import com.dndtool.persistence.JdbcCharacterModuleBindingRepository;
 import com.dndtool.persistence.JdbcModuleCatalogRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.sql.SQLException;
 import java.util.HashMap;

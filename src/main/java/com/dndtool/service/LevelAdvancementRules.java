@@ -2,7 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.AdvancementValueProfile;
 import com.dndtool.persistence.LevelAdvancementRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

@@ -1,6 +1,6 @@
 package com.dndtool.service;
 
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.util.HashMap;

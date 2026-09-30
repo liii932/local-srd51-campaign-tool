@@ -1,8 +1,11 @@
-package com.dndtool.persistence;
+package com.dndtool.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
-import com.dndtool.service.ModuleIntegrityService;
+import com.dndtool.persistence.DatabaseSchemaStatus;
+import com.dndtool.persistence.DatabaseSchemaVerifier;
+import com.dndtool.persistence.SchemaMigrations;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.naming.NamingException;
@@ -14,13 +17,15 @@ final class DatabaseDiagnosticsTest {
     private static final DataSource DATA_SOURCE = proxyDataSource();
 
     @Test
-    void readyRequiresSchemaThenModuleIntegrity() {
+    void readyRequiresSchemaThenModuleIntegrity() throws Exception {
         AtomicBoolean schemaCalled = new AtomicBoolean();
         AtomicBoolean moduleCalled = new AtomicBoolean();
         DatabaseDiagnostics diagnostics = new DatabaseDiagnostics(
                 () -> DATA_SOURCE,
                 (dataSource, expectations) -> schemaCalled.set(true),
                 dataSource -> {
+                    assertEquals(true, schemaCalled.get());
+                    assertSame(DATA_SOURCE, dataSource);
                     moduleCalled.set(true);
                     return ModuleIntegrityService.Status.READY;
                 });
@@ -28,9 +33,10 @@ final class DatabaseDiagnosticsTest {
         DatabaseSchemaStatus result = diagnostics.run();
 
         assertEquals(DatabaseSchemaStatus.State.READY, result.state());
-        assertEquals(SchemaMigrations.V019_VERSION, result.schemaVersion());
-        assertEquals(SchemaMigrations.V019_SCRIPT_NAME, result.scriptName());
-        assertEquals(SchemaMigrations.V019_APPROVED_SHA256, result.scriptSha256());
+        SchemaMigrations.Expectation latest = SchemaMigrations.loadExpectations().getLast();
+        assertEquals(latest.version(), result.schemaVersion());
+        assertEquals(latest.scriptName(), result.scriptName());
+        assertEquals(latest.scriptSha256(), result.scriptSha256());
         assertEquals(true, schemaCalled.get());
         assertEquals(true, moduleCalled.get());
     }
@@ -79,6 +85,22 @@ final class DatabaseDiagnosticsTest {
 
         assertEquals(DatabaseSchemaStatus.State.JNDI_UNAVAILABLE, diagnostics.run().state());
         assertEquals(false, schemaCalled.get());
+    }
+
+    @Test
+    void schemaConnectionFailurePreventsModuleReads() {
+        AtomicBoolean moduleCalled = new AtomicBoolean();
+        DatabaseDiagnostics diagnostics = new DatabaseDiagnostics(
+                () -> DATA_SOURCE,
+                (dataSource, expectations) -> { throw new SQLException("secret SQL detail"); },
+                dataSource -> {
+                    moduleCalled.set(true);
+                    return ModuleIntegrityService.Status.READY;
+                });
+
+        assertEquals(new DatabaseSchemaStatus(
+                DatabaseSchemaStatus.State.DATABASE_UNAVAILABLE, 0, null, null), diagnostics.run());
+        assertEquals(false, moduleCalled.get());
     }
 
     private static DataSource proxyDataSource() {

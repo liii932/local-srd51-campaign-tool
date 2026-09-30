@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.dndtool.module.BuiltinModuleHashManifest;
 import com.dndtool.module.ModuleCanonicalException;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;

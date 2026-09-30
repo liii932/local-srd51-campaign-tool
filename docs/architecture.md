@@ -193,7 +193,18 @@ Tomcat 10.1 根上下文
       MySQL 8.0
 ```
 
-Servlet 不直接执行 SQL，DAO 不决定业务权限，JSP 不保存权威状态。事务边界放在 Service 层。包按真实代码逐步建立为 `web`、`service`、`dao`、`domain`、`security` 和 `support`，不创建无内容占位类。
+Servlet 不直接执行 SQL，Repository 不决定业务权限，JSP 不保存权威状态。现有职责包为
+`web`、`service`、`persistence`、`module` 和 `security`，不创建无内容占位类。
+`module.ModuleCatalog` 是唯一不可变规则逻辑投影，不含数据库 ID；目录仓储、规则计算和
+canonical 编码共用该模型，模型及编码不反向依赖 JDBC 存储包。
+
+`web.DatabaseDiagnosticsFactory` 负责原运行 JNDI 的延迟查找和诊断依赖装配，
+`web.DatabaseStartupListener` 与 Host 诊断 Servlet 使用同一能力；
+`service.DatabaseDiagnostics` 先校验打包迁移，再协调 schema 与规则完整性检查，
+`persistence.DatabaseSchemaVerifier` 只负责参数化查询、账本比较和资源关闭。
+失败时不继续下游规则读取，不执行迁移、安装或业务写入。
+当前诊断仍在启动及每次 Host 诊断请求时重新检查原单库，不要求第二 JNDI。
+这项分层不改变现有命令事务所有权，也不表示 v2 准备/执行上下文已接入。
 
 ### 4.2 根上下文和路由
 

@@ -1,14 +1,14 @@
 package com.dndtool.web;
 
-import com.dndtool.persistence.DatabaseDiagnostics;
 import com.dndtool.persistence.DatabaseSchemaStatus;
-import com.dndtool.persistence.DatabaseStartupListener;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 /** Exposes a fresh read-only database check only inside the existing host security boundary. */
 @WebServlet(name = "HostDatabaseDiagnosticServlet", urlPatterns = "/api/host/diagnostics/database")
@@ -19,10 +19,20 @@ public final class HostDatabaseDiagnosticServlet extends HttpServlet {
     private static final String MODULE_FAILURE_JSON =
             "{\"status\":\"ERROR\",\"code\":\"MODULE_HASH_MISMATCH\"}";
 
+    private final Supplier<DatabaseSchemaStatus> diagnostics;
+
+    public HostDatabaseDiagnosticServlet() {
+        this(DatabaseDiagnosticsFactory.usingJndi()::run);
+    }
+
+    HostDatabaseDiagnosticServlet(Supplier<DatabaseSchemaStatus> diagnostics) {
+        this.diagnostics = Objects.requireNonNull(diagnostics);
+    }
+
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
-        DatabaseSchemaStatus status = DatabaseDiagnostics.usingJndi().run();
+        DatabaseSchemaStatus status = diagnostics.get();
         ServletContext context = getServletContext();
         context.setAttribute(DatabaseStartupListener.STATUS_ATTRIBUTE, status);
 

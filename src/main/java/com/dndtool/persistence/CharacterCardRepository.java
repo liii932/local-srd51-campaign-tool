@@ -1,5 +1,6 @@
 package com.dndtool.persistence;
 
+import com.dndtool.module.ModuleCatalog;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;

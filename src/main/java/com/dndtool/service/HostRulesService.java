@@ -4,7 +4,7 @@ import com.dndtool.module.BuiltinModuleHashManifest;
 import com.dndtool.module.BuiltinModuleReleaseRegistry;
 import com.dndtool.module.ModuleContentHasher;
 import com.dndtool.persistence.CampaignModuleBindingRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.math.BigDecimal;
 import java.sql.SQLException;

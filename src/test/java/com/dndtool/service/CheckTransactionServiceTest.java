@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dndtool.persistence.CheckEffectPlanRepository;
 import com.dndtool.persistence.CheckExecutionRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.CharacterVersionRepository;
 import com.dndtool.persistence.CheckIdempotencyRepository;
 import com.dndtool.persistence.CheckEffectExecutionRepository;
