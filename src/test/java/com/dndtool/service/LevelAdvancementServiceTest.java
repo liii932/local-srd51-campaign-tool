@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.dndtool.persistence.LevelAdvancementRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;

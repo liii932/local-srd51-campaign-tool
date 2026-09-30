@@ -7,7 +7,7 @@ import com.dndtool.module.BuiltinModuleHashManifest;
 import com.dndtool.module.ModuleCanonicalException;
 import com.dndtool.persistence.CampaignModuleBindingRepository;
 import com.dndtool.persistence.CharacterModuleBindingRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.sql.SQLException;
 import java.util.List;

@@ -2,7 +2,6 @@ package com.dndtool.module;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.dndtool.persistence.ModuleCatalog;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
 import java.nio.charset.StandardCharsets;

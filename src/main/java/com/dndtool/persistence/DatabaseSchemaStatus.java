@@ -19,7 +19,7 @@ public record DatabaseSchemaStatus(
     }
 
     /** Reports the newest migration after the complete packaged chain has been verified. */
-    static DatabaseSchemaStatus ready(List<SchemaMigrations.Expectation> expectations) {
+    public static DatabaseSchemaStatus ready(List<SchemaMigrations.Expectation> expectations) {
         SchemaMigrations.Expectation latest = expectations.get(expectations.size() - 1);
         return new DatabaseSchemaStatus(
                 State.READY,
@@ -28,7 +28,7 @@ public record DatabaseSchemaStatus(
                 latest.scriptSha256());
     }
 
-    static DatabaseSchemaStatus failure(State state) {
+    public static DatabaseSchemaStatus failure(State state) {
         return new DatabaseSchemaStatus(state, 0, null, null);
     }
 

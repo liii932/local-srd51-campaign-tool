@@ -105,7 +105,7 @@ content_sha256、observed_content_sha256、数据库身份或第二份安装清�
 
 `LanguagePartition` 是只依赖 JDK 的不可变完整语言分区，检查准确键集合、分类配对和顺序置换。
 它输出 18 条窄类型 `Definition` 和 36 条 sealed `Attribute`，不创建通用属性袋或复制整份
-`persistence.ModuleCatalog`。每项定义映射键、显示名、说明及显式顺序；类型固定
+`module.ModuleCatalog`。每项定义映射键、显示名、说明及显式顺序；类型固定
 `character.language`。每项属性为 `(catalog.category,1,IDENTIFIER,Category)` 与
 `(source.page,1,INTEGER,int)`；本分区没有关系。定义按 ASCII 键排序，属性按键再按 category/page
 排序，等价于无符号 UTF-8 规范顺序。输入数组位置和显示顺序不能代替规范顺序。

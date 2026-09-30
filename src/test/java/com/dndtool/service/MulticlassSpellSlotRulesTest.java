@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;

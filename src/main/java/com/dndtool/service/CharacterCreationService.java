@@ -7,7 +7,7 @@ import com.dndtool.module.ModuleContentHasher;
 import com.dndtool.module.ModuleHashManifest;
 import com.dndtool.persistence.CampaignModuleBindingRepository;
 import com.dndtool.persistence.CharacterCreationRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import com.dndtool.service.CharacterCreationIdentityFactory.CharacterType;
 import com.dndtool.service.CharacterCreationIdentityFactory.NewCharacterRequest;

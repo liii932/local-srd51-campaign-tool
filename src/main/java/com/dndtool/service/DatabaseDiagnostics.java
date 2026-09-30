@@ -1,35 +1,27 @@
-package com.dndtool.persistence;
+package com.dndtool.service;
 
-import com.dndtool.service.ModuleIntegrityService;
+import com.dndtool.persistence.DatabaseSchemaStatus;
+import com.dndtool.persistence.DatabaseSchemaVerifier;
+import com.dndtool.persistence.SchemaMigrations;
 import java.sql.SQLException;
 import java.util.List;
-import javax.naming.InitialContext;
+import java.util.Objects;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 
 /** Performs the same read-only readiness check at startup and on host demand. */
 public final class DatabaseDiagnostics {
-    static final String JNDI_NAME = "java:comp/env/jdbc/DndToolSE";
-
     private final DataSourceLocator dataSourceLocator;
     private final SchemaVerifier schemaVerifier;
     private final ModuleVerifier moduleVerifier;
 
-    DatabaseDiagnostics(
+    public DatabaseDiagnostics(
             DataSourceLocator dataSourceLocator,
             SchemaVerifier schemaVerifier,
             ModuleVerifier moduleVerifier) {
-        this.dataSourceLocator = dataSourceLocator;
-        this.schemaVerifier = schemaVerifier;
-        this.moduleVerifier = moduleVerifier;
-    }
-
-    public static DatabaseDiagnostics usingJndi() {
-        DatabaseSchemaVerifier schemaVerifier = new DatabaseSchemaVerifier();
-        return new DatabaseDiagnostics(
-                DatabaseDiagnostics::lookupDataSource,
-                schemaVerifier::verify,
-                dataSource -> ModuleIntegrityService.using(dataSource).verifyAll());
+        this.dataSourceLocator = Objects.requireNonNull(dataSourceLocator);
+        this.schemaVerifier = Objects.requireNonNull(schemaVerifier);
+        this.moduleVerifier = Objects.requireNonNull(moduleVerifier);
     }
 
     public DatabaseSchemaStatus run() {
@@ -62,27 +54,19 @@ public final class DatabaseDiagnostics {
         }
     }
 
-    private static DataSource lookupDataSource() throws NamingException {
-        Object resource = InitialContext.doLookup(JNDI_NAME);
-        if (resource instanceof DataSource dataSource) {
-            return dataSource;
-        }
-        throw new NamingException("Configured JNDI resource is not a DataSource");
-    }
-
     @FunctionalInterface
-    interface DataSourceLocator {
+    public interface DataSourceLocator {
         DataSource locate() throws NamingException;
     }
 
     @FunctionalInterface
-    interface SchemaVerifier {
+    public interface SchemaVerifier {
         void verify(DataSource dataSource, List<SchemaMigrations.Expectation> expectations)
                 throws SQLException, DatabaseSchemaVerifier.SchemaMismatchException;
     }
 
     @FunctionalInterface
-    interface ModuleVerifier {
+    public interface ModuleVerifier {
         ModuleIntegrityService.Status verify(DataSource dataSource) throws SQLException;
     }
 }

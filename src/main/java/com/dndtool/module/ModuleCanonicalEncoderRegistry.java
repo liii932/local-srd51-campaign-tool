@@ -1,6 +1,5 @@
 package com.dndtool.module;
 
-import com.dndtool.persistence.ModuleCatalog;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

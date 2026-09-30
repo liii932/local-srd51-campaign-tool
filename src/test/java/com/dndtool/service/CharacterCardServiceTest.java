@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.dndtool.persistence.CharacterCardMutationRepository;
 import com.dndtool.persistence.CharacterCardRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;

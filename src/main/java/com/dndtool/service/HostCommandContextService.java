@@ -2,7 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.BuiltinModuleHashManifest;
 import com.dndtool.module.ModuleContentHasher;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import com.dndtool.persistence.HostCommandContextRepository;
 import java.sql.SQLException;

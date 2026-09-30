@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.dndtool.module.BuiltinModuleHashManifest;
 import com.dndtool.persistence.CampaignCreationRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.util.List;
 import java.util.Optional;

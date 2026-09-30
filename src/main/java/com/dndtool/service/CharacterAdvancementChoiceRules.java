@@ -1,6 +1,6 @@
 package com.dndtool.service;
 
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;

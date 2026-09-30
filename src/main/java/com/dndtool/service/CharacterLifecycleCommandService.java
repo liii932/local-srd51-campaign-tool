@@ -7,7 +7,7 @@ import com.dndtool.module.ModuleContentHasher;
 import com.dndtool.persistence.CharacterLifecycleMutationRepository;
 import com.dndtool.persistence.CharacterLifecycleMutationRepository.Action;
 import com.dndtool.persistence.CharacterModuleBindingRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

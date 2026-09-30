@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.persistence.CheckEffectPlanRepository;
-import com.dndtool.persistence.ModuleCatalog;
+import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.CheckEffectExecutionRepository;
 import java.text.Normalizer;
 import java.util.HashMap;

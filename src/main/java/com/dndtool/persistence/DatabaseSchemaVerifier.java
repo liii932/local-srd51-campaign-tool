@@ -8,14 +8,14 @@ import java.util.List;
 import javax.sql.DataSource;
 
 /** Reads and strictly compares the complete schema history without changing database data. */
-final class DatabaseSchemaVerifier {
+public final class DatabaseSchemaVerifier {
     private static final String SCHEMA_HISTORY_SQL = """
             SELECT schema_version, script_name, script_sha256
             FROM schema_meta
             ORDER BY schema_version ASC
             """;
 
-    void verify(DataSource dataSource, List<SchemaMigrations.Expectation> expectedMigrations)
+    public void verify(DataSource dataSource, List<SchemaMigrations.Expectation> expectedMigrations)
             throws SQLException, SchemaMismatchException {
         if (expectedMigrations.isEmpty()) {
             throw new IllegalArgumentException("At least one schema migration is required");
@@ -61,7 +61,7 @@ final class DatabaseSchemaVerifier {
     }
 
     /** The mismatch has no message so database values cannot accidentally reach a client. */
-    static final class SchemaMismatchException extends Exception {
+    public static final class SchemaMismatchException extends Exception {
         private static final long serialVersionUID = 1L;
     }
 }

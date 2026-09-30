@@ -19,7 +19,8 @@
 
 | 任务关键词 | 先读合同的相关部分 | 生产入口 / 测试定位 |
 |---|---|---|
-| 规则目录、canonical、hash、发布身份 | [冻结 v1](rules/srd-5.1.md) §2/§11；[v2 目录](rules/character-catalog-v2.md) | `module/BuiltinModuleReleaseRegistry.java`、`module/ModuleCanonicalEncoderV1.java` / `module/ModuleCanonicalEncoderV2.java`；再找 `persistence/ModuleCatalog.java` |
+| 规则目录、canonical、hash、发布身份 | [冻结 v1](rules/srd-5.1.md) §2/§11；[v2 目录](rules/character-catalog-v2.md) | `module/ModuleCatalog.java`、`module/BuiltinModuleReleaseRegistry.java`、`module/ModuleCanonicalEncoderV1.java` / `module/ModuleCanonicalEncoderV2.java` |
+| 启动、JNDI、数据库就绪诊断 | [架构](architecture.md) §4/§8；[数据库](database.md) | `web/DatabaseDiagnosticsFactory.java`、`web/DatabaseStartupListener.java` → `service/DatabaseDiagnostics.java` → `persistence/DatabaseSchemaVerifier.java`；`DatabaseDiagnosticsTest`、`DatabaseDiagnosticsFactoryTest`、`HostDatabaseDiagnosticServletTest` |
 | 语言作者 JSON、严格读取、纯分区投影 | [语言作者分区](rules/language-author-package.md) | `module/LanguageAuthorPackageReader.java`、`module/LanguagePartition.java`；`LanguageAuthorPackageReaderTest`；正式作者源在仓库根 `rule-packages/srd51-complete/`，不入 WAR |
 | 源语言只读 JDBC、当前安装证据、连接归还 | [源语言分区读取](rules/source-language-reading.md) | `persistence/JdbcSourceLanguageRepository.java`；`JdbcSourceLanguageRepositoryTest`；仅返回语言分区，不接生产完整目录或运行就绪 |
 | 运行语言快照、run/snapshot 身份、调用方事务 | [运行语言快照分区](rules/runtime-language-snapshot.md) | `persistence/JdbcRuntimeLanguageSnapshotRepository.java`；`JdbcRuntimeLanguageSnapshotRepositoryTest`、`V019RuntimeLanguageSnapshotSchemaTest`；V019 仅建空表，语言 PARTITION 不提供执行资格 |

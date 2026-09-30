@@ -10,7 +10,7 @@ import java.util.HexFormat;
 import java.util.List;
 
 /** Loads the ordered, approved schema migration chain packaged in the application. */
-final class SchemaMigrations {
+public final class SchemaMigrations {
     static final int V001_VERSION = 1;
     static final String V001_SCRIPT_NAME = "V001__stage1_schema.sql";
     static final String V001_APPROVED_SHA256 =
@@ -120,7 +120,7 @@ final class SchemaMigrations {
     private SchemaMigrations() {
     }
 
-    static List<Expectation> loadExpectations() throws PackagedSchemaException {
+    public static List<Expectation> loadExpectations() throws PackagedSchemaException {
         validateManifest();
 
         List<Expectation> expectations = new ArrayList<>(APPROVED_MIGRATIONS.size());
@@ -209,11 +209,11 @@ final class SchemaMigrations {
     private record Definition(int version, String scriptName, String approvedSha256) {
     }
 
-    record Expectation(int version, String scriptName, String scriptSha256) {
+    public record Expectation(int version, String scriptName, String scriptSha256) {
     }
 
     /** Deliberately carries no file contents or paths that could leak through a response. */
-    static final class PackagedSchemaException extends Exception {
+    public static final class PackagedSchemaException extends Exception {
         private static final long serialVersionUID = 1L;
     }
 }

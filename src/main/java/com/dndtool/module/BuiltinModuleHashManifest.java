@@ -1,6 +1,5 @@
 package com.dndtool.module;
 
-import com.dndtool.persistence.ModuleCatalog;
 import java.util.Optional;
 
 /** Immutable application manifest of built-in releases approved for canonical comparison. */

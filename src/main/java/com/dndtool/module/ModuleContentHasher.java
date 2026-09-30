@@ -1,6 +1,5 @@
 package com.dndtool.module;
 
-import com.dndtool.persistence.ModuleCatalog;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;

@@ -3,16 +3,63 @@ package com.dndtool.web;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.dndtool.persistence.DatabaseSchemaStatus;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 /** Ensures diagnostic responses expose only stable categories, never hash comparison details. */
 final class HostDatabaseDiagnosticServletTest {
+    @Test
+    void eachGetRefreshesTheDiagnosticAndPublishedContextStatus() throws Exception {
+        assertEquals(List.of("/api/host/diagnostics/database"), List.of(
+                HostDatabaseDiagnosticServlet.class.getAnnotation(WebServlet.class).urlPatterns()));
+        List<DatabaseSchemaStatus> results = List.of(
+                new DatabaseSchemaStatus(DatabaseSchemaStatus.State.READY, 19, "approved.sql", "abc"),
+                DatabaseSchemaStatus.failure(DatabaseSchemaStatus.State.DATABASE_UNAVAILABLE));
+        AtomicInteger calls = new AtomicInteger();
+        Map<String, Object> attributes = new HashMap<>();
+        ServletContext context = (ServletContext) Proxy.newProxyInstance(
+                ServletContext.class.getClassLoader(), new Class<?>[] {ServletContext.class},
+                (ignored, method, arguments) -> {
+                    if (method.getName().equals("setAttribute")) {
+                        attributes.put((String) arguments[0], arguments[1]);
+                        return null;
+                    }
+                    throw new AssertionError("Unexpected context call: " + method.getName());
+                });
+        ServletConfig config = (ServletConfig) Proxy.newProxyInstance(
+                ServletConfig.class.getClassLoader(), new Class<?>[] {ServletConfig.class},
+                (ignored, method, arguments) -> method.getName().equals("getServletContext") ? context : null);
+        HostDatabaseDiagnosticServlet servlet = new HostDatabaseDiagnosticServlet(
+                () -> results.get(calls.getAndIncrement()));
+        servlet.init(config);
+        assertEquals(0, calls.get());
+        ResponseFixture first = new ResponseFixture();
+        ResponseFixture second = new ResponseFixture();
+
+        servlet.doGet(null, first.proxy());
+        assertEquals(results.getFirst(), attributes.get("com.dndtool.persistence.databaseSchemaStatus"));
+        servlet.doGet(null, second.proxy());
+
+        assertEquals(2, calls.get());
+        assertEquals(results.getLast(), attributes.get("com.dndtool.persistence.databaseSchemaStatus"));
+        assertEquals(HttpServletResponse.SC_OK, first.status);
+        assertEquals("{\"status\":\"OK\",\"schemaVersion\":19,\"scriptName\":\"approved.sql\",\"scriptSha256\":\"abc\"}",
+                first.body.toString());
+        assertEquals(HttpServletResponse.SC_SERVICE_UNAVAILABLE, second.status);
+    }
+
     @Test
     void moduleMismatchUsesGenericConflictResponse() throws Exception {
         ResponseFixture response = new ResponseFixture();
@@ -29,15 +76,17 @@ final class HostDatabaseDiagnosticServletTest {
 
     @Test
     void otherFailuresRemainIndistinguishable() throws Exception {
-        ResponseFixture response = new ResponseFixture();
-        HostDatabaseDiagnosticServlet.writeStatus(
-                response.proxy(),
-                new DatabaseSchemaStatus(
-                        DatabaseSchemaStatus.State.DATABASE_UNAVAILABLE, 0, null, null));
+        for (DatabaseSchemaStatus.State state : DatabaseSchemaStatus.State.values()) {
+            if (state == DatabaseSchemaStatus.State.READY
+                    || state == DatabaseSchemaStatus.State.MODULE_HASH_MISMATCH) continue;
+            ResponseFixture response = new ResponseFixture();
+            HostDatabaseDiagnosticServlet.writeStatus(response.proxy(),
+                    new DatabaseSchemaStatus(state, 0, "private script", "private hash"));
 
-        assertEquals(HttpServletResponse.SC_SERVICE_UNAVAILABLE, response.status);
-        assertEquals("{\"status\":\"ERROR\",\"code\":\"DATABASE_SCHEMA_UNAVAILABLE\"}",
-                response.body.toString());
+            assertEquals(HttpServletResponse.SC_SERVICE_UNAVAILABLE, response.status);
+            assertEquals("{\"status\":\"ERROR\",\"code\":\"DATABASE_SCHEMA_UNAVAILABLE\"}",
+                    response.body.toString());
+        }
     }
 
     private static final class ResponseFixture implements InvocationHandler {

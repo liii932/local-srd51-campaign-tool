@@ -1,4 +1,4 @@
-package com.dndtool.persistence;
+package com.dndtool.module;
 
 import java.math.BigDecimal;
 import java.util.List;
