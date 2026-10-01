@@ -12,7 +12,7 @@ mvn clean verify
 
 确认最终退出码为 0、测试计数完整且出现 `BUILD SUCCESS`。候选默认为 `target/dnd-tool-se-0.1.0-SNAPSHOT.war`。
 
-记录候选的字节数、SHA-256 和 ZIP 条目数。检查必需的应用类、JSP、JavaScript、`web.xml` 和 V001—V019 资源存在；检查私钥、凭据、外部 Tomcat 配置、日志、备份、真实存档、结果捕获与本地文件名不存在。还应阅读生产资源/config 差异，文件名扫描不能代替内容审计。
+记录候选的字节数、SHA-256 和 ZIP 条目数。检查必需的应用类、JSP、JavaScript、`web.xml` 和 V001—V020 资源存在；检查私钥、凭据、外部 Tomcat 配置、日志、备份、真实存档、结果捕获与本地文件名不存在。还应阅读生产资源/config 差异，文件名扫描不能代替内容审计。
 
 ## 2. 数据库前提
 

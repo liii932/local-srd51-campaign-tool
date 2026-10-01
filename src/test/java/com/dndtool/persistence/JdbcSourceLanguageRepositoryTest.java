@@ -3,6 +3,7 @@ package com.dndtool.persistence;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.dndtool.module.LanguagePartition;
+import com.dndtool.module.ToolCatalogOracle;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
@@ -57,7 +58,7 @@ class JdbcSourceLanguageRepositoryTest {
         assertMatrix(partition);
         fixture.assertCompleted();
         assertThrows(UnsupportedOperationException.class, () -> partition.languages().clear());
-        assertEquals(List.of("schema", "ledger", "release", "installation", "partition", "language"),
+        assertEquals(List.of("schema", "ledger", "release", "installation", "partition", "language", "tool"),
                 fixture.queries);
         assertEquals(19, fixture.nextCalls.get("language"));
         assertEquals(1, fixture.commits);
@@ -506,6 +507,12 @@ class JdbcSourceLanguageRepositoryTest {
                         "category", bytes(row.category()), "source_page", 59, "sort_order", row.order()).get(0));
             }
             rows.put("language", languages);
+            var migration=RuleSchemaMigrations.expectations().get(1);
+            rows.get("ledger").add(one("schema_version",2,"script_name",bytes(migration.scriptName()),"script_sha256",bytes(migration.scriptSha256())).get(0));
+            rows.get("partition").add(one("release_id",releaseId,"installation_revision",2L,"partition_key",bytes("character.tool")).get(0));
+            rows.put("tool",new ArrayList<>(ToolCatalogOracle.rows().stream().map(t->one("release_id",releaseId,
+                    "tool_key",bytes(t.key()),"display_name",t.name(),"description",t.description(),"category",bytes(t.category()),
+                    "source_page",t.page(),"sort_order",t.order()).get(0)).toList()));
         }
 
         LanguagePartition load() throws SQLException {
@@ -526,7 +533,8 @@ class JdbcSourceLanguageRepositoryTest {
             releaseId = id;
             row("release").put("id", id);
             row("installation").put("release_id", id);
-            row("partition").put("release_id", id);
+            rows.get("partition").forEach(row->row.put("release_id",id));
+            rows.get("tool").forEach(row->row.put("release_id",id));
             rows.get("language").forEach(row -> row.put("release_id", id));
         }
 
@@ -579,7 +587,7 @@ class JdbcSourceLanguageRepositoryTest {
                     case "setMaxRows" -> {
                         hit("maxRows:" + table);
                         int maximum = (int) args[0];
-                        assertEquals(table.equals("language") ? 19 : 2, maximum);
+                        assertEquals(table.equals("language") ? 19 : table.equals("tool") ? 38 : Set.of("ledger","partition").contains(table) ? 3 : 2, maximum);
                         limits.put(table, maximum); yield null;
                     }
                     case "setQueryTimeout" -> {
@@ -644,7 +652,7 @@ class JdbcSourceLanguageRepositoryTest {
                 assertArrayEquals(bytes("1"), (byte[]) parameters.get(2));
             } else if (Set.of("installation", "partition").contains(table)) {
                 assertEquals(Map.of(1, releaseId, 2, 2L), parameters);
-            } else if (table.equals("language")) {
+            } else if (Set.of("language","tool").contains(table)) {
                 assertEquals(Map.of(1, releaseId), parameters);
             } else assertTrue(parameters.isEmpty());
         }
@@ -679,6 +687,7 @@ class JdbcSourceLanguageRepositoryTest {
             case "SELECT release_id, installation_revision, source_operation_id, operation_fingerprint_version, operation_digest_sha256, author_schema_version, installation_manifest_version, installation_manifest_sha256, package_display_name, verification_scope, observed_content_sha256 FROM rule_package_installation WHERE release_id = ? AND installation_revision = ?" -> "installation";
             case "SELECT release_id, installation_revision, partition_key FROM rule_package_installation_partition WHERE release_id = ? AND installation_revision = ? ORDER BY partition_key" -> "partition";
             case "SELECT release_id, language_key, display_name, description, category, source_page, sort_order FROM rule_language WHERE release_id = ? ORDER BY language_key" -> "language";
+            case "SELECT release_id, tool_key, display_name, description, category, source_page, sort_order FROM rule_tool WHERE release_id = ? ORDER BY tool_key" -> "tool";
             default -> throw new AssertionError("Unapproved SQL: " + sql);
         };
     }

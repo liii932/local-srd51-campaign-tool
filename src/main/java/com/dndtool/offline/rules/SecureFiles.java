@@ -57,7 +57,7 @@ final class SecureFiles {
     private static void inventory(SecureDirectoryStream<Path> directory,String prefix,Set<String> entries) throws IOException {
         for(Path path:directory) {
             String name=prefix+path.getFileName();
-            if(entries.size()>=6 || !entries.add(name)) throw new IOException("Directory budget exceeded");
+            if(entries.size()>=7 || !entries.add(name)) throw new IOException("Directory budget exceeded");
             var attr=directory.getFileAttributeView(path.getFileName(),BasicFileAttributeView.class,LinkOption.NOFOLLOW_LINKS).readAttributes();
             if(attr.isDirectory() && name.equals("character")) {
                 try(var child=directory.newDirectoryStream(path.getFileName(),LinkOption.NOFOLLOW_LINKS)) { inventory(child,name+"/",entries); }

@@ -30,10 +30,10 @@ MAVEN = "/usr/bin/mvn"
 SOURCE = "dnd_tool_rules"
 RUNTIME = "dnd_tool_se"
 LABEL = "com.dndtool.language-jdbc-acceptance"
-SOURCE_TABLES = sorted(("rule_schema_meta", "rule_release", "rule_language",
+SOURCE_TABLES = sorted(("rule_schema_meta", "rule_release", "rule_language", "rule_tool",
                        "rule_package_installation", "rule_package_installation_partition",
                        "rule_installation_control"))
-RUNTIME_TABLES = sorted(("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language"))
+RUNTIME_TABLES = sorted(("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language", "runtime_rule_tool"))
 ACCOUNTS = {
     "root": "localhost",
     "dnd_tool_se_migration_replay": "localhost",
@@ -78,11 +78,17 @@ def manifests():
         digest = re.search(rf'{prefix}_APPROVED_SHA256 =\s*"([0-9a-f]{{64}})";', java)
         require(name and digest and name[1].startswith(prefix + "__"), "Invalid migration constant")
         result.append((RUNTIME, number, name[1], digest[1], ROOT / "src/main/resources/db/migration" / name[1]))
-    require(len(result) == 19, "This acceptance profile requires review when the runtime chain changes")
+    require(len(result) == 20, "This acceptance profile requires review when the runtime chain changes")
     java = (ROOT / "src/main/java/com/dndtool/persistence/RuleSchemaMigrations.java").read_text("utf-8")
-    rule = re.search(r'APPROVED = List[.]of\(new Expectation\(\s*SCHEMA_ROLE, 1, "([a-zA-Z0-9_.-]+[.]sql)",\s*"([0-9a-f]{64})"\)\);', java)
-    require(rule is not None, "This acceptance profile requires review when the RULES chain changes")
-    result.append((SOURCE, 1, rule[1], rule[2], ROOT / "database/rules/migration" / rule[1]))
+    block = re.search(r"APPROVED = List[.]of\((.*?)\);", java, re.S)
+    require(block is not None, "Rules manifest not recognized")
+    pattern = r'new Expectation\(\s*SCHEMA_ROLE, ([0-9]+), "([a-zA-Z0-9_.-]+[.]sql)",\s*"([0-9a-f]{64})"\)'
+    rules = re.findall(pattern, block[1])
+    require(re.sub(pattern, "", block[1]).replace(",", "").strip() == "", "Unexpected rules manifest entry")
+    require(len(rules) == 2, "This acceptance profile requires review when the RULES chain changes")
+    for expected, (version, name, digest) in enumerate(rules, 1):
+        require(int(version) == expected and name.startswith(f"V{expected:03d}__"), "Unordered rules manifest")
+        result.append((SOURCE, expected, name, digest, ROOT / "database/rules/migration" / name))
     checked = []
     for schema, version, name, approved, path in result:
         raw = path.read_bytes()
@@ -335,7 +341,7 @@ class Acceptance:
             user = "dnd_tool_rules_migrator" if schema == SOURCE else "dnd_tool_se_migration_replay"
             self.mysql(user=user, schema=schema, path=path, approved=approved)
             print("Replayed " + schema + "/" + name, flush=True)
-        for name in ("rule-source-installer.sql", "rule-source-app.sql", "runtime-language-snapshot.sql"):
+        for name in ("rule-source-installer.sql", "rule-source-app.sql", "runtime-language-snapshot.sql", "runtime-tool-snapshot.sql"):
             self.mysql(path=ROOT / "database/grants" / name)
         self.mysql("GRANT SELECT ON `dnd\\_tool\\_se`.* TO 'dnd_tool_se_validation_ro'@'127.0.0.1';")
 
@@ -373,10 +379,11 @@ class Acceptance:
             require(self.mysql(f"SELECT COUNT(*) FROM information_schema.events WHERE event_schema='{schema}';").strip() == "0", "Unexpected events")
             require(self.mysql(f"SELECT COUNT(*) FROM information_schema.views WHERE table_schema='{schema}';").strip() == "0", "Unexpected views")
         self.save("audit/live-definitions.json", json.dumps(captures, ensure_ascii=False, indent=2) + "\n")
-        # Compare source and V019 trigger bodies to the original SQL, including their definers.
-        for schema, raw, definer in ((SOURCE, self.migrations[-1][5], "dnd_tool_rules_migrator@127.0.0.1"),
-                                     (RUNTIME, self.migrations[-2][5], "dnd_tool_se_migration_replay@localhost")):
-            original = raw.decode("utf-8")
+        # Compare all source and runtime snapshot trigger bodies to the immutable migration SQL.
+        for schema, definer in ((SOURCE, "dnd_tool_rules_migrator@127.0.0.1"),
+                                (RUNTIME, "dnd_tool_se_migration_replay@localhost")):
+            original = "\n".join(raw.decode("utf-8") for side, version, _, _, _, raw in self.migrations
+                                 if side == schema and (side == SOURCE or version >= 19))
             expected = {name: (event, table, timing, body) for name, timing, event, table, body in re.findall(
                 r"CREATE TRIGGER (\w+) (BEFORE|AFTER) (INSERT|UPDATE|DELETE) ON (\w+) FOR EACH ROW\s+(.*?)\$\$", original, re.S)}
             actual = {}
@@ -408,11 +415,11 @@ class Acceptance:
         captures["server"] = self.mysql("SELECT @@server_uuid, @@version, @@sql_mode, @@global.partial_revokes, @@port, @@bind_address, @@skip_networking, @@log_bin;")
         captures["fresh-history"] = self.mysql(
             "SELECT control_id,protocol_version,metadata_row_count,row_version FROM rule_installation_control;"
-            "SELECT (SELECT COUNT(*) FROM rule_release),(SELECT COUNT(*) FROM rule_language),"
+            "SELECT (SELECT COUNT(*) FROM rule_release),(SELECT COUNT(*) FROM rule_language),(SELECT COUNT(*) FROM rule_tool),"
             "(SELECT COUNT(*) FROM rule_package_installation),(SELECT COUNT(*) FROM rule_package_installation_partition);", user="dnd_tool_rules_app", schema=SOURCE)
-        require(captures["fresh-history"] == "1\t1\t1\t0\n0\t0\t0\t0\n", "Source is not freshly migrated")
+        require(captures["fresh-history"] == "1\t1\t1\t0\n0\t0\t0\t0\t0\n", "Source is not freshly migrated")
         require(self.mysql("SELECT (SELECT COUNT(*) FROM runtime_run_identity),(SELECT COUNT(*) FROM runtime_rule_snapshot),"
-                           "(SELECT COUNT(*) FROM runtime_rule_language);", user="dnd_tool_se_validation_ro", schema=RUNTIME) == "0\t0\t0\n", "Runtime not empty")
+                           "(SELECT COUNT(*) FROM runtime_rule_language),(SELECT COUNT(*) FROM runtime_rule_tool);", user="dnd_tool_se_validation_ro", schema=RUNTIME) == "0\t0\t0\t0\n", "Runtime not empty")
         captures["runtime-counts"] = self.mysql("SELECT table_name, table_type, engine FROM information_schema.tables WHERE table_schema='dnd_tool_se' ORDER BY table_name;", user="dnd_tool_se_validation_ro")
         self.legacy_sql = "SELECT module_key,release_version,canonical_format_version,hash_algorithm,content_sha256,release_status FROM module_release ORDER BY module_key,release_version;"
         captures["legacy-releases"] = self.mysql(self.legacy_sql, user="dnd_tool_se_validation_ro", schema=RUNTIME)
@@ -469,7 +476,7 @@ def main():
     parser.add_argument("--execute-disposable", action="store_true", help="execute authorized disposable migrations and JDBC acceptance")
     args = parser.parse_args()
     migrations = manifests()
-    print("Approved payloads verified: runtime V001-V019 and RULES V001. SQL files remain unchanged.", flush=True)
+    print("Approved payloads verified: runtime V001-V020 and RULES V001-V002. SQL files remain unchanged.", flush=True)
     if not args.execute_disposable:
         return
     require(os.name == "posix" and Path("/var/run/docker.sock").is_socket(), "Requires native Linux/WSL and the local Docker socket")

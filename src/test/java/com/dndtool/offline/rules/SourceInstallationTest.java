@@ -24,21 +24,21 @@ class SourceInstallationTest {
             var result=attempt.service.install(attempt.ticket,artifact);
             assertEquals(SourceInstallation.Status.COMMITTED,result.status());assertEquals(1,result.acceptedRevision());
             assertEquals("PARTITION",result.acceptance().scope());assertNull(result.acceptance().observedContentSha256());
-            assertEquals(23,db.dml);assertEquals(1,db.commits);assertEquals(4L,db.control[2]);assertEquals(1L,db.control[3]);
+            assertEquals(61,db.dml);assertEquals(1,db.commits);assertEquals(5L,db.control[2]);assertEquals(1L,db.control[3]);
             assertEquals(18,db.languages.size());assertNull(attempt.store.pending());
         }
         db.resetFaults();
         try(var attempt=attempt(db,1)) {
             assertEquals(SourceInstallation.Status.COMMITTED,attempt.service.install(attempt.ticket,artifact).status());
-            assertEquals(40,db.dml);assertEquals(2,db.facts.size());assertEquals(6L,db.control[2]);assertEquals(2L,db.control[3]);
+            assertEquals(115,db.dml);assertEquals(2,db.facts.size());assertEquals(8L,db.control[2]);assertEquals(2L,db.control[3]);
         }
         assertTrue(db.sql.stream().noneMatch(s->s.contains("dnd_tool_se")||s.contains("LOCK TABLES")||s.contains("SAVEPOINT")));
         assertTrue(db.sql.stream().filter(s->s.contains("FOR UPDATE")).allMatch(s->s.contains("rule_installation_control")||s.startsWith("SELECT id FROM rule_release")));
     }
     @TestFactory Stream<DynamicTest> everyWritePointExceptionZeroAndMultipleRowsRollBack()throws Exception {
-        // 23 first-root and 40 replacement statements, each independently failed three ways.
+        // 61 first-root and 115 replacement statements, each independently failed three ways.
         List<DynamicTest> tests=new ArrayList<>();
-        for(boolean existing:List.of(false,true))for(int point=1;point<=(existing?40:23);point++)for(String failure:List.of("exception","zero","multiple")) {
+        for(boolean existing:List.of(false,true))for(int point=1;point<=(existing?115:61);point++)for(String failure:List.of("exception","zero","multiple")) {
             int selected=point;String name=(existing?"replace":"first")+"-"+point+"-"+failure;
             tests.add(DynamicTest.dynamicTest(name,()->{
                 var db=new Database();if(existing)seed(db);
@@ -56,7 +56,7 @@ class SourceInstallationTest {
         var db=new Database();db.corruptReadback=true;
         try(var attempt=attempt(db,0)) {
             assertEquals(SourceInstallation.Status.ROLLED_BACK,attempt.service.install(attempt.ticket,artifact).status());
-            assertTrue(db.languages.isEmpty());assertTrue(db.facts.isEmpty());assertEquals(23,db.dml);
+            assertTrue(db.languages.isEmpty());assertTrue(db.facts.isEmpty());assertEquals(61,db.dml);
         }
     }
     @Test void commitResponseLostRemainsUnknownAndExplicitNoInputResolutionFindsAcceptance()throws Exception {
@@ -80,6 +80,45 @@ class SourceInstallationTest {
         try(var a=attempt(db,0)) {
             assertEquals(SourceInstallation.Status.UNKNOWN,a.service.install(a.ticket,artifact).status());
             assertEquals(0,db.dml);assertEquals(1,db.rollbacks);assertNotNull(a.store.pending());
+        }
+    }
+    @Test void persistedLanguageTicketResolvesOriginalPartitionBeforeAndAfterCatalogAdoption() throws Exception {
+        var db = new Database(); seed(db);
+        // Model the persisted predecessor: one language partition and its original intent.
+        db.tools.clear();
+        db.partitions.removeIf(row -> Arrays.equals((byte[])row[2], b("character.tool")));
+        db.control[2] = 4L;
+        var state = OfflineTestSupport.privateDirectory(temp,"legacy-state");
+        var legacy = new OperationTicket(UUID.randomUUID(),"a".repeat(64),"local-test","test-lineage",
+                0,"b".repeat(64),"srd51-language");
+        var template = OfflineTestSupport.evidence(temp,state,"INSTALL",null);
+        legacy = new OperationTicket(legacy.operationId(),legacy.fingerprint(),template.target(),template.lineage(),
+                0,legacy.manifestSha256(),legacy.profile());
+        db.facts.getFirst()[2] = legacy.operationBytes();
+        db.facts.getFirst()[4] = b(legacy.fingerprint());
+        db.facts.getFirst()[7] = b(legacy.manifestSha256());
+        try (var store = new TicketStore(state)) { store.save(legacy); }
+        Object[] historical = db.facts.getFirst().clone();
+        for (boolean adopt : List.of(false,true)) {
+            if (adopt) {
+                db.resolution = false; db.resetFaults();
+                try (var next = attempt(db,1)) {
+                    assertEquals(SourceInstallation.Status.COMMITTED,next.service.install(next.ticket,artifact).status());
+                    assertEquals(37,db.tools.size());
+                    assertArrayEquals(historical,db.facts.getFirst());
+                }
+            }
+            db.resetFaults(); db.resolution = true;
+            var evidence = OfflineTestSupport.evidence(temp,state,"RESOLVE",legacy.operationId());
+            try (var store = new TicketStore(state)) {
+                var persisted = store.load(legacy.operationId()+".json");
+                assertEquals(legacy,persisted);
+                var result = new SourceInstallation(evidence,store,db::open).resolve(persisted);
+                assertEquals(SourceInstallation.Status.COMMITTED,result.status());
+                assertEquals(List.of("character.language"),result.acceptance().partitions());
+                assertEquals(1L,result.acceptedRevision()); assertEquals(adopt?2L:1L,result.currentRevision());
+                assertEquals(0,db.dml); assertEquals(0,db.commits);
+            }
         }
     }
     @Test void commitSuccessThenCloseFailureStaysCommittedAndPreservesBlock()throws Exception {
@@ -215,7 +254,7 @@ class SourceInstallationTest {
     }
     @Test void legitimateEmptyRootIsChargedOnceAndSortPermutationReplacesWholePartition()throws Exception {
         var db=new Database();db.roots.add(new Object[]{1L,b("dnd5e2014_srd51_se"),b("1"),2,2,b("SHA-256"),null,b("DRAFT"),0L,Database.NOW,null});db.control[2]=2L;
-        try(var a=attempt(db,0)){assertEquals(SourceInstallation.Status.COMMITTED,a.service.install(a.ticket,artifact).status());assertEquals(22,db.dml);assertEquals(4L,db.control[2]);}
+        try(var a=attempt(db,0)){assertEquals(SourceInstallation.Status.COMMITTED,a.service.install(a.ticket,artifact).status());assertEquals(60,db.dml);assertEquals(5L,db.control[2]);}
         db.resetFaults();Path language=temp.resolve("author/character/languages.json");String content=Files.readString(language);
         // Last JSON member can end without a comma; use token-aware replacement for a complete reversal.
         var matcher=java.util.regex.Pattern.compile("\"sort_order\"\\s*:\\s*(\\d+)").matcher(content);StringBuilder changed=new StringBuilder();
@@ -225,7 +264,7 @@ class SourceInstallationTest {
         try(var store=new TicketStore(state)) {
             var ticket=OperationTicket.create(replacement,1,evidence);store.save(ticket);
             assertEquals(SourceInstallation.Status.COMMITTED,new SourceInstallation(evidence,store,db::open).install(ticket,replacement).status());
-            assertEquals(40,db.dml);assertEquals(18,db.languages.getFirst()[6]);
+            assertEquals(115,db.dml);assertEquals(18,db.languages.getFirst()[6]);
         }
     }
     @Test void historicalCompleteDigestSurvivesCurrentPartitionNull()throws Exception {
@@ -241,7 +280,7 @@ class SourceInstallationTest {
         for(String fault:List.of("count","gap","partition","protocol","extra-control","language")) {
             db=new Database();seed(db);
             switch(fault) {
-                case "count"->db.control[2]=5L;case "gap"->db.facts.getFirst()[1]=2L;case "partition"->db.partitions.clear();
+                case "count"->db.control[2]=6L;case "gap"->db.facts.getFirst()[1]=2L;case "partition"->db.partitions.clear();
                 case "protocol"->db.facts.getFirst()[5]=2;case "extra-control"->db.extraControl=true;case "language"->db.languages.remove(8);
             }
             try(var a=attempt(db,1)){assertEquals(SourceInstallation.Status.ROLLED_BACK,a.service.install(a.ticket,artifact).status(),fault);assertEquals(0,db.dml);}
@@ -260,7 +299,7 @@ class SourceInstallationTest {
         var db=new Database();OperationTicket accepted;Path acceptedState;
         try(var a=attempt(db,0)){accepted=a.ticket;acceptedState=a.state;a.service.install(a.ticket,artifact);}db.resetFaults();
         // Existing empty roots cost exactly one each and carry no domain/install rows.
-        for(int id=2;id<=16381;id++)db.roots.add(new Object[]{(long)id,b("empty.root"+id),b("1"),2,2,b("SHA-256"),null,b("DRAFT"),0L,Database.NOW,null});
+        for(int id=2;id<=16380;id++)db.roots.add(new Object[]{(long)id,b("empty.root"+id),b("1"),2,2,b("SHA-256"),null,b("DRAFT"),0L,Database.NOW,null});
         db.control[2]=16384L;
         try(var a=attempt(db,1)) {assertEquals(SourceInstallation.Status.ROLLED_BACK,a.service.install(a.ticket,artifact).status());assertEquals(0,db.dml);}
         db.resetFaults();var evidence=OfflineTestSupport.evidence(temp,acceptedState,"RESOLVE",accepted.operationId());db.resolution=true;
@@ -285,16 +324,16 @@ class SourceInstallationTest {
     static byte[] b(String text){return text.getBytes(StandardCharsets.US_ASCII);}
     static final class Database {
         static final LocalDateTime NOW=LocalDateTime.of(2026,1,1,0,0);
-        Object[] control={1,1,1L,0L};List<Object[]> roots=new ArrayList<>(),languages=new ArrayList<>(),facts=new ArrayList<>(),partitions=new ArrayList<>();
+        Object[] control={1,1,1L,0L};List<Object[]> roots=new ArrayList<>(),languages=new ArrayList<>(),tools=new ArrayList<>(),facts=new ArrayList<>(),partitions=new ArrayList<>();
         List<String> sql=new ArrayList<>();int dml,commits,rollbacks,opens,closes,restoreAutoCommit,failPoint;String failure="",preflightFault="";
         boolean commitLost,rollbackFails,closeFails,badControl,extraControl,corruptReadback,resolution;
         @FunctionalInterface interface CloseAction {void run()throws Exception;}
         CloseAction afterClose=()->{};
         void resetFaults(){dml=commits=rollbacks=opens=closes=restoreAutoCommit=failPoint=0;failure=preflightFault="";commitLost=rollbackFails=closeFails=badControl=extraControl=corruptReadback=false;sql.clear();}
-        String snapshot(){return Arrays.deepToString(control)+Arrays.deepToString(roots.toArray())+Arrays.deepToString(languages.toArray())+Arrays.deepToString(facts.toArray())+Arrays.deepToString(partitions.toArray());}
+        String snapshot(){return Arrays.deepToString(control)+Arrays.deepToString(roots.toArray())+Arrays.deepToString(languages.toArray())+Arrays.deepToString(tools.toArray())+Arrays.deepToString(facts.toArray())+Arrays.deepToString(partitions.toArray());}
         Connection open()throws SQLException {
             if(preflightFault.equals("open"))throw new SQLException("open failed");
-            opens++;Object[] oldControl=control.clone();var oldRoots=copy(roots);var oldLanguages=copy(languages);var oldFacts=copy(facts);var oldPartitions=copy(partitions);
+            opens++;Object[] oldControl=control.clone();var oldRoots=copy(roots);var oldLanguages=copy(languages);var oldTools=copy(tools);var oldFacts=copy(facts);var oldPartitions=copy(partitions);
             boolean[] auto={true},sLocked={false},rootLocked={false};
             return proxy(Connection.class,(p,m,a)->switch(m.getName()) {
                 case "getAutoCommit"->auto[0];
@@ -308,7 +347,7 @@ class SourceInstallationTest {
                     if(resolution)assertFalse(text.startsWith("SELECT id FROM rule_release"),"Resolution does not lock roots");
                     yield statement(text);}
                 case "commit"->{commits++;if(commitLost)throw new SQLException("lost commit response");yield null;}
-                case "rollback"->{rollbacks++;if(rollbackFails)throw new SQLException("lost rollback response");control=oldControl.clone();roots=copy(oldRoots);languages=copy(oldLanguages);facts=copy(oldFacts);partitions=copy(oldPartitions);yield null;}
+                case "rollback"->{rollbacks++;if(rollbackFails)throw new SQLException("lost rollback response");control=oldControl.clone();roots=copy(oldRoots);languages=copy(oldLanguages);tools=copy(oldTools);facts=copy(oldFacts);partitions=copy(oldPartitions);yield null;}
                 case "close"->{closes++;if(closeFails)throw new SQLException("close failed");afterClose.run();yield null;}
                 case "isClosed"->false;
                 default->throw new AssertionError("Unexpected connection method "+m.getName());
@@ -329,7 +368,7 @@ class SourceInstallationTest {
         List<Object[]> query(String text,Map<Integer,Object> params) {
             if(text.startsWith("SELECT CAST(DATABASE()"))return one(new Object[]{b(preflightFault.equals("schema")?"wrong":"dnd_tool_rules"),"12345678-1234-1234-1234-123456789abc","installer@127.0.0.1",preflightFault.equals("role")?"admin":"NONE",0L,0L,"STRICT_TRANS_TABLES"});
             if(text.equals("SHOW GRANTS"))return one(new Object[]{preflightFault.equals("grant")?"GRANT ALL":OfflineTestSupport.GRANT});
-            if(text.contains("FROM rule_schema_meta")){var expected=RuleSchemaMigrations.expectations().getFirst();return one(new Object[]{expected.version(),b(expected.scriptName()),b(preflightFault.equals("ledger")?"f".repeat(64):expected.scriptSha256())});}
+            if(text.contains("FROM rule_schema_meta"))return RuleSchemaMigrations.expectations().stream().map(e->new Object[]{e.version(),b(e.scriptName()),b(preflightFault.equals("ledger")?"f".repeat(64):e.scriptSha256())}).toList();
             if(text.contains("FROM rule_installation_control")) {
                 if(badControl)return List.of();if(extraControl&&!text.contains("WHERE"))return List.of(control,new Object[]{2,1,1L,0L});return one(control);
             }
@@ -339,6 +378,7 @@ class SourceInstallationTest {
             if(text.contains("FROM rule_release"))return copy(roots);
             if(text.contains("FROM rule_package_installation_partition"))return copy(partitions);
             if(text.contains("FROM rule_package_installation"))return copy(facts);
+            if(text.contains("FROM rule_tool"))return copy(tools);
             if(text.contains("FROM rule_language")) {
                 var rows=copy(languages);if(corruptReadback&&dml>0&&rows.size()==18)rows.get(8)[2]="corrupted ninth row";return rows;
             }
@@ -348,6 +388,8 @@ class SourceInstallationTest {
             if(text.startsWith("INSERT INTO rule_release")){roots.add(new Object[]{1L,p.get(1),p.get(2),p.get(3),p.get(4),p.get(5),null,b("DRAFT"),0L,NOW,null});return;}
             if(text.startsWith("DELETE FROM rule_language")){assertTrue(languages.removeIf(row->row[0].equals(p.get(1))&&Arrays.equals((byte[])row[1],(byte[])p.get(2))));return;}
             if(text.startsWith("INSERT INTO rule_language")){languages.add(values(p,7));languages.sort(Comparator.comparing(row->new String((byte[])row[1],StandardCharsets.US_ASCII)));return;}
+            if(text.startsWith("DELETE FROM rule_tool")){assertTrue(tools.removeIf(row->row[0].equals(p.get(1))&&Arrays.equals((byte[])row[1],(byte[])p.get(2))));return;}
+            if(text.startsWith("INSERT INTO rule_tool")){tools.add(values(p,7));tools.sort(Comparator.comparing(row->new String((byte[])row[1],StandardCharsets.US_ASCII)));return;}
             if(text.startsWith("UPDATE rule_release")){var row=roots.getFirst();assertEquals(row[8],p.get(8));row[3]=p.get(1);row[4]=p.get(2);row[5]=p.get(3);row[6]=null;row[8]=p.get(4);return;}
             if(text.startsWith("INSERT INTO rule_package_installation_partition")){partitions.add(values(p,3));return;}
             if(text.startsWith("INSERT INTO rule_package_installation")){Object[] row=Arrays.copyOf(values(p,11),12);row[11]=NOW;facts.add(row);return;}

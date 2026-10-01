@@ -1,14 +1,17 @@
-# SRD 5.1 language author source
+# SRD 5.1 character catalog author source
 
-This directory contains only the 18-entry `character.language` catalog for the DRAFT
+This directory contains the 18-entry `character.language` and 37-entry `character.tool` catalogs for the DRAFT
 `dnd5e2014_srd51_se` / `"1"` release. Its slug does not assert complete SRD coverage.
 
-The two authoritative author inputs are `author-package.json` and
-`character/languages.json`. Their strict grammar, budgets, baseline and pure projection
+The three authoritative author inputs are `author-package.json`,
+`character/languages.json` and `character/tools.json`. Their strict grammar, budgets, baseline and pure projection
 are specified in the repository's `docs/rules/language-author-package.md`
 ([link when read inside the repository](../../docs/rules/language-author-package.md)).
 The short descriptions and page 59 are catalog metadata inherited from the existing
 catalog, not complete language rules, character choices, scripts or secret-language mechanics.
+Tools retain the existing page-70 catalog metadata; they are proficiency references, not
+equipment price, weight, crafting or usage rules. See the
+[tool catalog contract](../../docs/rules/tool-catalog-partition.md) for the exact field closure.
 
 These sources are kept outside the WAR. Validation proves only PARTITION scope;
 it neither installs rules nor approves the DRAFT for execution. The repository author-source

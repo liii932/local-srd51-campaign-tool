@@ -17,9 +17,10 @@ public final class InstallationFingerprint {
             number(out,4,revision);number(out,5,h.authorSchemaVersion());number(out,6,1);
             number(out,7,h.canonicalFormatVersion());number(out,8,h.archiveFormatVersion());field(out,9,1,h.hashAlgorithm());
             field(out,10,2,h.packageDisplayName());field(out,11,1,"PARTITION");field(out,12,0,new byte[0]);
-            field(out,13,1,artifact.manifestSha256());field(out,14,1,"srd51-language");number(out,15,1);
+            field(out,13,1,artifact.manifestSha256());field(out,14,1,"srd51-character-catalog");number(out,15,1);
             var mapping=new ByteArrayOutputStream();var map=new DataOutputStream(mapping);
-            map.writeInt(1);lp(map,"character.language");lp(map,"character/languages.json");field(out,16,4,mapping.toByteArray());
+            map.writeInt(2);lp(map,"character.language");lp(map,"character/languages.json");
+            lp(map,"character.tool");lp(map,"character/tools.json");field(out,16,4,mapping.toByteArray());
             var files=new ByteArrayOutputStream();var f=new DataOutputStream(files);f.writeInt(artifact.files().size());
             for(var file:artifact.files()) {lp(f,file.path());lp(f,file.role());f.writeLong(file.byteLength());lp(f,file.rawSha256());}
             field(out,17,5,files.toByteArray());return bytes.toByteArray();

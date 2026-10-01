@@ -12,8 +12,8 @@ class RuleArtifactTest {
     @TempDir Path temp;
     @Test void completeArtifactHasOnlyPartitionEvidenceAndIndependentFingerprint()throws Exception {
         var artifact=OfflineTestSupport.artifact(temp);
-        assertEquals(4,artifact.files().size());assertEquals(18,artifact.author().partition().languages().size());
-        byte[] expected=HexFormat.of().parseHex(Files.readString(Path.of("src/test/resources/source-installation-fingerprint-v1.hex")).strip());
+        assertEquals(5,artifact.files().size());assertEquals(18,artifact.author().languages().languages().size());
+        byte[] expected=HexFormat.of().parseHex(Files.readString(Path.of("src/test/resources/source-installation-fingerprint-character-catalog-v1.hex")).strip());
         assertArrayEquals(expected,InstallationFingerprint.encode(artifact,0));
         assertNotEquals(InstallationFingerprint.digest(artifact,0),InstallationFingerprint.digest(artifact,1));
     }
@@ -51,7 +51,7 @@ class RuleArtifactTest {
     }
     @Test void boundedDocumentCapacityAndReaderDeadline()throws Exception {
         OfflineTestSupport.artifact(temp);Path source=temp.resolve("author");
-        for(String name:List.of("author-package.json","character/languages.json")) {
+        for(String name:List.of("author-package.json","character/languages.json","character/tools.json")) {
             byte[] original=Files.readAllBytes(source.resolve(name));byte[] padded=Arrays.copyOf(original,RuleArtifact.limit(name));
             Arrays.fill(padded,original.length,padded.length,(byte)' ');Files.write(source.resolve(name),padded);
         }

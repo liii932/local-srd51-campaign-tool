@@ -14,23 +14,27 @@ import java.util.Map;
 import java.util.Set;
 
 /** Pure, bounded author-schema-1 reader. No filesystem, installation, approval or runtime loading. */
-public final class LanguageAuthorPackageReader {
+public final class CharacterCatalogAuthorPackageReader {
     public static final String HEADER_PATH = "author-package.json";
     public static final String LANGUAGE_PATH = "character/languages.json";
     public static final int MAX_HEADER_BYTES = 8192;
     public static final int MAX_LANGUAGE_BYTES = 262144;
-    public static final int MAX_TOTAL_BYTES = MAX_HEADER_BYTES + MAX_LANGUAGE_BYTES;
+    public static final String TOOL_PATH = "character/tools.json";
+    public static final int MAX_TOOL_BYTES = 262144;
+    public static final int MAX_TOTAL_BYTES = MAX_HEADER_BYTES + MAX_LANGUAGE_BYTES + MAX_TOOL_BYTES;
     public static final int MAX_DEPTH = 4;
     public static final int MAX_TOKENS = 512;
     public static final int MAX_STRING_UNITS = 4096;
 
-    public Result read(byte[] headerBytes, byte[] languageBytes) {
+    public Result read(byte[] headerBytes, byte[] languageBytes, byte[] toolBytes) {
         // Check all allocations before copying or decoding either untrusted input.
         budget(headerBytes, MAX_HEADER_BYTES);
         budget(languageBytes, MAX_LANGUAGE_BYTES);
-        if ((long) headerBytes.length + languageBytes.length > MAX_TOTAL_BYTES) throw invalid();
+        budget(toolBytes, MAX_TOOL_BYTES);
+        if ((long) headerBytes.length + languageBytes.length + toolBytes.length > MAX_TOTAL_BYTES) throw invalid();
         byte[] headerSnapshot = headerBytes.clone();
         byte[] languageSnapshot = languageBytes.clone();
+        byte[] toolSnapshot = toolBytes.clone();
         Map<String, Object> head = object(parse(headerSnapshot), Set.of("author_schema_version",
                 "module_key", "release_version", "package_display_name", "canonical_format_version",
                 "archive_format_version", "hash_algorithm", "partitions"));
@@ -44,10 +48,13 @@ public final class LanguageAuthorPackageReader {
                 || !identity.releaseVersion().equals("1") || canonical != 2 || archive != 2
                 || !algorithm.equals("SHA-256")) throw invalid();
         List<?> partitions = array(head.get("partitions"));
-        if (partitions.size() != 1) throw invalid();
+        if (partitions.size() != 2) throw invalid();
         Map<String, Object> declaration = object(partitions.getFirst(), Set.of("partition_key", "path"));
         if (!LanguagePartition.KEY.equals(string(declaration, "partition_key"))
                 || !LANGUAGE_PATH.equals(string(declaration, "path"))) throw invalid();
+        Map<String, Object> toolDeclaration = object(partitions.get(1), Set.of("partition_key", "path"));
+        if (!ToolPartition.KEY.equals(string(toolDeclaration, "partition_key"))
+                || !TOOL_PATH.equals(string(toolDeclaration, "path"))) throw invalid();
         var header = new Header(identity, LanguagePartition.authorText(string(head, "package_display_name"), 120),
                 schema, canonical, archive, algorithm);
 
@@ -63,8 +70,21 @@ public final class LanguageAuthorPackageReader {
                     LanguagePartition.authorText(string(row, "description"), 1000),
                     category(string(row, "category")), integer(row, "source_page"), integer(row, "sort_order")));
         }
-        return new Result(header, new LanguagePartition(rows), List.of(raw(HEADER_PATH, headerSnapshot),
-                raw(LANGUAGE_PATH, languageSnapshot)));
+        List<?> toolInput = array(parse(toolSnapshot));
+        if (toolInput.size() != 37) throw invalid();
+        List<ToolPartition.Tool> toolRows = new ArrayList<>(37);
+        for (Object value : toolInput) {
+            Map<String, Object> row = object(value, Set.of("tool_key", "display_name", "description",
+                    "category", "source_page", "sort_order"));
+            toolRows.add(new ToolPartition.Tool(string(row, "tool_key"),
+                    ToolPartition.authorText(string(row, "display_name"), 120),
+                    ToolPartition.authorText(string(row, "description"), 1000),
+                    ToolPartition.Category.valueOf(string(row, "category")),
+                    integer(row, "source_page"), integer(row, "sort_order")));
+        }
+        return new Result(header, new LanguagePartition(rows), new ToolPartition(toolRows),
+                List.of(raw(HEADER_PATH, headerSnapshot), raw(LANGUAGE_PATH, languageSnapshot),
+                        raw(TOOL_PATH, toolSnapshot)));
     }
 
     public record Header(BuiltinModuleReleaseRegistry.Identity identity, String packageDisplayName,
@@ -73,8 +93,8 @@ public final class LanguageAuthorPackageReader {
 
     public record RawFile(String path, int byteLength, String rawSha256) { }
 
-    /** Raw evidence covers exactly two supplied byte arrays, not a directory or installation manifest. */
-    public record Result(Header header, LanguagePartition partition, List<RawFile> authorFiles) {
+    /** Raw evidence covers exactly three supplied byte arrays, not a directory or installation manifest. */
+    public record Result(Header header, LanguagePartition languages, ToolPartition tools, List<RawFile> authorFiles) {
         public Result { authorFiles = List.copyOf(authorFiles); }
         public String verificationScope() { return "PARTITION"; }
     }
@@ -165,7 +185,7 @@ public final class LanguageAuthorPackageReader {
                 List<Object> list = new ArrayList<>();
                 if (take(']')) return list;
                 do {
-                    if (list.size() >= 18) throw invalid();
+                    if (list.size() >= 37) throw invalid();
                     list.add(value(depth + 1));
                     if (take(']')) return list;
                 } while (take(','));

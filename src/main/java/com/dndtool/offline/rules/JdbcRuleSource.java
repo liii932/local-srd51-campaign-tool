@@ -1,6 +1,7 @@
 package com.dndtool.offline.rules;
 
 import com.dndtool.module.LanguagePartition;
+import com.dndtool.module.ToolPartition;
 import com.dndtool.persistence.RuleSchemaMigrations;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -75,12 +76,15 @@ final class JdbcRuleSource {
             if(!roots.containsKey(id) || revision!=revisions.getOrDefault(id,0L)+1 || facts.put(new Revision(id,revision),fact)!=null || operations.put(operation,fact)!=null)throw bad();
             revisions.put(id,revision);
         }
-        Set<Revision> partitions=new LinkedHashSet<>();
+        Set<Partition> partitions=new LinkedHashSet<>();
         for(Object[] r:bounded("SELECT release_id, installation_revision, partition_key FROM rule_package_installation_partition ORDER BY release_id, installation_revision, partition_key")) {
             var key=new Revision(positive(r[0]),positive(r[1]));
-            if(!binary(r[2]).equals("character.language") || !facts.containsKey(key) || !partitions.add(key))throw bad();
+            String partition=binary(r[2]);
+            if(!Set.of(LanguagePartition.KEY,ToolPartition.KEY).contains(partition) || !facts.containsKey(key)
+                    || !partitions.add(new Partition(key,partition)))throw bad();
         }
-        if(!partitions.equals(facts.keySet()) || locked.count()!=1L+roots.size()+facts.size()+partitions.size() || locked.version()!=facts.size())throw bad();
+        for(Revision revision:facts.keySet())if(!partitions.contains(new Partition(revision,LanguagePartition.KEY)))throw bad();
+        if(locked.count()!=1L+roots.size()+facts.size()+partitions.size() || locked.version()!=facts.size())throw bad();
         for(Root root:roots.values()) {
             if(root.revision()!=revisions.getOrDefault(root.id(),0L))throw bad();
             if(root.revision()>0) {
@@ -103,7 +107,19 @@ final class JdbcRuleSource {
             if(root.revision()>0)parsed.put(root.id(),new LanguagePartition(languages.getOrDefault(root.id(),List.of())));
             else if(languages.containsKey(root.id()))throw bad();
         }
-        return new State(locked,Map.copyOf(roots),Map.copyOf(facts),Map.copyOf(operations),Set.copyOf(partitions),Map.copyOf(parsed));
+        var toolRows=rows("SELECT release_id, tool_key, display_name, description, category, source_page, sort_order FROM rule_tool ORDER BY release_id, tool_key",38);
+        if(toolRows.size()>37)throw bad();
+        Map<Long,List<ToolPartition.Tool>> tools=new HashMap<>();
+        for(Object[] r:toolRows) {
+            long id=positive(r[0]);Root root=roots.get(id);
+            if(root==null || !root.isTarget() || !partitions.contains(new Partition(new Revision(id,root.revision()),ToolPartition.KEY)))throw bad();
+            tools.computeIfAbsent(id,ignored->new ArrayList<>()).add(new ToolPartition.Tool(binary(r[1]),string(r[2]),string(r[3]),
+                    ToolPartition.Category.valueOf(binary(r[4])),positiveInt(r[5]),positiveInt(r[6])));
+        }
+        Map<Long,ToolPartition> parsedTools=new HashMap<>();
+        for(Root root:roots.values())if(partitions.contains(new Partition(new Revision(root.id(),root.revision()),ToolPartition.KEY)))
+            parsedTools.put(root.id(),new ToolPartition(tools.getOrDefault(root.id(),List.of())));
+        return new State(locked,Map.copyOf(roots),Map.copyOf(facts),Map.copyOf(operations),Set.copyOf(partitions),Map.copyOf(parsed),Map.copyOf(parsedTools));
     }
     long expectedRevision()throws SQLException {
         var result=rows("SELECT installation_revision, release_status, canonical_format_version, archive_format_version, hash_algorithm FROM rule_release WHERE module_key = ? AND release_version = ?",2,ascii("dnd5e2014_srd51_se"),ascii("1"));
@@ -118,7 +134,7 @@ final class JdbcRuleSource {
         if(root!=null && (!root.status().equals("DRAFT") || root.canonical()!=2 || root.archive()!=2 || !root.algorithm().equals("SHA-256")))throw bad();
         // Current COMPLETE belongs to a future all-domain profile, not this writer's adoption gate.
         if(root!=null && root.revision()>0 && !before.facts().get(new Revision(root.id(),root.revision())).scope().equals("PARTITION"))throw bad();
-        long count=Math.addExact(before.control().count(),root==null?3:2);if(count>BUDGET)throw bad();
+        long count=Math.addExact(before.control().count(),root==null?4:3);if(count>BUDGET)throw bad();
         long id;
         if(root==null) {
             execute("INSERT INTO rule_release (module_key, release_version, canonical_format_version, archive_format_version, hash_algorithm) VALUES (?, ?, ?, ?, ?)",ascii("dnd5e2014_srd51_se"),ascii("1"),2,2,ascii("SHA-256"));
@@ -130,10 +146,15 @@ final class JdbcRuleSource {
             if(oldRevision>0)for(var language:before.languages().get(id).languages())
                 execute("DELETE FROM rule_language WHERE release_id = ? AND language_key = ?",id,ascii(language.languageKey()));
         }
-        for(var language:artifact.author().partition().languages())execute("INSERT INTO rule_language (release_id, language_key, display_name, description, category, source_page, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",id,ascii(language.languageKey()),language.displayName(),language.description(),ascii(language.category().name()),language.sourcePage(),language.sortOrder());
+        for(var language:artifact.author().languages().languages())execute("INSERT INTO rule_language (release_id, language_key, display_name, description, category, source_page, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",id,ascii(language.languageKey()),language.displayName(),language.description(),ascii(language.category().name()),language.sourcePage(),language.sortOrder());
+        if(before.tools().containsKey(id))for(var tool:before.tools().get(id).tools())
+            execute("DELETE FROM rule_tool WHERE release_id = ? AND tool_key = ?",id,ascii(tool.toolKey()));
+        for(var tool:artifact.author().tools().tools())execute("INSERT INTO rule_tool (release_id, tool_key, display_name, description, category, source_page, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                id,ascii(tool.toolKey()),tool.displayName(),tool.description(),ascii(tool.category().name()),tool.sourcePage(),tool.sortOrder());
         execute("UPDATE rule_release SET canonical_format_version = ?, archive_format_version = ?, hash_algorithm = ?, content_sha256 = NULL, installation_revision = ? WHERE id = ? AND module_key = ? AND release_version = ? AND installation_revision = ? AND release_status = ? AND canonical_format_version = ? AND archive_format_version = ? AND hash_algorithm = ? AND content_sha256 <=> ?",2,2,ascii("SHA-256"),oldRevision+1,id,ascii("dnd5e2014_srd51_se"),ascii("1"),oldRevision,ascii("DRAFT"),2,2,ascii("SHA-256"),root==null?null:nullableAscii(root.digest()));
         execute("INSERT INTO rule_package_installation (release_id, installation_revision, source_operation_id, operation_fingerprint_version, operation_digest_sha256, author_schema_version, installation_manifest_version, installation_manifest_sha256, package_display_name, verification_scope, observed_content_sha256) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",id,oldRevision+1,ticket.operationBytes(),1,ascii(ticket.fingerprint()),1,1,ascii(artifact.manifestSha256()),artifact.author().header().packageDisplayName(),ascii("PARTITION"),null);
         execute("INSERT INTO rule_package_installation_partition (release_id, installation_revision, partition_key) VALUES (?, ?, ?)",id,oldRevision+1,ascii("character.language"));
+        execute("INSERT INTO rule_package_installation_partition (release_id, installation_revision, partition_key) VALUES (?, ?, ?)",id,oldRevision+1,ascii("character.tool"));
         execute("UPDATE rule_installation_control SET metadata_row_count = ?, row_version = ? WHERE control_id = 1 AND protocol_version = 1 AND metadata_row_count = ? AND row_version = ?",count,before.control().version()+1,before.control().count(),before.control().version());
         State after=read(new Control(count,before.control().version()+1),0);
         verifyAfter(before,after,ticket,artifact,id);return new Installed(after.roots().get(id),after.operations().get(ticket.operationId()));
@@ -145,14 +166,16 @@ final class JdbcRuleSource {
                 || fact==null || !fact.fingerprint().equals(ticket.fingerprint()) || fact.releaseId()!=id || fact.revision()!=current.revision()
                 || fact.authorVersion()!=1 || fact.manifestVersion()!=1 || !fact.manifest().equals(artifact.manifestSha256())
                 || !fact.name().equals(artifact.author().header().packageDisplayName()) || !fact.scope().equals("PARTITION") || fact.observed()!=null
-                || !artifact.author().partition().equals(after.languages().get(id)))throw bad();
+                || !artifact.author().languages().equals(after.languages().get(id))
+                || !artifact.author().tools().equals(after.tools().get(id)))throw bad();
         Root previous=before.roots().get(id);
         if(previous!=null && !previous.createdAt().equals(current.createdAt()))throw bad();
         for(var entry:before.roots().entrySet())if(entry.getKey()!=id && !entry.getValue().equals(after.roots().get(entry.getKey())))throw bad();
         for(var entry:before.languages().entrySet())if(entry.getKey()!=id && !entry.getValue().equals(after.languages().get(entry.getKey())))throw bad();
+        for(var entry:before.tools().entrySet())if(entry.getKey()!=id && !entry.getValue().equals(after.tools().get(entry.getKey())))throw bad();
         for(var entry:before.facts().entrySet())if(!entry.getValue().equals(after.facts().get(entry.getKey())))throw bad();
         if(after.roots().size()!=before.roots().size()+(previous==null?1:0) || after.facts().size()!=before.facts().size()+1
-                || !after.partitions().containsAll(before.partitions()) || after.partitions().size()!=before.partitions().size()+1)throw bad();
+                || !after.partitions().containsAll(before.partitions()) || after.partitions().size()!=before.partitions().size()+2)throw bad();
     }
     private List<Object[]> bounded(String sql)throws SQLException {var r=rows(sql,BUDGET+1);if(r.size()>BUDGET)throw bad();return r;}
     List<Object[]> rows(String sql,int max,Object... parameters)throws SQLException {
@@ -210,9 +233,10 @@ final class JdbcRuleSource {
         boolean isTarget(){return key.equals("dnd5e2014_srd51_se")&&release.equals("1");}
     }
     record Revision(long id,long revision) { }
+    record Partition(Revision revision,String key) { }
     record Installed(Root root,Fact fact) { }
     record Fact(long releaseId,long revision,UUID operation,String fingerprint,int authorVersion,int manifestVersion,String manifest,String name,String scope,String observed,java.time.LocalDateTime installedAt) { }
-    record State(Control control,Map<Long,Root> roots,Map<Revision,Fact> facts,Map<UUID,Fact> operations,Set<Revision> partitions,Map<Long,LanguagePartition> languages) {
+    record State(Control control,Map<Long,Root> roots,Map<Revision,Fact> facts,Map<UUID,Fact> operations,Set<Partition> partitions,Map<Long,LanguagePartition> languages,Map<Long,ToolPartition> tools) {
         Root target(){return roots.values().stream().filter(Root::isTarget).findFirst().orElse(null);}
     }
 }

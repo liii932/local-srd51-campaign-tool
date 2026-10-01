@@ -59,6 +59,10 @@ schema。运行表广泛保存 `module_release_id`，部分表通过外键直接
 `snapshot_id` 和类型化语言键，不保存来源库 ID。它是 DRAFT PARTITION 存储边界，不提供上述
 完整发布绑定，也不接入下述启动加载协议或执行目录。
 
+[工具熟练目录](rules/tool-catalog-partition.md)在来源 V002 与运行 V020 增加类型化工具表，
+与语言共享发布、安装事实及运行身份，通过同一调用方事务写入并读回双分区内容。两分区
+仍为 DRAFT/PARTITION，不改变生产单池、完整发布门或下述尚待采用的装配协议。
+
 ### 不可变规则注册表
 
 应用进程持有不可变的 `VerifiedRuleCatalogRegistry`，按规则身份和摘要精确索引

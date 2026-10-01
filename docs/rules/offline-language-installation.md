@@ -1,9 +1,9 @@
-# 离线语言分区安装与提交查证
+# 离线角色目录安装与提交查证
 
 `tools/rule-packages/rule-package.sh` 是显式离线入口，复用 Maven 编译的
 `com.dndtool.offline.rules`；这些类由 WAR 打包排除。它只写独立 `dnd_tool_rules`
-中 `dnd5e2014_srd51_se` / 字符串 `"1"` 的 DRAFT 语言分区，profile 为
-`srd51-language` / `1`。安装 18 行不提供完整内容摘要、COMPLETE、发布批准、
+中 `dnd5e2014_srd51_se` / 字符串 `"1"` 的 DRAFT 语言与工具熟练目录，profile 为
+`srd51-character-catalog` / `1`。安装 18 项语言与 37 项工具不提供完整内容摘要、COMPLETE、发布批准、
 运行快照或 archive 2 开放资格。运行库、默认 RELEASED v1、旧摘要域及迁移不变。
 
 这里提供可执行组件与无 DB 故障测试。真实引擎的权限、触发器、并发、存储耐久、
@@ -18,27 +18,28 @@ bash tools/rule-packages/rule-package.sh build rule-packages/srd51-complete /con
 bash tools/rule-packages/rule-package.sh verify /controlled/new-artifact EXTERNAL_MANIFEST_SHA256
 ```
 
-`build` 只接受新的输出目录；四个文件保留准确原始字节。输出清单含作者 schema、
+`build` 只接受新的输出目录；五个文件保留准确原始字节。输出清单含作者 schema、
 manifest 版本、精确发布身份、canonical/archive 格式、算法、PARTITION、
-`partition_keys` 和四项 `files`。每项恰为 path、role、byte_length、raw_sha256。
+`partition_keys` 和五项 `files`。每项恰为 path、role、byte_length、raw_sha256。
+分区集合准确为 `character.language`、`character.tool`。
 包展示名只来自作者头；PARTITION 清单禁止 `observed_content_sha256`，连 null 也拒绝。
 清单自身不在 files 内；命令打印其原始 SHA-256，操作者另存于制品外的受控交付记录。
 清单及哈希不是作者认证或发布批准，不随作者材料提供连接目标、凭据或 schema 升级。
 
-当前封闭制品恰含 `author-package.json`、`character/languages.json`、
+当前封闭制品恰含 `author-package.json`、`character/languages.json`、`character/tools.json`、
 `package-guide.md`、`notice.md` 和 `installation-manifest.json`；额外、遗漏、重复、
 角色错误、未知路径、Windows 保留名、链接和目录逃逸均拒绝。清单版本/身份/格式
-严格核对，四个文件包括文档和许可逐个有界实读、重算长度/raw hash，最后重新盘点。
-作者头与语言交给已有纯 reader，锁内不再读取目录。
+严格核对，五个文件包括文档和许可逐个有界实读、重算长度/raw hash，最后重新盘点。
+作者头、语言和工具交给同一严格 reader，锁内不再读取目录。
 
 | 输入预算 | 上界 |
 |---|---:|
-| 文件 / 目录 | 5 / 1（character） |
-| 作者头 / 语言 | 8192 / 262144 字节 |
+| 文件 / 目录 | 6 / 1（character） |
+| 作者头 / 语言 / 工具 | 8192 / 262144 / 262144 字节 |
 | 每个文档或许可 | 65536 字节 |
-| manifest / 所有输入总和 | 16384 / 417792 字节 |
+| manifest / 所有输入总和 | 16384 / 679936 字节 |
 | manifest JSON | 深度 5、1024 token、每对象/数组 32 项、字符串 4096 UTF-16 单元 |
-| 语言 / 关系 | 18 行 / 0 |
+| 语言 / 工具 / 关系 | 18 行 / 37 行 / 0 |
 | 每个源 SQL | 5 秒查询超时，驱动 socket 超时 15 秒 |
 | CLI 进程 | 64 MiB 堆；120 秒 TERM，5 秒后 KILL |
 
@@ -80,8 +81,8 @@ provider 失败关闭，使用 Linux/WSL 受控本地介质。构建输出父目
 | history_minimum_version | 已独立保管历史检查点的非负安装计数下界 |
 | state_directory | 固定、绝对、owner-only 的共享状态目录 |
 
-`schema-audit.txt` 必须记录：批准规则链完整定义比较；六个准确 InnoDB 表及全部列、
-索引、CHECK、18 个触发器和其 DEFINER；源内 RESTRICT FK 与**所有 schema 的入向引用**；
+`schema-audit.txt` 必须记录：批准规则链完整定义比较；七个准确 InnoDB 表及全部列、
+索引、CHECK、21 个触发器和其 DEFINER；源内 RESTRICT FK 与**所有 schema 的入向引用**；
 无额外表/视图/函数/例程/触发器副作用或运行库访问；所有授予和继承能力与
 `rule-source-installer.sql` 的最小权限相符；实际列级 S/root FOR UPDATE 可用；
 所有内容安装/发布入口共享 S 且永久事实不能旁路删除；迁移/发布/DDL 已隔离。
@@ -117,14 +118,14 @@ UUIDv4。票据保存准确发布/profile、原 expected、指纹、manifest 与
 崩溃或 UNKNOWN 留下它并阻断后续写入。不得删除、覆盖票据或复用 UUID 改意图。
 
 安装单连接 READ_COMMITTED、autoCommit=false，首业务 SQL 按 PK 锁永久 S，再锁目标根，
-有界读取全源 release→installation→partition→语言，核对连续代次、唯一操作、父子闭包、
+有界读取全源 release→installation→partition→语言→工具，核对连续代次、唯一操作、父子闭包、
 当前摘要/scope 与 S 精确行数/接受计数。每表最多 16385 行探测，元数据上限 16384；
 本 profile 只允许一个非空受支持根，其他根只能是合法空头并计费。未知非空 profile
 失败关闭；多发布完整 profile 与未来 COMPLETE 全域内容验证不是本组件的能力。
 
-原接受先判，新写才检查 DRAFT、expected、格式和预算；精确删除原 18 行再插入新 18 行，
-更新头、插入永久事实/分区、更新 S，各语句必须恰好影响 1 行。新根共 23 个 DML，整替换
-40 个 DML。整套后像从 JDBC 实读并逐字段比较，包括其他根和历史不变，最后一次 commit。
+原接受先判，新写才检查 DRAFT、expected、格式和预算；精确删除原目录再插入 18 项语言与 37 项工具，
+更新头、插入永久事实及两个分区、更新 S，各语句必须恰好影响 1 行。新根共 61 个 DML，完整整替换
+115 个 DML。整套后像从 JDBC 实读并逐字段比较，包括其他根和历史不变，最后一次 commit。
 任何写点、影响数或读回异常完整 rollback；仓储不自借连接、不提交、不用 savepoint。
 
 COMMITTED 只来自明确 commit 或同 S 下核实的原永久接受；commit 响应丢失、rollback
@@ -151,9 +152,12 @@ ID/指纹冲突保留阻断。查证结束不自动重试；新尝试需要原�
 大端 LP(domain)+U32(1)+U16(17)，随后每字段 U16 序号/U8 tag/U32 payload 长度/payload。
 17 字段依次为 INSTALL、module_key、release_version、expected、author schema、manifest
 版本、canonical、archive、算法、包展示名、PARTITION、NULL 完整观测、manifest hash、
-profile key、profile version、分区路径集合和四文件真实盘点。NULL 不是空串或零；
+profile key、profile version、分区路径集合和五文件真实盘点。NULL 不是空串或零；
 技术文本 ASCII、展示名 NFC UTF-8，整数 U64，集合按键/路径 ASCII 序编码。操作 ID、时间、
 源本地 ID、连接、绝对路径和凭据不入指纹；目标/谱系另由可靠票据与维护边界绑定。
+
+永久历史中的 `srd51-language` / `1` 原票据仍可显式 resolve，返回原事实自己的分区集合。
+新安装仅接受角色目录 profile；旧语言 PARTITION 不被改写成新的安装事实或完整运行身份。
 
 ```bash
 mvn '-Dtest=RuleArtifactTest,TicketStoreTest,SourceInstallationTest' test

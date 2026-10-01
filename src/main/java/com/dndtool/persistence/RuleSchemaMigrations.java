@@ -13,7 +13,8 @@ public final class RuleSchemaMigrations {
     public static final String DEFAULT_SCHEMA = "dnd_tool_rules";
     private static final List<Expectation> APPROVED = List.of(new Expectation(
             SCHEMA_ROLE, 1, "V001__rule-source-schema.sql",
-            "003916bc758315351e46f177fec10eb70f2b1275a524d270c6eb89a602cd130e"));
+            "003916bc758315351e46f177fec10eb70f2b1275a524d270c6eb89a602cd130e"),
+            new Expectation(SCHEMA_ROLE, 2, "V002__tool-catalog.sql", "2a5a8a67ebef60754ff9ca572d651878558ccc56ed2bfd311ce811ef42082c40"));
 
     private RuleSchemaMigrations() {
     }

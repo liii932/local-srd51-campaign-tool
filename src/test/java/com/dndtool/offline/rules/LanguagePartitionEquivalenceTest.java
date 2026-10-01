@@ -1,6 +1,6 @@
 package com.dndtool.offline.rules;
 
-import com.dndtool.module.LanguageAuthorPackageReader;
+import com.dndtool.module.CharacterCatalogAuthorPackageReader;
 import com.dndtool.module.LanguagePartition;
 import com.dndtool.module.ModuleCanonicalEncoderV2;
 import com.dndtool.module.ModuleCanonicalException;
@@ -30,7 +30,7 @@ class LanguagePartitionEquivalenceTest {
 
     @Test void authorArtifactInstalledRowsSourceAndRuntimeReadMatchIndependentMatrixAndVector() throws Exception {
         var artifact = artifact(""); var db = install(artifact); var fixture = new LanguagePartitionJdbcFixture(db);
-        assertBoundary(baseline(), artifact.author().partition(), vector());
+        assertBoundary(baseline(), artifact.author().languages(), vector());
         assertInstalled(baseline(), db);
         var source = new JdbcSourceLanguageRepository(fixture.source()).load();
         assertBoundary(baseline(), source, vector());
@@ -52,7 +52,7 @@ class LanguagePartitionEquivalenceTest {
     @Test void authorArrayAndSqlResultOrderDoNotBecomeContent() throws Exception {
         var artifact = artifact("reverse"); var db = install(artifact); var fixture = new LanguagePartitionJdbcFixture(db);
         fixture.reverseRows = true;
-        assertBoundary(baseline(), artifact.author().partition(), vector()); assertInstalled(baseline(), db);
+        assertBoundary(baseline(), artifact.author().languages(), vector()); assertInstalled(baseline(), db);
         var source = new JdbcSourceLanguageRepository(fixture.source()).load();
         assertBoundary(baseline(), source, vector());
         var id = Identity.random();
@@ -67,9 +67,9 @@ class LanguagePartitionEquivalenceTest {
         return Stream.of("display_name", "description", "source_page", "sort_order", "unicode").map(field -> DynamicTest.dynamicTest(field, () -> {
             var artifact = artifact(field); var expected = changed(field); var db = install(artifact);
             var fixture = new LanguagePartitionJdbcFixture(db); fixture.reverseRows = true;
-            byte[] bytes = canonical(artifact.author().partition());
+            byte[] bytes = canonical(artifact.author().languages());
             assertFalse(Arrays.equals(vector(), bytes), "Legal content change must affect canonical bytes");
-            assertBoundary(expected, artifact.author().partition(), bytes); assertInstalled(expected, db);
+            assertBoundary(expected, artifact.author().languages(), bytes); assertInstalled(expected, db);
             var source = new JdbcSourceLanguageRepository(fixture.source()).load(); assertBoundary(expected, source, bytes);
             var id = Identity.random();
             try (var tx = fixture.runtime()) {
@@ -86,6 +86,7 @@ class LanguagePartitionEquivalenceTest {
         // Coherently relabel the source identity, then perform an actual second installation/revision.
         db.roots.getFirst()[0] = 701L;
         for (var r : db.languages) r[0] = 701L;
+        for (var r : db.tools) r[0] = 701L;
         for (var r : db.facts) r[0] = 701L;
         for (var r : db.partitions) r[0] = 701L;
         installInto(db, artifact, 1);
@@ -188,7 +189,7 @@ class LanguagePartitionEquivalenceTest {
     }
 
     @Test void independentOracleRejectsIdenticalCommonModeLossAndWrongLogicalScalar() throws Exception {
-        var good = projection(artifact("").author().partition());
+        var good = projection(artifact("").author().languages());
         // Simulate the same defect at both sides: pairwise equality alone would pass.
         var lost = good.catalogDefinitions().stream().map(d -> new ModuleCatalog.CatalogDefinition(
                 d.definitionType(), d.definitionKey(), d.displayName(), "omitted", d.sortOrder())).toList();
@@ -213,7 +214,7 @@ class LanguagePartitionEquivalenceTest {
     private RuleArtifact artifact(String change) throws Exception {
         Path parent = Files.createDirectory(temp.resolve("input-" + UUID.randomUUID()));
         Path author = Files.createDirectory(parent.resolve("author")); Files.createDirectory(author.resolve("character"));
-        for (String name : List.of("author-package.json", "character/languages.json", "package-guide.md", "notice.md")) {
+        for (String name : List.of("author-package.json", "character/languages.json", "character/tools.json", "package-guide.md", "notice.md")) {
             Files.copy(Path.of("rule-packages/srd51-complete").resolve(name), author.resolve(name));
         }
         Path file = parent.resolve("author/character/languages.json");
@@ -237,9 +238,9 @@ class LanguagePartitionEquivalenceTest {
         }
         if (!change.isEmpty()) Files.writeString(file, rows.toString());
         // Exercise the author entry separately as well as the artifact's production reader.
-        var direct = new LanguageAuthorPackageReader().read(Files.readAllBytes(parent.resolve("author/author-package.json")), Files.readAllBytes(file));
+        var direct = new CharacterCatalogAuthorPackageReader().read(Files.readAllBytes(parent.resolve("author/author-package.json")), Files.readAllBytes(file), Files.readAllBytes(parent.resolve("author/character/tools.json")));
         Path output = parent.resolve("changed"); String hash = RuleArtifact.build(parent.resolve("author"), output);
-        var result = RuleArtifact.read(output, hash); assertEquals(direct.partition(), result.author().partition()); return result;
+        var result = RuleArtifact.read(output, hash); assertEquals(direct.languages(), result.author().languages()); return result;
     }
 
     private SourceInstallationTest.Database install(RuleArtifact artifact) throws Exception {
