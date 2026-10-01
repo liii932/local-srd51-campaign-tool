@@ -182,25 +182,10 @@ final class ModuleCatalogValidatorV2 {
             case "class.proficiency_bonus_profile" -> {
                 requireDefinitionType(row, "character.class");
                 if (!(row.value() instanceof ModuleCatalog.TextValue)) reject();
-                final AdvancementValueProfile profile;
                 try {
-                    profile = AdvancementValueProfile.parse(
+                    AdvancementValueProfile.parseProficiencyBonus(
                             ((ModuleCatalog.TextValue) row.value()).value());
                 } catch (IllegalArgumentException exception) {
-                    reject();
-                    return;
-                }
-                if (profile.firstLevel() != 1 || !profile.constantsOnly()
-                        || profile.atLevel(1, 0).maximum() != 2
-                        || profile.atLevel(4, 0).maximum() != 2
-                        || profile.atLevel(5, 0).maximum() != 3
-                        || profile.atLevel(8, 0).maximum() != 3
-                        || profile.atLevel(9, 0).maximum() != 4
-                        || profile.atLevel(12, 0).maximum() != 4
-                        || profile.atLevel(13, 0).maximum() != 5
-                        || profile.atLevel(16, 0).maximum() != 5
-                        || profile.atLevel(17, 0).maximum() != 6
-                        || profile.atLevel(20, 0).maximum() != 6) {
                     reject();
                 }
             }
@@ -301,8 +286,10 @@ final class ModuleCatalogValidatorV2 {
             }
             case "resource.recovery_profile" -> {
                 requireDefinitionType(row, "character.resource");
-                if (!(row.value() instanceof ModuleCatalog.TextValue text)
-                        || !validRecoveryProfile(text.value())) {
+                if (!(row.value() instanceof ModuleCatalog.TextValue)) reject();
+                try {
+                    ResourceRecoveryProfile.parse(((ModuleCatalog.TextValue) row.value()).value());
+                } catch (IllegalArgumentException exception) {
                     reject();
                 }
             }
@@ -567,22 +554,6 @@ final class ModuleCatalogValidatorV2 {
             }
         }
         return true;
-    }
-
-    private static boolean validRecoveryProfile(String value) {
-        if (value == null || value.length() > 200) return false;
-        int expectedLevel = 1;
-        for (String band : value.split(",", -1)) {
-            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                    "([1-9]|1[0-9]|20)-([1-9]|1[0-9]|20):(SHORT_REST|LONG_REST)")
-                    .matcher(band);
-            if (!matcher.matches()) return false;
-            int first = Integer.parseInt(matcher.group(1));
-            int last = Integer.parseInt(matcher.group(2));
-            if (first != expectedLevel || last < first) return false;
-            expectedLevel = last + 1;
-        }
-        return expectedLevel == 21;
     }
 
     private static boolean validRelationShape(ModuleCatalog.CatalogRelation row) {

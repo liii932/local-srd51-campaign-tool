@@ -8,12 +8,15 @@ import com.dndtool.module.ModuleCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ClassResourceRecoveryRulesTest {
     @Test
     void shortRestProducesOnlyTypedEligibleResourceEffects() {
         ClassResourceRecoveryRules.Prepared prepared = new ClassResourceRecoveryRules().prepare(
-                catalog(), "class.bard", 5, "SHORT_REST", List.of(
+                catalog(), "class.bard", 5, 18, "SHORT_REST", List.of(
                         state("resource.bard.bardic_inspiration", 1, 4),
                         state("resource.bard.long_rest_pool", 1, 3)));
 
@@ -26,13 +29,13 @@ class ClassResourceRecoveryRulesTest {
     @Test
     void frozenRecoveryBandChangesAtLevelFive() {
         ClassResourceRecoveryRules rules = new ClassResourceRecoveryRules();
-        assertEquals(List.of(), rules.prepare(catalog(), "class.bard", 4, "SHORT_REST",
+        assertEquals(List.of(), rules.prepare(catalog(), "class.bard", 4, 18, "SHORT_REST",
                 List.of(state("resource.bard.bardic_inspiration", 1, 4),
                         state("resource.bard.long_rest_pool", 1, 3))).effects());
-        assertEquals(2, rules.prepare(catalog(), "class.bard", 4, "LONG_REST",
+        assertEquals(2, rules.prepare(catalog(), "class.bard", 4, 18, "LONG_REST",
                 List.of(state("resource.bard.bardic_inspiration", 1, 4),
                         state("resource.bard.long_rest_pool", 1, 3))).effects().size());
-        assertEquals(2, rules.prepare(catalog(), "class.bard", 5, "LONG_REST",
+        assertEquals(2, rules.prepare(catalog(), "class.bard", 5, 18, "LONG_REST",
                 List.of(state("resource.bard.bardic_inspiration", 1, 4),
                         state("resource.bard.long_rest_pool", 1, 3))).effects().size());
     }
@@ -45,10 +48,10 @@ class ClassResourceRecoveryRulesTest {
         invalid.add(state("resource.bard.spell_slots", 1, 1));
 
         assertCode("AUTHORITATIVE_STATE_MISMATCH", () -> new ClassResourceRecoveryRules()
-                .prepare(catalog(), "class.bard", 5, "LONG_REST", invalid));
+                .prepare(catalog(), "class.bard", 5, 18, "LONG_REST", invalid));
 
         assertCode("AUTHORITATIVE_STATE_MISMATCH", () -> new ClassResourceRecoveryRules()
-                .prepare(catalog(), "class.bard", 5, "LONG_REST", List.of(
+                .prepare(catalog(), "class.bard", 5, 18, "LONG_REST", List.of(
                         state("resource.bard.bardic_inspiration", 4, 4),
                         state("resource.bard.long_rest_pool", 3, 3),
                         state("resource.unknown.injected", 1, 1))));
@@ -63,9 +66,104 @@ class ClassResourceRecoveryRulesTest {
                 "resource.recovery_profile", 2, "1-20:LONG_REST"));
 
         assertCode("MALFORMED_FROZEN_CATALOG", () -> new ClassResourceRecoveryRules().prepare(
-                copy(valid, attributes), "class.bard", 5, "SHORT_REST", List.of(
+                copy(valid, attributes), "class.bard", 5, 18, "SHORT_REST", List.of(
                         state("resource.bard.bardic_inspiration", 1, 4),
                         state("resource.bard.long_rest_pool", 1, 3))));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1-4:LONG_REST,6-20:SHORT_REST", "1-4:LONG_REST,5-20:CLIENT_REST",
+            "1-4:LONG_REST,5-20:SHORT_REST\u0085", "1-4:LONG_REST,5-19:SHORT_REST"})
+    void validatesTheWholeRecoveryProfileEvenIfNoEffectWouldBeProduced(String profile) {
+        var attributes = new ArrayList<>(catalog().catalogAttributes());
+        attributes.removeIf(row -> "resource.bard.bardic_inspiration".equals(row.definitionKey())
+                && "resource.recovery_profile".equals(row.attributeKey()));
+        attributes.add(text("resource.bard.bardic_inspiration", "resource.recovery_profile", 1, profile));
+        // A later invalid band must not be hidden by the current level or a full resource.
+        assertCode("MALFORMED_FROZEN_CATALOG", () -> new ClassResourceRecoveryRules().prepare(
+                copy(catalog(), attributes), "class.bard", 1, 18, "SHORT_REST", List.of(
+                        state("resource.bard.bardic_inspiration", 4, 4),
+                        state("resource.bard.long_rest_pool", 3, 3))));
+    }
+
+    @Test
+    void unavailableAndUnlimitedResourcesStillRequireValidRecoveryProfiles() {
+        for (String maximum : List.of("5-20:4", "1-20:UNLIMITED")) {
+            var attributes = new ArrayList<>(catalog().catalogAttributes());
+            attributes.removeIf(row -> "resource.bard.bardic_inspiration".equals(row.definitionKey())
+                    && List.of("resource.maximum_profile", "resource.recovery_profile")
+                            .contains(row.attributeKey()));
+            attributes.add(text("resource.bard.bardic_inspiration", "resource.maximum_profile", 1, maximum));
+            attributes.add(text("resource.bard.bardic_inspiration", "resource.recovery_profile", 1,
+                    "1-4:LONG_REST,5-20:INVALID"));
+            var states = new ArrayList<>(List.of(state("resource.bard.long_rest_pool", 3, 3)));
+            if (maximum.contains("UNLIMITED")) states.add(new LevelAdvancementRepository.ResourceState(
+                    "resource.bard.bardic_inspiration", 0, 0, true));
+            assertCode("MALFORMED_FROZEN_CATALOG", () -> new ClassResourceRecoveryRules().prepare(
+                    copy(catalog(), attributes), "class.bard", 1, 18, "SHORT_REST", states));
+        }
+    }
+
+    @Test
+    void profilesRequireTextTypeAndSingleAttributeOrdinal() {
+        for (String key : List.of("resource.maximum_profile", "resource.recovery_profile")) {
+            for (boolean badType : List.of(false, true)) {
+                var attributes = new ArrayList<>(catalog().catalogAttributes());
+                int index = java.util.stream.IntStream.range(0, attributes.size())
+                        .filter(i -> key.equals(attributes.get(i).attributeKey())).findFirst().orElseThrow();
+                var original = attributes.get(index);
+                attributes.set(index, new ModuleCatalog.CatalogAttribute(original.definitionType(),
+                        original.definitionKey(), key, badType ? 1 : 2,
+                        badType ? "INTEGER" : "TEXT", original.value()));
+                assertCode("MALFORMED_FROZEN_CATALOG", () -> new ClassResourceRecoveryRules().prepare(
+                        copy(catalog(), attributes), "class.bard", 5, 18, "SHORT_REST", List.of(
+                                state("resource.bard.bardic_inspiration", 1, 4),
+                                state("resource.bard.long_rest_pool", 1, 3))));
+            }
+        }
+    }
+
+    @Test
+    void nullTriggerUsesTheStableRequestError() {
+        assertCode("INVALID_REQUEST", () -> new ClassResourceRecoveryRules().prepare(
+                catalog(), "class.bard", 5, 18, null, List.of()));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"1,1,1", "8,1,1", "10,1,1", "12,1,2", "18,4,5", "20,5,6", "30,10,11"})
+    void evaluatesCharismaBasedLimitsFromTheAuthoritativeScore(
+            int score, long inspirationMaximum, long onePlusMaximum) {
+        var attributes = new ArrayList<>(catalog().catalogAttributes());
+        attributes.removeIf(row -> "resource.bard.long_rest_pool".equals(row.definitionKey())
+                && "resource.maximum_profile".equals(row.attributeKey()));
+        attributes.add(text("resource.bard.long_rest_pool", "resource.maximum_profile", 1,
+                "1-20:ONE_PLUS_CHARISMA_MODIFIER_MINIMUM_ONE"));
+        var prepared = new ClassResourceRecoveryRules().prepare(copy(catalog(), attributes),
+                "class.bard", 5, score, "LONG_REST", List.of(
+                        state("resource.bard.bardic_inspiration", 0, inspirationMaximum),
+                        state("resource.bard.long_rest_pool", 0, onePlusMaximum)));
+        assertEquals(List.of(
+                new ClassResourceRecoveryRules.RecoveryEffect("RESOURCE_CURRENT_SET_TO_MAXIMUM",
+                        "resource.bard.bardic_inspiration", 0, inspirationMaximum, inspirationMaximum),
+                new ClassResourceRecoveryRules.RecoveryEffect("RESOURCE_CURRENT_SET_TO_MAXIMUM",
+                        "resource.bard.long_rest_pool", 0, onePlusMaximum, onePlusMaximum)), prepared.effects());
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {Integer.MIN_VALUE, 0, 31, Integer.MAX_VALUE})
+    void rejectsOutOfRangeAuthoritativeAbilityScores(int score) {
+        assertCode("AUTHORITATIVE_STATE_MISMATCH", () -> new ClassResourceRecoveryRules().prepare(
+                catalog(), "class.bard", 5, score, "SHORT_REST", List.of(
+                        state("resource.bard.bardic_inspiration", 0, 4),
+                        state("resource.bard.long_rest_pool", 0, 3))));
+    }
+
+    @Test
+    void rejectsAResourceMaximumThatDoesNotMatchTheAuthoritativeAbility() {
+        assertCode("AUTHORITATIVE_STATE_MISMATCH", () -> new ClassResourceRecoveryRules().prepare(
+                catalog(), "class.bard", 5, 18, "SHORT_REST", List.of(
+                        state("resource.bard.bardic_inspiration", 0, 1),
+                        state("resource.bard.long_rest_pool", 0, 3))));
     }
 
     private static ModuleCatalog catalog() {
@@ -78,7 +176,7 @@ class ClassResourceRecoveryRulesTest {
                 definition("character.resource", "resource.bard.spell_slots", 3));
         List<ModuleCatalog.CatalogAttribute> attributes = List.of(
                 text("resource.bard.bardic_inspiration", "resource.maximum_profile", 1,
-                        "1-20:4"),
+                        "1-20:CHARISMA_MODIFIER_MINIMUM_ONE"),
                 identifier("resource.bard.bardic_inspiration", "resource.execution_mode",
                         "AUTOMATIC"),
                 text("resource.bard.bardic_inspiration", "resource.recovery_profile", 1,
