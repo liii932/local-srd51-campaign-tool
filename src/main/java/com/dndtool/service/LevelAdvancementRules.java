@@ -93,9 +93,6 @@ public final class LevelAdvancementRules {
                 proficiency.atLevel(context.totalLevel(), 0).maximum());
         int newProficiency = exactInt(
                 proficiency.atLevel(request.targetLevel(), 0).maximum());
-        if (previousProficiency < 2 || newProficiency > 6) {
-            throw invalid("MALFORMED_FROZEN_CATALOG");
-        }
 
         Map<String, LevelAdvancementRepository.ResourceState> existing = resources(context);
         LevelAdvancementRepository.ResourceState hitPoints = existing.get("resource.hit_points");
@@ -191,11 +188,8 @@ public final class LevelAdvancementRules {
             throw invalid("MALFORMED_FROZEN_CATALOG");
         }
         requireDefinition(catalog, "character.resource", "resource.hit_dice.d" + hitDieSides);
-        AdvancementValueProfile proficiency = profile(catalog, "character.class", classKey,
+        profile(catalog, "character.class", classKey,
                 "class.proficiency_bonus_profile");
-        if (proficiency.atLevel(1, 0).maximum() != 2) {
-            throw invalid("MALFORMED_FROZEN_CATALOG");
-        }
         Map<String, LevelAdvancementRepository.ResourceState> absent = Map.of();
         List<LevelAdvancementRepository.ResourceChange> classResources = classResourceChanges(
                 catalog, classKey, 0, 1, modifier(charismaScore), modifier(charismaScore), absent);
@@ -315,11 +309,15 @@ public final class LevelAdvancementRules {
                         && attributeKey.equals(row.attributeKey()))
                 .toList();
         if (values.size() != 1
+                || values.getFirst().attributeOrder() != 1
+                || !"TEXT".equals(values.getFirst().valueType())
                 || !(values.getFirst().value() instanceof ModuleCatalog.TextValue text)) {
             throw invalid("MALFORMED_FROZEN_CATALOG");
         }
         try {
-            return AdvancementValueProfile.parse(text.value());
+            return "class.proficiency_bonus_profile".equals(attributeKey)
+                    ? AdvancementValueProfile.parseProficiencyBonus(text.value())
+                    : AdvancementValueProfile.parse(text.value());
         } catch (IllegalArgumentException exception) {
             throw invalid("MALFORMED_FROZEN_CATALOG");
         }

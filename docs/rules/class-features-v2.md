@@ -61,6 +61,22 @@ Draconic Bloodline、The Fiend 为 1；Circle of the Land、School of Evocation 
 `RESOURCE_CURRENT_SET_TO_MAXIMUM` 类型化效果；短休只恢复短休资源，长休同时恢复短休和长休资源。
 吟游激励在 1—4 级为长休恢复，5—20 级为短休恢复。
 
+恢复组件的 `prepare` 接收与资源状态同一权威快照中的 `charismaScore`（1—30），在服务端
+计算魅力修正并重新求值资源上限；不使用常量 0 或从资源上限反推属性。越界属性或资源上限
+与该属性不符时使用 `AUTHORITATIVE_STATE_MISMATCH`。这一参数不属于客户端可指定的派生结果。
+
+`module.ResourceRecoveryProfile` 统一承担目录校验和 `ClassResourceRecoveryRules` 的恢复
+区间解析，业务层不另写正则或区间解释器。文本至多 200 个 ASCII 字符，以逗号分隔
+`minimum-maximum:SHORT_REST` 或 `minimum-maximum:LONG_REST`；包括单级区间也必须写
+两个端点。范围须按顺序连续覆盖 1—20，拒绝未知恢复方式、前导零、空洞、重叠、乱序和坏 Unicode。
+结构化入口 `ofRanges` 接收最多 20 个类型化 `Range(minimumLevel, maximumLevel, rest)`，
+共用完整覆盖校验并复制为不可变集合；短休仅恢复 SHORT_REST，长休恢复两种资源。
+
+恢复规则在判断自动资源是否已满、尚未获得或无限之前，验证整个恢复 profile，包括当前等级
+以后的区间；属性必须唯一、序号为 1 且声明 `TEXT`。失败使用 `MALFORMED_FROZEN_CATALOG`，
+不返回部分恢复效果。该模型接入内部 DRAFT 规则组件，不代表休息命令、资源作者源、类型化
+来源表或完整运行快照已采用。
+
 DM 裁决只接受 `SUCCESS`、`FAILURE`、`NO_EFFECT`，并按冻结算法绑定到一个稳定裁决键。
 自动能力不能改走 DM 裁决，阻断能力不能被裁决伪装成可执行。权威写入必须先证明角色已经获得
 该特性，再在同一事务保存根事件、裁决行、字段/资源变化、row version、事件尾和幂等结果。

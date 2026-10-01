@@ -1,6 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.AdvancementValueProfile;
+import com.dndtool.module.ResourceRecoveryProfile;
 import com.dndtool.persistence.LevelAdvancementRepository;
 import com.dndtool.module.ModuleCatalog;
 import java.util.ArrayList;
@@ -18,13 +19,17 @@ public final class ClassResourceRecoveryRules {
     public static final String EFFECT_TYPE = "RESOURCE_CURRENT_SET_TO_MAXIMUM";
     private static final Set<String> TRIGGERS = Set.of(SHORT_REST, LONG_REST);
 
-    public Prepared prepare(ModuleCatalog catalog, String classKey, int classLevel,
+    /** The ability score must come from the same authoritative snapshot as the resource states. */
+    public Prepared prepare(ModuleCatalog catalog, String classKey, int classLevel, int charismaScore,
             String trigger, List<LevelAdvancementRepository.ResourceState> resourceStates) {
         if (catalog == null || !stableKey(classKey) || classLevel < 1 || classLevel > 20
-                || !TRIGGERS.contains(trigger) || resourceStates == null) {
+                || trigger == null || !TRIGGERS.contains(trigger) || resourceStates == null) {
             throw new RuleException("INVALID_REQUEST");
         }
+        if (charismaScore < 1 || charismaScore > 30) authoritative();
+        int charismaModifier = Math.floorDiv(charismaScore - 10, 2);
         requireDefinition(catalog, "character.class", classKey);
+        ResourceRecoveryProfile.Rest completedRest = ResourceRecoveryProfile.Rest.valueOf(trigger);
         Map<String, LevelAdvancementRepository.ResourceState> states = states(resourceStates);
         List<String> keys = catalog.catalogRelations().stream()
                 .filter(row -> "character.resource".equals(row.sourceType())
@@ -48,11 +53,12 @@ public final class ClassResourceRecoveryRules {
                 continue;
             }
             if (!"AUTOMATIC".equals(execution)) malformed();
+            ResourceRecoveryProfile recovery = recoveryProfile(catalog, key);
             AdvancementValueProfile.ResolvedValue expected = maximumProfile(catalog, key)
-                    .atLevel(classLevel, 0);
+                    .atLevel(classLevel, charismaModifier);
             validateState(key, state, expected);
             if (expected.maximum() == 0 || expected.unlimited()
-                    || !recovers(recoveryAtLevel(catalog, key, classLevel), trigger)
+                    || !recovery.atLevel(classLevel).recoversOn(completedRest)
                     || state.currentValue() == state.maximumValue()) continue;
             effects.add(new RecoveryEffect(EFFECT_TYPE, key, state.currentValue(),
                     state.maximumValue(), state.maximumValue()));
@@ -82,6 +88,8 @@ public final class ClassResourceRecoveryRules {
         List<ModuleCatalog.CatalogAttribute> rows = attributes(
                 catalog, key, "resource.maximum_profile");
         if (rows.size() != 1
+                || rows.getFirst().attributeOrder() != 1
+                || !"TEXT".equals(rows.getFirst().valueType())
                 || !(rows.getFirst().value() instanceof ModuleCatalog.TextValue text)) {
             malformed();
         }
@@ -94,34 +102,22 @@ public final class ClassResourceRecoveryRules {
         }
     }
 
-    private static String recoveryAtLevel(ModuleCatalog catalog, String key, int level) {
+    private static ResourceRecoveryProfile recoveryProfile(ModuleCatalog catalog, String key) {
         List<ModuleCatalog.CatalogAttribute> rows = attributes(
                 catalog, key, "resource.recovery_profile");
         if (rows.size() != 1
+                || rows.getFirst().attributeOrder() != 1
+                || !"TEXT".equals(rows.getFirst().valueType())
                 || !(rows.getFirst().value() instanceof ModuleCatalog.TextValue text)) {
             malformed();
         }
-        int expected = 1;
-        String result = null;
-        for (String band : ((ModuleCatalog.TextValue) rows.getFirst().value()).value()
-                .split(",", -1)) {
-            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
-                    "([1-9]|1[0-9]|20)-([1-9]|1[0-9]|20):(SHORT_REST|LONG_REST)")
-                    .matcher(band);
-            if (!matcher.matches()) malformed();
-            int first = Integer.parseInt(matcher.group(1));
-            int last = Integer.parseInt(matcher.group(2));
-            if (first != expected || last < first) malformed();
-            if (level >= first && level <= last) result = matcher.group(3);
-            expected = last + 1;
+        try {
+            return ResourceRecoveryProfile.parse(
+                    ((ModuleCatalog.TextValue) rows.getFirst().value()).value());
+        } catch (IllegalArgumentException exception) {
+            malformed();
+            throw new AssertionError();
         }
-        if (expected != 21 || result == null) malformed();
-        return result;
-    }
-
-    private static boolean recovers(String minimumRest, String completedRest) {
-        return minimumRest.equals(completedRest)
-                || SHORT_REST.equals(minimumRest) && LONG_REST.equals(completedRest);
     }
 
     private static String identifier(ModuleCatalog catalog, String key, String attribute) {

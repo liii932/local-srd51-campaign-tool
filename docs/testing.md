@@ -212,6 +212,13 @@ DRAFT 发布门保持关闭。
 畸形、跳级、资源状态不一致、固定值/服务端掷骰、stale row version、事务失败和禁止部分写入，
 并证明过期状态或幂等重放不会消耗随机性。
 
+成长与恢复区间的共用模型使用 `AdvancementValueProfileTest`、`ResourceRecoveryProfileTest`、
+`ModuleCanonicalEncoderV2Test`、`LevelAdvancementRulesTest` 和 `ClassResourceRecoveryRulesTest`
+验证：结构化区间与文本共用校验、集合不可变、逐个等级破坏熟练加值、恢复方式组合、未来区间
+错误及资源已满/不可用/无限时仍拒绝坏规则；恢复组件另验证权威魅力值、最低一次公式及容量
+不匹配拒绝。涉及这些纯模型时保留 canonical v1 独立向量，
+并按真实调用闭包选择一级创建和升级 Service 测试；不以纯规则测试替代领域存储或 MySQL 验收。
+
 职业特性的定向验证包括 `ClassFeatureRulesTest`、`ClassFeatureAdjudicationRulesTest`、
 `ClassResourceRecoveryRulesTest`、`V014ClassFeatureCoverageMatrixTest`、
 `V014ClassFeatureLifecycleSchemaTest`、`CharacterAdvancementChoiceRulesTest` 和

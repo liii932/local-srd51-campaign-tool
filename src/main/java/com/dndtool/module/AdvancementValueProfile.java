@@ -18,7 +18,6 @@ public final class AdvancementValueProfile {
             throw invalid();
         }
         List<Range> ranges = new ArrayList<>();
-        int previousMaximum = 0;
         for (String segment : value.split(",", -1)) {
             int colon = segment.indexOf(':');
             if (colon <= 0 || colon == segment.length() - 1
@@ -26,13 +25,35 @@ public final class AdvancementValueProfile {
                 throw invalid();
             }
             int[] bounds = bounds(segment.substring(0, colon));
-            if (!ranges.isEmpty() && bounds[0] != previousMaximum + 1) throw invalid();
             Value expression = expression(segment.substring(colon + 1));
             ranges.add(new Range(bounds[0], bounds[1], expression));
-            previousMaximum = bounds[1];
         }
-        if (ranges.isEmpty() || previousMaximum != 20) throw invalid();
+        return ofRanges(ranges);
+    }
+
+    public static AdvancementValueProfile ofRanges(List<Range> ranges) {
+        if (ranges == null || ranges.isEmpty() || ranges.size() > 20) throw invalid();
+        int previousMaximum = 0;
+        for (Range range : ranges) {
+            if (range == null || previousMaximum != 0
+                    && range.minimumLevel() != previousMaximum + 1) throw invalid();
+            previousMaximum = range.maximumLevel();
+        }
+        if (previousMaximum != 20) throw invalid();
         return new AdvancementValueProfile(ranges);
+    }
+
+    public static AdvancementValueProfile parseProficiencyBonus(String value) {
+        AdvancementValueProfile profile = parse(value);
+        if (profile.firstLevel() != 1 || !profile.constantsOnly()) throw invalid();
+        for (int level = 1; level <= 20; level++) {
+            if (profile.atLevel(level, 0).maximum() != 2 + (level - 1) / 4) throw invalid();
+        }
+        return profile;
+    }
+
+    public List<Range> ranges() {
+        return ranges;
     }
 
     public ResolvedValue atLevel(int classLevel, int charismaModifier) {
@@ -112,10 +133,19 @@ public final class AdvancementValueProfile {
         }
     }
 
-    private record Range(int minimumLevel, int maximumLevel, Value value) {
+    public record Range(int minimumLevel, int maximumLevel, Value value) {
+        public Range {
+            if (minimumLevel < 1 || maximumLevel > 20 || minimumLevel > maximumLevel
+                    || value == null) throw invalid();
+        }
     }
 
-    private record Value(Kind kind, long constant) {
+    public record Value(Kind kind, long constant) {
+        public Value {
+            if (kind == null || (kind == Kind.CONSTANT
+                    ? constant < 1 || constant > 1_000_000 : constant != 0)) throw invalid();
+        }
+
         ResolvedValue resolve(int classLevel, int charismaModifier) {
             return switch (kind) {
                 case CONSTANT -> new ResolvedValue(constant, false);
@@ -130,7 +160,7 @@ public final class AdvancementValueProfile {
         }
     }
 
-    private enum Kind {
+    public enum Kind {
         CONSTANT,
         CLASS_LEVEL,
         FIVE_TIMES_CLASS_LEVEL,

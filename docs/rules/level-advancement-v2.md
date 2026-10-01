@@ -40,6 +40,18 @@
 为 +4、13–16 为 +5、17–20 为 +6。未知表达式、重叠、空洞、乱序、超范围等级、重复属性或
 错误类型全部 fail closed。
 
+`module.AdvancementValueProfile` 是容量区间的唯一解析与求值入口。文本解析和结构化
+`ofRanges` 构造共用完整区间校验，返回不可变的 `Range` / `Value` 集合；不向业务暴露可变集合。
+每个区间为 `minimumLevel`、`maximumLevel`、`value.kind`、`value.constant`：等级为 1—20，
+常量范围为 1—1,000,000，非 `CONSTANT` 表达式的 constant 必须为 0。首段可晚于一级，
+此时此前等级尚未获得资源；末段必须覆盖至 20，最多 20 段。
+
+目录 canonical 校验、一级初始资源和升级计算统一使用 `parseProficiencyBonus` 验证全部
+20 级的熟练加值，不能只验证当前等级或区间端点。服务读取 profile 时同时要求唯一属性、
+序号 1 和 `TEXT` 类型；畸形输入映射为 `MALFORMED_FROZEN_CATALOG`。这些类型化区间是纯
+规则模型，现有 DRAFT 物理目录与 canonical 文本投影尚未切换为成长领域表；不据此声称作者源、
+来源表及运行镜像链路已经完成。
+
 ## 预览、确认和资源语义
 
 V013 基线只允许已有单职业角色为该职业增加一级。V015 在不修改 V013 历史身份的前提下增加

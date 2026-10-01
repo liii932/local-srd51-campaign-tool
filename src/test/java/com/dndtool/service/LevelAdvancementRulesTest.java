@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class LevelAdvancementRulesTest {
     private static final String HASH = "a".repeat(64);
@@ -137,6 +139,42 @@ class LevelAdvancementRulesTest {
 
         assertCode("MALFORMED_FROZEN_CATALOG", () -> new LevelAdvancementRules().prepare(
                 duplicate, request(2, "FIXED_AVERAGE"), context(), HASH));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20})
+    void creationAndAdvancementRejectCorruptionOutsideTheRequestedLevel(int corruptedLevel) {
+        StringBuilder profile = new StringBuilder();
+        for (int level = 1; level <= 20; level++) {
+            if (level > 1) profile.append(',');
+            profile.append(level).append(':').append(level == corruptedLevel ? 7 : 2 + (level - 1) / 4);
+        }
+        var attributes = new ArrayList<>(catalog().catalogAttributes());
+        attributes.removeIf(row -> "class.proficiency_bonus_profile".equals(row.attributeKey()));
+        attributes.add(text("character.class", "class.fighter", "class.proficiency_bonus_profile",
+                profile.toString()));
+        ModuleCatalog invalid = copy(catalog(), attributes);
+        assertCode("MALFORMED_FROZEN_CATALOG", () -> new LevelAdvancementRules().prepare(
+                invalid, request(2, "FIXED_AVERAGE"), context(), HASH));
+        assertCode("MALFORMED_FROZEN_CATALOG", () -> LevelAdvancementRules.initialResources(
+                invalid, "class.fighter", 14, 8));
+    }
+
+    @Test
+    void profilesRequireTextTypeAndSingleAttributeOrdinal() {
+        for (String key : List.of("class.proficiency_bonus_profile", "resource.maximum_profile")) {
+            for (boolean badType : List.of(false, true)) {
+                var attributes = new ArrayList<>(catalog().catalogAttributes());
+                int index = java.util.stream.IntStream.range(0, attributes.size())
+                        .filter(i -> key.equals(attributes.get(i).attributeKey())).findFirst().orElseThrow();
+                var original = attributes.get(index);
+                attributes.set(index, new ModuleCatalog.CatalogAttribute(original.definitionType(),
+                        original.definitionKey(), key, badType ? 1 : 2,
+                        badType ? "INTEGER" : "TEXT", original.value()));
+                assertCode("MALFORMED_FROZEN_CATALOG", () -> new LevelAdvancementRules().prepare(
+                        copy(catalog(), attributes), request(2, "FIXED_AVERAGE"), context(), HASH));
+            }
+        }
     }
 
     private static LevelAdvancementRepository.ResourceChange change(

@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class ModuleCanonicalEncoderV2Test {
     private static final String VECTOR_RESOURCE = "/module-canonical-v2-character.hex";
@@ -89,8 +91,7 @@ class ModuleCanonicalEncoderV2Test {
         assertDoesNotThrow(() -> encoder.encode(builder.build()));
     }
 
-    @Test
-    void validatesClosedClassFeatureAndResourceLifecycleAttributes() {
+    private static CatalogBuilder lifecycleCatalog() {
         CatalogBuilder builder = new CatalogBuilder();
         builder.definitions.add(new ModuleCatalog.CatalogDefinition(
                 "character.class", "class.fighter", "Fighter", "Fighter", 1));
@@ -155,6 +156,13 @@ class ModuleCanonicalEncoderV2Test {
                 "character.resource", "resource.fighter.second_wind", "resource.owner",
                 "character.class", "class.fighter", 1));
 
+        return builder;
+    }
+
+    @Test
+    void validatesClosedClassFeatureAndResourceLifecycleAttributes() {
+        CatalogBuilder builder = lifecycleCatalog();
+
         assertDoesNotThrow(() -> encoder.encode(builder.build()));
 
         int progressionIndex = java.util.stream.IntStream.range(0, builder.attributes.size())
@@ -169,6 +177,33 @@ class ModuleCanonicalEncoderV2Test {
 
         builder.attributes.removeIf(row -> "resource.recovery_profile".equals(
                 row.attributeKey()));
+        assertRejected(builder);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20})
+    void canonicalRejectsIncorrectProficiencyAtEveryLevel(int corruptedLevel) {
+        CatalogBuilder builder = lifecycleCatalog();
+        assertDoesNotThrow(() -> encoder.encode(builder.build()));
+        StringBuilder profile = new StringBuilder();
+        for (int level = 1; level <= 20; level++) {
+            if (level > 1) profile.append(',');
+            profile.append(level).append(':').append(level == corruptedLevel ? 7 : 2 + (level - 1) / 4);
+        }
+        builder.attributes.removeIf(row -> "class.proficiency_bonus_profile".equals(row.attributeKey()));
+        builder.attributes.add(text("character.class", "class.fighter",
+                "class.proficiency_bonus_profile", profile.toString()));
+        assertRejected(builder);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1-4:SHORT_REST,6-20:LONG_REST", "1-20:CLIENT_REST",
+            "1-4:SHORT_REST,5-20:LONG_REST\u0085", "1-19:SHORT_REST"})
+    void canonicalRejectsMalformedRecoveryProfiles(String profile) {
+        CatalogBuilder builder = lifecycleCatalog();
+        builder.attributes.removeIf(row -> "resource.recovery_profile".equals(row.attributeKey()));
+        builder.attributes.add(text("character.resource", "resource.fighter.second_wind",
+                "resource.recovery_profile", profile));
         assertRejected(builder);
     }
 

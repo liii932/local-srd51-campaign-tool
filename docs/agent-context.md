@@ -29,7 +29,7 @@
 | v1 战役创建、角色创建、角色卡 | [冻结 v1](rules/srd-5.1.md) §3—5；[架构](architecture.md) §6 | `service/CampaignCreationService.java`、`service/CharacterCreationService.java`、`service/CharacterCardService.java` |
 | v2 一级创建、种族、背景、初始选择 | [一级创建](rules/character-creation-v2.md) | `service/LevelOneCharacterCreationService.java`；`LevelOneCharacterRulesTest` |
 | 升级、HP、生命骰 | [升级](rules/level-advancement-v2.md) | `service/LevelAdvancementService.java`；`LevelAdvancementRulesTest` |
-| 职业/子职业特性、休息、资源恢复 | [职业特性](rules/class-features-v2.md) | `service/ClassFeatureRules.java`、`service/CharacterLifecycleCommandService.java`；`ClassResourceRecoveryRulesTest` |
+| 职业/子职业特性、休息、资源恢复 | [职业特性](rules/class-features-v2.md) | `module/ResourceRecoveryProfile.java`、`service/ClassResourceRecoveryRules.java`、`service/ClassFeatureRules.java`；`ResourceRecoveryProfileTest`、`ClassResourceRecoveryRulesTest`；恢复纯规则组件尚未接入完整休息命令 |
 | 多职业、ASI、专长、熟练 | [多职业与专长](rules/multiclass-asi-feats-v2.md) | `service/CharacterAdvancementChoiceRules.java`；`LevelAdvancementServiceTest` |
 | 多职业施法、共享法术位、Pact Magic | [共享法术位](rules/multiclass-spell-slots-v2.md)，含未完成边界 | `service/MulticlassSpellSlotRules.java`；`V018MulticlassSpellSlotFoundationSchemaTest` |
 | 检定、骰子、简单物品、事件效果 | [冻结 v1](rules/srd-5.1.md) §6/§8—9 | `service/CheckTransactionService.java`、`service/CheckEffectExecutionService.java` |
