@@ -2,7 +2,7 @@
 
 规则源链位于 `database/rules/migration/`，角色为 `RULES`，显式默认库为 `dnd_tool_rules`。
 它与运行链 `src/main/resources/db/migration/`、`dnd_tool_se.schema_meta` 分开编号和批准。
-规则链从 `V001__rule-source-schema.sql` 开始；已应用文件不可改写，后续变更追加本链下一个
+规则链由 `V001__rule-source-schema.sql` 与 `V002__tool-catalog.sql` 组成；已应用文件不可改写，后续变更追加本链下一个
 连续编号。运行 V001—V018、RELEASED v1、旧默认发布及现有 JNDI 合同保持不变。
 
 本合同提供离线 schema 源、批准元数据、窄权限模板和独立只读账本核验器。它不接入 Web、
@@ -31,7 +31,7 @@ JNDI、health、规则安装或加载入口，不表示已创建数据库或已�
 
 ## 表与列
 
-六表均为 InnoDB。源本地 ID、安装代次与计数使用有符号 BIGINT；只有发布根 `id` 自增。
+七表均为 InnoDB（包含独立账本）。源本地 ID、安装代次与计数使用有符号 BIGINT；只有发布根 `id` 自增。
 FK 只指向源内同一发布，全部 UPDATE/DELETE RESTRICT，不级联，不引用运行 schema。
 技术键、版本、枚举和摘要使用 VARBINARY，保留全部字节的大小写与尾字符区别。
 SQL 将二进制输入无损映射到 latin1 字符进行大小写敏感的 ASCII 白名单检查；不用 binary
@@ -41,8 +41,9 @@ SQL 将二进制输入无损映射到 latin1 字符进行大小写敏感的 ASCI
 |---|---|
 | `rule_release` | 正 `id`；唯一 `(module_key, release_version)`；键 1—128 ASCII，`[a-z][a-z0-9_]*([.][a-z][a-z0-9_]*)*`；版本 1—64 ASCII，首字符字母或数字，其余字母/数字/点/下划线/连字符；`canonical_format_version`、`archive_format_version` 正 INT；`hash_algorithm` 精确 `SHA-256`；可 NULL `content_sha256`；`release_status` 为 DRAFT/RELEASED；`installation_revision` 为 0..Long.MAX_VALUE；UTC `created_at`、可 NULL `released_at` |
 | `rule_language` | PK `(release_id, language_key)`；`display_name VARCHAR(120)`、`description VARCHAR(1000)`；`category VARBINARY(8)`；`source_page SMALLINT` 3—74；`sort_order SMALLINT` 1—18，按发布唯一；release FK |
+| `rule_tool` | PK `(release_id, tool_key)`；`display_name VARCHAR(120)`、`description VARCHAR(1000)`；`category VARBINARY(18)`；`source_page SMALLINT` 3—74；`sort_order SMALLINT` 1—37，按发布唯一；release FK；封闭键/分类见[工具目录](rules/tool-catalog-partition.md) |
 | `rule_package_installation` | PK `(release_id, installation_revision)`，二者正数；全表唯一 `source_operation_id VARBINARY(16)` 精确 UUIDv4 网络序及 variant；`operation_fingerprint_version INT=1`；`operation_digest_sha256`；正 INT `author_schema_version`、`installation_manifest_version`；`installation_manifest_sha256`；`package_display_name VARCHAR(120)`；`verification_scope` 为 PARTITION/COMPLETE；可 NULL `observed_content_sha256`；UTC `installed_at`；release FK |
-| `rule_package_installation_partition` | PK `(release_id, installation_revision, partition_key)`；前两列共同 FK 指向安装事实；首片键精确 `character.language`；不保存数组、JSON 或旧目录 |
+| `rule_package_installation_partition` | PK `(release_id, installation_revision, partition_key)`；前两列共同 FK 指向安装事实；键为 `character.language` 或 `character.tool`；不保存数组、JSON 或旧目录 |
 | `rule_installation_control` | 永久 PK `control_id TINYINT=1`、`protocol_version INT=1`；`metadata_row_count BIGINT` 1—16384；`row_version BIGINT` 0..Long.MAX_VALUE；无 FK |
 
 所有摘要列都是 VARBINARY(64)，非 NULL 时必须恰好为 64 个小写 ASCII hex。
@@ -76,13 +77,13 @@ PARTITION 事实的 observed 摘要恒 NULL，COMPLETE 恒非 NULL。当前事�
 
 根 UPDATE 自身持有排他行锁，触发器用 OLD/NEW 拒绝 RELEASED 改动和 id/身份/created_at
 重绑，根 DELETE 一律拒绝。自增列不能用于 MySQL CHECK，因此 AFTER INSERT 在实际 ID
-已分配后拒绝非正数。语言变更、事实/分区新增在触发器中 `SELECT ... FOR UPDATE` 锁所属根并
-确认 DRAFT；语言 UPDATE 先拒绝跨根/键重绑。永久事实/分区 UPDATE/DELETE 一律拒绝。
+已分配后拒绝非正数。语言/工具变更、事实/分区新增在触发器中 `SELECT ... FOR UPDATE` 锁所属根并
+确认 DRAFT；语言/工具 UPDATE 先拒绝跨根/键重绑。永久事实/分区 UPDATE/DELETE 一律拒绝。
 这些防线也阻断受保护根/事实的 REPLACE 删除再插入路径；不使用客户端可伪造的 session 标志。
 控制行身份/协议不可改，不能删除；UTC 时间由触发器生成，不能靠客户端指定时间制造事实。
 
 唯一空源种子为 S `(control_id, protocol_version, metadata_row_count, row_version)=(1,1,1,0)`。
-不种规则头、语言或安装事实。16384 是工程验证基线，未完成容量验收不能称为发布容量。
+不种规则头、语言、工具或安装事实。16384 是工程验证基线，未完成容量验收不能称为发布容量。
 受控安装须先锁 S，再锁已有根；新根也必须在 S 下建立。u 等于 S、根、事实、分区的全源
 行数之和；v 等于成功安装事实数。新安装按新增根 b 与分区数 p 收费 `u+b+1+p`、`v+1`；
 重放/查证/发布不收费。安装器必须把领域行、头代次/摘要、事实、分区与计数同事务提交。
@@ -91,10 +92,10 @@ PARTITION 事实的 observed 摘要恒 NULL，COMPLETE 恒非 NULL。当前事�
 ## 账号与验收
 
 管理员分别审核 `database/grants/rule-source-{app,agent,installer,migrator}.sql`；文件不创建
-账号或设置密码。app/agent 只对六个准确源表 SELECT，没有 schema 通配或写权限；普通只读
-核验不能借此声明取得源提交查证屏障。installer 只获明确列级根 INSERT/UPDATE、语言内容
+账号或设置密码。app/agent 只对七个准确源表 SELECT，没有 schema 通配或写权限；普通只读
+核验不能借此声明取得源提交查证屏障。installer 只获明确列级根 INSERT/UPDATE、语言/工具内容
 写权、事实/分区 INSERT、S 两计数列 UPDATE，不能写账本、状态/发布时间、根身份、永久事实
-或 S 身份。独立 migrator 仅源 schema 所需 CREATE/ALTER/INDEX/REFERENCES/TRIGGER/DML，
+或 S 身份。独立 migrator 仅源 schema 所需 CREATE/CREATE TEMPORARY TABLES/ALTER/INDEX/REFERENCES/TRIGGER/DML，
 没有全局权限、账号管理或 GRANT OPTION；不把其能力传给 Web/installer。
 
 库级 GRANT 中的下划线在 `partial_revokes=OFF` 时是通配符，反引号本身不能消除该语义。
@@ -111,12 +112,13 @@ migrator 模板使用 `dnd\_tool\_rules`；管理员先读取 `@@GLOBAL.partial_
 创建空 schema 并预检；原样执行本链获批 SQL；核对对象和空源后记最后账本；独立只读核验；
 另行账号授权验收。迁移前必须确认默认库精确为 `dnd_tool_rules`、无既有对象且前序历史一致，
 不能以默认库未知或可改名目标试跑。DDL 可能隐式提交，中途失败立即维护阻断，不 IF NOT EXISTS
-跳过、不盲重跑、不补造账本。最后账本 INSERT 自检准确默认库、六表/十八触发器及空源种子，
-不能替代完整定义核验或使多条 DDL 获得整体回滚。
+跳过、不盲重跑、不补造账本。V001 自检初始六表/十八触发器及空源种子；V002 验证准确前序
+账本，再增加工具表、三个触发器和分区键约束。账本不能替代完整定义核验或使多条 DDL 获得整体回滚。
 
 `database/verify/rule-source-schema.sql` 只有 SELECT/SHOW，输出默认库、账本、种子、列、索引、
 FK、CHECK、触发器/视图/例程及权限材料。触发器元数据被 MySQL 权限过滤，须由 migrator 在
 停止写入后只读核验，不扩大 app/agent 权限。其空源计数只用于迁移检查点，不作为安装后准入。
+工具增量使用 `database/verify/rule-tool-catalog.sql`，与前述全源元数据核验共同执行。
 
 无 DB 测试检查源摘要、独立清单、结构和 grant 防回归以及 JDBC 只读/资源关闭边界。
 真实 MySQL 验收还必须覆盖非法高字节/尾空格/NUL、版本逐字节不同、18 项关系、补充平面文本

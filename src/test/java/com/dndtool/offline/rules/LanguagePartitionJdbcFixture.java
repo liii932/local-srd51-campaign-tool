@@ -17,9 +17,11 @@ final class LanguagePartitionJdbcFixture {
     final SourceInstallationTest.Database installed;
     int sourceOpens, sourceQueries, runtimeQueries, commits, rollbacks, languageWrites;
     boolean sourceOffline, reverseRows;
-    int failLanguageWrite;
+    int failLanguageWrite, failToolWrite, toolWrites;
     Consumer<List<Map<String, Object>>> sourceFault = rows -> {};
     Consumer<List<Map<String, Object>>> runtimeFault = rows -> {};
+    List<Map<String, Object>> tools = new ArrayList<>();
+    Consumer<List<Map<String,Object>>> toolFault = rows -> {};
     List<Map<String, Object>> registrations = new ArrayList<>(), heads = new ArrayList<>(), languages = new ArrayList<>();
 
     LanguagePartitionJdbcFixture(SourceInstallationTest.Database installed) { this.installed = installed; }
@@ -67,14 +69,14 @@ final class LanguagePartitionJdbcFixture {
 
     Connection runtime() {
         // Captures the committed baseline of this caller-owned transaction, including previous runs.
-        var oldRegistrations = copy(registrations); var oldHeads = copy(heads); var oldLanguages = copy(languages);
+        var oldRegistrations = copy(registrations); var oldHeads = copy(heads); var oldLanguages = copy(languages); var oldTools=copy(tools);
         return proxy(Connection.class, (p, m, a) -> switch (m.getName()) {
             case "getAutoCommit", "isReadOnly" -> false;
             case "getTransactionIsolation" -> Connection.TRANSACTION_READ_COMMITTED;
             case "prepareStatement" -> statement((String) a[0], false);
             case "commit" -> { commits++; yield null; }
             case "rollback" -> {
-                rollbacks++; registrations = copy(oldRegistrations); heads = copy(oldHeads); languages = copy(oldLanguages);
+                rollbacks++; registrations = copy(oldRegistrations); heads = copy(oldHeads); languages = copy(oldLanguages); tools=copy(oldTools);
                 yield null;
             }
             case "close" -> null;
@@ -91,7 +93,7 @@ final class LanguagePartitionJdbcFixture {
                 assertFalse(params.containsKey((int) a[0])); params.put((int) a[0], value); yield null;
             }
             case "setQueryTimeout" -> { assertEquals(5, a[0]); yield null; }
-            case "setMaxRows" -> { max[0] = (int) a[0]; assertTrue(max[0] > 0 && max[0] <= 19); yield null; }
+            case "setMaxRows" -> { max[0] = (int) a[0]; assertTrue(max[0] > 0 && max[0] <= 38); yield null; }
             case "executeQuery" -> {
                 assertTrue(max[0] > 0); List<Map<String, Object>> rows;
                 if (source) { sourceQueries++; rows = sourceQuery(sql, params); }
@@ -133,6 +135,11 @@ final class LanguagePartitionJdbcFixture {
                     .map(r -> row("release_id, " + LANGUAGE_COLUMNS, r)).toList());
             sourceFault.accept(rows); if (reverseRows) Collections.reverse(rows); return rows;
         }
+        if (sql.endsWith("FROM rule_tool WHERE release_id = ? ORDER BY tool_key")) {
+            assertEquals(1,p.size());
+            return installed.tools.stream().filter(r->equal(r[0],p.get(1)))
+                    .map(r->row("release_id, tool_key, display_name, description, category, source_page, sort_order",r)).toList();
+        }
         throw new AssertionError("Unexpected source SQL " + sql);
     }
 
@@ -155,6 +162,12 @@ final class LanguagePartitionJdbcFixture {
             assertTrue(heads.stream().anyMatch(r -> equal(r.get("snapshot_id"), p.get(1))));
             languages.add(row("snapshot_id, " + LANGUAGE_COLUMNS, values(p, 7))); return;
         }
+        if(sql.equals("INSERT INTO runtime_rule_tool (snapshot_id, tool_key, display_name, description, category, source_page, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+            assertEquals(7,p.size());toolWrites++;
+            if(toolWrites==failToolWrite)throw new SQLException("Tool write failed");
+            assertTrue(heads.stream().anyMatch(r->equal(r.get("snapshot_id"),p.get(1))));
+            tools.add(row("snapshot_id, tool_key, display_name, description, category, source_page, sort_order",values(p,7)));return;
+        }
         throw new AssertionError("Unexpected runtime write " + sql);
     }
 
@@ -175,6 +188,10 @@ final class LanguagePartitionJdbcFixture {
             assertEquals(1, p.size());
             var rows = copy(languages.stream().filter(r -> equal(r.get("snapshot_id"), p.get(1))).toList());
             runtimeFault.accept(rows); if (reverseRows) Collections.reverse(rows); return rows;
+        }
+        if(sql.endsWith("FROM runtime_rule_tool WHERE snapshot_id = ? ORDER BY tool_key")) {
+            assertEquals(1,p.size());var rows=copy(tools.stream().filter(r->equal(r.get("snapshot_id"),p.get(1))).toList());
+            toolFault.accept(rows);if(reverseRows)Collections.reverse(rows);return rows;
         }
         throw new AssertionError("Unexpected runtime query " + sql);
     }

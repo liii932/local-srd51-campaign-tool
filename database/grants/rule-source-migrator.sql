@@ -6,5 +6,5 @@
 -- With partial_revokes=OFF, schema-level underscores must be escaped as below.
 -- With partial_revokes=ON, use the literal identifier `dnd_tool_rules` instead;
 -- do not change the server setting or apply both forms.
-GRANT CREATE, ALTER, INDEX, REFERENCES, TRIGGER, SELECT, INSERT, UPDATE, DELETE
+GRANT CREATE, CREATE TEMPORARY TABLES, ALTER, INDEX, REFERENCES, TRIGGER, SELECT, INSERT, UPDATE, DELETE
     ON `dnd\_tool\_rules`.* TO 'dnd_tool_rules_migrator'@'127.0.0.1';

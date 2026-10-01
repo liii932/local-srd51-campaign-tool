@@ -75,8 +75,9 @@ class AcceptanceBoundaryTest(unittest.TestCase):
 
     def test_approved_manifest_is_read_only_and_complete(self):
         migrations = module.manifests()
-        self.assertEqual(20, len(migrations))
-        self.assertEqual(list(range(1, 20)), [item[1] for item in migrations[:-1]])
+        self.assertEqual(22, len(migrations))
+        self.assertEqual(list(range(1, 21)), [item[1] for item in migrations[:20]])
+        self.assertEqual([1, 2], [item[1] for item in migrations[20:]])
         for _, _, _, digest, path, raw in migrations:
             self.assertEqual(raw, path.read_bytes())
             self.assertEqual(digest, module.payload_digest(raw))

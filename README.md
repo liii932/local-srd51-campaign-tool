@@ -15,12 +15,14 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - 使用显式内置发布版注册表；当前默认仍是经过哈希校验的
   `dnd5e2014_srd51_se_v1` release 1 / canonical 1 / archive 1；
 - 已为完整规则族 `dnd5e2014_srd51_se` 固定 release 1 / canonical 2 / archive 2
-  映射，但该身份仍为 `DRAFT`，不能创建战役、读取目录或导入存档；
+  映射，但该身份仍为 `DRAFT`，不能通过正式业务入口绑定战役、执行规则或导入存档；
 - 已在该 DRAFT 身份下建立 12 职业/子职业的 236 项特性三态矩阵，以及职业资源的类型化
   容量/休息恢复边界，并建立多职业先决条件/熟练增量、ASI 和可扩展专长状态（当前仅
   Grappler）的 DRAFT 角色切片；V018 进一步固定十二职业的多职业施法贡献，并提供共享法术位
   上限计算基础，但法术权威状态、升级事务集成和 Grappler 战斗效果仍阻断。该内部规则基础不
   等于发布或开放可达业务入口，完整规则族会保持 DRAFT，直到主要规则领域完成跨领域发布候选验收；
+- DRAFT 的[语言与工具熟练目录](./docs/rules/tool-catalog-partition.md)提供严格作者包、双分区离线安装、
+  来源读取与调用方事务运行镜像；仅为 PARTITION，不提供完整规则或游戏运行资格；
 - DRAFT 的[成长区间](./docs/rules/level-advancement-v2.md)与[资源恢复区间](./docs/rules/class-features-v2.md)
   使用共用纯规则模型，严格核验完整等级范围；角色领域的作者源与两侧存储链路仍待补齐；
 - 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
@@ -129,7 +131,7 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
 
 当前自动化使用 `dnd_tool_se` 作为本地部署运行库，使用 `dnd_tool_se_it` 执行临时表集成测试；
-完整 V001—V018 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
+完整 V001—V020 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
 运行实例内创建改名 schema，也不改写迁移 SQL。运行、只读核验、正式迁移、集成测试和隔离重放
 使用不同账号。现有少量测试数据的运行库可继续作为开发部署目标，但不能作为集成测试或迁移重放
 目标，使用前仍需盘点和备份。精确账号权限与 Agent 检查点见[数据库说明](./docs/database.md)。
@@ -161,7 +163,7 @@ src/main/java/com/dndtool/
   service/         业务验证、诊断编排、事务、幂等和存档服务
   web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V018 只增不改数据库迁移
+                    V001—V020 只增不改运行数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南

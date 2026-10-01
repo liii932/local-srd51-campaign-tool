@@ -41,7 +41,7 @@ public final class SourceInstallation {
     }
     public Result install(OperationTicket ticket,RuleArtifact artifact)throws IOException {
         evidence.requireInstall();evidence.match(ticket);tickets.requireClear();
-        if(!ticket.equals(tickets.load(ticket.operationId()+".json")) || !ticket.manifestSha256().equals(artifact.manifestSha256())
+        if(!ticket.profile().equals("srd51-character-catalog") || !ticket.equals(tickets.load(ticket.operationId()+".json")) || !ticket.manifestSha256().equals(artifact.manifestSha256())
                 || !ticket.fingerprint().equals(InstallationFingerprint.digest(artifact,ticket.expectedRevision())))
             return result(Status.CONFLICT,null,null,"Original input does not match ticket");
         tickets.begin(ticket);return transaction(ticket,artifact,false);
@@ -75,7 +75,7 @@ public final class SourceInstallation {
                         || accepted.authorVersion()!=1 || accepted.manifestVersion()!=1
                         || !accepted.scope().equals("PARTITION") || accepted.observed()!=null)
                     outcome=result(Status.CONFLICT,null,root,"Permanent operation identity conflict");
-                else outcome=accepted(accepted,root,"Original immutable acceptance; current COMPLETE content, if any, is outside this profile");
+                else outcome=accepted(accepted,root,state,"Original immutable acceptance; current COMPLETE content, if any, is outside this profile");
                 // Read-only replay/resolve releases S using rollback, not a commit or DML.
                 releaseCalled=true;connection.rollback();transaction=false;
             } else if(resolution) {
@@ -84,7 +84,7 @@ public final class SourceInstallation {
             } else {
                 var installed=source.install(state,ticket,artifact);
                 commitCalled=true;connection.commit();transaction=false;
-                outcome=accepted(installed.fact(),installed.root(),"Language partition committed; no full content digest or release approval");
+                outcome=accepted(installed.fact(),installed.root(),null,"Language/tool partitions committed; no full content digest or release approval");
             }
         } catch(Exception failure) {
             if(commitCalled||releaseCalled)outcome=result(Status.UNKNOWN,null,null,"Transaction completion uncertain; explicit resolution required");
@@ -112,9 +112,12 @@ public final class SourceInstallation {
     private static Result result(Status status,Long accepted,JdbcRuleSource.Root root,String detail) {
         return new Result(status,accepted,root==null?null:root.revision(),root==null?null:root.status(),detail,null);
     }
-    private static Result accepted(JdbcRuleSource.Fact fact,JdbcRuleSource.Root root,String detail) {
+    private static Result accepted(JdbcRuleSource.Fact fact,JdbcRuleSource.Root root,JdbcRuleSource.State state,String detail) {
+        List<String> partitions=state==null?List.of("character.language","character.tool"):
+                state.partitions().stream().filter(p->p.revision().equals(new JdbcRuleSource.Revision(fact.releaseId(),fact.revision())))
+                        .map(JdbcRuleSource.Partition::key).sorted().toList();
         var acceptance=new Acceptance(fact.operation(),fact.fingerprint(),root.key(),root.release(),fact.revision(),fact.scope(),
-                List.of("character.language"),fact.manifest(),fact.name(),fact.observed(),fact.installedAt());
+                partitions,fact.manifest(),fact.name(),fact.observed(),fact.installedAt());
         return new Result(Status.COMMITTED,fact.revision(),root.revision(),root.status(),detail,acceptance);
     }
 }

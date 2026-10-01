@@ -20,7 +20,7 @@ class RuleDatabaseSchemaVerifierTest {
     void exactRoleAndWholeHistoryCloseResourcesWithoutMutation() throws Exception {
         Fixture f = new Fixture();
         new RuleDatabaseSchemaVerifier().verify(f.source());
-        assertEquals(List.of(2, 2), f.limits);
+        assertEquals(List.of(2, 3), f.limits);
         assertEquals(List.of(5, 5), f.timeouts);
         assertEquals(2, f.closedResults);
         assertEquals(2, f.closedStatements);
@@ -70,6 +70,22 @@ class RuleDatabaseSchemaVerifierTest {
     }
 
     @Test
+    void everyLedgerRowIsRequiredAndEveryFieldIsCompared() {
+        var valid = new Fixture().history;
+        for (int i = 0; i < valid.size(); i++) {
+            var missing = new ArrayList<>(valid); missing.remove(i);
+            Fixture absent = new Fixture(); absent.history = missing; mismatch(absent);
+            for (int column = 0; column < 3; column++) {
+                var rows = valid.stream().map(Object[]::clone).collect(java.util.stream.Collectors.toList());
+                rows.get(i)[column] = column == 0 ? 99L : bytes("wrong");
+                Fixture corrupt = new Fixture(); corrupt.history = rows; mismatch(corrupt);
+            }
+        }
+        Fixture extra = new Fixture();
+        extra.history = new ArrayList<>(valid); extra.history.add(row()); mismatch(extra);
+    }
+
+    @Test
     void sqlFailuresAlwaysCloseAcquiredResources() {
         for (String failure : List.of("prepare1", "execute1", "next1", "prepare2", "execute2", "next2")) {
             Fixture f = new Fixture(); f.failure = failure;
@@ -96,7 +112,8 @@ class RuleDatabaseSchemaVerifierTest {
     /** Unexpected JDBC methods fail: transaction ownership or mutation cannot hide behind defaults. */
     private static final class Fixture {
         byte[] schema = bytes("dnd_tool_rules");
-        List<Object[]> history = java.util.Collections.singletonList(row());
+        List<Object[]> history = RuleSchemaMigrations.expectations().stream().map(e ->
+                new Object[] {(long)e.version(), bytes(e.scriptName()), bytes(e.scriptSha256())}).toList();
         String failure = "";
         boolean closedConnection;
         int prepared, openedStatements, closedStatements, openedResults, closedResults;

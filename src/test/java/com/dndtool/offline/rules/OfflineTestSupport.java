@@ -12,7 +12,7 @@ final class OfflineTestSupport {
     }
     static RuleArtifact artifact(Path parent)throws Exception {
         Path source=Files.createDirectory(parent.resolve("author"));Files.createDirectory(source.resolve("character"));
-        for(String file:List.of("author-package.json","character/languages.json")) {
+        for(String file:List.of("author-package.json","character/languages.json","character/tools.json")) {
             String input=Files.readString(Path.of("rule-packages/srd51-complete").resolve(file)).replace("\r\n","\n");
             Files.writeString(source.resolve(file),input);
         }

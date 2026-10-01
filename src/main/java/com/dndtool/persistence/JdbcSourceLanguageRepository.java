@@ -1,6 +1,8 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.LanguagePartition;
+import com.dndtool.module.ToolPartition;
+import com.dndtool.module.CharacterCatalogPartition;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -46,6 +48,10 @@ public final class JdbcSourceLanguageRepository {
             SELECT release_id, language_key, display_name, description, category, source_page, sort_order
             FROM rule_language WHERE release_id = ? ORDER BY language_key
             """;
+    private static final String TOOL_SQL = """
+            SELECT release_id, tool_key, display_name, description, category, source_page, sort_order
+            FROM rule_tool WHERE release_id = ? ORDER BY tool_key
+            """;
 
     private final DataSource dataSource;
 
@@ -59,9 +65,14 @@ public final class JdbcSourceLanguageRepository {
      * The supplied pool must bound acquisition and driver network waits independently of query timeout.
      */
     public LanguagePartition load() throws SQLException {
+        return loadCatalog().languages();
+    }
+
+    /** Both supported domains are read from the same fixed source transaction. */
+    public CharacterCatalogPartition loadCatalog() throws SQLException {
         Connection connection = dataSource.getConnection();
         State original = null;
-        LanguagePartition partition = null;
+        CharacterCatalogPartition partition = null;
         Throwable failure = null;
         boolean ownedTransaction = false;
         boolean settled = false;
@@ -120,7 +131,7 @@ public final class JdbcSourceLanguageRepository {
         return partition;
     }
 
-    private static LanguagePartition read(Connection connection) throws SQLException {
+    private static CharacterCatalogPartition read(Connection connection) throws SQLException {
         List<byte[]> schemas = query(connection, SCHEMA_SQL, 1, statement -> {},
                 result -> binary(result, "schema_name"));
         require(schemas.size() == 1 && asciiEquals(RuleSchemaMigrations.DEFAULT_SCHEMA, schemas.get(0)));
@@ -173,13 +184,12 @@ public final class JdbcSourceLanguageRepository {
                     return true;
                 });
         require(installations.size() == 1);
-        List<Boolean> partitions = query(connection, PARTITION_SQL, 1,
+        List<String> partitions = query(connection, PARTITION_SQL, 2,
                 statement -> bindInstallation(statement, release), result -> {
                     association(result, release);
-                    exact(result, "partition_key", LanguagePartition.KEY);
-                    return true;
+                    return ascii(result, "partition_key",128);
                 });
-        require(partitions.size() == 1);
+        require(partitions.equals(List.of(LanguagePartition.KEY,ToolPartition.KEY)));
         List<LanguagePartition.Language> languages = query(connection, LANGUAGE_SQL, 18,
                 statement -> statement.setLong(1, release.id()), result -> {
                     require(integer(result, "release_id", 1, Long.MAX_VALUE) == release.id());
@@ -193,8 +203,19 @@ public final class JdbcSourceLanguageRepository {
                         throw invalidSource();
                     }
                 });
+        List<ToolPartition.Tool> tools = query(connection, TOOL_SQL, 37,
+                statement -> statement.setLong(1, release.id()), result -> {
+                    require(integer(result, "release_id", 1, Long.MAX_VALUE) == release.id());
+                    try {
+                        return new ToolPartition.Tool(ascii(result, "tool_key", 128),
+                                text(result, "display_name", 120), text(result, "description", 1000),
+                                ToolPartition.Category.valueOf(ascii(result, "category", 18)),
+                                (int) integer(result, "source_page", 3, 74),
+                                (int) integer(result, "sort_order", 1, 37));
+                    } catch (IllegalArgumentException invalid) { throw invalidSource(); }
+                });
         try {
-            return new LanguagePartition(languages);
+            return new CharacterCatalogPartition(new LanguagePartition(languages),new ToolPartition(tools));
         } catch (IllegalArgumentException invalid) {
             throw invalidSource();
         }

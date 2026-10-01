@@ -72,7 +72,9 @@ class RuleSourceSchemaContractTest {
             var matcher = Pattern.compile("GRANT SELECT ON `dnd_tool_rules`[.]`(\\w+)` TO 'dnd_tool_rules_" + role + "'@'127[.]0[.]0[.]1';").matcher(grants);
             var tables = new java.util.HashSet<String>();
             while (matcher.find()) tables.add(matcher.group(1));
-            assertEquals(TABLES, tables);
+            var currentTables = new java.util.HashSet<>(TABLES);
+            currentTables.add("rule_tool");
+            assertEquals(currentTables, tables);
             assertEquals("", matcher.replaceAll("").trim());
         }
         String grants = stripComments(Files.readString(Path.of("database/grants/rule-source-installer.sql")));
@@ -88,6 +90,7 @@ class RuleSourceSchemaContractTest {
         assertEquals(Map.of(
                 "rule_release", "INSERT (module_key, release_version, canonical_format_version, archive_format_version, hash_algorithm), UPDATE (canonical_format_version, archive_format_version, hash_algorithm, content_sha256, installation_revision)",
                 "rule_language", "INSERT, DELETE, UPDATE (display_name, description, category, source_page, sort_order)",
+                "rule_tool", "SELECT, INSERT, DELETE",
                 "rule_package_installation", "INSERT (release_id, installation_revision, source_operation_id, operation_fingerprint_version, operation_digest_sha256, author_schema_version, installation_manifest_version, installation_manifest_sha256, package_display_name, verification_scope, observed_content_sha256)",
                 "rule_package_installation_partition", "INSERT",
                 "rule_installation_control", "UPDATE (metadata_row_count, row_version)"), writes);
@@ -98,7 +101,7 @@ class RuleSourceSchemaContractTest {
     void migratorGrantCannotMatchAnotherSchemaThroughUnderscoreWildcards() throws Exception {
         String grants = stripComments(Files.readString(Path.of("database/grants/rule-source-migrator.sql")))
                 .replaceAll("\\s+", " ").trim();
-        assertEquals("GRANT CREATE, ALTER, INDEX, REFERENCES, TRIGGER, SELECT, INSERT, UPDATE, DELETE "
+        assertEquals("GRANT CREATE, CREATE TEMPORARY TABLES, ALTER, INDEX, REFERENCES, TRIGGER, SELECT, INSERT, UPDATE, DELETE "
                 + "ON `dnd\\_tool\\_rules`.* TO 'dnd_tool_rules_migrator'@'127.0.0.1';", grants);
     }
 

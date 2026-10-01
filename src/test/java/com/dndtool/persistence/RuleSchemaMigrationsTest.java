@@ -26,11 +26,12 @@ class RuleSchemaMigrationsTest {
             assertEquals(i + 1, migration.version());
             assertEquals(migration.scriptSha256(), RuleSchemaMigrations.canonicalPayloadSha256(
                     Files.readAllBytes(SOURCE.getParent().resolve(migration.scriptName()))));
-            assertTrue(Files.readString(SOURCE).substring(Files.readString(SOURCE)
+            Path current=SOURCE.getParent().resolve(migration.scriptName());
+            assertTrue(Files.readString(current).substring(Files.readString(current)
                     .indexOf("-- CHECKSUM-SCOPE-END")).contains("'" + migration.scriptSha256() + "'"));
         }
         assertThrows(UnsupportedOperationException.class, () -> chain.clear());
-        assertEquals(19, SchemaMigrations.loadExpectations().size());
+        assertEquals(20, SchemaMigrations.loadExpectations().size());
         assertNull(getClass().getResource("/database/rules/migration/" + SOURCE.getFileName()));
         assertNull(getClass().getResource("/db/migration/" + SOURCE.getFileName()));
     }

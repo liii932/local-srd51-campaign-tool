@@ -1,6 +1,9 @@
 package com.dndtool.offline.rules;
 
 import com.dndtool.module.LanguagePartition;
+import com.dndtool.module.CharacterCatalogPartition;
+import com.dndtool.module.ToolCatalogOracle;
+import com.dndtool.persistence.JdbcRuntimeCharacterCatalogRepository;
 import com.dndtool.persistence.JdbcRuntimeLanguageSnapshotRepository;
 import com.dndtool.persistence.JdbcRuntimeLanguageSnapshotRepository.Identity;
 import com.dndtool.persistence.JdbcSourceLanguageRepository;
@@ -33,12 +36,13 @@ class LanguagePartitionJdbcIT {
         // A previous attempt is not permission to replay installation history or reuse an instance.
         assertEquals(0, count(SOURCE, "SELECT COUNT(*) FROM rule_release"));
         assertEquals(0, count(SOURCE, "SELECT COUNT(*) FROM rule_package_installation"));
-        for (String table : List.of("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language"))
+        for (String table : List.of("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language", "runtime_rule_tool"))
             assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM " + table));
 
         RuleArtifact baselineArtifact = artifact("");
-        assertBoundary(baseline(), baselineArtifact.author().partition(), vector());
+        assertBoundary(baseline(), baselineArtifact.author().languages(), vector());
         install(baselineArtifact, 1, null);
+        verifyTools(baselineArtifact);
         LanguagePartition baseline = readSource(); assertSource(baseline(), baseline, vector(), 1);
         Identity original = append(baseline(), baseline, vector());
 
@@ -51,8 +55,8 @@ class LanguagePartitionJdbcIT {
         int revision = 2; Identity changedSnapshot = null; LanguagePartition current = baseline;
         for (String field : List.of("description", "source_page", "sort_order", "display_name", "unicode")) {
             RuleArtifact artifact = artifact(field); List<Row> expected = changed(field);
-            byte[] bytes = canonical(artifact.author().partition()); assertFalse(Arrays.equals(vector(), bytes));
-            assertBoundary(expected, artifact.author().partition(), bytes);
+            byte[] bytes = canonical(artifact.author().languages()); assertFalse(Arrays.equals(vector(), bytes));
+            assertBoundary(expected, artifact.author().languages(), bytes);
             install(artifact, ++revision, null); current = readSource(); assertSource(expected, current, bytes, revision);
             changedSnapshot = append(expected, current, bytes);
             assertRuntime(original, baseline(), vector());
@@ -63,13 +67,15 @@ class LanguagePartitionJdbcIT {
             assertThrows(SQLException.class, () -> runtime.read(c, mismatch)); c.rollback();
         }
 
-        // Actual installer transaction: the ninth statement reaches MySQL with page=2 and CHECK rejects it.
-        var before = sourceState(); Fault sourceFault = new Fault("rule_language", "range");
-        install(baselineArtifact, revision + 1, sourceFault);
-        assertEquals(9, sourceFault.writes); assertNotNull(sourceFault.databaseFailure);
-        assertEquals(3819, sourceFault.databaseFailure.getErrorCode(), "MySQL CHECK failure, not synthetic JDBC success");
-        assertEquals(0, sourceFault.commits); assertEquals(1, sourceFault.rollbacks);
-        assertTrue(before.equals(sourceState()), "Failed installation must retain all six source tables exactly");
+        // Each domain reaches MySQL with page=2; tool failure must also roll back earlier language writes.
+        for (String table : List.of("rule_language", "rule_tool")) {
+            var before = sourceState(); Fault sourceFault = new Fault(table, "range");
+            install(baselineArtifact, revision + 1, sourceFault);
+            assertEquals(9, sourceFault.writes); assertNotNull(sourceFault.databaseFailure);
+            assertEquals(3819, sourceFault.databaseFailure.getErrorCode(), "MySQL CHECK failure, not synthetic JDBC success");
+            assertEquals(0, sourceFault.commits); assertEquals(1, sourceFault.rollbacks);
+            assertEquals(before, sourceState(), "Failed installation must retain all seven source tables exactly");
+        }
         assertSource(changed("unicode"), readSource(), canonical(current), revision);
 
         for (String failure : List.of("range", "readback", "non-nfc", "later-caller"))
@@ -229,6 +235,7 @@ class LanguagePartitionJdbcIT {
         assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM runtime_run_identity WHERE run_id = ? OR snapshot_id = ?", id.runBytes(), id.snapshotBytes()));
         assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM runtime_rule_snapshot WHERE snapshot_id = ?", id.snapshotBytes()));
         assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM runtime_rule_language WHERE snapshot_id = ?", id.snapshotBytes()));
+        assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM runtime_rule_tool WHERE snapshot_id = ?", id.snapshotBytes()));
     }
     private Connection runtimeTransaction() throws SQLException {
         Connection c = acceptance.open(RUNTIME); c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED); c.setAutoCommit(false); return c;
@@ -241,7 +248,7 @@ class LanguagePartitionJdbcIT {
     private List<String> sourceState() throws SQLException {
         var state = new ArrayList<String>();
         try (Connection c = acceptance.open(SOURCE)) {
-            for (String table : List.of("rule_schema_meta", "rule_release", "rule_language", "rule_package_installation",
+            for (String table : List.of("rule_schema_meta", "rule_release", "rule_language", "rule_tool", "rule_package_installation",
                     "rule_package_installation_partition", "rule_installation_control")) {
                 try (var s = c.createStatement(); var r = s.executeQuery("SELECT * FROM " + table)) {
                     while (r.next()) {
@@ -281,7 +288,7 @@ class LanguagePartitionJdbcIT {
     private RuleArtifact artifact(String change) throws Exception {
         Path root = Files.createDirectory(temp.resolve("package-" + UUID.randomUUID()));
         Path author = Files.createDirectory(root.resolve("author")); Files.createDirectory(author.resolve("character"));
-        for (String file : List.of("author-package.json", "character/languages.json", "package-guide.md", "notice.md"))
+        for (String file : List.of("author-package.json", "character/languages.json", "character/tools.json", "package-guide.md", "notice.md"))
             Files.copy(Path.of("rule-packages/srd51-complete").resolve(file), author.resolve(file));
         if (!change.isEmpty()) {
             Path file = author.resolve("character/languages.json"); var json = JsonParser.parseString(Files.readString(file)).getAsJsonArray();
@@ -302,6 +309,87 @@ class LanguagePartitionJdbcIT {
         assertPartition(expected, actual); assertArrayEquals(bytes, canonical(actual));
     }
     private static byte[] ascii(String value) { return value.getBytes(java.nio.charset.StandardCharsets.US_ASCII); }
+    private void verifyTools(RuleArtifact artifact) throws Exception {
+        var repository=new JdbcRuntimeCharacterCatalogRepository();
+        var author=new CharacterCatalogPartition(artifact.author().languages(),artifact.author().tools());
+        DataSource source=proxy(DataSource.class,(p,method,args)-> {
+            if(!method.getName().equals("getConnection"))throw new AssertionError(method.getName());
+            sourceConnections.incrementAndGet();
+            if(rejectSourceConnections)throw new SQLException("Injected source acquisition outage","FI007");
+            return acceptance.open(SOURCE);
+        });
+        var partition=new JdbcSourceLanguageRepository(source).loadCatalog();
+        assertEquals(author,partition);
+        byte[] independent=java.util.HexFormat.of().parseHex(Files.readString(
+                Path.of("src/test/resources/module-canonical-v2-language-tools.hex")).strip());
+        var encoder=new com.dndtool.module.ModuleCanonicalEncoderV2();
+        assertArrayEquals(independent,encoder.encode(author.projection()));
+        assertArrayEquals(independent,encoder.encode(partition.projection()));
+        try(Connection c=acceptance.open(SOURCE)) {
+            var actual=rows(c,"SELECT tool_key, display_name, description, category, source_page, sort_order FROM rule_tool ORDER BY tool_key");
+            assertEquals(37,actual.size());
+            for(int i=0;i<37;i++) {
+                var e=ToolCatalogOracle.rows().get(i);var a=actual.get(i);
+                assertArrayEquals(ascii(e.key()),(byte[])a.get("tool_key"));
+                assertEquals(e.name(),a.get("display_name"));assertEquals(e.description(),a.get("description"));
+                assertArrayEquals(ascii(e.category()),(byte[])a.get("category"));
+                assertEquals(e.page(),((Number)a.get("source_page")).intValue());assertEquals(e.order(),((Number)a.get("sort_order")).intValue());
+            }
+        }
+        Identity saved=Identity.random();
+        try(Connection c=runtimeTransaction()) {
+            var actual=repository.append(c,saved,partition).partition();
+            assertEquals(partition,actual);assertArrayEquals(independent,encoder.encode(actual.projection()));c.commit();
+        }
+        rejectSourceConnections=true;int connections=sourceConnections.get();
+        try(Connection c=runtimeTransaction()) {
+            var actual=repository.read(c,saved).partition();
+            assertEquals(partition,actual);assertArrayEquals(independent,encoder.encode(actual.projection()));c.rollback();
+        } finally {rejectSourceConnections=false;}
+        assertEquals(connections,sourceConnections.get());
+        for(String kind:List.of("range","readback","non-nfc","later-caller")) {
+            Identity failed=Identity.random();Fault fault=new Fault("runtime_rule_tool",kind);
+            try(Connection c=runtimeTransaction()) {
+                Connection wrapped=fault.wrap(c);
+                if(kind.equals("later-caller"))repository.append(wrapped,failed,partition);
+                else assertThrows(SQLException.class,()->repository.append(wrapped,failed,partition));
+                if(kind.equals("range"))assertEquals(3819,fault.databaseFailure.getErrorCode());
+                c.rollback();
+            }
+            assertAbsent(failed);
+        }
+        for(String bad:List.of("null","unknown-key","wrong-category","duplicate-order","foreign-snapshot")) {
+            Identity candidate=Identity.random();var first=partition.tools().tools().getFirst();
+            try(Connection c=runtimeTransaction()) {
+                repository.append(c,candidate,partition);
+                try(var delete=c.prepareStatement("DELETE FROM runtime_rule_tool WHERE snapshot_id = ? AND tool_key = ?")) {
+                    delete.setBytes(1,candidate.snapshotBytes());delete.setBytes(2,ascii(first.toolKey()));
+                    assertEquals(1,delete.executeUpdate());
+                }
+                try(var insert=c.prepareStatement("INSERT INTO runtime_rule_tool (snapshot_id, tool_key, display_name, description, category, source_page, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+                    insert.setBytes(1,bad.equals("foreign-snapshot")?Identity.random().snapshotBytes():candidate.snapshotBytes());
+                    insert.setBytes(2,ascii(bad.equals("unknown-key")?"tool.unknown":first.toolKey()));
+                    insert.setString(3,first.displayName());insert.setString(4,first.description());
+                    if(bad.equals("null"))insert.setNull(4,Types.VARCHAR);
+                    insert.setBytes(5,ascii(bad.equals("wrong-category")?"GAMING_SET":first.category().name()));
+                    insert.setInt(6,first.sourcePage());insert.setInt(7,bad.equals("duplicate-order")?2:1);
+                    SQLException rejected=assertThrows(SQLException.class,insert::executeUpdate);
+                    int code=switch(bad){case "null"->1048;case "duplicate-order"->1062;case "foreign-snapshot"->1452;default->3819;};
+                    assertEquals(code,rejected.getErrorCode(),bad);
+                }
+                c.rollback();
+            }
+            assertAbsent(candidate);
+        }
+        // Check actual no-UPDATE/no-source-write privileges using the exact additional domain tables.
+        for(var forbidden:Map.of(RUNTIME,"UPDATE runtime_rule_tool SET source_page=source_page WHERE 1=0",
+                SOURCE,"DELETE FROM rule_tool WHERE 1=0").entrySet()) {
+            try(Connection c=acceptance.open(forbidden.getKey());var statement=c.createStatement()) {
+                SQLException denied=assertThrows(SQLException.class,()->statement.executeUpdate(forbidden.getValue()));
+                assertTrue(Set.of(1142,1143).contains(denied.getErrorCode()));
+            }
+        }
+    }
     private static <T> T proxy(Class<T> type, InvocationHandler handler) {
         return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, handler));
     }

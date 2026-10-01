@@ -4,6 +4,8 @@
 准确内容。范围只有 `dnd5e2014_srd51_se` / `1` 的 18 项 `character.language`，不是完整规则
 目录、执行上下文或存档验收。旧 RELEASED v1 仍为默认，完整规则族保持 DRAFT，archive 2
 发布门不变。
+当前作者包和安装同时含语言与工具；本页的语言专用断言保持 18 项，两个分区共同的字段、
+快照与字节核验由 `CharacterCatalogChainTest` 补充，见[工具熟练目录](tool-catalog-partition.md)。
 
 字段与投影以[语言作者分区](language-author-package.md)为准；安装、连接及事务所有权分别沿用
 [离线安装](offline-language-installation.md)、[源分区读取](source-language-reading.md)和
@@ -49,16 +51,15 @@ category 在 page 前。规范键序与显式显示顺序分别检查。
 ## 可重复验证与证据边界
 
 ```bash
-mvn '-Dtest=LanguagePartitionEquivalenceTest,MySqlIntegrationTestSupportTest' test
-mvn clean verify
+mvn '-Dtest=LanguagePartitionEquivalenceTest,CharacterCatalogChainTest,MySqlIntegrationTestSupportTest' test
 ```
 
-第一条命令同时重验数据库测试目标保护；两组测试都不连接真实数据库。链路代理记录生产 SQL
+该命令同时重验数据库测试目标保护；各组测试都不连接真实数据库。链路代理记录生产 SQL
 和参数，并以事务状态模拟提交/回滚。这些结果证明 Java 边界上的字段保留、类型、编码、身份
 与事务调用协议，不证明 MySQL 引擎、驱动、权限、触发器、外键或真实持久化的行为。
 
 真实 JDBC 验收须单独授权物理隔离、可销毁的 MySQL 实例，按[测试指南](../testing.md#31-自动化数据库验证顺序)
-原样重放运行 V001—V019 及独立规则迁移链，分别验证账本、结构和最小权限，再执行完整制品
+原样重放运行 V001—V020 及独立规则 V001—V002，分别验证账本、结构和最小权限，再执行完整制品
 安装、源只读读取、调用方事务镜像写入及指定身份读取。维护证据必须来自实际独立审计，不能
 使用代理测试中的示例报告充当安装授权或真实历史证明。
 
@@ -111,6 +112,10 @@ Unicode 文本、真实 CHECK 拒绝与新连接查询的回滚结果。SQL 的 
 分别记录为引擎拒绝；非 NFC 文本实际写入后由 reader 拒绝。读回异常在真实查询之后注入，后续
 调用方异常由调用方注入，两者验证真实事务回滚。源不可用场景在 DataSource 取连接处注入失败，
 已有镜像仍通过真实 JDBC 读取；它不声称整个 MySQL 实例停机，也不覆盖响应丢失或介质断电。
+同一入口还核对 37 项工具的独立字段/字节、双领域运行回读、非法工具范围与源写权限、
+工具回读和调用方失败后的整笔回滚。语言、工具来源写入分别触发真实范围 CHECK，工具
+镜像还覆盖未知键、分类错配、NULL、重复排序和缺少父快照；失败后的新连接查询确认两领域
+均无部分提交。来源新增 V002 和运行新增 V020 必须一起接受现场审计。
 
 报告必须分列无数据库测试与真实隔离 JDBC 结果。未运行或未获授权的数据库项保留未验收状态，
 不得用代理、静态 SQL 检查、历史通过记录或跳过测试关闭。普通构建不启动数据库或部署；测试

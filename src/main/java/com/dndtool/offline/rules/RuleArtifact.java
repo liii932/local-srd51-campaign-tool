@@ -1,25 +1,25 @@
 package com.dndtool.offline.rules;
 
-import com.dndtool.module.LanguageAuthorPackageReader;
+import com.dndtool.module.CharacterCatalogAuthorPackageReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.*;
 import java.util.*;
 
-/** Complete fixed language artifact, including documentation/license bytes. No database access. */
+/** Complete language and tool artifact, including documentation/license bytes. No database access. */
 public final class RuleArtifact {
     public static final String MANIFEST="installation-manifest.json";
-    public static final int MAX_MANIFEST=16384, MAX_DOCUMENT=65536, MAX_TOTAL=417792;
+    public static final int MAX_MANIFEST=16384, MAX_DOCUMENT=65536, MAX_TOTAL=679936;
     static final Map<String,String> ROLES=Map.of("author-package.json","author-header",
-            "character/languages.json","author-partition","package-guide.md","documentation","notice.md","license");
-    private final LanguageAuthorPackageReader.Result author;
+            "character/languages.json","author-partition","character/tools.json","author-partition","package-guide.md","documentation","notice.md","license");
+    private final CharacterCatalogAuthorPackageReader.Result author;
     private final List<FileFact> files;
     private final String manifestSha256;
-    private RuleArtifact(LanguageAuthorPackageReader.Result author,List<FileFact> files,String hash) {
+    private RuleArtifact(CharacterCatalogAuthorPackageReader.Result author,List<FileFact> files,String hash) {
         this.author=author; this.files=List.copyOf(files); this.manifestSha256=hash;
     }
-    public LanguageAuthorPackageReader.Result author() {return author;}
+    public CharacterCatalogAuthorPackageReader.Result author() {return author;}
     public List<FileFact> files() {return files;}
     public String manifestSha256() {return manifestSha256;}
     public record FileFact(String path,String role,long byteLength,String rawSha256) { }
@@ -40,8 +40,8 @@ public final class RuleArtifact {
                     || !OfflineJson.string(map,"release_version").equals("1")
                     || !OfflineJson.string(map,"hash_algorithm").equals("SHA-256")
                     || !OfflineJson.string(map,"verification_scope").equals("PARTITION")
-                    || !OfflineJson.array(map.get("partition_keys")).equals(List.of("character.language"))) throw OfflineJson.bad();
-            var listed=OfflineJson.array(map.get("files")); if(listed.size()!=4) throw OfflineJson.bad();
+                    || !OfflineJson.array(map.get("partition_keys")).equals(List.of("character.language", "character.tool"))) throw OfflineJson.bad();
+            var listed=OfflineJson.array(map.get("files")); if(listed.size()!=5) throw OfflineJson.bad();
             Map<String,byte[]> bytes=new TreeMap<>(); List<FileFact> facts=new ArrayList<>(); long total=manifest.length;
             for(Object item:listed) {
                 var row=OfflineJson.object(item,"path","role","byte_length","raw_sha256");
@@ -58,7 +58,7 @@ public final class RuleArtifact {
             try(var again=root.newDirectoryStream(Path.of("."),java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
                 if(!SecureFiles.inventory(again).equals(expected))throw new IOException("Artifact inventory changed");
             }
-            var author=new LanguageAuthorPackageReader().read(bytes.get("author-package.json"),bytes.get("character/languages.json"));
+            var author=new CharacterCatalogAuthorPackageReader().read(bytes.get("author-package.json"),bytes.get("character/languages.json"),bytes.get("character/tools.json"));
             return new RuleArtifact(author,facts.stream().sorted(Comparator.comparing(FileFact::path)).toList(),expectedManifestHash);
         }
     }
@@ -70,8 +70,8 @@ public final class RuleArtifact {
             if(!SecureFiles.inventory(root).equals(expected)) throw new IOException("Author inventory mismatch");
             for(String path:ROLES.keySet()) bytes.put(path,SecureFiles.read(root,path,limit(path)));
         }
-        new LanguageAuthorPackageReader().read(bytes.get("author-package.json"),bytes.get("character/languages.json"));
-        StringBuilder json=new StringBuilder("{\"installation_manifest_version\":1,\"author_schema_version\":1,\"module_key\":\"dnd5e2014_srd51_se\",\"release_version\":\"1\",\"canonical_format_version\":2,\"archive_format_version\":2,\"hash_algorithm\":\"SHA-256\",\"verification_scope\":\"PARTITION\",\"partition_keys\":[\"character.language\"],\"files\":[");
+        new CharacterCatalogAuthorPackageReader().read(bytes.get("author-package.json"),bytes.get("character/languages.json"),bytes.get("character/tools.json"));
+        StringBuilder json=new StringBuilder("{\"installation_manifest_version\":1,\"author_schema_version\":1,\"module_key\":\"dnd5e2014_srd51_se\",\"release_version\":\"1\",\"canonical_format_version\":2,\"archive_format_version\":2,\"hash_algorithm\":\"SHA-256\",\"verification_scope\":\"PARTITION\",\"partition_keys\":[\"character.language\",\"character.tool\"],\"files\":[");
         boolean comma=false;
         for(var entry:bytes.entrySet()) {
             if(comma)json.append(',');comma=true;
@@ -87,7 +87,7 @@ public final class RuleArtifact {
         java.nio.file.Files.write(output.resolve(MANIFEST),manifest,java.nio.file.StandardOpenOption.CREATE_NEW);
         String hash=sha256(manifest);read(output,hash);return hash;
     }
-    static int limit(String path) {return switch(path) {case "author-package.json"->8192;case "character/languages.json"->262144;default->MAX_DOCUMENT;};}
+    static int limit(String path) {return switch(path) {case "author-package.json"->8192;case "character/languages.json","character/tools.json"->262144;default->MAX_DOCUMENT;};}
     static void path(String value) {
         if(value.length()>255 || !value.matches("(?:[a-z0-9]+(?:-[a-z0-9]+)*/)*[a-z0-9]+(?:-[a-z0-9]+)*[.][a-z0-9]+")) throw OfflineJson.bad();
         for(String segment:value.split("/")) {

@@ -10,6 +10,10 @@
     {
       "partition_key": "character.language",
       "path": "character/languages.json"
+    },
+    {
+      "partition_key": "character.tool",
+      "path": "character/tools.json"
     }
   ]
 }

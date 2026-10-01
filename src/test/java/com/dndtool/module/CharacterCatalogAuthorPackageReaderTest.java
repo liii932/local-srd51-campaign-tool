@@ -15,7 +15,7 @@ import java.util.HexFormat;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class LanguageAuthorPackageReaderTest {
+class CharacterCatalogAuthorPackageReaderTest {
     private static final Path SOURCE = Path.of("rule-packages/srd51-complete");
     private static final String MATRIX = """
             abyssal|Abyssal|EXOTIC
@@ -37,7 +37,7 @@ class LanguageAuthorPackageReaderTest {
             thieves_cant|Thieves Cant|SECRET
             undercommon|Undercommon|EXOTIC
             """;
-    private final LanguageAuthorPackageReader reader = new LanguageAuthorPackageReader();
+    private final CharacterCatalogAuthorPackageReader reader = new CharacterCatalogAuthorPackageReader();
 
     @Test
     void formalSourceMatchesEveryIndependentFieldAndTypedProjection() throws Exception {
@@ -48,12 +48,12 @@ class LanguageAuthorPackageReaderTest {
         assertEquals(2, result.header().canonicalFormatVersion());
         assertEquals(2, result.header().archiveFormatVersion());
         assertEquals("SHA-256", result.header().hashAlgorithm());
-        assertEquals(18, result.partition().definitions().size());
-        assertEquals(36, result.partition().attributes().size());
+        assertEquals(18, result.languages().definitions().size());
+        assertEquals(36, result.languages().attributes().size());
         String[] expected = MATRIX.strip().split("\n");
         for (int i = 0; i < expected.length; i++) {
             String[] fields = expected[i].split("\\|");
-            var row = result.partition().languages().get(i);
+            var row = result.languages().languages().get(i);
             String key = "language." + fields[0];
             String description = fields[1] + " is an SRD 5.1 language catalog entry.";
             assertEquals(key, row.languageKey());
@@ -62,14 +62,14 @@ class LanguageAuthorPackageReaderTest {
             assertEquals(fields[2], row.category().name());
             assertEquals(59, row.sourcePage());
             assertEquals(i + 1, row.sortOrder());
-            var definition = result.partition().definitions().get(i);
+            var definition = result.languages().definitions().get(i);
             assertEquals("character.language", definition.definitionType());
             assertEquals(key, definition.definitionKey());
             assertEquals(fields[1], definition.displayName());
             assertEquals(description, definition.description());
             assertEquals(i + 1, definition.sortOrder());
-            var category = assertInstanceOf(LanguagePartition.CategoryAttribute.class, result.partition().attributes().get(i * 2));
-            var page = assertInstanceOf(LanguagePartition.SourcePageAttribute.class, result.partition().attributes().get(i * 2 + 1));
+            var category = assertInstanceOf(LanguagePartition.CategoryAttribute.class, result.languages().attributes().get(i * 2));
+            var page = assertInstanceOf(LanguagePartition.SourcePageAttribute.class, result.languages().attributes().get(i * 2 + 1));
             for (var attribute : List.of(category, page)) {
                 assertEquals("character.language", attribute.definitionType());
                 assertEquals(key, attribute.definitionKey());
@@ -99,13 +99,13 @@ class LanguageAuthorPackageReaderTest {
         JsonArray array = JsonParser.parseString(languages()).getAsJsonArray();
         JsonArray reversed = new JsonArray();
         for (int i = 17; i >= 0; i--) reversed.add(array.get(i));
-        assertEquals(original.partition(), read(header(), reversed.toString()).partition());
+        assertEquals(original.languages(), read(header(), reversed.toString()).languages());
         assertArrayEquals(canonical(original), canonical(read(header(), reversed.toString())));
         array.get(2).getAsJsonObject().addProperty("sort_order", 4);
         array.get(3).getAsJsonObject().addProperty("sort_order", 3);
         assertFalse(Arrays.equals(canonical(original), canonical(read(header(), array.toString()))));
-        assertThrows(UnsupportedOperationException.class, () -> original.partition().languages().clear());
-        var mutable = new ArrayList<>(original.partition().languages());
+        assertThrows(UnsupportedOperationException.class, () -> original.languages().languages().clear());
+        var mutable = new ArrayList<>(original.languages().languages());
         var copy = new LanguagePartition(mutable);
         mutable.clear();
         assertEquals(18, copy.languages().size());
@@ -181,7 +181,7 @@ class LanguageAuthorPackageReaderTest {
                 rejects(header().replaceFirst("\"" + field + "\": [12]", "\"" + field + "\": " + token), languages());
             }
         }
-        for (int page : List.of(3, 74)) assertEquals(page, read(header(), changeNumber("source_page", page, 0)).partition().languages().getFirst().sourcePage());
+        for (int page : List.of(3, 74)) assertEquals(page, read(header(), changeNumber("source_page", page, 0)).languages().languages().getFirst().sourcePage());
         for (int page : List.of(2, 75)) rejects(header(), changeNumber("source_page", page, 0));
         for (int order : List.of(0, 19, 2)) rejects(header(), changeNumber("sort_order", order, 0));
     }
@@ -196,7 +196,7 @@ class LanguageAuthorPackageReaderTest {
         }
         var composed = read(header(), change("display_name", "é", 0));
         var decomposed = read(header(), change("display_name", "e\u0301", 0));
-        assertEquals(composed.partition(), decomposed.partition());
+        assertEquals(composed.languages(), decomposed.languages());
         assertNotEquals(composed.authorFiles().get(1).rawSha256(), decomposed.authorFiles().get(1).rawSha256());
         assertArrayEquals(canonical(composed), canonical(decomposed));
         for (String escaped : List.of("\\ud800", "\\udfff", "\\ud800x", "\\ud800\\ud800")) {
@@ -232,12 +232,12 @@ class LanguageAuthorPackageReaderTest {
         byte[] original = canonical(read(header(), languages()));
         for (String field : List.of("display_name", "description")) {
             var result = read(header(), change(field, "Changed", 0));
-            assertEquals("Changed", field.equals("display_name") ? result.partition().definitions().getFirst().displayName()
-                    : result.partition().definitions().getFirst().description());
+            assertEquals("Changed", field.equals("display_name") ? result.languages().definitions().getFirst().displayName()
+                    : result.languages().definitions().getFirst().description());
             assertFalse(Arrays.equals(original, canonical(result)));
         }
         var result = read(header(), changeNumber("source_page", 74, 0));
-        assertEquals(74, ((LanguagePartition.SourcePageAttribute) result.partition().attributes().get(1)).value());
+        assertEquals(74, ((LanguagePartition.SourcePageAttribute) result.languages().attributes().get(1)).value());
         assertFalse(Arrays.equals(original, canonical(result)));
     }
 
@@ -248,13 +248,13 @@ class LanguageAuthorPackageReaderTest {
                 "[[[[[1]]]]]", "{unquoted:1}", "{'a':1}", "[1,]", "{\"a\":1,}")) rejects(json, languages());
         byte[] valid = languages().getBytes(StandardCharsets.UTF_8);
         for (byte[] bad : List.of(new byte[]{(byte)0xc0,(byte)0xaf}, new byte[]{(byte)0xed,(byte)0xa0,(byte)0x80}, new byte[]{(byte)0xe2,(byte)0x82}, new byte[]{(byte)0xff})) {
-            assertThrows(IllegalArgumentException.class, () -> reader.read(bad, valid));
-            assertThrows(IllegalArgumentException.class, () -> reader.read(header().getBytes(StandardCharsets.UTF_8), bad));
+            assertThrows(IllegalArgumentException.class, () -> readComplete(bad, valid));
+            assertThrows(IllegalArgumentException.class, () -> readComplete(header().getBytes(StandardCharsets.UTF_8), bad));
         }
-        assertThrows(IllegalArgumentException.class, () -> reader.read(new byte[LanguageAuthorPackageReader.MAX_HEADER_BYTES + 1], valid));
-        assertThrows(IllegalArgumentException.class, () -> reader.read(header().getBytes(StandardCharsets.UTF_8), new byte[LanguageAuthorPackageReader.MAX_LANGUAGE_BYTES + 1]));
-        rejects(header(), change("description", "a".repeat(LanguageAuthorPackageReader.MAX_STRING_UNITS + 1), 0));
-        assertThrows(IllegalArgumentException.class, () -> reader.read(null, valid));
+        assertThrows(IllegalArgumentException.class, () -> readComplete(new byte[CharacterCatalogAuthorPackageReader.MAX_HEADER_BYTES + 1], valid));
+        assertThrows(IllegalArgumentException.class, () -> readComplete(header().getBytes(StandardCharsets.UTF_8), new byte[CharacterCatalogAuthorPackageReader.MAX_LANGUAGE_BYTES + 1]));
+        rejects(header(), change("description", "a".repeat(CharacterCatalogAuthorPackageReader.MAX_STRING_UNITS + 1), 0));
+        assertThrows(IllegalArgumentException.class, () -> readComplete(null, valid));
         assertThrows(IllegalArgumentException.class, () -> new LanguagePartition(Collections.nCopies(18, null)));
     }
 
@@ -262,12 +262,16 @@ class LanguageAuthorPackageReaderTest {
     void exactByteBudgetsAllowWhitespaceAndBoundsRejectAdversarialShapesPromptly() throws Exception {
         byte[] header = header().getBytes(StandardCharsets.UTF_8);
         byte[] rows = languages().getBytes(StandardCharsets.UTF_8);
-        byte[] paddedHeader = Arrays.copyOf(header, LanguageAuthorPackageReader.MAX_HEADER_BYTES);
-        byte[] paddedRows = Arrays.copyOf(rows, LanguageAuthorPackageReader.MAX_LANGUAGE_BYTES);
+        byte[] paddedHeader = Arrays.copyOf(header, CharacterCatalogAuthorPackageReader.MAX_HEADER_BYTES);
+        byte[] paddedRows = Arrays.copyOf(rows, CharacterCatalogAuthorPackageReader.MAX_LANGUAGE_BYTES);
         Arrays.fill(paddedHeader, header.length, paddedHeader.length, (byte) ' ');
         Arrays.fill(paddedRows, rows.length, paddedRows.length, (byte) '\n');
-        assertEquals(LanguageAuthorPackageReader.MAX_TOTAL_BYTES, paddedHeader.length + paddedRows.length);
-        assertEquals(read(header(), languages()).partition(), reader.read(paddedHeader, paddedRows).partition());
+        byte[] tools = Files.readAllBytes(Path.of("rule-packages/srd51-complete/character/tools.json"));
+        byte[] paddedTools = Arrays.copyOf(tools, CharacterCatalogAuthorPackageReader.MAX_TOOL_BYTES);
+        Arrays.fill(paddedTools, tools.length, paddedTools.length, (byte) ' ');
+        assertEquals(CharacterCatalogAuthorPackageReader.MAX_TOTAL_BYTES, paddedHeader.length + paddedRows.length + paddedTools.length);
+        assertEquals(read(header(), languages()).languages(),
+                new CharacterCatalogAuthorPackageReader().read(paddedHeader, paddedRows, paddedTools).languages());
         String eighteenNumbers = "[" + String.join(",", Collections.nCopies(18, "1")) + "]";
         String nested = "[" + String.join(",", Collections.nCopies(18, eighteenNumbers)) + "]";
         String tokenBomb = "[" + String.join(",", Collections.nCopies(18, nested)) + "]";
@@ -275,7 +279,7 @@ class LanguageAuthorPackageReaderTest {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
             rejects(cachedHeader, tokenBomb);
             rejects(cachedHeader, "[".repeat(10000) + "1" + "]".repeat(10000));
-            rejects(cachedHeader, "\"" + "a".repeat(LanguageAuthorPackageReader.MAX_STRING_UNITS + 1) + "\"");
+            rejects(cachedHeader, "\"" + "a".repeat(CharacterCatalogAuthorPackageReader.MAX_STRING_UNITS + 1) + "\"");
         });
     }
 
@@ -292,23 +296,23 @@ class LanguageAuthorPackageReaderTest {
         String escaped = input.toString().replace("😀", "\\ud83d\\ude00");
         byte[] rawHeader = head.toString().getBytes(StandardCharsets.UTF_8);
         byte[] rawRows = escaped.getBytes(StandardCharsets.UTF_8);
-        assertTrue(rawRows.length <= LanguageAuthorPackageReader.MAX_LANGUAGE_BYTES);
-        byte[] paddedHeader = Arrays.copyOf(rawHeader, LanguageAuthorPackageReader.MAX_HEADER_BYTES);
-        byte[] paddedRows = Arrays.copyOf(rawRows, LanguageAuthorPackageReader.MAX_LANGUAGE_BYTES);
+        assertTrue(rawRows.length <= CharacterCatalogAuthorPackageReader.MAX_LANGUAGE_BYTES);
+        byte[] paddedHeader = Arrays.copyOf(rawHeader, CharacterCatalogAuthorPackageReader.MAX_HEADER_BYTES);
+        byte[] paddedRows = Arrays.copyOf(rawRows, CharacterCatalogAuthorPackageReader.MAX_LANGUAGE_BYTES);
         Arrays.fill(paddedHeader, rawHeader.length, paddedHeader.length, (byte)' ');
         Arrays.fill(paddedRows, rawRows.length, paddedRows.length, (byte)' ');
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
-            var parsed = reader.read(paddedHeader, paddedRows);
-            assertEquals(18, parsed.partition().languages().size());
-            assertEquals(1000, parsed.partition().languages().getFirst().description().codePointCount(0, 2000));
-            assertEquals(36, parsed.partition().attributes().size());
+            var parsed = readComplete(paddedHeader, paddedRows);
+            assertEquals(18, parsed.languages().languages().size());
+            assertEquals(1000, parsed.languages().languages().getFirst().description().codePointCount(0, 2000));
+            assertEquals(36, parsed.languages().attributes().size());
         });
     }
 
     private String header() throws Exception { return Files.readString(SOURCE.resolve("author-package.json")); }
     private String languages() throws Exception { return Files.readString(SOURCE.resolve("character/languages.json")); }
-    private LanguageAuthorPackageReader.Result read(String head, String rows) {
-        return reader.read(head.getBytes(StandardCharsets.UTF_8), rows.getBytes(StandardCharsets.UTF_8));
+    private CharacterCatalogAuthorPackageReader.Result read(String head, String rows) {
+        return readComplete(head.getBytes(StandardCharsets.UTF_8), rows.getBytes(StandardCharsets.UTF_8));
     }
     private void rejects(String head, String rows) { assertThrows(IllegalArgumentException.class, () -> read(head, rows)); }
     private String change(String field, String value, int row) throws Exception {
@@ -321,10 +325,10 @@ class LanguageAuthorPackageReaderTest {
     }
 
     /** Test-only adapter to the existing DRAFT encoder, never a production full-release factory. */
-    private byte[] canonical(LanguageAuthorPackageReader.Result result) throws Exception {
-        var definitions = result.partition().definitions().stream().map(row -> new ModuleCatalog.CatalogDefinition(
+    private byte[] canonical(CharacterCatalogAuthorPackageReader.Result result) throws Exception {
+        var definitions = result.languages().definitions().stream().map(row -> new ModuleCatalog.CatalogDefinition(
                 row.definitionType(), row.definitionKey(), row.displayName(), row.description(), row.sortOrder())).toList();
-        var attributes = result.partition().attributes().stream().map(row -> new ModuleCatalog.CatalogAttribute(
+        var attributes = result.languages().attributes().stream().map(row -> new ModuleCatalog.CatalogAttribute(
                 row.definitionType(), row.definitionKey(), row.attributeKey(), row.attributeOrder(), row.valueType(),
                 row instanceof LanguagePartition.CategoryAttribute category ? new ModuleCatalog.IdentifierValue(category.value().name())
                         : new ModuleCatalog.IntegerValue(((LanguagePartition.SourcePageAttribute) row).value()))).toList();
@@ -336,4 +340,10 @@ class LanguageAuthorPackageReaderTest {
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), definitions, attributes, List.of()));
     }
+    private CharacterCatalogAuthorPackageReader.Result readComplete(byte[] header, byte[] languages) {
+        try {
+            return reader.read(header, languages, Files.readAllBytes(SOURCE.resolve("character/tools.json")));
+        } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+    }
+
 }

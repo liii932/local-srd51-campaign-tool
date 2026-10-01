@@ -1,13 +1,14 @@
 # 规则源语言分区读取
 
 `persistence.JdbcSourceLanguageRepository` 从独立规则 `DataSource` 读取
-`dnd5e2014_srd51_se` / 字符串 `1` 的当前语言分区。`load()` 只返回不可变
-`LanguagePartition`；缺失、未安装、损坏或超出支持范围均失败，不返回部分集合。
+`dnd5e2014_srd51_se` / 字符串 `1` 的当前语言与工具熟练目录。`loadCatalog()` 返回不可变
+`CharacterCatalogPartition`；`load()` 是其语言投影，仍完整验证同次安装的两个分区。
+缺失、未安装、损坏或超出支持范围均失败，不返回部分集合。
 它不产生完整内容摘要、发布批准或运行就绪证明，也不连接 Host、JNDI、启动加载和业务调用方。
 完整规则族保持 DRAFT，旧 RELEASED v1、新战役默认值及既有迁移不变。
 
 结构依据是[规则源 schema](../rule-source-schema.md)，字段、精确语言集合及纯投影沿用
-[语言作者分区](language-author-package.md)。读取不依赖作者文件、离线安装类或旧目录三表。
+[语言作者分区](language-author-package.md)与[工具熟练目录](tool-catalog-partition.md)。读取不依赖作者文件、离线安装类或旧目录三表。
 
 ## 固定读取与当前证据
 
@@ -19,11 +20,12 @@
    NULL 内容摘要及 NULL 发布时间。
 4. 同一源 ID 与当前代次的安装事实，核对准确归属、支持的作者/清单/指纹版本、UUIDv4 网络序、
    小写摘要及包展示文本；当前范围只能是 PARTITION，observed 摘要必须 NULL。
-5. 同一当前事实的分区声明，准确且唯一为 `character.language`。
+5. 同一当前事实的分区声明，准确且唯一为 `character.language`、`character.tool`。
 6. 同一发布根的全部语言行，独立验证准确 18 键、键/分类矩阵及 1—18 排序置换后构造纯分区。
+7. 同一发布根的全部工具行，独立验证准确 37 键、键/分类矩阵及 1—37 排序置换。
 
 所有 SQL 固定、参数绑定，不切库、不执行 DML、DDL 或锁读。每个查询设置 5 秒 JDBC 查询超时；
-头、当前事实及唯一声明允许观察第 2 行，账本允许观察期望数加一，语言允许观察第 19 行后拒绝，
+头与当前事实允许观察第 2 行，分区声明允许第 3 行，账本允许期望数加一，语言允许第 19 行、工具允许第 38 行后拒绝，
 不会截断多余行制造合格集合。该超时不等于连接借用或整次操作的可中断 deadline。
 
 仅当前代次的证据参与本分区读取。旧 COMPLETE 事实可以保留原非 NULL 摘要，而当前 PARTITION
@@ -59,11 +61,10 @@ JDBC 的真实整数值，在转换和使用前检查范围；字符串、浮点
 ## 验证
 
 ```bash
-mvn '-Dtest=JdbcSourceLanguageRepositoryTest,RuleDatabaseSchemaVerifierTest,LanguageAuthorPackageReaderTest,BuiltinModuleReleaseRegistryTest,CampaignArchiveCapabilityBoundaryTest' test
-mvn clean verify
+mvn '-Dtest=JdbcSourceLanguageRepositoryTest,CharacterCatalogChainTest,RuleDatabaseSchemaVerifierTest,CharacterCatalogAuthorPackageReaderTest,ToolAuthorPartitionTest,BuiltinModuleReleaseRegistryTest,CampaignArchiveCapabilityBoundaryTest' test
 ```
 
-无数据库测试使用独立手写的 18 项字段矩阵和 JDBC 故障代理，核对固定读取、投影、类型、当前
+无数据库测试使用独立手写的 18 项语言与 37 项工具字段矩阵和 JDBC 故障代理，核对固定读取、投影、类型、当前
 证据、超量/损坏拒绝及连接资源与失败处置。WAR 审计确认新只读适配器和纯模型存在，规则 SQL、
 作者源、离线安装类和测试夹具不入包。
 

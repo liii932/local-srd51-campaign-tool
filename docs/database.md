@@ -20,14 +20,14 @@
 
 只读验证脚本位于 [database/verify](../database/verify/)，最小授权脚本位于 [database/grants](../database/grants/)。移动和阅读这些文件不会执行 SQL。
 
-V019 在运行链末尾追加永久运行身份登记、不可变快照头和类型化语言镜像三张空表。它不复制旧
-规则目录或创建战役，当前 Repository 只接受 DRAFT 语言 PARTITION。身份、调用方事务、授权
-与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)。应用迁移清单预期
-V001—V019；仍停留在 V018 的数据库不能满足这个候选版本的 schema 诊断。
+V019 建立永久运行身份登记、不可变快照头和类型化语言镜像；V020 追加空工具镜像表。它们不复制旧
+规则目录或创建战役，当前 Repository 只接受 DRAFT PARTITION。身份、调用方事务、授权
+与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。应用迁移清单预期
+V001—V020；未安装 V020 的数据库不能满足这个候选版本的 schema 诊断。
 
 独立 `RULES` 链位于 `database/rules/migration/`，目标为 `dnd_tool_rules.rule_schema_meta`，
-从本链 V001 开始，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
-六表空源、列约束、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)。
+本链包括 V001—V002，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
+七表空源、列约束、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)。
 该本地交付不改变当前单 schema 生产调用链，不建立第二个 JNDI 或执行任何外部迁移/授权。
 
 ## 自动化数据库拓扑与账号职责
@@ -43,7 +43,7 @@ V001—V019；仍停留在 V018 的数据库不能满足这个候选版本的 sc
 | 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
 | 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
 | 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
-| 独立 disposable 实例 | V001—V019 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
+| 独立 disposable 实例 | V001—V020 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
 | 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
 
 运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源
