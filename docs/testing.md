@@ -4,13 +4,21 @@
 
 ## 1. 聚焦测试
 
-修改生产代码前后先运行最相关的测试类，例如：
+默认只运行覆盖本次变化的最小充分测试集合。先检查本次任务的 diff、调用方、共用规则与资源引用，再选择相关测试类，不只按同名类匹配。执行前简述范围和理由，例如：
 
 ```bash
 mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 ```
 
 根据变更覆盖正常行为、边界值、Unicode 码点/NFC、非法冻结数据、旧版本、幂等冲突、事务失败与禁止部分写入。重命名批次还应覆盖受影响的 Servlet 注册、反射字符串、页面资源和脚本引用。
+
+纯文档或 skill 变化只检查内容、链接和格式，不运行 Maven；只确认生产代码可编译时使用 `mvn compile`。定向 `test` 已含前置编译阶段，不需要机械重复 `compile`。保留无匹配测试的失败行为，不用 `failIfNoTests=false` 或 `surefire.failIfNoSpecifiedTests=false` 隐藏选错测试。
+
+只有需要制品时才运行 `package`：相关测试尚未运行时用 `mvn '-Dtest=实际相关测试类' package`；相同代码、资源、依赖和配置已有本次定向通过证据时，可用 `mvn -DskipTests package`，并明确这是跳过测试的打包。生产代码或打包资源变化仍按第 6 节审计 WAR，不能把打包当作全量通过。
+
+`-Dtest` 仅约束 Surefire。使用 `verify`、profile 或多模块 reactor 前检查 POM 及插件绑定，不能据此假定 Failsafe、其他插件或所有模块均已缩小范围。MySQL 集成测试仍按第 3 节单独授权和选择目标。
+
+相关测试失败时先修复并重跑相关范围，不自动扩大为全量。复用本次对相同代码、资源、依赖、配置及相关环境取得的有效结果；后续改动影响证据时才重跑对应范围。不得同时运行会写同一 `target` 的 Maven 命令。
 
 规则模型归属或诊断装配变化时，先覆盖固定 canonical/hash 向量、目录 JDBC、发布门和旧单池诊断：
 
@@ -23,15 +31,17 @@ mvn '-Dtest=ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,ModuleCont
 无数据写入、每次 GET 更新结果及有限 HTTP/日志类别。包迁移打包时排除旧路径残留类，
 特别是旧 listener，避免重复启动诊断；这些无数据库测试不构成真实 MySQL 或部署验收。
 
-## 2. 完整验证
+## 2. 必要时的完整验证
 
-代码、资源、迁移、构建或公开文档整理完成后运行：
+不默认执行裸 `mvn test`、`mvn verify` 或 `mvn clean verify`。只有用户明确要求，当前发布/部署/合并检查点明确要求，或已确认跨模块/共用核心影响且定向覆盖不足时，才运行全量。执行前说明具体影响和覆盖缺口；文件数量、路径、JSP/CSS/资源变化或任务收尾本身不是触发理由。
+
+全量范围和 `clean` 分开判断。通常全量使用 `mvn verify`；有残留产物证据、删除/重命名可能遗留旧产物，或需要可重复的干净候选时才加 `clean`。发布/部署仍遵守[部署指南](deployment.md)要求的干净构建：
 
 ```bash
 mvn clean verify
 ```
 
-报告必须来自完整结束的进程，并包含退出码、测试总数、失败、错误、跳过和最终 `BUILD SUCCESS`/失败。不要从截断或仍在运行的输出宣称成功。
+所有验证报告必须来自已结束的进程，列出实际命令、退出码、测试总数、失败、错误、跳过和最终 `BUILD SUCCESS`/失败，以及未运行范围。不要从截断或仍在运行的输出宣称成功，不将定向通过、零测试或跳过测试表述成全量通过。
 
 普通 `clean verify` 不应写入业务数据库。数据库相关单元测试使用 mock、临时结构或静态 SQL 检查。
 
@@ -191,7 +201,7 @@ mvn '-Dtest=BuiltinModuleReleaseRegistryTest,BuiltinModuleHashManifestTest' test
 默认及重复拒绝、独立批准摘要查询。正整数格式结构不等于支持；expected 查询不等于来源
 状态、摘要相等或完整内容验证。Java `int` 测试不证明 JSON 原 token 的类型和词法已被验证。
 涉及该边界时继续运行 `ModuleCanonicalEncoderV1Test`、`ModuleCanonicalEncoderV2Test`、
-`CampaignArchiveCapabilityBoundaryTest` 及受影响消费者的拒绝回归，再按第 2 节完整验证；
+`CampaignArchiveCapabilityBoundaryTest` 及受影响消费者的拒绝回归，再按第 2 节判断是否需要全量验证；
 生产代码变化还须按第 6 节审计 WAR。这些纯测试无需启用 MySQL 集成测试。
 
 - V001—V018 是不可修改的迁移历史；V011 的角色 DRAFT 目录、V012 的一级创建 schema/profile、

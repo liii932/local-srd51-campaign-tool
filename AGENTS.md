@@ -12,6 +12,14 @@ These instructions apply to automated contributors working in this repository. C
 6. Treat old conversations, historical reports, handoffs and historical test results only as search hints. Re-establish progress from the current repository, Git state and any explicitly authorized external evidence.
 7. Summarize the bounded change, protected contracts and intended verification before implementation.
 
+## Agent collaboration
+
+- The main agent plans the work, delegates execution to subagents, integrates their results and performs the final review. It chooses cohesive task boundaries, the number of subagents and serial or parallel execution according to dependencies, write boundaries and actual need; do not prescribe a fixed count, paired agents or the smallest possible fragments.
+- Create subagents with explicit `model="gpt-6.1-sol"` and `reasoning_effort="xhigh"` (the user's “GPT-6.1-xhigh”). Do not change the main session's model or reasoning setting. If delegation or the specified capability is unavailable, report the limitation; do not silently substitute a model or claim that delegation occurred.
+- Give each subagent sufficient scope, inputs, protected contracts, allowed paths, acceptance criteria and known user changes. Avoid concurrent writes to the same files. Subagents stay within their assignment and check their own work before returning actual changes, verification evidence and remaining issues.
+- The main agent personally reviews the actual diff, relevant contracts and verification evidence. Return defects to the author for correction and review the revised result until it passes. Author self-checks remain required; an additional non-author or cross-agent review is not a prerequisite for the main agent's review or completion.
+- Follow the user's later task-specific directions. Delegation does not expand Git/GitHub, database, deployment, browser-write or other external-action authorization.
+
 ## Sources of truth
 
 - [docs/agent-context.md](docs/agent-context.md): compact orientation and pointers; it does not override the authorities below.
@@ -31,6 +39,8 @@ If these sources conflict, compare the relevant migration, frozen rules and curr
 - Use Windows PowerShell and Windows tool paths only for Windows-specific administration, an explicitly requested Windows implementation, or required interoperability with Tomcat/MySQL/Windows scripts. Use PowerShell syntax and its call operator within that boundary.
 - Keep one Git implementation for a task. Repository `.gitattributes` defines cross-platform line endings; do not normalize or bulk-rewrite the working tree merely to change tools.
 - If a registered native tool is missing, perform one narrow lookup and then use the documented fallback. Do not recursively scan drives or silently change proxy, DNS, firewall or package sources.
+- Run normal local harness scripts for status, planning, checks and local tests without requesting additional approval. Platform execution permissions still apply; invoking a harness script does not authorize database, deployment, Git/GitHub, browser-write or other external actions.
+- Review diffs and file contents directly; do not use hashes as a substitute for review. Unless the user explicitly requests hash verification, do not generate baseline hashes for documentation or routine edits or repeatedly hash the full working tree. Preserve contract-required canonical/persisted digests, hashes at documented security trust boundaries, and build/release WAR audits and candidate/active hash checks.
 
 ## Product and security boundaries
 
@@ -58,13 +68,14 @@ If these sources conflict, compare the relevant migration, frozen rules and curr
 2. Make the smallest cohesive production change. Reuse existing services, repositories, event sequencing, error mapping and security filters.
 3. Treat compatibility as scoped work, not the default priority: protect RELEASED/persisted contracts, but prefer completing and integrating the current DRAFT model over preserving superseded DRAFT behavior.
 4. Keep Servlet/API parsing, service validation, persistence and module-catalog responsibilities separated.
-5. Run targeted tests first, then `mvn clean verify` after code, resource or migration changes.
+5. Default to the smallest sufficient set of related tests, selected from changed behavior, callers and shared contracts; use `mvn '-Dtest=RelatedTest,OtherRelatedTest' test`. Documentation/skill-only changes need no Maven run; compilation-only checks use `mvn compile`. Run full suites only when explicitly requested, required by the current release/deployment/merge checkpoint, or justified by cross-cutting impact that targeted tests cannot cover. Explain that reason before execution; decide whether `clean` is necessary separately. Follow `docs/testing.md` for packaging, result reuse and reporting.
 6. When production code or packaged resources change, audit the WAR for byte size, SHA-256, entry count, required assets and forbidden/sensitive files. Review configuration/resource diffs for embedded secrets.
-7. Update public documentation with stable procedures, not changing PIDs, timestamps, personal paths or one-off execution logs.
+7. Synchronize affected project documentation in the same change as implementation, design, schema, API, configuration or procedure changes; documentation is part of acceptance, not deferred follow-up work. Update the relevant root entry files and `docs/` authorities, links and adoption boundaries; Agent notes or completion reports do not replace project documentation. Write stable procedures, not changing PIDs, timestamps, personal paths or one-off execution logs.
 
 ## Public repository content
 
 - Write public documentation as current contracts and repeatable procedures. Do not preserve migration timelines, dated acceptance claims, local IP addresses, certificate failures, terminal transcripts or machine-specific paths as project guidance.
+- Replace obsolete descriptions rather than append a version-by-version narrative. Keep historical version details only when needed to explain an active compatibility boundary, immutable persisted contract or required migration procedure; use Git history for superseded designs, implementation attempts and change chronology. Keep current behavior and target design explicit without turning project documentation into a changelog. This does not authorize changing applied migrations or frozen contracts.
 - Keep community entry files at the repository root. Put durable documentation under `docs/`, verification SQL under `database/verify/`, account grants under `database/grants/`, integration-test setup under `database/test/`, external configuration examples under `config/` and reusable maintenance tools under `tools/`.
 - Do not move result captures, logs, table dumps, temporary recovery scripts or obsolete planning backups into `legacy`, `archive` or compatibility directories. Extract durable rules first, then delete material with no long-term value.
 - Use conventional root filenames; use lowercase ASCII kebab-case for documentation, scripts, helper SQL and directories; use responsibility-based PascalCase names for Java types. Applied Flyway filenames are exempt and immutable.
