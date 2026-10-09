@@ -2,10 +2,11 @@
 
 应用使用 MySQL 8.0、InnoDB、JDBC 与 Tomcat JNDI DataSource。数据库 schema 是权威持久化状态，应用不会从 Session、本地文件或 JVM 缓存重建业务数据。
 
-当前实现仍把规则目录和运行状态放在 `dnd_tool_se` 单一 schema。目标设计允许在启动时从只读
-规则存储加载并验证不可变目录快照；该快照不是战役业务状态的替代来源，角色、事件、版本和幂等
-结果仍只以运行数据库为权威。物理拆分必须使用前向迁移并遵循
-[静态规则目录与运行数据库分离设计](rule-database-separation.md)。
+当前正式业务仍把规则目录和运行状态放在 `dnd_tool_se` 单一 schema。新 v2 目标使用独立
+来源领域表、启动准备视图和导入期持久化完整运行快照；角色、事件、版本和幂等结果仍只以
+运行数据库为权威。现有语言与工具目录分区尚未提供全规则或战役运行资格。职责见
+[规则存储与版本](design/v2/rule-storage-and-versioning.md)，现状与前向采用边界见
+[规则数据库分离](rule-database-separation.md)。
 
 ## 迁移合同
 

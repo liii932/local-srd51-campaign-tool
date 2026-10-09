@@ -23,6 +23,8 @@ These instructions apply to automated contributors working in this repository. C
 ## Sources of truth
 
 - [docs/agent-context.md](docs/agent-context.md): compact orientation and pointers; it does not override the authorities below.
+- [docs/product.md](docs/product.md): product purpose, current behavior, v2 target workflow and deferred scope.
+- [docs/design/v2/README.md](docs/design/v2/README.md): recorded v2 target decisions and adoption boundaries, not implementation, deployment or release evidence. Project design belongs here rather than in ignored Agent workspaces.
 - [docs/architecture.md](docs/architecture.md): product scope, components, trust and transaction boundaries.
 - [docs/rules/srd-5.1.md](docs/rules/srd-5.1.md): frozen v1 stable keys, algorithms, ranges and canonical encoding.
 - `src/main/resources/db/migration/`: approved, forward-only schema and seed history.
@@ -31,6 +33,7 @@ These instructions apply to automated contributors working in this repository. C
 - [docs/deployment.md](docs/deployment.md): build, rollback, deployment and HTTP acceptance.
 
 If these sources conflict, compare the relevant migration, frozen rules and current code. Do not silently persist data under an invented interpretation.
+Distinguish current behavior from a target design before treating a difference as a conflict. Record adoption gaps explicitly; do not reopen an established v2 decision merely because its implementation is absent. Local design notes are provenance hints, not a competing authority or proof of historical approval.
 
 ## Local command environment
 
