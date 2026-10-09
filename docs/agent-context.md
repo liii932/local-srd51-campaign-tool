@@ -10,6 +10,7 @@
 - Java 21 / Maven WAR / Tomcat 10.1 / Servlet-JSP / 原生 JavaScript / MySQL 8 / JDBC-JNDI / Gson。
 - `dnd5e2014_srd51_se_v1` release 1、canonical/archive 1：`RELEASED`，新战役默认；既有持久化合同不可改写。
 - `dnd5e2014_srd51_se` release 1、canonical/archive 2：仍为 `DRAFT`；可协调演进，跨领域发布门前不可绑定战役或激活存档。发布门见 [完整规则目标](rules/srd-5.1-complete.md)。
+- [产品说明](product.md)与 [v2 设计基线](design/v2/README.md)记录目标，和当前实现分开阅读；理解项目不依赖本地 Agent 目录。
 - 请求解析 → `web`；校验/事务 → `service`；JDBC → `persistence`；冻结目录/规范编码 → `module`；入口安全 → `security`。随机结果、版本推进与审计由服务器拥有，事务不得部分提交。
 
 ## 任务路由（只选相关行）
@@ -19,6 +20,8 @@
 
 | 任务关键词 | 先读合同的相关部分 | 生产入口 / 测试定位 |
 |---|---|---|
+| 产品范围、v2 总体设计、规则版本与存储方向 | [产品说明](product.md)、[v2 设计导航](design/v2/README.md)；按主题选一篇 | 先区分目标已定、待细化和当前实现；不从设计记录推断迁移、发布或部署已完成 |
+| v2 快照绑定、运行生命周期、保存/结束/恢复设计 | [v2 采用边界](design/v2/adoption-boundaries.md)，再读对应主题 | 全域设计入口在 `docs/design/v2/`；未采用能力不虚构生产入口，语言 PARTITION 不构成运行资格 |
 | 规则目录、canonical、hash、发布身份 | [冻结 v1](rules/srd-5.1.md) §2/§11；[v2 目录](rules/character-catalog-v2.md) | `module/ModuleCatalog.java`、`module/BuiltinModuleReleaseRegistry.java`、`module/ModuleCanonicalEncoderV1.java` / `module/ModuleCanonicalEncoderV2.java` |
 | 启动、JNDI、数据库就绪诊断 | [架构](architecture.md) §4/§8；[数据库](database.md) | `web/DatabaseDiagnosticsFactory.java`、`web/DatabaseStartupListener.java` → `service/DatabaseDiagnostics.java` → `persistence/DatabaseSchemaVerifier.java`；`DatabaseDiagnosticsTest`、`DatabaseDiagnosticsFactoryTest`、`HostDatabaseDiagnosticServletTest` |
 | 语言/工具作者 JSON、严格读取、纯分区投影 | [语言作者入口](rules/language-author-package.md)、[工具熟练目录](rules/tool-catalog-partition.md) | `module/CharacterCatalogAuthorPackageReader.java`、`module/CharacterCatalogPartition.java`；`CharacterCatalogAuthorPackageReaderTest`、`ToolAuthorPartitionTest`；正式作者源在仓库根 `rule-packages/srd51-complete/`，不入 WAR |
@@ -50,4 +53,5 @@
 - Pi 在项目受信任且未禁用 skills 时发现 `.agents/skills/`，默认只把名称与描述放入上下文；`AGENTS.md` 引导 Agent 在首个任务加载本 skill。它不是自动执行的启动脚本。
 - 新增 skill 后可在已信任项目中 `/reload` 或重启；显式调用 `/skill:dnd-project-start 具体任务` 可确保加载。其他 Agent 也可按 `AGENTS.md` 的链接读取，无需 Pi 插件。
 - 入口变化时同步修正表中路径。规则正文、安全/事务不变量、账号职责、验证方法只在对应权威文档维护，不在 skill 中复制第二份。
+- 新 v2 产品和跨领域设计维护在 `docs/design/v2/`。本地 SD/CD 编号仅是来源线索；历史提案、任务状态和测试报告不能覆盖正式设计或证明已实现。
 - 动态 Issue/PR、分支、历史测试结果和部署状态不缓存于本文。被忽略的 `.pi/harness/domain-json-rules/` 是本机分域 JSON harness，仅任务明确涉及它时读取，不进入 Git 或 WAR。
