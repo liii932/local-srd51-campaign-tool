@@ -13,10 +13,14 @@
 - 当前资源及有限/无限状态；
 - 各职业当前等级；
 - 当前子职业、已获得特性及有序特性选择；
-- 当前专长及多职业熟练增量。
+- 当前专长及多职业熟练增量；
+- `proficiencyGrants`：每条语言/工具授予的角色键、类别、来源模组/类型/条目、授予槽、
+  `FIXED/CHOICE`、目标模组/条目及压制状态。同一目标的不同来源分别保留，不能从去重后的
+  语言/工具列表重建。初始 `creationSelections` 保留完整授予目标集合，实际贡献排除被压制项。
 
 当前切片尚未投影 ASI 后的六项当前能力值，因此不能用于恢复已经发生 ASI 的角色。补齐该状态
-必须使用 V019 或合并时下一个可用前向迁移，并同时完成数据库读取、严格 codec 和恢复往返；不能
+必须使用后续前向迁移，并同时完成数据库读取、严格 codec 和恢复往返。当前数据库导出会在
+输出前检查真实 ASI 选择和能力变化记录；任一种存在就明确拒绝，不输出丢失当前能力的文件。不能
 把一级创建 `finalScore` 误当成角色当前值。
 
 投影不包含数据库 ID、`row_version`、host epoch、幂等记录、Session/CSRF、完整事件历史、
@@ -42,6 +46,11 @@
 SHA-256 形状、能力集合、资源范围、唯一关系及事件闭包校验。读取结果按稳定键规范排序，因此
 输入数组顺序不改变再次写出的字节顺序。
 
+授予分区的文档校验要求来源属于同角色初始种族、亚种、背景或职业；身份不能重复，完整
+授予目标集合须与初始语言/工具记录一致。数据库导出及直接恢复还使用准确冻结目录重新
+推导完整来源授予，逐条比对，拒绝漏掉重复来源、伪造来源、跨模组或旧 DRAFT 不支持的压制。
+字段能表达压制与跨模组，不代表这些分支已有运行采用资格。
+
 DRAFT 预览无副作用，只返回 `eventTail`、各分区计数和原始载荷 SHA-256。它不把 DRAFT 模组视为
 已发布，也不访问或修改战役状态。
 
@@ -52,10 +61,20 @@ V015 `character_advancement_choice_v2` 父记录存在。format 2 当前状态�
 `state_origin=ARCHIVE_RESTORE`，触发器要求 `acquired_event_id` 指向同一战役、同一角色且类型为
 `CHARACTER_LEVEL_ADVANCED` 的重建事件。两类状态均不可更新。
 
-`JdbcCampaignArchiveV2CharacterStateImportRepository` 只在调用方事务中插入事件和当前状态，不得
+`JdbcCampaignArchiveV2CharacterStateRepository` 在调用方的一致事务中读取全部当前角色分区，
+包括 V022 授予和最小事件闭包，并核对冻结模组与角色来源。包内
+`CampaignArchiveV2DraftExportService` 以只读 REPEATABLE READ 事务连接该 reader 和严格 codec，
+明确读回成功后返回文件字节；它不调用 format 1 导出器，也没有 Host 路由。
+导出使用 `campaign.internal_event_tail`，不从最小事件闭包或 `MAX(event_sequence)` 推算。
+两侧调用方必须先可靠校验不可变目录的完整内容；仓储对发布身份的 header 核对只防串绑，
+不替代内容摘要与完整目录校验。
+`JdbcCampaignArchiveV2CharacterStateImportRepository` 先核对准确目录、全体角色物理映射与来源，
+整战役初始化者先恢复 `campaign.internal_event_tail`；片段仓储在首次插入前锁定该行并要求
+其值与文件 `eventTail` 准确一致，失败零插入，不自行推进或覆盖另一份权威尾。随后在调用方
+事务中直接插入事件和当前状态，包括每条原始授予；不重新执行创建、选择或随机性，不得
 commit 或 rollback。DRAFT 事务服务在借连接前完成第一次严格读取，在 `SERIALIZABLE` 事务内再次
 读取并校验；任一 JDBC 或验证失败由事务所有者整体回滚。整战役替换清理顺序已覆盖 V012—V015
-子表，避免旧 DRAFT 状态阻止角色根重建。
+子表及 V022 授予；授予先于创建快照和角色根清理，避免残留引用阻止重建。
 
 ## 尚未激活的边界
 

@@ -8,6 +8,7 @@ import com.dndtool.persistence.CharacterCardMutationRepository;
 import com.dndtool.persistence.CharacterCardMutationRepository.Action;
 import com.dndtool.persistence.CharacterCardRepository;
 import com.dndtool.module.ModuleCatalog;
+import com.dndtool.module.CharacterProficiencyGrant;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -305,7 +306,40 @@ public final class CharacterCardService {
                 snapshot.characterKey(), snapshot.characterType(), snapshot.characterName(),
                 snapshot.characterStatus(), snapshot.rowVersion(), totalLevel,
                 proficiencyBonus, fields, classes, skills, saves, tiers,
-                itemTemplates, items);
+                itemTemplates, items, proficiencyGrants(snapshot, catalog));
+    }
+
+    private static List<ProficiencyGrantView> proficiencyGrants(
+            CharacterCardRepository.Snapshot snapshot, ModuleCatalog catalog) {
+        var basis = snapshot.proficiencyBasis();
+        if (basis == null) {
+            if (!snapshot.proficiencyGrants().isEmpty()) {
+                throw new IllegalArgumentException("Grant lacks character creation source");
+            }
+            return List.of();
+        }
+        List<CharacterProficiencyGrant> expected = LevelOneCharacterRules.reconstructProficiencyGrants(
+                catalog, basis.raceKey(), basis.subraceKey(), basis.backgroundKey(), basis.classKey(),
+                basis.languages(), basis.tools());
+        if (expected.size() != snapshot.proficiencyGrants().size()
+                || !Set.copyOf(expected).equals(Set.copyOf(snapshot.proficiencyGrants()))) {
+            throw new IllegalArgumentException("Character proficiency grants differ from creation");
+        }
+        return snapshot.proficiencyGrants().stream().map(grant -> {
+            String type = grant.category() == CharacterProficiencyGrant.Category.LANGUAGE
+                    ? "character.language" : "character.tool";
+            String name = catalog.catalogDefinitions().stream()
+                    .filter(value -> value.definitionType().equals(type)
+                            && value.definitionKey().equals(grant.proficiencyKey()))
+                    .map(ModuleCatalog.CatalogDefinition::displayName).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown proficiency target"));
+            String sourceName = catalog.catalogDefinitions().stream()
+                    .filter(value -> value.definitionType().equals(grant.sourceType())
+                            && value.definitionKey().equals(grant.sourceKey()))
+                    .map(ModuleCatalog.CatalogDefinition::displayName).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown proficiency source"));
+            return new ProficiencyGrantView(grant, name, sourceName);
+        }).toList();
     }
 
     private static ProficiencyView proficiencyView(
@@ -635,7 +669,8 @@ public final class CharacterCardService {
             List<ProficiencyView> saves,
             List<TierView> tiers,
             List<ItemTemplateView> itemTemplates,
-            List<ItemView> items) {
+            List<ItemView> items,
+            List<ProficiencyGrantView> proficiencyGrants) {
         public Card {
             fields = List.copyOf(fields);
             classes = List.copyOf(classes);
@@ -644,7 +679,12 @@ public final class CharacterCardService {
             tiers = List.copyOf(tiers);
             itemTemplates = List.copyOf(itemTemplates);
             items = List.copyOf(items);
+            proficiencyGrants = List.copyOf(proficiencyGrants);
         }
+    }
+
+    public record ProficiencyGrantView(
+            CharacterProficiencyGrant grant, String displayName, String sourceDisplayName) {
     }
 
     public record FieldView(

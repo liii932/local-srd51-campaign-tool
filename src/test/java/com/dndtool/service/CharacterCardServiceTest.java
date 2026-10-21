@@ -133,6 +133,68 @@ final class CharacterCardServiceTest {
         assertEquals(3, captured.get(1).integerValue());
     }
 
+    @Test
+    void cardConsumesCompleteGrantProvenanceAndRejectsOmittedDuplicateSource() throws Exception {
+        ModuleCatalog base = catalog();
+        ModuleCatalog grantsCatalog = CharacterProficiencyArchiveTestData.catalog();
+        ModuleCatalog catalog = new ModuleCatalog(base.release(),
+                base.ruleConstants(),
+                base.fieldDefinitions(),
+                base.classDefinitions(),
+                base.proficiencyTiers(),
+                base.proficiencyBonusBands(),
+                base.skillDefinitions(),
+                base.saveDefinitions(),
+                base.itemTemplates(),
+                base.entityTemplates(),
+                base.entityTemplateValues(),
+                base.entityTemplateClassLevels(),
+                base.entityTemplateProficiencies(),
+                base.checkDefinitions(),
+                base.rollModes(),
+                base.eventTemplates(),
+                base.eventChecks(),
+                base.eventEffects(),
+                base.effectDefinitions(),
+                base.effectParameters(),
+                base.mapDefinitions(),
+                base.mapNodes(),
+                base.mapConnections(),
+                grantsCatalog.catalogDefinitions(), grantsCatalog.catalogAttributes(), List.of());
+        var initial = snapshot();
+        var grants = CharacterProficiencyArchiveTestData.grants().stream().map(value ->
+                new com.dndtool.module.CharacterProficiencyGrant(value.category(),
+                        base.release().moduleKey(), value.sourceType(), value.sourceKey(),
+                        value.grantSlotKey(), value.grantKind(), base.release().moduleKey(),
+                        value.proficiencyKey(), value.suppressed())).toList();
+        var basis = new CharacterCardRepository.CreationProficiencyBasis("race.human", null,
+                "background.acolyte", "class.fighter",
+                List.of("language.celestial", "language.common"), List.of("tool.smith_tools"));
+        var valid = withGrants(initial, grants, basis);
+        var result = new CharacterCardService((key, version) -> Optional.of(catalog),
+                key -> Optional.of(valid), command -> null, ignored -> SHA, ignored -> SHA)
+                .load(CHARACTER_KEY);
+        assertEquals(CharacterCardService.LoadStatus.READY, result.status());
+        assertEquals(4, result.card().proficiencyGrants().size());
+        assertEquals("人类", result.card().proficiencyGrants().getFirst().sourceDisplayName());
+        assertEquals("通用语", result.card().proficiencyGrants().getFirst().displayName());
+        var missing = withGrants(initial, grants.subList(1, grants.size()), basis);
+        assertEquals(CharacterCardService.LoadStatus.INVALID_STATE,
+                new CharacterCardService((key, version) -> Optional.of(catalog),
+                        key -> Optional.of(missing), command -> null, ignored -> SHA, ignored -> SHA)
+                        .load(CHARACTER_KEY).status());
+    }
+
+    private static CharacterCardRepository.Snapshot withGrants(
+            CharacterCardRepository.Snapshot source,
+            List<com.dndtool.module.CharacterProficiencyGrant> grants,
+            CharacterCardRepository.CreationProficiencyBasis basis) {
+        return new CharacterCardRepository.Snapshot(source.characterKey(), source.characterType(),
+                source.characterName(), source.characterStatus(), source.rowVersion(), source.binding(),
+                source.fields(), source.classLevels(), source.skillProficiencies(),
+                source.saveProficiencies(), source.items(), grants, basis);
+    }
+
     private static CharacterCardService service(
             CharacterCardRepository.Snapshot snapshot,
             CharacterCardMutationRepository mutationRepository) {
@@ -172,7 +234,8 @@ final class CharacterCardServiceTest {
                 List.of(new CharacterCardRepository.Proficiency(
                         "save.constitution", "proficiency.full")),
                 List.of(new CharacterCardRepository.Item(
-                        1, "MODULE", "item.torch", "火把", "普通照明用火把", 2, "ACTIVE")));
+                        1, "MODULE", "item.torch", "火把", "普通照明用火把", 2, "ACTIVE")),
+                List.of(), null);
     }
 
     private static CharacterCardRepository.Snapshot copy(
@@ -183,7 +246,7 @@ final class CharacterCardServiceTest {
                 source.characterKey(), source.characterType(), source.characterName(),
                 source.characterStatus(), source.rowVersion(), binding, fields,
                 source.classLevels(), source.skillProficiencies(), source.saveProficiencies(),
-                source.items());
+                source.items(), source.proficiencyGrants(), source.proficiencyBasis());
     }
 
     private static ModuleCatalog catalog() {

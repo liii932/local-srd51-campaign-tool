@@ -40,6 +40,7 @@
 | 双目录快照、工具结构、逐字段及字节链路 | [工具熟练目录](rules/tool-catalog-partition.md) | `persistence/JdbcRuntimeCharacterCatalogRepository.java`；`CharacterCatalogChainTest`、`ToolCatalogSchemaTest`；运行 V020、来源 V002；PARTITION 不提供执行资格 |
 | 离线语言安装、制品清单、操作票据、提交查证 | [离线语言安装](rules/offline-language-installation.md) | `offline/rules/RulePackageCli.java`、`offline/rules/SourceInstallation.java`、`offline/rules/JdbcRuleSource.java`；`RuleArtifactTest`、`TicketStoreTest`、`SourceInstallationTest`；离线类不入 WAR |
 | 语言链路等价、独立字段/字节期望、跨快照故障 | [语言分区链路核验](rules/language-partition-equivalence.md) | 测试目录 `offline/rules/LanguagePartitionEquivalenceTest.java`；连接作者、离线安装、源只读及运行分区仓储；代理证据与真实 JDBC 分开报告 |
+| 角色语言／工具授予、来源槽、卡片和内部存档 | [角色授予合同](rules/character-proficiency-grants.md) | `service/LevelOneCharacterRules.java`、`LevelOneCharacterCreationService.java`、`persistence/JdbcCharacterProficiencyGrantRepository.java`；运行 V022；`CharacterCardService` 与内部 format 2 读写；旧 DRAFT 路径不等于 schema 2 业务初始化 |
 | v1 战役创建、角色创建、角色卡 | [冻结 v1](rules/srd-5.1.md) §3—5；[架构](architecture.md) §6 | `service/CampaignCreationService.java`、`service/CharacterCreationService.java`、`service/CharacterCardService.java` |
 | v2 一级创建、种族、背景、初始选择 | [一级创建](rules/character-creation-v2.md) | `service/LevelOneCharacterCreationService.java`；`LevelOneCharacterRulesTest` |
 | 升级、HP、生命骰 | [升级](rules/level-advancement-v2.md) | `service/LevelAdvancementService.java`；`LevelAdvancementRulesTest` |

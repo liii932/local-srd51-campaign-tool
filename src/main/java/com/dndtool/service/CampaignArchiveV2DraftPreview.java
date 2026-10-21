@@ -22,7 +22,7 @@ final class CampaignArchiveV2DraftPreview {
                 state.features().size(),
                 state.featureChoices().size(),
                 state.feats().size(),
-                state.multiclassProficiencies().size());
+                state.multiclassProficiencies().size(), state.proficiencyGrants().size());
         return new Result(Status.READY,
                 new Preview(state.eventTail(), counts, CampaignArchiveDigest.sha256(content)));
     }
@@ -42,7 +42,8 @@ final class CampaignArchiveV2DraftPreview {
             int features,
             int featureChoices,
             int feats,
-            int multiclassProficiencies) {
+            int multiclassProficiencies,
+            int proficiencyGrants) {
     }
 
     record Preview(long eventTail, Counts counts, String rawPayloadSha256) {

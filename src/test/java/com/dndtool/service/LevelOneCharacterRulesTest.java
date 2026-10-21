@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.dndtool.module.ModuleCatalog;
+import com.dndtool.module.CharacterProficiencyGrant;
+import com.dndtool.module.CharacterProficiencyGrant.Category;
+import com.dndtool.module.CharacterProficiencyGrant.GrantKind;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,135 @@ class LevelOneCharacterRulesTest {
                 result.skills());
         assertEquals(List.of("save.constitution", "save.strength"), result.saves());
         assertEquals(64, result.previewDigestSha256().length());
+        assertEquals(List.of(
+                grant(Category.LANGUAGE, "character.background", "background.acolyte", GrantKind.CHOICE, "language.celestial"),
+                grant(Category.LANGUAGE, "character.background", "background.acolyte", GrantKind.CHOICE, "language.draconic"),
+                grant(Category.LANGUAGE, "character.race", "race.dwarf", GrantKind.FIXED, "language.common"),
+                grant(Category.LANGUAGE, "character.race", "race.dwarf", GrantKind.FIXED, "language.dwarvish"),
+                grant(Category.TOOL, "character.race", "race.dwarf", GrantKind.CHOICE, "tool.smith_tools")),
+                result.proficiencyGrants());
+    }
+
+    @Test
+    void reconstructsExactSourceFactsAndRejectsMissingFixedAndForgedSelections() {
+        var prepared = new LevelOneCharacterRules().prepare(catalog(), validRequest(), 7L, HASH);
+        assertEquals(prepared.proficiencyGrants(), LevelOneCharacterRules.reconstructProficiencyGrants(
+                catalog(), "race.dwarf", "subrace.hill_dwarf", "background.acolyte", "class.fighter",
+                prepared.languages(), prepared.tools()));
+        assertThrows(LevelOneCharacterRules.RuleException.class, () ->
+                LevelOneCharacterRules.reconstructProficiencyGrants(catalog(), "race.dwarf",
+                        "subrace.hill_dwarf", "background.acolyte", "class.fighter",
+                        List.of("language.celestial", "language.draconic", "language.dwarvish"),
+                        prepared.tools()));
+        assertThrows(LevelOneCharacterRules.RuleException.class, () ->
+                LevelOneCharacterRules.reconstructProficiencyGrants(catalog(), "race.dwarf",
+                        "subrace.hill_dwarf", "background.acolyte", "class.fighter",
+                        prepared.languages(), List.of("tool.unknown")));
+    }
+
+    @Test
+    void preservesParentChoiceOwnershipWhenCandidatesOverlapAndRequireBacktracking() {
+        ModuleCatalog base = catalog();
+        List<ModuleCatalog.CatalogAttribute> attributes = new java.util.ArrayList<>(base.catalogAttributes());
+        attributes.replaceAll(row -> row.attributeKey().equals("creation.level_one_profile")
+                && row.definitionKey().equals("race.dwarf")
+                ? profile("character.race", "race.dwarf", "bonus=constitution+2|language=1:celestial,draconic|subrace=required|tool=smith_tools")
+                : row.attributeKey().equals("creation.level_one_profile")
+                && row.definitionKey().equals("background.acolyte")
+                ? profile("character.background", "background.acolyte", "language=1:celestial|skill=insight,religion|start=1:starting.background.acolyte.equipment")
+                : row);
+        ModuleCatalog changed = withAttributes(base, attributes);
+        var result = new LevelOneCharacterRules().prepare(changed,
+                request(List.of("skill.athletics"), List.of("language.celestial", "language.draconic"), List.of()),
+                7L, HASH);
+        assertEquals(List.of(
+                grant(Category.LANGUAGE, "character.background", "background.acolyte", GrantKind.CHOICE, "language.celestial"),
+                grant(Category.LANGUAGE, "character.race", "race.dwarf", GrantKind.CHOICE, "language.draconic"),
+                grant(Category.TOOL, "character.race", "race.dwarf", GrantKind.FIXED, "tool.smith_tools")),
+                result.proficiencyGrants());
+    }
+
+    @Test
+    void rejectsMissingFrozenTargetsEvenWhenTheBrokenCandidateWasNotChosen() {
+        ModuleCatalog base = catalog();
+        List<ModuleCatalog.CatalogAttribute> attributes = new java.util.ArrayList<>(base.catalogAttributes());
+        attributes.replaceAll(row -> row.attributeKey().equals("creation.level_one_profile")
+                && row.definitionKey().equals("background.acolyte")
+                ? profile("character.background", "background.acolyte", "language=2:celestial,draconic,unknown|skill=insight,religion|start=1:starting.background.acolyte.equipment")
+                : row);
+        assertEquals("MALFORMED_FROZEN_CATALOG", assertThrows(LevelOneCharacterRules.RuleException.class,
+                () -> new LevelOneCharacterRules().prepare(withAttributes(base, attributes),
+                        validRequest(), 7L, HASH)).code());
+    }
+
+    @Test
+    void retainsEveryFixedSourceWhileTheLanguageAndToolTargetsRemainDistinct() {
+        ModuleCatalog base = catalog();
+        List<ModuleCatalog.CatalogAttribute> attributes = new java.util.ArrayList<>(base.catalogAttributes());
+        attributes.replaceAll(row -> row.attributeKey().equals("creation.level_one_profile")
+                && row.definitionKey().equals("race.dwarf")
+                ? profile("character.race", "race.dwarf", "bonus=constitution+2|language=common,dwarvish|subrace=required|tool=smith_tools")
+                : row.attributeKey().equals("creation.level_one_profile")
+                && row.definitionKey().equals("background.acolyte")
+                ? profile("character.background", "background.acolyte", "language=common|skill=insight,religion|start=1:starting.background.acolyte.equipment")
+                : row.attributeKey().equals("creation.level_one_profile")
+                && row.definitionKey().equals("class.fighter")
+                ? profile("character.class", "class.fighter", "hp=10|save=constitution,strength|skill=1:athletics,history,insight|start=1:starting.class.fighter.a,starting.class.fighter.b|tool=smith_tools")
+                : row);
+        ModuleCatalog changed = withAttributes(base, attributes);
+        var result = new LevelOneCharacterRules().prepare(changed,
+                request(List.of("skill.athletics"), List.of(), List.of()), 7L, HASH);
+        assertEquals(List.of("language.common", "language.dwarvish"), result.languages());
+        assertEquals(List.of("tool.smith_tools"), result.tools());
+        List<CharacterProficiencyGrant> expected = List.of(
+                grant(Category.LANGUAGE, "character.background", "background.acolyte", GrantKind.FIXED, "language.common"),
+                grant(Category.LANGUAGE, "character.race", "race.dwarf", GrantKind.FIXED, "language.common"),
+                grant(Category.LANGUAGE, "character.race", "race.dwarf", GrantKind.FIXED, "language.dwarvish"),
+                grant(Category.TOOL, "character.class", "class.fighter", GrantKind.FIXED, "tool.smith_tools"),
+                grant(Category.TOOL, "character.race", "race.dwarf", GrantKind.FIXED, "tool.smith_tools"));
+        assertEquals(expected, result.proficiencyGrants());
+        assertEquals(expected, LevelOneCharacterRules.reconstructProficiencyGrants(changed,
+                "race.dwarf", "subrace.hill_dwarf", "background.acolyte", "class.fighter",
+                result.languages(), result.tools()));
+        assertEquals("DUPLICATE_OR_MALFORMED_SELECTION", assertThrows(LevelOneCharacterRules.RuleException.class,
+                () -> LevelOneCharacterRules.reconstructProficiencyGrants(changed,
+                        "race.dwarf", "subrace.hill_dwarf", "background.acolyte", "class.fighter",
+                        List.of("language.common", "language.common", "language.dwarvish"),
+                        result.tools())).code());
+    }
+
+    @Test
+    void stillRejectsRepeatedChoiceInputsAndChoicesOverlappingAnyFixedSource() {
+        assertEquals("DUPLICATE_OR_MALFORMED_SELECTION", assertThrows(LevelOneCharacterRules.RuleException.class,
+                () -> new LevelOneCharacterRules().prepare(catalog(),
+                        request(List.of("skill.athletics"),
+                                List.of("language.celestial", "language.celestial"),
+                                List.of("tool.smith_tools")), 7L, HASH)).code());
+        assertEquals("DUPLICATE_SELECTION", assertThrows(LevelOneCharacterRules.RuleException.class,
+                () -> new LevelOneCharacterRules().prepare(catalog(),
+                        request(List.of("skill.athletics"),
+                                List.of("language.common", "language.draconic"),
+                                List.of("tool.smith_tools")), 7L, HASH)).code());
+    }
+
+    private static CharacterProficiencyGrant grant(Category category, String sourceType,
+            String sourceKey, GrantKind kind, String target) {
+        return new CharacterProficiencyGrant(category, "dnd5e2014_srd51_se", sourceType,
+                sourceKey, "creation." + category.name().toLowerCase(java.util.Locale.ROOT)
+                        + "." + kind.name().toLowerCase(java.util.Locale.ROOT),
+                kind, "dnd5e2014_srd51_se", target, false);
+    }
+
+    private static ModuleCatalog withAttributes(ModuleCatalog base,
+            List<ModuleCatalog.CatalogAttribute> attributes) {
+        return new ModuleCatalog(base.release(), base.ruleConstants(), base.fieldDefinitions(),
+                base.classDefinitions(), base.proficiencyTiers(), base.proficiencyBonusBands(),
+                base.skillDefinitions(), base.saveDefinitions(), base.itemTemplates(),
+                base.entityTemplates(), base.entityTemplateValues(), base.entityTemplateClassLevels(),
+                base.entityTemplateProficiencies(), base.checkDefinitions(), base.rollModes(),
+                base.eventTemplates(), base.eventChecks(), base.eventEffects(), base.effectDefinitions(),
+                base.effectParameters(), base.mapDefinitions(), base.mapNodes(), base.mapConnections(),
+                base.catalogDefinitions(), attributes, base.catalogRelations());
     }
 
     @Test
@@ -80,6 +212,13 @@ class LevelOneCharacterRulesTest {
                 definition("character.subrace", "subrace.hill_dwarf", 1),
                 definition("character.background", "background.acolyte", 1),
                 definition("character.class", "class.fighter", 1),
+                definition("character.language", "language.common", 1),
+                definition("character.language", "language.dwarvish", 2),
+                definition("character.language", "language.celestial", 3),
+                definition("character.language", "language.draconic", 4),
+                definition("character.tool", "tool.brewer_supplies", 1),
+                definition("character.tool", "tool.mason_tools", 2),
+                definition("character.tool", "tool.smith_tools", 3),
                 definition("character.feature", "feature.fighter.second_wind", 1),
                 definition("character.resource", "resource.hit_dice.d10", 1),
                 definition("character.resource", "resource.fighter.second_wind", 2));

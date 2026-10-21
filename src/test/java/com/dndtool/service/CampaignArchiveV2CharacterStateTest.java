@@ -44,6 +44,53 @@ final class CampaignArchiveV2CharacterStateTest {
     }
 
     @Test
+    void retainsEveryGrantAgainstIndependentBytesAndRejectsForgedOrMissingProvenance() {
+        var state = state().validated(CHARACTERS, CharacterProficiencyArchiveTestData.catalog());
+        assertEquals(4, state.proficiencyGrants().size());
+        String grantJson = "\"proficiencyGrants\":["
+                + grantJson("LANGUAGE", "character.background", "background.acolyte", "creation.language.choice", "CHOICE", "language.celestial") + ","
+                + grantJson("LANGUAGE", "character.class", "class.fighter", "creation.language.fixed", "FIXED", "language.common") + ","
+                + grantJson("LANGUAGE", "character.race", "race.human", "creation.language.fixed", "FIXED", "language.common") + ","
+                + grantJson("TOOL", "character.background", "background.acolyte", "creation.tool.fixed", "FIXED", "tool.smith_tools") + "]";
+        assertTrue(json().contains(grantJson));
+        assertStatus(CampaignArchiveV2CharacterStateCodec.Status.INVALID_STRUCTURE,
+                json().replace(grantJson, "\"omittedGrants\":[]"));
+        assertStatus(CampaignArchiveV2CharacterStateCodec.Status.INVALID_VALUE,
+                json().replace("\"sourceKey\":\"race.human\"", "\"sourceKey\":\"race.dwarf\""));
+        var missingDuplicateSource = withGrants(state, state.proficiencyGrants().stream()
+                .filter(row -> !row.grant().sourceType().equals("character.class")).toList());
+        // The target remains granted by the race; the exact catalog still requires the class fact.
+        assertThrows(IllegalArgumentException.class, () -> missingDuplicateSource.validated(
+                CHARACTERS, CharacterProficiencyArchiveTestData.catalog()));
+        var first = state.proficiencyGrants().getFirst();
+        var grant = first.grant();
+        var forged = new com.dndtool.module.CharacterProficiencyGrant(grant.category(),
+                "other_module", grant.sourceType(), grant.sourceKey(), grant.grantSlotKey(),
+                grant.grantKind(), grant.targetModuleKey(), grant.proficiencyKey(), grant.suppressed());
+        List<ProficiencyGrant> rows = new ArrayList<>(state.proficiencyGrants());
+        rows.set(0, new ProficiencyGrant(CHARACTER, forged));
+        assertThrows(IllegalArgumentException.class, () -> withGrants(state, rows).validated(
+                CHARACTERS, CharacterProficiencyArchiveTestData.catalog()));
+    }
+
+    private static String grantJson(String category, String sourceType, String sourceKey,
+            String slot, String kind, String target) {
+        return "{\"characterKey\":\"" + CHARACTER + "\",\"category\":\"" + category
+                + "\",\"sourceModuleKey\":\"dnd5e2014_srd51_se\",\"sourceType\":\"" + sourceType
+                + "\",\"sourceKey\":\"" + sourceKey + "\",\"grantSlotKey\":\"" + slot
+                + "\",\"grantKind\":\"" + kind + "\",\"targetModuleKey\":\"dnd5e2014_srd51_se\""
+                + ",\"proficiencyKey\":\"" + target + "\",\"suppressed\":false}";
+    }
+
+    private static CampaignArchiveV2CharacterState withGrants(
+            CampaignArchiveV2CharacterState state, List<ProficiencyGrant> grants) {
+        return new CampaignArchiveV2CharacterState(2, state.eventTail(), state.stateEvents(),
+                state.creationSnapshots(), state.creationSelections(), state.resources(),
+                state.classLevels(), state.subclasses(), state.features(), state.featureChoices(),
+                state.feats(), state.multiclassProficiencies(), grants);
+    }
+
+    @Test
     void previewReportsEveryCurrentCharacterRulesPartitionAndRawDigest() {
         byte[] content = CampaignArchiveV2CharacterStateCodec.write(state(), CHARACTERS);
 
@@ -53,7 +100,7 @@ final class CampaignArchiveV2CharacterStateTest {
         assertEquals(CampaignArchiveV2DraftPreview.Status.READY, result.status());
         assertEquals(12, result.preview().eventTail());
         assertEquals(new CampaignArchiveV2DraftPreview.Counts(
-                2, 1, 1, 1, 2, 1, 1, 1, 1, 1), result.preview().counts());
+                2, 1, 4, 1, 2, 1, 1, 1, 1, 1, 4), result.preview().counts());
         assertEquals(CampaignArchiveDigest.sha256(content), result.preview().rawPayloadSha256());
     }
 
@@ -112,7 +159,46 @@ final class CampaignArchiveV2CharacterStateTest {
         assertInvalid(new CampaignArchiveV2CharacterState(
                 2, 7, valid.stateEvents(), valid.creationSnapshots(), valid.creationSelections(),
                 valid.resources(), valid.classLevels(), valid.subclasses(), valid.features(),
-                valid.featureChoices(), valid.feats(), valid.multiclassProficiencies()));
+                valid.featureChoices(), valid.feats(), valid.multiclassProficiencies(), valid.proficiencyGrants()));
+    }
+
+    @Test
+    void draftExportConnectsConsistentReaderToStrictBytesAndRestoresConnection() throws Exception {
+        Fixture fixture = new Fixture();
+        var service = new CampaignArchiveV2DraftExportService(fixture.dataSource(),
+                (connection, campaign, release, catalog) -> {
+                    assertFalse(connection.getAutoCommit());
+                    assertTrue(connection.isReadOnly());
+                    assertEquals(Connection.TRANSACTION_REPEATABLE_READ, connection.getTransactionIsolation());
+                    assertEquals(7, campaign);
+                    assertEquals(9, release);
+                    fixture.calls.add("read");
+                    return state();
+                });
+        byte[] bytes = service.exportState(7, 9, CharacterProficiencyArchiveTestData.catalog());
+        assertTrue(new String(bytes, StandardCharsets.UTF_8).contains(
+                grantJson("TOOL", "character.background", "background.acolyte",
+                        "creation.tool.fixed", "FIXED", "tool.smith_tools")));
+        assertEquals(List.of("read", "commit"), fixture.calls);
+        assertTrue(fixture.autoCommit);
+        assertFalse(fixture.readOnly);
+        assertEquals(Connection.TRANSACTION_READ_COMMITTED, fixture.isolation);
+        assertTrue(fixture.closed);
+        Fixture failed = new Fixture();
+        assertThrows(SQLException.class, () -> new CampaignArchiveV2DraftExportService(
+                failed.dataSource(), (connection, campaign, release, catalog) -> {
+                    throw new SQLException("bad export source");
+                }).exportState(7, 9, CharacterProficiencyArchiveTestData.catalog()));
+        assertEquals(List.of("rollback"), failed.calls);
+        assertTrue(failed.autoCommit);
+        assertTrue(failed.closed);
+        Fixture brokenProvenance = new Fixture();
+        assertThrows(IllegalArgumentException.class, () -> new CampaignArchiveV2DraftExportService(
+                brokenProvenance.dataSource(), (connection, campaign, release, catalog) ->
+                        withGrants(state(), List.of())).exportState(
+                                7, 9, CharacterProficiencyArchiveTestData.catalog()));
+        assertEquals(List.of("rollback"), brokenProvenance.calls);
+        assertTrue(brokenProvenance.closed);
     }
 
     @Test
@@ -178,8 +264,10 @@ final class CampaignArchiveV2CharacterStateTest {
                         CHARACTER, 1, "a".repeat(64), "b".repeat(64),
                         "ability.standard_array_v1", "race.human", null,
                         "background.acolyte", "class.fighter", abilities, 12)),
-                List.of(new CreationSelection(
-                        CHARACTER, "SKILL", 1, "skill.athletics")),
+                List.of(new CreationSelection(CHARACTER, "SKILL", 1, "skill.athletics"),
+                        new CreationSelection(CHARACTER, "LANGUAGE", 1, "language.common"),
+                        new CreationSelection(CHARACTER, "LANGUAGE", 2, "language.celestial"),
+                        new CreationSelection(CHARACTER, "TOOL", 1, "tool.smith_tools")),
                 List.of(new ResourceState(
                         CHARACTER, "resource.hit_points", 12, 12, false)),
                 List.of(
@@ -195,7 +283,9 @@ final class CampaignArchiveV2CharacterStateTest {
                         "character.feature", "feature.fighter.fighting_style.archery", 1)),
                 List.of(new FeatState(CHARACTER, "feat.grappler", 8)),
                 List.of(new MulticlassProficiency(
-                        CHARACTER, "class.rogue", "proficiency.armor.light", 8)));
+                        CHARACTER, "class.rogue", "proficiency.armor.light", 8)),
+                CharacterProficiencyArchiveTestData.grants().stream()
+                        .map(grant -> new ProficiencyGrant(CHARACTER, grant)).toList());
     }
 
     private static CampaignArchiveV2CharacterState withEvents(
@@ -203,7 +293,7 @@ final class CampaignArchiveV2CharacterStateTest {
         return new CampaignArchiveV2CharacterState(
                 2, 12, events, state.creationSnapshots(), state.creationSelections(),
                 state.resources(), state.classLevels(), state.subclasses(), state.features(),
-                state.featureChoices(), state.feats(), state.multiclassProficiencies());
+                state.featureChoices(), state.feats(), state.multiclassProficiencies(), state.proficiencyGrants());
     }
 
     private static CampaignArchiveV2CharacterState withFeats(
@@ -211,7 +301,7 @@ final class CampaignArchiveV2CharacterStateTest {
         return new CampaignArchiveV2CharacterState(
                 2, 12, state.stateEvents(), state.creationSnapshots(), state.creationSelections(),
                 state.resources(), state.classLevels(), state.subclasses(), state.features(),
-                state.featureChoices(), feats, state.multiclassProficiencies());
+                state.featureChoices(), feats, state.multiclassProficiencies(), state.proficiencyGrants());
     }
 
     private static void assertInvalid(CampaignArchiveV2CharacterState state) {

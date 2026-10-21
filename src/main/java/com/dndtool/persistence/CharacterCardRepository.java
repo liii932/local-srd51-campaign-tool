@@ -1,6 +1,7 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.ModuleCatalog;
+import com.dndtool.module.CharacterProficiencyGrant;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
@@ -20,13 +21,25 @@ public interface CharacterCardRepository {
             List<ClassLevel> classLevels,
             List<Proficiency> skillProficiencies,
             List<Proficiency> saveProficiencies,
-            List<Item> items) {
+            List<Item> items,
+            List<CharacterProficiencyGrant> proficiencyGrants,
+            CreationProficiencyBasis proficiencyBasis) {
         public Snapshot {
             fields = List.copyOf(fields);
             classLevels = List.copyOf(classLevels);
             skillProficiencies = List.copyOf(skillProficiencies);
             saveProficiencies = List.copyOf(saveProficiencies);
             items = List.copyOf(items);
+            proficiencyGrants = List.copyOf(proficiencyGrants);
+        }
+    }
+
+    record CreationProficiencyBasis(
+            String raceKey, String subraceKey, String backgroundKey, String classKey,
+            List<String> languages, List<String> tools) {
+        public CreationProficiencyBasis {
+            languages = List.copyOf(languages);
+            tools = List.copyOf(tools);
         }
     }
 

@@ -29,6 +29,8 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - schema 2 的[来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md)提供只读来源复核、
   类型化最终规则与完整覆盖链的原子保存、独立读回、操作查证和准确恢复绑定；范围为内部材料，
   尚不创建战役或开放游戏执行；
+- DRAFT 的[角色语言／工具授予](./docs/rules/character-proficiency-grants.md)在一级创建中保留来源与槽，
+  并由角色卡和内部角色存档读取、校验及直接恢复；仍依赖旧单发布目录，尚未接通 schema 2 业务初始化；
 - schema 2 的[初始授予计划](./docs/rules/schema-2-proficiency-grants.md)将真实角色来源、稳定授予槽和
   跨模组目标纳入严格作者输入、类型化来源及运行快照，由实际快照读回生成固定／选择授予与抑制事实；
   仍属内部计划，不写角色工作集、不开放新运行或工具检定；

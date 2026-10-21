@@ -88,6 +88,44 @@ final class CampaignArchiveV2CharacterStateValidator {
             }
         }
 
+        Set<String> grantIdentities = new HashSet<>();
+        Map<String, Set<String>> grantedTargets = new HashMap<>();
+        for (ProficiencyGrant row : state.proficiencyGrants()) {
+            if (row == null || !characters.contains(row.characterKey()) || row.grant() == null) {
+                throw invalid();
+            }
+            var grant = row.grant();
+            CreationSnapshot source = snapshotByCharacter.get(row.characterKey());
+            String sourceKey = switch (grant.sourceType()) {
+                case "character.race" -> source.raceKey();
+                case "character.subrace" -> source.subraceKey();
+                case "character.background" -> source.backgroundKey();
+                case "character.class" -> source.classKey();
+                default -> throw invalid();
+            };
+            if (!grant.sourceKey().equals(sourceKey)
+                    || !grantIdentities.add(relation(row.characterKey(), grant.category().name(),
+                            grant.sourceModuleKey(), grant.sourceType(), grant.sourceKey(),
+                            grant.grantSlotKey(), grant.targetModuleKey(), grant.proficiencyKey()))) {
+                throw invalid();
+            }
+            grantedTargets.computeIfAbsent(relation(row.characterKey(), grant.category().name()),
+                    ignored -> new HashSet<>()).add(grant.proficiencyKey());
+        }
+        for (String character : characters) {
+            for (String category : List.of("LANGUAGE", "TOOL")) {
+                Set<String> selected = new HashSet<>();
+                for (CreationSelection selection : state.creationSelections()) {
+                    if (selection.characterKey().equals(character)
+                            && selection.selectionKind().equals(category)) {
+                        selected.add(selection.selectionKey());
+                    }
+                }
+                if (!selected.equals(grantedTargets.getOrDefault(
+                        relation(character, category), Set.of()))) throw invalid();
+            }
+        }
+
         Set<String> resources = new HashSet<>();
         for (ResourceState resource : state.resources()) {
             boolean bounded = resource != null && !resource.unlimited()
@@ -225,7 +263,15 @@ final class CampaignArchiveV2CharacterStateValidator {
                         .thenComparing(FeatState::featKey)),
                 sorted(state.multiclassProficiencies(),
                         Comparator.comparing(MulticlassProficiency::characterKey)
-                                .thenComparing(MulticlassProficiency::proficiencyKey)));
+                                .thenComparing(MulticlassProficiency::proficiencyKey)),
+                sorted(state.proficiencyGrants(), Comparator.comparing(ProficiencyGrant::characterKey)
+                        .thenComparing(value -> value.grant().category().name())
+                        .thenComparing(value -> value.grant().sourceModuleKey())
+                        .thenComparing(value -> value.grant().sourceType())
+                        .thenComparing(value -> value.grant().sourceKey())
+                        .thenComparing(value -> value.grant().grantSlotKey())
+                        .thenComparing(value -> value.grant().targetModuleKey())
+                        .thenComparing(value -> value.grant().proficiencyKey())));
     }
 
     private static boolean validAbilities(List<AbilityScore> values) {

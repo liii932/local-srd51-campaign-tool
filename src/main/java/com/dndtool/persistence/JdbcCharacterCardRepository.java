@@ -16,7 +16,7 @@ import javax.sql.DataSource;
 public final class JdbcCharacterCardRepository implements CharacterCardRepository {
     private static final String ROOT_SQL = """
             SELECT cr.id, cr.character_key, cr.character_type, cr.character_name,
-                   cr.character_status, cr.row_version,
+                   cr.character_status, cr.row_version, cr.module_release_id,
                    cr.saved_module_key, cr.saved_release_version, cr.saved_content_sha256,
                    cm.frozen_module_key, cm.frozen_release_version, cm.frozen_content_sha256,
                    mr.module_key, mr.release_version, mr.content_sha256, mr.release_status
@@ -78,7 +78,10 @@ public final class JdbcCharacterCardRepository implements CharacterCardRepositor
                         fields(connection, root.id()), classes(connection, root.id()),
                         proficiencies(connection, root.id(), SKILL_SQL, "skill_key"),
                         proficiencies(connection, root.id(), SAVE_SQL, "save_key"),
-                        items(connection, root.id()));
+                        items(connection, root.id()),
+                        new JdbcCharacterProficiencyGrantRepository().read(
+                                connection, root.id(), root.moduleReleaseId()),
+                        proficiencyBasis(connection, root.id(), root.moduleReleaseId()));
                 connection.commit();
                 restore(connection, original);
                 return Optional.of(snapshot);
@@ -97,7 +100,8 @@ public final class JdbcCharacterCardRepository implements CharacterCardRepositor
             try (ResultSet result = statement.executeQuery()) {
                 if (!result.next()) return null;
                 Root root = new Root(
-                        positiveLong(result, "id"), requireString(result, "character_key"),
+                        positiveLong(result, "id"), positiveLong(result, "module_release_id"),
+                        requireString(result, "character_key"),
                         requireString(result, "character_type"),
                         requireString(result, "character_name"),
                         requireString(result, "character_status"),
@@ -115,6 +119,42 @@ public final class JdbcCharacterCardRepository implements CharacterCardRepositor
                                 requireString(result, "release_status")));
                 if (result.next()) throw invalidState();
                 return root;
+            }
+        }
+    }
+
+    private static CreationProficiencyBasis proficiencyBasis(
+            Connection connection, long characterId, long moduleReleaseId) throws SQLException {
+        String sql = "SELECT race_key, subrace_key, background_key, class_key "
+                + "FROM character_creation_snapshot_v2 WHERE character_id = ? AND module_release_id = ?";
+        try (PreparedStatement statement = childStatement(connection, sql, characterId)) {
+            statement.setLong(2, moduleReleaseId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (!result.next()) return null;
+                String race = requireString(result, "race_key");
+                String subrace = result.getString("subrace_key");
+                String background = requireString(result, "background_key");
+                String characterClass = requireString(result, "class_key");
+                if (result.next()) throw invalidState();
+                List<String> languages = new ArrayList<>();
+                List<String> tools = new ArrayList<>();
+                String selectionSql = "SELECT selection_kind, selection_key "
+                        + "FROM character_creation_selection_v2 WHERE character_id = ? "
+                        + "AND module_release_id = ? AND selection_kind IN ('LANGUAGE','TOOL') "
+                        + "ORDER BY selection_kind, selection_order";
+                try (PreparedStatement selections = childStatement(connection, selectionSql, characterId)) {
+                    selections.setLong(2, moduleReleaseId);
+                    try (ResultSet rows = selections.executeQuery()) {
+                        while (rows.next()) {
+                            String kind = requireString(rows, "selection_kind");
+                            if (kind.equals("LANGUAGE")) languages.add(requireString(rows, "selection_key"));
+                            else if (kind.equals("TOOL")) tools.add(requireString(rows, "selection_key"));
+                            else throw invalidState();
+                        }
+                    }
+                }
+                return new CreationProficiencyBasis(race, subrace, background, characterClass,
+                        languages, tools);
             }
         }
     }
@@ -268,6 +308,7 @@ public final class JdbcCharacterCardRepository implements CharacterCardRepositor
 
     private record Root(
             long id,
+            long moduleReleaseId,
             String characterKey,
             String characterType,
             String characterName,

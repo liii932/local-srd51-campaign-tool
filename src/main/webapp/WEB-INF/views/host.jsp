@@ -540,7 +540,9 @@
             </details>
             <details class="card-section"><summary>豁免</summary>
             <div id="character-card-saves"></div>
-
+            </details>
+            <details class="card-section"><summary>语言与工具授予</summary>
+            <div id="character-card-proficiency-grants"></div>
             </details>
             <details class="card-section" open><summary>简单物品</summary>
             <div id="character-card-items"></div>

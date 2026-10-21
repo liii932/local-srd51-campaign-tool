@@ -156,6 +156,7 @@ public final class JdbcCampaignArchiveImportRepository
             childDelete("character_level_advancement_v2", "level_advancement"),
             childDelete("character_class_level_v2", "class_level_v2"),
             childDelete("character_resource_state_v2", "resource_state"),
+            childDelete("character_proficiency_grant_v2", "proficiency_grant"),
             childDelete("character_creation_selection_v2", "creation_selection"),
             childDelete("character_creation_snapshot_v2", "creation_snapshot"),
             """

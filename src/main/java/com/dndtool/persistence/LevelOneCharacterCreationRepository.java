@@ -1,5 +1,7 @@
 package com.dndtool.persistence;
 
+import com.dndtool.module.CharacterProficiencyGrant;
+
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,7 @@ public interface LevelOneCharacterCreationRepository {
             Map<String, Integer> baseAbilityScores,
             Map<String, Integer> finalAbilityScores,
             List<Selection> selections,
+            List<CharacterProficiencyGrant> proficiencyGrants,
             int maximumHitPoints,
             int hitDieSides,
             List<InitialResource> initialResources,
@@ -45,6 +48,7 @@ public interface LevelOneCharacterCreationRepository {
             baseAbilityScores = Map.copyOf(baseAbilityScores);
             finalAbilityScores = Map.copyOf(finalAbilityScores);
             selections = List.copyOf(selections);
+            proficiencyGrants = List.copyOf(proficiencyGrants);
             initialResources = List.copyOf(initialResources);
         }
     }

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dndtool.security.HostRequestSecurityFilter;
 import com.dndtool.service.CharacterCardService;
+import com.dndtool.service.CharacterProficiencyArchiveTestData;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
@@ -38,6 +39,10 @@ final class HostCharacterCardServletTest {
         assertTrue(body.startsWith("{\"status\":\"READY\",\"card\":{"));
         assertTrue(body.contains("\"characterName\":\"A\\\"ria\""));
         assertTrue(body.contains("\"totalLevel\":5"));
+        assertTrue(body.contains("\"proficiencyGrants\":[{\"category\":\"LANGUAGE\""));
+        assertTrue(body.contains("\"sourceKey\":\"race.human\""));
+        assertTrue(body.contains("\"sourceDisplayName\":\"人类\""));
+        assertTrue(body.contains("\"suppressed\":false"));
         assertFalse(body.contains("<script>"));
         assertTrue(body.contains("\\u2028"));
     }
@@ -143,7 +148,8 @@ final class HostCharacterCardServletTest {
                 List.of(new CharacterCardService.ClassView("class.fighter", "战士", 5)),
                 List.of(), List.of(),
                 List.of(new CharacterCardService.TierView("proficiency.none", "NONE")),
-                List.of(), List.of());
+                List.of(), List.of(), List.of(new CharacterCardService.ProficiencyGrantView(
+                        CharacterProficiencyArchiveTestData.grants().getFirst(), "通用语", "人类")));
     }
 
     private static HttpServletRequest request(String method) {

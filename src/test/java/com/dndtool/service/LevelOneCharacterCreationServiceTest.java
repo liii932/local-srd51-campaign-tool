@@ -24,7 +24,8 @@ class LevelOneCharacterCreationServiceTest {
         LevelOneCharacterCreationService service = service(repository);
 
         LevelOneCharacterCreationService.PreviewResult preview = service.preview(request());
-        assertEquals(LevelOneCharacterCreationService.Status.PREVIEW_READY, preview.status());
+        assertEquals(LevelOneCharacterCreationService.Status.PREVIEW_READY, preview.status(),
+                preview.errorCode());
         assertNull(repository.command);
 
         String digest = LevelOneCharacterCreationRequestDigest.sha256(
@@ -38,13 +39,18 @@ class LevelOneCharacterCreationServiceTest {
         assertEquals(preview.prepared().finalAbilityScores(),
                 repository.command.finalAbilityScores());
         assertEquals(13, repository.command.maximumHitPoints());
+        assertEquals(preview.prepared().proficiencyGrants(), repository.command.proficiencyGrants());
+        assertEquals(5, repository.command.proficiencyGrants().size());
     }
 
     @Test
     void changedEventTailMakesPreviewStaleBeforeAnyAuthoritativeWrite() throws Exception {
         FakeRepository repository = new FakeRepository();
         LevelOneCharacterCreationService service = service(repository);
-        var preview = service.preview(request()).prepared();
+        var previewResult = service.preview(request());
+        assertEquals(LevelOneCharacterCreationService.Status.PREVIEW_READY, previewResult.status(),
+                previewResult.errorCode());
+        var preview = previewResult.prepared();
         repository.tail = 8L;
         String digest = LevelOneCharacterCreationRequestDigest.sha256(
                 CAMPAIGN, "山丘守卫", preview.previewDigestSha256());
@@ -93,6 +99,13 @@ class LevelOneCharacterCreationServiceTest {
                 definition("character.subrace", "subrace.hill_dwarf"),
                 definition("character.background", "background.acolyte"),
                 definition("character.class", "class.fighter"),
+                definition("character.language", "language.common", 1),
+                definition("character.language", "language.dwarvish", 2),
+                definition("character.language", "language.celestial", 3),
+                definition("character.language", "language.draconic", 4),
+                definition("character.tool", "tool.brewer_supplies", 1),
+                definition("character.tool", "tool.mason_tools", 2),
+                definition("character.tool", "tool.smith_tools", 3),
                 definition("character.feature", "feature.fighter.second_wind"),
                 definition("character.resource", "resource.hit_dice.d10"),
                 new ModuleCatalog.CatalogDefinition("character.resource",
@@ -148,7 +161,11 @@ class LevelOneCharacterCreationServiceTest {
     }
 
     private static ModuleCatalog.CatalogDefinition definition(String type, String key) {
-        return new ModuleCatalog.CatalogDefinition(type, key, key, key, 1);
+        return definition(type, key, 1);
+    }
+
+    private static ModuleCatalog.CatalogDefinition definition(String type, String key, int order) {
+        return new ModuleCatalog.CatalogDefinition(type, key, key, key, order);
     }
 
     private static ModuleCatalog.CatalogAttribute profile(String type, String key, String value) {
