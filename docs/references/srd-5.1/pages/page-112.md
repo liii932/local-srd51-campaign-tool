@@ -1,0 +1,129 @@
+# SRD 5.1 — PDF page 112
+
+Source: [original PDF, page 112](../../srd-5.1.pdf#page=112).
+
+[Previous page](page-111.md) · [Next page](page-113.md)
+
+Page boundaries are preserved; text and tables may continue on adjacent pages.
+
+## Left column
+
+```text
+Fog Cloud
+Grease
+Hideous Laughter
+Identify
+Illusory Script
+Jump
+Longstrider
+Mage Armor
+Magic Missile
+Protection from Evil and Good
+Shield
+Silent Image
+Sleep
+Thunderwave
+Unseen Servant
+
+2nd Level
+Acid Arrow
+Alter Self
+Arcane Lock
+Arcanist’s Magic Aura
+Blindness/Deafness
+Blur
+Continual Flame
+Darkness
+Darkvision
+Detect Thoughts
+Enlarge/Reduce
+Flaming Sphere
+Gentle Repose
+Gust of Wind
+Hold Person
+Invisibility
+Knock
+Levitate
+Locate Object
+Magic Mouth
+Magic Weapon
+Mirror Image
+Misty Step
+Ray of Enfeeblement
+Rope Trick
+Scorching Ray
+See Invisibility
+Shatter
+Spider Climb
+Suggestion
+Web
+
+3rd Level
+Animate Dead
+Bestow Curse
+Blink
+```
+
+## Right column
+
+```text
+Clairvoyance
+Counterspell
+Dispel Magic
+Fear
+Fireball
+Fly
+Gaseous Form
+Glyph of Warding
+Haste
+Hypnotic Pattern
+Lightning Bolt
+Magic Circle
+Major Image
+Nondetection
+Phantom Steed
+Protection from Energy
+Remove Curse
+Sending
+Sleet Storm
+Slow
+Stinking Cloud
+Tiny Hut
+Tongues
+Vampiric Touch
+Water Breathing
+
+4th Level
+Arcane Eye
+Banishment
+Black Tentacles
+Blight
+Confusion
+Conjure Minor Elementals
+Control Water
+Dimension Door
+Fabricate
+Faithful Hound
+Fire Shield
+Greater Invisibility
+Hallucinatory Terrain
+Ice Storm
+Locate Creature
+Phantasmal Killer
+Polymorph
+Private Sanctum
+Resilient Sphere
+Secret Chest
+Stone Shape
+Stoneskin
+Wall of Fire
+
+5th Level
+Animate Objects
+```
+
+## Original page footer
+
+```text
+System Reference Document 5.1                               112
+```

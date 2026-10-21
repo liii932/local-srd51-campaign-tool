@@ -26,6 +26,7 @@ These instructions apply to automated contributors working in this repository. C
 - [docs/product.md](docs/product.md): product purpose, current behavior, v2 target workflow and deferred scope.
 - [docs/design/v2/README.md](docs/design/v2/README.md): recorded v2 target decisions and adoption boundaries, not implementation, deployment or release evidence. Project design belongs here rather than in ignored Agent workspaces.
 - [docs/architecture.md](docs/architecture.md): product scope, components, trust and transaction boundaries.
+- [docs/references/srd-5.1/README.md](docs/references/srd-5.1/README.md): local SRD 5.1 source index. For original rule text, search the page-based Markdown and read only relevant pages; check ambiguous text or tables against the [local PDF](docs/references/srd-5.1.pdf). Use the official online source only when the local PDF is missing or damaged, or the task explicitly requires official-source verification; rebuild missing derived text from the local PDF. These references do not replace project implementation contracts or executable rule packages.
 - [docs/rules/srd-5.1.md](docs/rules/srd-5.1.md): frozen v1 stable keys, algorithms, ranges and canonical encoding.
 - `src/main/resources/db/migration/`: approved, forward-only schema and seed history.
 - [docs/database.md](docs/database.md): migration and account responsibilities.

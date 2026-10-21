@@ -20,6 +20,7 @@
 
 | 任务关键词 | 先读合同的相关部分 | 生产入口 / 测试定位 |
 |---|---|---|
+| SRD 5.1 原文、规则条款、章节与页码 | 先用[本地主题索引与分页文本](references/srd-5.1/README.md)，按主题或搜索结果只读相关页；歧义核对[本地 PDF](references/srd-5.1.pdf) | 重建与官方回源条件见[参考说明](references/README.md)；原文不替代冻结合同或证明项目已实现 |
 | 产品范围、v2 总体设计、规则版本与存储方向 | [产品说明](product.md)、[v2 设计导航](design/v2/README.md)；按主题选一篇 | 先区分目标已定、待细化和当前实现；不从设计记录推断迁移、发布或部署已完成 |
 | v2 快照绑定、运行生命周期、保存/结束/恢复设计 | [v2 采用边界](design/v2/adoption-boundaries.md)，再读对应主题 | 全域设计入口在 `docs/design/v2/`；未采用能力不虚构生产入口，语言 PARTITION 不构成运行资格 |
 | 规则目录、canonical、hash、发布身份 | [冻结 v1](rules/srd-5.1.md) §2/§11；[v2 目录](rules/character-catalog-v2.md) | `module/ModuleCatalog.java`、`module/BuiltinModuleReleaseRegistry.java`、`module/ModuleCanonicalEncoderV1.java` / `module/ModuleCanonicalEncoderV2.java` |

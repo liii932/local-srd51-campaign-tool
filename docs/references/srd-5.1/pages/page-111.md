@@ -1,0 +1,129 @@
+# SRD 5.1 — PDF page 111
+
+Source: [original PDF, page 111](../../srd-5.1.pdf#page=111).
+
+[Previous page](page-110.md) · [Next page](page-112.md)
+
+Page boundaries are preserved; text and tables may continue on adjacent pages.
+
+## Left column
+
+```text
+1st Level
+Charm Person
+Comprehend Languages
+Expeditious Retreat
+Hellish Rebuke
+Illusory Script
+Protection from Evil and Good
+Unseen Servant
+
+2nd Level
+Darkness
+Enthrall
+Hold Person
+Invisibility
+Mirror Image
+Misty Step
+Ray of Enfeeblement
+Shatter
+Spider Climb
+Suggestion
+
+3rd Level
+Counterspell
+Dispel Magic
+Fear
+Fly
+Gaseous Form
+Hypnotic Pattern
+Magic Circle
+Major Image
+Remove Curse
+Tongues
+Vampiric Touch
+
+4th Level
+Banishment
+Blight
+Dimension Door
+Hallucinatory Terrain
+
+5th Level
+Contact Other Plane
+Dream
+Hold Monster
+Scrying
+
+6th Level
+Circle of Death
+Conjure Fey
+Create Undead
+Eyebite
+Flesh to Stone
+Mass Suggestion
+```
+
+## Right column
+
+```text
+True Seeing
+
+7th Level
+Etherealness
+Finger of Death
+Forcecage
+Plane Shift
+
+8th Level
+Demiplane
+Dominate Monster
+Feeblemind
+Glibness
+Power Word Stun
+
+9th Level
+Astral Projection
+Foresight
+Imprisonment
+Power Word Kill
+True Polymorph
+
+Wizard Spells
+
+Cantrips (0 Level)
+Acid Splash
+Chill Touch
+Dancing Lights
+Fire Bolt
+Light
+Mage Hand
+Mending
+Message
+Minor Illusion
+Poison Spray
+Prestidigitation
+Ray of Frost
+Shocking Grasp
+True Strike
+
+1st Level
+Alarm
+Burning Hands
+Charm Person
+Color Spray
+Comprehend Languages
+Detect Magic
+Disguise Self
+Expeditious Retreat
+False Life
+Feather Fall
+Find Familiar
+Floating Disk
+```
+
+## Original page footer
+
+```text
+System Reference Document 5.1                               111
+```
