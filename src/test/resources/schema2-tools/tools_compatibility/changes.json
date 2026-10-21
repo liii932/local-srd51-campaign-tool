@@ -1,0 +1,99 @@
+[
+  {
+    "op": "set_enabled",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.bagpipes"
+    },
+    "value": true
+  },
+  {
+    "op": "set_enabled",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "thieves_tools"
+    },
+    "value": true
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_extension",
+      "entry_key": "additional_tool"
+    },
+    "field": "tool",
+    "value": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.vehicles_land"
+    }
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_extension",
+      "entry_key": "additional_tool"
+    },
+    "field": "author_note"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.alchemist_supplies"
+    },
+    "field": "category",
+    "value": "ARTISAN"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "catalog.tool_set",
+      "rule_key": "tool_set.all"
+    },
+    "field": "minimum_enabled_members",
+    "value": 37
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "catalog.tool_set",
+      "rule_key": "tool_set.all"
+    },
+    "field": "author_note",
+    "value": "Tools available to this selection."
+  }
+]

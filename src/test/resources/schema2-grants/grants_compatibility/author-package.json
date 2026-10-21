@@ -1,0 +1,34 @@
+{
+  "author_schema_version": 2,
+  "module_key": "grants_compatibility",
+  "release_version": "1",
+  "package_display_name": "Grants Compatibility",
+  "role": "compatibility",
+  "dependencies": [
+    {
+      "module_key": "grants_base",
+      "supported_versions": [
+        "1"
+      ]
+    },
+    {
+      "module_key": "grants_extension",
+      "supported_versions": [
+        "1"
+      ]
+    }
+  ],
+  "compatible_combinations": [
+    {
+      "grants_base": "1",
+      "grants_extension": "1"
+    }
+  ],
+  "load_order_constraints": [],
+  "files": [
+    {
+      "kind": "changes",
+      "path": "changes.json"
+    }
+  ]
+}

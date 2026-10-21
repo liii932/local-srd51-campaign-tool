@@ -1,0 +1,5 @@
+[
+  {"identity":{"kind":"rule","module_key":"validation_base","rule_type":"character.language","rule_key":"language.common"},"display_name":"Common","description":"Common is a Standard language.","category":"STANDARD","source_page":59,"author_note":"Base editorial note."},
+  {"identity":{"kind":"rule","module_key":"validation_base","rule_type":"character.language","rule_key":"language.dwarvish"},"display_name":"Dwarvish","description":"Dwarvish is a Standard language.","category":"STANDARD","source_page":59},
+  {"identity":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"display_name":"Standard languages","minimum_enabled_members":1}
+]

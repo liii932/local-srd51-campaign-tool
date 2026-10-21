@@ -1,0 +1,3 @@
+[
+  {"identity":{"kind":"entry","rule":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"collection_key":"members","module_key":"validation_extension","entry_key":"elvish"},"language":{"kind":"rule","module_key":"validation_extension","rule_type":"character.language","rule_key":"language.elvish"},"author_note":"Extension editorial note."}
+]

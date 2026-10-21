@@ -1,0 +1,23 @@
+[
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_extension",
+      "entry_key": "additional_tool"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.thieves_tools"
+    },
+    "author_note": "Extension duplicate membership."
+  }
+]

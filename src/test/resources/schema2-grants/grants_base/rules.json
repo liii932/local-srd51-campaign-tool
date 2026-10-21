@@ -1,0 +1,145 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.language",
+      "rule_key": "language.common"
+    },
+    "display_name": "Common",
+    "description": "Common catalog target.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.language",
+      "rule_key": "language.elvish"
+    },
+    "display_name": "Elvish",
+    "description": "Elvish catalog target.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.language",
+      "rule_key": "language.dwarvish"
+    },
+    "display_name": "Dwarvish",
+    "description": "Dwarvish catalog target.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.flute"
+    },
+    "display_name": "Flute",
+    "description": "Flute catalog target.",
+    "source_page": 70,
+    "category": "MUSICAL_INSTRUMENT"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.herbalism"
+    },
+    "display_name": "Herbalism kit",
+    "description": "Herbalism kit catalog target.",
+    "source_page": 70,
+    "category": "KIT"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.smith_tools"
+    },
+    "display_name": "Smith tools",
+    "description": "Smith tools catalog target.",
+    "source_page": 70,
+    "category": "ARTISAN"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "catalog.language_set",
+      "rule_key": "language_set.initial"
+    },
+    "display_name": "Initial languages",
+    "minimum_enabled_members": 1
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "catalog.tool_set",
+      "rule_key": "tool_set.initial"
+    },
+    "display_name": "Initial tools",
+    "minimum_enabled_members": 1
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.race",
+      "rule_key": "race.human"
+    },
+    "display_name": "Human",
+    "description": "Human initial proficiency source.",
+    "source_page": 10,
+    "author_note": "Source identity remains stable."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.subrace",
+      "rule_key": "subrace.north"
+    },
+    "display_name": "North human",
+    "description": "North human initial proficiency source.",
+    "source_page": 10,
+    "parent_race": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.race",
+      "rule_key": "race.human"
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.background",
+      "rule_key": "background.sailor"
+    },
+    "display_name": "Sailor",
+    "description": "Sailor initial proficiency source.",
+    "source_page": 10
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.class",
+      "rule_key": "class.scholar"
+    },
+    "display_name": "Scholar",
+    "description": "Scholar initial proficiency source.",
+    "source_page": 10
+  }
+]

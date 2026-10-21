@@ -1,0 +1,479 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.alchemist_supplies"
+    },
+    "display_name": "Alchemist Supplies",
+    "description": "Alchemist Supplies is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70,
+    "author_note": "Base tool annotation."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.bagpipes"
+    },
+    "display_name": "Bagpipes",
+    "description": "Bagpipes is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.brewer_supplies"
+    },
+    "display_name": "Brewer Supplies",
+    "description": "Brewer Supplies is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.calligrapher_supplies"
+    },
+    "display_name": "Calligrapher Supplies",
+    "description": "Calligrapher Supplies is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.carpenter_tools"
+    },
+    "display_name": "Carpenter Tools",
+    "description": "Carpenter Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.cartographer_tools"
+    },
+    "display_name": "Cartographer Tools",
+    "description": "Cartographer Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.cobbler_tools"
+    },
+    "display_name": "Cobbler Tools",
+    "description": "Cobbler Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.cook_utensils"
+    },
+    "display_name": "Cook Utensils",
+    "description": "Cook Utensils is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.dice_set"
+    },
+    "display_name": "Dice Set",
+    "description": "Dice Set is an SRD 5.1 tool catalog entry.",
+    "category": "GAMING_SET",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.disguise_kit"
+    },
+    "display_name": "Disguise Kit",
+    "description": "Disguise Kit is an SRD 5.1 tool catalog entry.",
+    "category": "KIT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.drum"
+    },
+    "display_name": "Drum",
+    "description": "Drum is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.dulcimer"
+    },
+    "display_name": "Dulcimer",
+    "description": "Dulcimer is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.flute"
+    },
+    "display_name": "Flute",
+    "description": "Flute is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.forgery_kit"
+    },
+    "display_name": "Forgery Kit",
+    "description": "Forgery Kit is an SRD 5.1 tool catalog entry.",
+    "category": "KIT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.glassblower_tools"
+    },
+    "display_name": "Glassblower Tools",
+    "description": "Glassblower Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.herbalism_kit"
+    },
+    "display_name": "Herbalism Kit",
+    "description": "Herbalism Kit is an SRD 5.1 tool catalog entry.",
+    "category": "KIT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.horn"
+    },
+    "display_name": "Horn",
+    "description": "Horn is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.jeweler_tools"
+    },
+    "display_name": "Jeweler Tools",
+    "description": "Jeweler Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.leatherworker_tools"
+    },
+    "display_name": "Leatherworker Tools",
+    "description": "Leatherworker Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.lute"
+    },
+    "display_name": "Lute",
+    "description": "Lute is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.lyre"
+    },
+    "display_name": "Lyre",
+    "description": "Lyre is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.mason_tools"
+    },
+    "display_name": "Mason Tools",
+    "description": "Mason Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.navigator_tools"
+    },
+    "display_name": "Navigator Tools",
+    "description": "Navigator Tools is an SRD 5.1 tool catalog entry.",
+    "category": "NAVIGATION",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.painter_supplies"
+    },
+    "display_name": "Painter Supplies",
+    "description": "Painter Supplies is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.pan_flute"
+    },
+    "display_name": "Pan Flute",
+    "description": "Pan Flute is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.playing_card_set"
+    },
+    "display_name": "Playing Card Set",
+    "description": "Playing Card Set is an SRD 5.1 tool catalog entry.",
+    "category": "GAMING_SET",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.poisoner_kit"
+    },
+    "display_name": "Poisoner Kit",
+    "description": "Poisoner Kit is an SRD 5.1 tool catalog entry.",
+    "category": "KIT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.potter_tools"
+    },
+    "display_name": "Potter Tools",
+    "description": "Potter Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.shawm"
+    },
+    "display_name": "Shawm",
+    "description": "Shawm is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.smith_tools"
+    },
+    "display_name": "Smith Tools",
+    "description": "Smith Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.thieves_tools"
+    },
+    "display_name": "Thieves Tools",
+    "description": "Thieves Tools is an SRD 5.1 tool catalog entry.",
+    "category": "KIT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.tinker_tools"
+    },
+    "display_name": "Tinker Tools",
+    "description": "Tinker Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.vehicles_land"
+    },
+    "display_name": "Vehicles (Land)",
+    "description": "Vehicles (Land) is an SRD 5.1 tool catalog entry.",
+    "category": "VEHICLE",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.vehicles_water"
+    },
+    "display_name": "Vehicles (Water)",
+    "description": "Vehicles (Water) is an SRD 5.1 tool catalog entry.",
+    "category": "VEHICLE",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.viol"
+    },
+    "display_name": "Viol",
+    "description": "Viol is an SRD 5.1 tool catalog entry.",
+    "category": "MUSICAL_INSTRUMENT",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.weaver_tools"
+    },
+    "display_name": "Weaver Tools",
+    "description": "Weaver Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.woodcarver_tools"
+    },
+    "display_name": "Woodcarver Tools",
+    "description": "Woodcarver Tools is an SRD 5.1 tool catalog entry.",
+    "category": "ARTISAN",
+    "source_page": 70
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "catalog.tool_set",
+      "rule_key": "tool_set.all"
+    },
+    "display_name": "All tool proficiencies",
+    "minimum_enabled_members": 37
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.language",
+      "rule_key": "language.common"
+    },
+    "display_name": "Common",
+    "description": "Common is a Standard language.",
+    "category": "STANDARD",
+    "source_page": 59
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "catalog.language_set",
+      "rule_key": "language_set.standard"
+    },
+    "display_name": "Standard languages",
+    "minimum_enabled_members": 1
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {"op":"set_field","target":{"kind":"rule","module_key":"validation_base","rule_type":"character.language","rule_key":"language.common"},"field":"description","value":"Common is available in this validation set."},
+  {"op":"set_enabled","target":{"kind":"rule","module_key":"validation_base","rule_type":"character.language","rule_key":"language.dwarvish"},"value":true},
+  {"op":"set_enabled","target":{"kind":"entry","rule":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"collection_key":"members","module_key":"validation_base","entry_key":"common"},"value":true},
+  {"op":"clear_field","target":{"kind":"entry","rule":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"collection_key":"members","module_key":"validation_extension","entry_key":"elvish"},"field":"author_note"},
+  {"op":"set_field","target":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"field":"author_note","value":"Validation context only."},
+  {"op":"set_field","target":{"kind":"entry","rule":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"collection_key":"members","module_key":"validation_base","entry_key":"common"},"field":"language","value":{"kind":"rule","module_key":"validation_base","rule_type":"character.language","rule_key":"language.common"}}
+]

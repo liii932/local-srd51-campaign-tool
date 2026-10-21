@@ -1,0 +1,763 @@
+[
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "alchemist_supplies"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.alchemist_supplies"
+    },
+    "author_note": "Base tool membership."
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "bagpipes"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.bagpipes"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "brewer_supplies"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.brewer_supplies"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "calligrapher_supplies"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.calligrapher_supplies"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "carpenter_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.carpenter_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "cartographer_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.cartographer_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "cobbler_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.cobbler_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "cook_utensils"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.cook_utensils"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "dice_set"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.dice_set"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "disguise_kit"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.disguise_kit"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "drum"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.drum"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "dulcimer"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.dulcimer"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "flute"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.flute"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "forgery_kit"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.forgery_kit"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "glassblower_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.glassblower_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "herbalism_kit"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.herbalism_kit"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "horn"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.horn"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "jeweler_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.jeweler_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "leatherworker_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.leatherworker_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "lute"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.lute"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "lyre"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.lyre"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "mason_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.mason_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "navigator_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.navigator_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "painter_supplies"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.painter_supplies"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "pan_flute"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.pan_flute"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "playing_card_set"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.playing_card_set"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "poisoner_kit"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.poisoner_kit"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "potter_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.potter_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "shawm"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.shawm"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "smith_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.smith_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "thieves_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.thieves_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "tinker_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.tinker_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "vehicles_land"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.vehicles_land"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "vehicles_water"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.vehicles_water"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "viol"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.viol"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "weaver_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.weaver_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "woodcarver_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.woodcarver_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "common"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.language",
+      "rule_key": "language.common"
+    }
+  }
+]
