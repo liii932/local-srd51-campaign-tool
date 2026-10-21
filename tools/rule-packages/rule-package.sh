@@ -6,7 +6,7 @@ if [[ ! -d "$project_root/target/classes/com/dndtool/offline/rules" ]]; then
   printf '%s\n' 'Compile the project first: mvn -DskipTests compile' >&2
   exit 1
 fi
-if [[ ${1:-} == build || ${1:-} == verify ]]; then
+if [[ ${1:-} == build || ${1:-} == verify || ${1:-} == schema2-verify ]]; then
   classpath="$project_root/target/classes"
 else
   : "${DND_RULE_INSTALLER_JDBC_JAR:?Set the absolute path to the independently supplied Connector/J jar}"
@@ -15,4 +15,8 @@ else
 fi
 # Hard process boundary, including input IO and driver calls; no worker can continue in this JVM.
 # A killed attempt retains its pre-DML pending ticket and needs independent server-side isolation.
-exec timeout --signal=TERM --kill-after=5s 120s java -Xmx64m -cp "$classpath" com.dndtool.offline.rules.RulePackageCli "$@"
+jvm_heap=64m
+if [[ ${1:-} == schema2-* ]]; then
+  jvm_heap=256m
+fi
+exec timeout --signal=TERM --kill-after=5s 120s java "-Xmx$jvm_heap" -cp "$classpath" com.dndtool.offline.rules.RulePackageCli "$@"

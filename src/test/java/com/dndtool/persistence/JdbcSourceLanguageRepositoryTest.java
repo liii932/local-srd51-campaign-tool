@@ -490,8 +490,9 @@ class JdbcSourceLanguageRepositoryTest {
 
         Fixture() {
             rows.put("schema", one("schema_name", bytes("dnd_tool_rules")));
-            rows.put("ledger", one("schema_version", 1, "script_name", bytes("V001__rule-source-schema.sql"),
-                    "script_sha256", bytes("003916bc758315351e46f177fec10eb70f2b1275a524d270c6eb89a602cd130e")));
+            rows.put("ledger", new ArrayList<>(RuleSchemaMigrations.expectations().stream().map(migration ->
+                    one("schema_version", migration.version(), "script_name", bytes(migration.scriptName()),
+                            "script_sha256", bytes(migration.scriptSha256())).get(0)).toList()));
             rows.put("release", one("id", releaseId, "module_key", bytes("dnd5e2014_srd51_se"), "release_version", bytes("1"),
                     "canonical_format_version", 2, "archive_format_version", 2, "hash_algorithm", bytes("SHA-256"),
                     "content_sha256", null, "release_status", bytes("DRAFT"), "installation_revision", 2L, "released_at", null));
@@ -507,8 +508,6 @@ class JdbcSourceLanguageRepositoryTest {
                         "category", bytes(row.category()), "source_page", 59, "sort_order", row.order()).get(0));
             }
             rows.put("language", languages);
-            var migration=RuleSchemaMigrations.expectations().get(1);
-            rows.get("ledger").add(one("schema_version",2,"script_name",bytes(migration.scriptName()),"script_sha256",bytes(migration.scriptSha256())).get(0));
             rows.get("partition").add(one("release_id",releaseId,"installation_revision",2L,"partition_key",bytes("character.tool")).get(0));
             rows.put("tool",new ArrayList<>(ToolCatalogOracle.rows().stream().map(t->one("release_id",releaseId,
                     "tool_key",bytes(t.key()),"display_name",t.name(),"description",t.description(),"category",bytes(t.category()),
@@ -587,7 +586,9 @@ class JdbcSourceLanguageRepositoryTest {
                     case "setMaxRows" -> {
                         hit("maxRows:" + table);
                         int maximum = (int) args[0];
-                        assertEquals(table.equals("language") ? 19 : table.equals("tool") ? 38 : Set.of("ledger","partition").contains(table) ? 3 : 2, maximum);
+                        assertEquals(table.equals("language") ? 19 : table.equals("tool") ? 38
+                                : table.equals("ledger") ? RuleSchemaMigrations.expectations().size() + 1
+                                : table.equals("partition") ? 3 : 2, maximum);
                         limits.put(table, maximum); yield null;
                     }
                     case "setQueryTimeout" -> {

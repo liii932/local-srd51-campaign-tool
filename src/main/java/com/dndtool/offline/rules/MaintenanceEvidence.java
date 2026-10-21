@@ -13,15 +13,26 @@ public final class MaintenanceEvidence {
     private final Map<String,Object> config;
     private MaintenanceEvidence(Map<String,Object> config) {this.config=config;}
     public static MaintenanceEvidence read(Path directory) throws IOException {
+        return read(directory,false);
+    }
+    /** Schema 2 requires its own independent history checkpoint and acceptance capability. */
+    public static MaintenanceEvidence readSchema2(Path directory) throws IOException {
+        return read(directory,true);
+    }
+    private static MaintenanceEvidence read(Path directory,boolean schema2) throws IOException {
         try(var root=SecureFiles.directory(directory)) {
             if(java.nio.file.Files.getPosixFilePermissions(directory,java.nio.file.LinkOption.NOFOLLOW_LINKS).stream()
                     .anyMatch(p->p.name().startsWith("GROUP_")||p.name().startsWith("OTHERS_")))
                 throw new IOException("Maintenance evidence directory must be owner-only");
-            var map=OfflineJson.object(OfflineJson.parse(SecureFiles.read(root,"maintenance.json",16384)),
+            var fields=new java.util.ArrayList<>(java.util.List.of(
                     "evidence_version","target","lineage","jdbc_url","user","server_uuid","current_user","grants_sha256",
                     "schema_audit_sha256","history_audit_sha256","isolation_audit_sha256","expires_at","permission",
-                    "isolated_operation","history_minimum_version","state_directory");
-            if(OfflineJson.number(map,"evidence_version")!=1)throw OfflineJson.bad();
+                    "isolated_operation","history_minimum_version","state_directory"));
+            if(schema2)fields.add("schema2_history_minimum_version");
+            var map=OfflineJson.object(OfflineJson.parse(SecureFiles.read(root,"maintenance.json",16384)),fields.toArray(String[]::new));
+            if(OfflineJson.number(map,"evidence_version")!=(schema2?2:1)
+                    || OfflineJson.number(map,"history_minimum_version")<0
+                    || schema2&&OfflineJson.number(map,"schema2_history_minimum_version")<0)throw OfflineJson.bad();
             if(!Path.of(OfflineJson.string(map,"state_directory")).isAbsolute())throw OfflineJson.bad();
             OperationTicket.token(OfflineJson.string(map,"target"));OperationTicket.token(OfflineJson.string(map,"lineage"));
             String url=OfflineJson.string(map,"jdbc_url");
@@ -39,7 +50,7 @@ public final class MaintenanceEvidence {
             }
             RuleArtifact.digestText(OfflineJson.string(map,"grants_sha256"));
             String permission=OfflineJson.string(map,"permission");
-            if(!permission.equals("INSTALL") && !permission.equals("RESOLVE"))throw OfflineJson.bad();
+            if(!permission.equals("INSTALL") && !permission.equals("RESOLVE") && !(schema2&&permission.equals("ACCEPT")))throw OfflineJson.bad();
             String isolated=OfflineJson.string(map,"isolated_operation");
             if(!isolated.equals("none")) {
                 var uuid=java.util.UUID.fromString(isolated);
@@ -50,16 +61,26 @@ public final class MaintenanceEvidence {
     }
     void fresh() {if(!Instant.parse(text("expires_at")).isAfter(Instant.now()))throw new IllegalStateException("Maintenance evidence expired");}
     void requireInstall() {fresh();if(!text("permission").equals("INSTALL"))throw new IllegalStateException("No independent installation authorization");}
+    void requireSchema2Install() {requireSchema2();requireInstall();}
+    void requireAccept() {requireSchema2();fresh();if(!text("permission").equals("ACCEPT"))throw new IllegalStateException("No independent acceptance authorization");}
+    private void requireSchema2() {if(OfflineJson.number(config,"evidence_version")!=2)throw new IllegalStateException("Schema 2 evidence required");}
     void requireResolution(OperationTicket ticket) {
         match(ticket);fresh();
         if(!text("permission").equals("RESOLVE") || !text("isolated_operation").equals(ticket.operationId().toString()))
             throw new IllegalStateException("Original executor isolation is not independently attested");
     }
     void match(OperationTicket ticket) {if(!target().equals(ticket.target()) || !lineage().equals(ticket.lineage()))throw new IllegalStateException("Source lineage mismatch");}
+    void match(Schema2OperationTicket ticket) {requireSchema2();if(!target().equals(ticket.target()) || !lineage().equals(ticket.lineage()))throw new IllegalStateException("Source lineage mismatch");}
+    void requireResolution(Schema2OperationTicket ticket) {
+        match(ticket);fresh();
+        if(!text("permission").equals("RESOLVE") || !text("isolated_operation").equals(ticket.operationId().toString()))
+            throw new IllegalStateException("Original executor isolation is not independently attested");
+    }
     String text(String key) {return OfflineJson.string(config,key);}
     public String target() {return text("target");}
     public String lineage() {return text("lineage");}
     long minimumVersion() {return OfflineJson.number(config,"history_minimum_version");}
+    long schema2MinimumVersion() {requireSchema2();return OfflineJson.number(config,"schema2_history_minimum_version");}
     String url() {return text("jdbc_url");}
     String user() {return text("user");}
     public Path stateDirectory() {return Path.of(text("state_directory"));}
