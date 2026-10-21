@@ -92,6 +92,22 @@ public final class SchemaMigrations {
     static final String V020_APPROVED_SHA256 =
             "cc8cf59276982af13f25640abe64ec2cac359e5710d31d7bfc15d3c2fce0f5a1";
 
+    static final int V021_VERSION = 21;
+    static final String V021_SCRIPT_NAME = "V021__schema2-runtime-snapshot.sql";
+    static final String V021_APPROVED_SHA256 = "4c3d2b1e56fc9cb25657c780771953cae305a71428879f970003752c16a00b99";
+
+    static final int V022_VERSION = 22;
+    static final String V022_SCRIPT_NAME = "V022__character-proficiency-grants.sql";
+    static final String V022_APPROVED_SHA256 = "9debf26264a286cf659a37645ecfef031467b02f0d336391678c3984fa66f25b";
+
+    static final int V023_VERSION = 23;
+    static final String V023_SCRIPT_NAME = "V023__schema2-runtime-tools.sql";
+    static final String V023_APPROVED_SHA256 = "7451618776976c30cffcff44fd224a2ed83e1644a5ce1e3ed2dd995b8c2b87e0";
+
+    static final int V024_VERSION = 24;
+    static final String V024_SCRIPT_NAME = "V024__schema2-character-grants.sql";
+    static final String V024_APPROVED_SHA256 = "8920967f4aff141ef8dca0bd8235376126091fe2ba25106fdbc825d589348c57";
+
     private static final String RESOURCE_DIRECTORY = "/db/migration/";
     private static final String SCOPE_BEGIN = "-- CHECKSUM-SCOPE-BEGIN";
     private static final String SCOPE_END = "-- CHECKSUM-SCOPE-END";
@@ -120,7 +136,11 @@ public final class SchemaMigrations {
             new Definition(V017_VERSION, V017_SCRIPT_NAME, V017_APPROVED_SHA256),
             new Definition(V018_VERSION, V018_SCRIPT_NAME, V018_APPROVED_SHA256),
             new Definition(V019_VERSION, V019_SCRIPT_NAME, V019_APPROVED_SHA256),
-            new Definition(V020_VERSION, V020_SCRIPT_NAME, V020_APPROVED_SHA256));
+            new Definition(V020_VERSION, V020_SCRIPT_NAME, V020_APPROVED_SHA256),
+            new Definition(V021_VERSION, V021_SCRIPT_NAME, V021_APPROVED_SHA256),
+            new Definition(V022_VERSION, V022_SCRIPT_NAME, V022_APPROVED_SHA256),
+            new Definition(V023_VERSION, V023_SCRIPT_NAME, V023_APPROVED_SHA256),
+            new Definition(V024_VERSION, V024_SCRIPT_NAME, V024_APPROVED_SHA256));
 
     private SchemaMigrations() {
     }

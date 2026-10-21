@@ -8,10 +8,10 @@ import org.junit.jupiter.api.Test;
 
 class SchemaMigrationsTest {
     @Test
-    void packagedMigrationChainContainsApprovedV001ThroughV020() throws Exception {
+    void packagedMigrationChainContainsApprovedV001ThroughV024() throws Exception {
         List<SchemaMigrations.Expectation> expectations = SchemaMigrations.loadExpectations();
 
-        assertEquals(20, expectations.size());
+        assertEquals(24, expectations.size());
         assertExpectation(
                 expectations.get(0),
                 SchemaMigrations.V001_VERSION,
@@ -107,6 +107,16 @@ class SchemaMigrationsTest {
                 SchemaMigrations.V019_VERSION,
                 SchemaMigrations.V019_SCRIPT_NAME,
                 SchemaMigrations.V019_APPROVED_SHA256);
+        assertExpectation(expectations.get(19), SchemaMigrations.V020_VERSION,
+                SchemaMigrations.V020_SCRIPT_NAME, SchemaMigrations.V020_APPROVED_SHA256);
+        assertExpectation(expectations.get(20), SchemaMigrations.V021_VERSION,
+                SchemaMigrations.V021_SCRIPT_NAME, SchemaMigrations.V021_APPROVED_SHA256);
+        assertExpectation(expectations.get(21), SchemaMigrations.V022_VERSION,
+                SchemaMigrations.V022_SCRIPT_NAME, SchemaMigrations.V022_APPROVED_SHA256);
+        assertExpectation(expectations.get(22), SchemaMigrations.V023_VERSION,
+                SchemaMigrations.V023_SCRIPT_NAME, SchemaMigrations.V023_APPROVED_SHA256);
+        assertExpectation(expectations.get(23), SchemaMigrations.V024_VERSION,
+                SchemaMigrations.V024_SCRIPT_NAME, SchemaMigrations.V024_APPROVED_SHA256);
     }
 
     @Test
