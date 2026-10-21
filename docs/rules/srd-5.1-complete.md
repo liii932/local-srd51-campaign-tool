@@ -11,8 +11,15 @@
 持久化、审计、导出和恢复；不是只收录一份可搜索文本，也不是宣称程序能够替代 DM 处理
 所有开放式叙事判断。
 
-规则与内容边界以官方 [SRD 5.1](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf)
-及仓库 [NOTICE](../../NOTICE) 中的许可和署名为准。SRD 5.2.x、未包含在 SRD 5.1 中的商业
+规则与内容边界以 SRD 5.1 及仓库 [NOTICE](../../NOTICE) 中的许可和署名为准。原文查阅
+先从[本地主题索引](../references/srd-5.1/README.md)定位 `pages/page-NNN.md`，表格、脚注
+或排版含义按需核对[本地原文 PDF](../references/srd-5.1.pdf)。
+[官方 SRD 5.1](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf)
+用于来源追溯。分页文本缺失或与 PDF 不一致时，先按[本地参考说明](../references/README.md)
+从本地 PDF 重建；只有本地 PDF 缺失/损坏或任务明确要求核对官方来源时才回源。
+本地分页文本供检索，不代表规则已实现或已形成可执行规则包。
+
+SRD 5.2.x、未包含在 SRD 5.1 中的商业
 出版内容、自创扩展和第三方内容不自动进入本目标；若要加入，必须分别确认规则身份、许可、
 稳定合同和兼容策略。
 

@@ -9,6 +9,12 @@ Linux Git、Maven、Java、Python 与 ripgrep；Windows 管理、明确指定 Wi
 Windows 脚本互操作时才使用 PowerShell 7。单个任务保持同一 Git 实现，跨平台行尾由
 `.gitattributes` 约束，不为切换工具批量改写工作树。
 
+涉及 SRD 条款时，先从[本地主题索引](docs/references/srd-5.1/README.md)定位，只读相关
+`pages/page-NNN.md`；表格、脚注和排版含义核对[本地 PDF](docs/references/srd-5.1.pdf)。
+分页文本缺失或与 PDF 不一致时，先按[本地参考说明](docs/references/README.md)从本地 PDF
+重建。官方链接用于来源追溯，只有本地 PDF 缺失/损坏或任务明确要求核对官方来源时才回源。
+分页文本不代表规则已实现或已形成可执行规则包。
+
 1. 从当前工作树和待处理问题开始，保留无关的用户修改。
 2. 先检查最接近的生产代码、测试、迁移和稳定规则。
 3. 为正常、边界、失败关闭、版本/幂等和事务失败行为添加聚焦测试。

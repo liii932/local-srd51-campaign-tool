@@ -21,8 +21,10 @@ V011 的种子覆盖 SRD 5.1 角色章节中的以下定义族：
 | `character.resource` | `resource.` | 16 | 具有短休、长休或特殊恢复方式的职业资源 |
 | `character.feat` | `feat.` | 1 | Grappler |
 
-名称和覆盖边界以官方 [SRD 5.1](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf)
-为准。目录保存稳定身份、显示名、来源页、最早等级、分类、拥有关系、父级关系和当前可表达的
+名称和覆盖边界以 SRD 5.1 为准。查阅先从[本地主题索引](../references/srd-5.1/README.md)
+定位相关分页，并按需核对[本地原文 PDF](../references/srd-5.1.pdf)；
+[官方来源](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf)用于出处追溯。
+目录保存稳定身份、显示名、来源页、最早等级、分类、拥有关系、父级关系和当前可表达的
 前置关系；规则正文的自动执行由后续领域任务实现，不能从简短目录说明推断算法。
 
 ## 类型化投影

@@ -1,0 +1,7891 @@
+{
+  "format_version": 1,
+  "source": "../srd-5.1.pdf",
+  "source_page_count": 403,
+  "complete": true,
+  "pages": [
+    {
+      "pdf_page": 1,
+      "path": "pages/page-001.md",
+      "headings": [
+        "Legal Information"
+      ],
+      "blank": false,
+      "source_glyphs": 1041,
+      "nonspace_glyphs": 890,
+      "normalized_nonspace_characters": 890,
+      "regions": [
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 2,
+      "path": "pages/page-002.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 70,
+      "nonspace_glyphs": 59,
+      "normalized_nonspace_characters": 59,
+      "regions": [
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 3,
+      "path": "pages/page-003.md",
+      "headings": [
+        "Races",
+        "Racial Traits",
+        "Ability Score Increase",
+        "Age",
+        "Alignment",
+        "Size",
+        "Speed",
+        "Languages",
+        "Subraces",
+        "Dwarf",
+        "Dwarf Traits"
+      ],
+      "blank": false,
+      "source_glyphs": 3822,
+      "nonspace_glyphs": 3181,
+      "normalized_nonspace_characters": 3181,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 4,
+      "path": "pages/page-004.md",
+      "headings": [
+        "Hill Dwarf",
+        "Elf",
+        "Elf Traits",
+        "High Elf",
+        "Halfling",
+        "Halfling Traits"
+      ],
+      "blank": false,
+      "source_glyphs": 3931,
+      "nonspace_glyphs": 3245,
+      "normalized_nonspace_characters": 3245,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 5,
+      "path": "pages/page-005.md",
+      "headings": [
+        "Lightfoot",
+        "Human",
+        "Human Traits",
+        "Dragonborn",
+        "Dragonborn Traits",
+        "Draconic Ancestry"
+      ],
+      "blank": false,
+      "source_glyphs": 3875,
+      "nonspace_glyphs": 3196,
+      "normalized_nonspace_characters": 3196,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 6,
+      "path": "pages/page-006.md",
+      "headings": [
+        "Gnome",
+        "Gnome Traits",
+        "Rock Gnome",
+        "Half-Elf",
+        "Half-Elf Traits"
+      ],
+      "blank": false,
+      "source_glyphs": 4137,
+      "nonspace_glyphs": 3429,
+      "normalized_nonspace_characters": 3429,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 7,
+      "path": "pages/page-007.md",
+      "headings": [
+        "Half-Orc",
+        "Half-Orc Traits",
+        "Tiefling",
+        "Tiefling Traits"
+      ],
+      "blank": false,
+      "source_glyphs": 3811,
+      "nonspace_glyphs": 3130,
+      "normalized_nonspace_characters": 3130,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 8,
+      "path": "pages/page-008.md",
+      "headings": [
+        "Barbarian",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Barbarian",
+        "Rage",
+        "Unarmored Defense"
+      ],
+      "blank": false,
+      "source_glyphs": 2701,
+      "nonspace_glyphs": 2266,
+      "normalized_nonspace_characters": 2266,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 9,
+      "path": "pages/page-009.md",
+      "headings": [
+        "Reckless Attack",
+        "Danger Sense",
+        "Primal Path",
+        "Ability Score Improvement",
+        "Extra Attack",
+        "Fast Movement",
+        "Feral Instinct",
+        "Brutal Critical",
+        "Relentless Rage",
+        "Persistent Rage",
+        "Indomitable Might",
+        "Primal Champion",
+        "Path of the Berserker",
+        "Frenzy"
+      ],
+      "blank": false,
+      "source_glyphs": 3553,
+      "nonspace_glyphs": 2910,
+      "normalized_nonspace_characters": 2910,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 10,
+      "path": "pages/page-010.md",
+      "headings": [
+        "Mindless Rage",
+        "Intimidating Presence",
+        "Retaliation"
+      ],
+      "blank": false,
+      "source_glyphs": 1170,
+      "nonspace_glyphs": 954,
+      "normalized_nonspace_characters": 954,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 11,
+      "path": "pages/page-011.md",
+      "headings": [
+        "Bard",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Bard",
+        "Spellcasting"
+      ],
+      "blank": false,
+      "source_glyphs": 2176,
+      "nonspace_glyphs": 1754,
+      "normalized_nonspace_characters": 1754,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 12,
+      "path": "pages/page-012.md",
+      "headings": [
+        "Cantrips",
+        "Spell Slots",
+        "Spells Known of 1st Level and Higher",
+        "Spellcasting Ability",
+        "Ritual Casting",
+        "Spellcasting Focus",
+        "Bardic Inspiration",
+        "Jack of All Trades",
+        "Song of Rest",
+        "Bard College"
+      ],
+      "blank": false,
+      "source_glyphs": 3913,
+      "nonspace_glyphs": 3187,
+      "normalized_nonspace_characters": 3187,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 13,
+      "path": "pages/page-013.md",
+      "headings": [
+        "Expertise",
+        "Ability Score Improvement",
+        "Font of Inspiration",
+        "Countercharm",
+        "Magical Secrets",
+        "Superior Inspiration",
+        "College of Lore",
+        "Bonus Proficiencies",
+        "Cutting Words",
+        "Additional Magical Secrets"
+      ],
+      "blank": false,
+      "source_glyphs": 4035,
+      "nonspace_glyphs": 3322,
+      "normalized_nonspace_characters": 3322,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 14,
+      "path": "pages/page-014.md",
+      "headings": [
+        "Peerless Skill"
+      ],
+      "blank": false,
+      "source_glyphs": 356,
+      "nonspace_glyphs": 291,
+      "normalized_nonspace_characters": 291,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 15,
+      "path": "pages/page-015.md",
+      "headings": [
+        "Cleric",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Cleric",
+        "Spellcasting",
+        "Cantrips"
+      ],
+      "blank": false,
+      "source_glyphs": 2227,
+      "nonspace_glyphs": 1808,
+      "normalized_nonspace_characters": 1808,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 16,
+      "path": "pages/page-016.md",
+      "headings": [
+        "Preparing and Casting Spells",
+        "Spellcasting Ability",
+        "Ritual Casting",
+        "Spellcasting Focus",
+        "Divine Domain",
+        "Domain Spells",
+        "Channel Divinity",
+        "Channel Divinity: Turn Undead"
+      ],
+      "blank": false,
+      "source_glyphs": 4279,
+      "nonspace_glyphs": 3500,
+      "normalized_nonspace_characters": 3500,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 17,
+      "path": "pages/page-017.md",
+      "headings": [
+        "Ability Score Improvement",
+        "Destroy Undead",
+        "Destroy Undead",
+        "Divine Intervention",
+        "Life Domain",
+        "Life Domain Spells",
+        "Bonus Proficiency",
+        "Disciple of Life",
+        "Channel Divinity: Preserve Life",
+        "Blessed Healer",
+        "Divine Strike",
+        "Supreme Healing"
+      ],
+      "blank": false,
+      "source_glyphs": 3776,
+      "nonspace_glyphs": 3111,
+      "normalized_nonspace_characters": 3111,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 18,
+      "path": "pages/page-018.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 123,
+      "nonspace_glyphs": 102,
+      "normalized_nonspace_characters": 102,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 19,
+      "path": "pages/page-019.md",
+      "headings": [
+        "Druid",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Druid",
+        "Druidic",
+        "Spellcasting"
+      ],
+      "blank": false,
+      "source_glyphs": 2281,
+      "nonspace_glyphs": 1856,
+      "normalized_nonspace_characters": 1856,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 20,
+      "path": "pages/page-020.md",
+      "headings": [
+        "Cantrips",
+        "Preparing and Casting Spells",
+        "Spellcasting Ability",
+        "Ritual Casting",
+        "Spellcasting Focus",
+        "Wild Shape",
+        "Beast Shapes"
+      ],
+      "blank": false,
+      "source_glyphs": 4023,
+      "nonspace_glyphs": 3305,
+      "normalized_nonspace_characters": 3305,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 21,
+      "path": "pages/page-021.md",
+      "headings": [
+        "Druid Circle",
+        "Ability Score Improvement",
+        "Timeless Body",
+        "Beast Spells",
+        "Archdruid",
+        "Circle of the Land",
+        "Bonus Cantrip",
+        "Natural Recovery",
+        "Circle Spells"
+      ],
+      "blank": false,
+      "source_glyphs": 4069,
+      "nonspace_glyphs": 3359,
+      "normalized_nonspace_characters": 3359,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 22,
+      "path": "pages/page-022.md",
+      "headings": [
+        "Arctic",
+        "Coast",
+        "Desert",
+        "Forest",
+        "Grassland",
+        "Mountain",
+        "Swamp",
+        "Land’s Stride",
+        "Nature’s Ward",
+        "Nature’s Sanctuary"
+      ],
+      "blank": false,
+      "source_glyphs": 3450,
+      "nonspace_glyphs": 2881,
+      "normalized_nonspace_characters": 2881,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 23,
+      "path": "pages/page-023.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 385,
+      "nonspace_glyphs": 321,
+      "normalized_nonspace_characters": 321,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 24,
+      "path": "pages/page-024.md",
+      "headings": [
+        "Fighter",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Fighter",
+        "Fighting Style",
+        "Archery",
+        "Defense",
+        "Dueling",
+        "Great Weapon Fighting",
+        "Protection",
+        "Two-Weapon Fighting",
+        "Second Wind"
+      ],
+      "blank": false,
+      "source_glyphs": 2980,
+      "nonspace_glyphs": 2485,
+      "normalized_nonspace_characters": 2485,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 25,
+      "path": "pages/page-025.md",
+      "headings": [
+        "Action Surge",
+        "Martial Archetype",
+        "Ability Score Improvement",
+        "Extra Attack",
+        "Indomitable",
+        "Martial Archetypes",
+        "Champion",
+        "Improved Critical",
+        "Remarkable Athlete",
+        "Additional Fighting Style",
+        "Superior Critical",
+        "Survivor"
+      ],
+      "blank": false,
+      "source_glyphs": 2929,
+      "nonspace_glyphs": 2413,
+      "normalized_nonspace_characters": 2413,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 26,
+      "path": "pages/page-026.md",
+      "headings": [
+        "Monk",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Monk",
+        "Unarmored Defense",
+        "Martial Arts"
+      ],
+      "blank": false,
+      "source_glyphs": 2686,
+      "nonspace_glyphs": 2248,
+      "normalized_nonspace_characters": 2248,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 27,
+      "path": "pages/page-027.md",
+      "headings": [
+        "Ki",
+        "Flurry of Blows",
+        "Patient Defense",
+        "Step of the Wind",
+        "Unarmored Movement",
+        "Monastic Tradition",
+        "Deflect Missiles",
+        "Ability Score Improvement",
+        "Slow Fall",
+        "Extra Attack"
+      ],
+      "blank": false,
+      "source_glyphs": 3846,
+      "nonspace_glyphs": 3121,
+      "normalized_nonspace_characters": 3121,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 28,
+      "path": "pages/page-028.md",
+      "headings": [
+        "Stunning Strike",
+        "Ki-Empowered Strikes",
+        "Evasion",
+        "Stillness of Mind",
+        "Purity of Body",
+        "Tongue of the Sun and Moon",
+        "Diamond Soul",
+        "Timeless Body",
+        "Empty Body",
+        "Perfect Self",
+        "Monastic Traditions",
+        "Way of the Open Hand",
+        "Open Hand Technique",
+        "Wholeness of Body"
+      ],
+      "blank": false,
+      "source_glyphs": 3659,
+      "nonspace_glyphs": 3012,
+      "normalized_nonspace_characters": 3012,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 29,
+      "path": "pages/page-029.md",
+      "headings": [
+        "Tranquility",
+        "Quivering Palm"
+      ],
+      "blank": false,
+      "source_glyphs": 1211,
+      "nonspace_glyphs": 986,
+      "normalized_nonspace_characters": 986,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 30,
+      "path": "pages/page-030.md",
+      "headings": [
+        "Paladin",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Paladin",
+        "Divine Sense"
+      ],
+      "blank": false,
+      "source_glyphs": 2396,
+      "nonspace_glyphs": 1977,
+      "normalized_nonspace_characters": 1977,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 31,
+      "path": "pages/page-031.md",
+      "headings": [
+        "Lay on Hands",
+        "Fighting Style",
+        "Defense",
+        "Dueling",
+        "Great Weapon Fighting",
+        "Protection",
+        "Spellcasting",
+        "Preparing and Casting Spells",
+        "Spellcasting Ability",
+        "Spellcasting Focus",
+        "Divine Smite"
+      ],
+      "blank": false,
+      "source_glyphs": 3881,
+      "nonspace_glyphs": 3168,
+      "normalized_nonspace_characters": 3168,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 32,
+      "path": "pages/page-032.md",
+      "headings": [
+        "Divine Health",
+        "Sacred Oath",
+        "Oath Spells",
+        "Channel Divinity",
+        "Ability Score Improvement",
+        "Extra Attack",
+        "Aura of Protection",
+        "Aura of Courage",
+        "Improved Divine Smite",
+        "Cleansing Touch",
+        "Sacred Oaths",
+        "Oath of Devotion"
+      ],
+      "blank": false,
+      "source_glyphs": 3769,
+      "nonspace_glyphs": 3088,
+      "normalized_nonspace_characters": 3088,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 33,
+      "path": "pages/page-033.md",
+      "headings": [
+        "Tenets of Devotion",
+        "Oath Spells",
+        "Oath of Devotion Spells",
+        "Channel Divinity",
+        "Aura of Devotion",
+        "Purity of Spirit",
+        "Holy Nimbus"
+      ],
+      "blank": false,
+      "source_glyphs": 4232,
+      "nonspace_glyphs": 3465,
+      "normalized_nonspace_characters": 3465,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 34,
+      "path": "pages/page-034.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 356,
+      "nonspace_glyphs": 297,
+      "normalized_nonspace_characters": 297,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 35,
+      "path": "pages/page-035.md",
+      "headings": [
+        "Ranger",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "The Ranger",
+        "Equipment",
+        "Favored Enemy"
+      ],
+      "blank": false,
+      "source_glyphs": 2568,
+      "nonspace_glyphs": 2136,
+      "normalized_nonspace_characters": 2136,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 36,
+      "path": "pages/page-036.md",
+      "headings": [
+        "Natural Explorer",
+        "Fighting Style",
+        "Archery",
+        "Defense",
+        "Dueling",
+        "Two-Weapon Fighting",
+        "Spellcasting",
+        "Spell Slots",
+        "Spells Known of 1st Level and Higher",
+        "Spellcasting Ability"
+      ],
+      "blank": false,
+      "source_glyphs": 3496,
+      "nonspace_glyphs": 2892,
+      "normalized_nonspace_characters": 2892,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 37,
+      "path": "pages/page-037.md",
+      "headings": [
+        "Ranger Archetype",
+        "Primeval Awareness",
+        "Ability Score Improvement",
+        "Extra Attack",
+        "Land’s Stride",
+        "Hide in Plain Sight",
+        "Vanish",
+        "Feral Senses",
+        "Foe Slayer",
+        "Ranger Archetypes",
+        "Hunter",
+        "Hunter’s Prey"
+      ],
+      "blank": false,
+      "source_glyphs": 3683,
+      "nonspace_glyphs": 3038,
+      "normalized_nonspace_characters": 3038,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 38,
+      "path": "pages/page-038.md",
+      "headings": [
+        "Defensive Tactics",
+        "Multiattack",
+        "Superior Hunter’s Defense"
+      ],
+      "blank": false,
+      "source_glyphs": 2283,
+      "nonspace_glyphs": 1868,
+      "normalized_nonspace_characters": 1868,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 39,
+      "path": "pages/page-039.md",
+      "headings": [
+        "Rogue",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Rogue",
+        "Expertise",
+        "Sneak Attack",
+        "Thieves’ Cant"
+      ],
+      "blank": false,
+      "source_glyphs": 3033,
+      "nonspace_glyphs": 2549,
+      "normalized_nonspace_characters": 2549,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 40,
+      "path": "pages/page-040.md",
+      "headings": [
+        "Cunning Action",
+        "Roguish Archetype",
+        "Ability Score Improvement",
+        "Uncanny Dodge",
+        "Evasion",
+        "Reliable Talent",
+        "Blindsense",
+        "Slippery Mind",
+        "Elusive",
+        "Stroke of Luck",
+        "Roguish Archetypes",
+        "Thief",
+        "Fast Hands"
+      ],
+      "blank": false,
+      "source_glyphs": 3543,
+      "nonspace_glyphs": 2926,
+      "normalized_nonspace_characters": 2926,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 41,
+      "path": "pages/page-041.md",
+      "headings": [
+        "Second-Story Work",
+        "Supreme Sneak",
+        "Use Magic Device",
+        "Thief’s Reflexes"
+      ],
+      "blank": false,
+      "source_glyphs": 1156,
+      "nonspace_glyphs": 947,
+      "normalized_nonspace_characters": 947,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 42,
+      "path": "pages/page-042.md",
+      "headings": [
+        "Sorcerer",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Sorcerer"
+      ],
+      "blank": false,
+      "source_glyphs": 1836,
+      "nonspace_glyphs": 1466,
+      "normalized_nonspace_characters": 1466,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 43,
+      "path": "pages/page-043.md",
+      "headings": [
+        "Spellcasting",
+        "Cantrips",
+        "Spell Slots",
+        "Spells Known of 1st Level and Higher",
+        "Spellcasting Ability",
+        "Spellcasting Focus",
+        "Sorcerous Origin",
+        "Font of Magic",
+        "Sorcery Points",
+        "Flexible Casting",
+        "Creating Spell Slots"
+      ],
+      "blank": false,
+      "source_glyphs": 3618,
+      "nonspace_glyphs": 2966,
+      "normalized_nonspace_characters": 2966,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 44,
+      "path": "pages/page-044.md",
+      "headings": [
+        "Metamagic",
+        "Careful Spell",
+        "Distant Spell",
+        "Empowered Spell",
+        "Extended Spell",
+        "Heightened Spell",
+        "Quickened Spell",
+        "Subtle Spell",
+        "Twinned Spell",
+        "Ability Score Improvement",
+        "Sorcerous Restoration",
+        "Sorcerous Origins",
+        "Draconic Bloodline",
+        "Dragon Ancestor",
+        "Draconic Ancestry"
+      ],
+      "blank": false,
+      "source_glyphs": 3711,
+      "nonspace_glyphs": 3033,
+      "normalized_nonspace_characters": 3033,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 45,
+      "path": "pages/page-045.md",
+      "headings": [
+        "Draconic Resilience",
+        "Elemental Affinity",
+        "Dragon Wings",
+        "Draconic Presence"
+      ],
+      "blank": false,
+      "source_glyphs": 2153,
+      "nonspace_glyphs": 1768,
+      "normalized_nonspace_characters": 1768,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 46,
+      "path": "pages/page-046.md",
+      "headings": [
+        "Warlock",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Warlock",
+        "Otherworldly Patron",
+        "Pact Magic",
+        "Cantrips"
+      ],
+      "blank": false,
+      "source_glyphs": 2238,
+      "nonspace_glyphs": 1836,
+      "normalized_nonspace_characters": 1836,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 47,
+      "path": "pages/page-047.md",
+      "headings": [
+        "Spell Slots",
+        "Spells Known of 1st Level and Higher",
+        "Spellcasting Ability",
+        "Spellcasting Focus",
+        "Eldritch Invocations",
+        "Pact Boon",
+        "Pact of the Chain",
+        "Pact of the Blade"
+      ],
+      "blank": false,
+      "source_glyphs": 4117,
+      "nonspace_glyphs": 3372,
+      "normalized_nonspace_characters": 3372,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 48,
+      "path": "pages/page-048.md",
+      "headings": [
+        "Pact of the Tome",
+        "Ability Score Improvement",
+        "Mystic Arcanum",
+        "Eldritch Master",
+        "Eldritch Invocations",
+        "Agonizing Blast",
+        "Armor of Shadows",
+        "Ascendant Step",
+        "Beast Speech",
+        "Beguiling Influence",
+        "Bewitching Whispers",
+        "Book of Ancient Secrets"
+      ],
+      "blank": false,
+      "source_glyphs": 3935,
+      "nonspace_glyphs": 3225,
+      "normalized_nonspace_characters": 3225,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 49,
+      "path": "pages/page-049.md",
+      "headings": [
+        "Chains of Carceri",
+        "Devil’s Sight",
+        "Dreadful Word",
+        "Eldritch Sight",
+        "Eldritch Spear",
+        "Eyes of the Rune Keeper",
+        "Fiendish Vigor",
+        "Gaze of Two Minds",
+        "Lifedrinker",
+        "Mask of Many Faces",
+        "Master of Myriad Forms",
+        "Minions of Chaos",
+        "Mire the Mind",
+        "Misty Visions",
+        "One with Shadows",
+        "Otherworldly Leap",
+        "Repelling Blast"
+      ],
+      "blank": false,
+      "source_glyphs": 2894,
+      "nonspace_glyphs": 2395,
+      "normalized_nonspace_characters": 2395,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 50,
+      "path": "pages/page-050.md",
+      "headings": [
+        "Sculptor of Flesh",
+        "Sign of Ill Omen",
+        "Thief of Five Fates",
+        "Thirsting Blade",
+        "Visions of Distant Realms",
+        "Voice of the Chain Master",
+        "Whispers of the Grave",
+        "Witch Sight",
+        "Otherworldly Patrons",
+        "The Fiend",
+        "Expanded Spell List",
+        "Fiend Expanded Spells",
+        "Dark One’s Blessing",
+        "Dark One’s Own Luck"
+      ],
+      "blank": false,
+      "source_glyphs": 3334,
+      "nonspace_glyphs": 2773,
+      "normalized_nonspace_characters": 2773,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 51,
+      "path": "pages/page-051.md",
+      "headings": [
+        "Fiendish Resilience",
+        "Hurl Through Hell"
+      ],
+      "blank": false,
+      "source_glyphs": 1683,
+      "nonspace_glyphs": 1378,
+      "normalized_nonspace_characters": 1378,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 52,
+      "path": "pages/page-052.md",
+      "headings": [
+        "Wizard",
+        "Class Features",
+        "Hit Points",
+        "Proficiencies",
+        "Equipment",
+        "The Wizard",
+        "Spellcasting",
+        "Cantrips",
+        "Spellbook"
+      ],
+      "blank": false,
+      "source_glyphs": 2216,
+      "nonspace_glyphs": 1799,
+      "normalized_nonspace_characters": 1799,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 53,
+      "path": "pages/page-053.md",
+      "headings": [
+        "Preparing and Casting Spells",
+        "Spellcasting Ability",
+        "Ritual Casting",
+        "Spellcasting Focus",
+        "Learning Spells of 1st Level and Higher",
+        "Arcane Recovery",
+        "Arcane Tradition",
+        "Ability Score Improvement",
+        "Spell Mastery"
+      ],
+      "blank": false,
+      "source_glyphs": 4064,
+      "nonspace_glyphs": 3332,
+      "normalized_nonspace_characters": 3332,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 54,
+      "path": "pages/page-054.md",
+      "headings": [
+        "Signature Spells",
+        "Arcane Traditions",
+        "School of Evocation",
+        "Evocation Savant",
+        "Sculpt Spells",
+        "Potent Cantrip",
+        "Empowered Evocation",
+        "Overchannel"
+      ],
+      "blank": false,
+      "source_glyphs": 4475,
+      "nonspace_glyphs": 3714,
+      "normalized_nonspace_characters": 3714,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 55,
+      "path": "pages/page-055.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 1300,
+      "nonspace_glyphs": 1066,
+      "normalized_nonspace_characters": 1066,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 56,
+      "path": "pages/page-056.md",
+      "headings": [
+        "Beyond 1st Level",
+        "Character Advancement",
+        "Multiclassing",
+        "Prerequisites",
+        "Multiclassing Prerequisites"
+      ],
+      "blank": false,
+      "source_glyphs": 3733,
+      "nonspace_glyphs": 3108,
+      "normalized_nonspace_characters": 3108,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 57,
+      "path": "pages/page-057.md",
+      "headings": [
+        "Experience Points",
+        "Hit Points and Hit Dice",
+        "Proficiency Bonus",
+        "Proficiencies",
+        "Multiclassing Proficiencies",
+        "Class Features",
+        "Channel Divinity",
+        "Extra Attack",
+        "Unarmored Defense",
+        "Spellcasting"
+      ],
+      "blank": false,
+      "source_glyphs": 3969,
+      "nonspace_glyphs": 3299,
+      "normalized_nonspace_characters": 3299,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 58,
+      "path": "pages/page-058.md",
+      "headings": [
+        "Multiclass Spellcaster:",
+        "Spell Slots per Spell Level",
+        "Alignment"
+      ],
+      "blank": false,
+      "source_glyphs": 4184,
+      "nonspace_glyphs": 3349,
+      "normalized_nonspace_characters": 3349,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 59,
+      "path": "pages/page-059.md",
+      "headings": [
+        "Alignment in the Multiverse",
+        "Languages",
+        "Standard Languages",
+        "Exotic Languages",
+        "Inspiration"
+      ],
+      "blank": false,
+      "source_glyphs": 4216,
+      "nonspace_glyphs": 3523,
+      "normalized_nonspace_characters": 3523,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 60,
+      "path": "pages/page-060.md",
+      "headings": [
+        "Gaining Inspiration",
+        "Using Inspiration",
+        "Backgrounds",
+        "Proficiencies",
+        "Languages",
+        "Equipment",
+        "Suggested Characteristics",
+        "Customizing a Background",
+        "Acolyte"
+      ],
+      "blank": false,
+      "source_glyphs": 4050,
+      "nonspace_glyphs": 3392,
+      "normalized_nonspace_characters": 3392,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 61,
+      "path": "pages/page-061.md",
+      "headings": [
+        "Feature: Shelter of the Faithful",
+        "Suggested Characteristics"
+      ],
+      "blank": false,
+      "source_glyphs": 4379,
+      "nonspace_glyphs": 3587,
+      "normalized_nonspace_characters": 3587,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 62,
+      "path": "pages/page-062.md",
+      "headings": [
+        "Equipment",
+        "Standard Exchange Rates",
+        "Selling Treasure",
+        "Armor"
+      ],
+      "blank": false,
+      "source_glyphs": 4460,
+      "nonspace_glyphs": 3674,
+      "normalized_nonspace_characters": 3674,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 63,
+      "path": "pages/page-063.md",
+      "headings": [
+        "Light Armor",
+        "Medium Armor",
+        "Heavy Armor",
+        "Armor"
+      ],
+      "blank": false,
+      "source_glyphs": 4096,
+      "nonspace_glyphs": 3395,
+      "normalized_nonspace_characters": 3395,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 64,
+      "path": "pages/page-064.md",
+      "headings": [
+        "Getting Into and Out of Armor",
+        "Donning and Doffing Armor",
+        "Weapons",
+        "Weapon Proficiency",
+        "Weapon Properties"
+      ],
+      "blank": false,
+      "source_glyphs": 3616,
+      "nonspace_glyphs": 2941,
+      "normalized_nonspace_characters": 2941,
+      "regions": [
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 65,
+      "path": "pages/page-065.md",
+      "headings": [
+        "Improvised Weapons",
+        "Silvered Weapons",
+        "Special Weapons",
+        "Weapons"
+      ],
+      "blank": false,
+      "source_glyphs": 4149,
+      "nonspace_glyphs": 3393,
+      "normalized_nonspace_characters": 3393,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 66,
+      "path": "pages/page-066.md",
+      "headings": [
+        "Adventuring Gear"
+      ],
+      "blank": false,
+      "source_glyphs": 3409,
+      "nonspace_glyphs": 2806,
+      "normalized_nonspace_characters": 2806,
+      "regions": [
+        "Full-width region",
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 67,
+      "path": "pages/page-067.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 5017,
+      "nonspace_glyphs": 4095,
+      "normalized_nonspace_characters": 4095,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 68,
+      "path": "pages/page-068.md",
+      "headings": [
+        "Adventuring Gear"
+      ],
+      "blank": false,
+      "source_glyphs": 4823,
+      "nonspace_glyphs": 3931,
+      "normalized_nonspace_characters": 3931,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 69,
+      "path": "pages/page-069.md",
+      "headings": [
+        "Container Capacity"
+      ],
+      "blank": false,
+      "source_glyphs": 2689,
+      "nonspace_glyphs": 2062,
+      "normalized_nonspace_characters": 2062,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 70,
+      "path": "pages/page-070.md",
+      "headings": [
+        "Tools",
+        "Tools"
+      ],
+      "blank": false,
+      "source_glyphs": 4078,
+      "nonspace_glyphs": 3301,
+      "normalized_nonspace_characters": 3301,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 71,
+      "path": "pages/page-071.md",
+      "headings": [
+        "Mounts and Vehicles",
+        "Mounts and Other Animals"
+      ],
+      "blank": false,
+      "source_glyphs": 4842,
+      "nonspace_glyphs": 4009,
+      "normalized_nonspace_characters": 4009,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 72,
+      "path": "pages/page-072.md",
+      "headings": [
+        "Tack, Harness, and Drawn Vehicles",
+        "Waterborne Vehicles",
+        "Trade Goods",
+        "Trade Goods",
+        "Expenses",
+        "Lifestyle Expenses",
+        "Lifestyle Expenses"
+      ],
+      "blank": false,
+      "source_glyphs": 3306,
+      "nonspace_glyphs": 2678,
+      "normalized_nonspace_characters": 2678,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 73,
+      "path": "pages/page-073.md",
+      "headings": [
+        "Food, Drink, and Lodging",
+        "Food, Drink, and Lodging"
+      ],
+      "blank": false,
+      "source_glyphs": 4573,
+      "nonspace_glyphs": 3822,
+      "normalized_nonspace_characters": 3822,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 74,
+      "path": "pages/page-074.md",
+      "headings": [
+        "Services",
+        "Services",
+        "Spellcasting Services"
+      ],
+      "blank": false,
+      "source_glyphs": 3363,
+      "nonspace_glyphs": 2767,
+      "normalized_nonspace_characters": 2767,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 75,
+      "path": "pages/page-075.md",
+      "headings": [
+        "Feats",
+        "Grappler"
+      ],
+      "blank": false,
+      "source_glyphs": 1291,
+      "nonspace_glyphs": 1080,
+      "normalized_nonspace_characters": 1080,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 76,
+      "path": "pages/page-076.md",
+      "headings": [
+        "Using Ability",
+        "Scores",
+        "Ability Scores and Modifiers",
+        "Ability Scores and Modifiers",
+        "Advantage and",
+        "Disadvantage"
+      ],
+      "blank": false,
+      "source_glyphs": 3701,
+      "nonspace_glyphs": 3088,
+      "normalized_nonspace_characters": 3088,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 77,
+      "path": "pages/page-077.md",
+      "headings": [
+        "Proficiency Bonus",
+        "Ability Checks",
+        "Typical Difficulty Classes",
+        "Contests",
+        "Skills"
+      ],
+      "blank": false,
+      "source_glyphs": 4388,
+      "nonspace_glyphs": 3624,
+      "normalized_nonspace_characters": 3624,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 78,
+      "path": "pages/page-078.md",
+      "headings": [
+        "Strength",
+        "Dexterity",
+        "Intelligence",
+        "Wisdom",
+        "Charisma",
+        "Variant: Skills with Different Abilities",
+        "Passive Checks"
+      ],
+      "blank": false,
+      "source_glyphs": 3680,
+      "nonspace_glyphs": 3093,
+      "normalized_nonspace_characters": 3093,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 79,
+      "path": "pages/page-079.md",
+      "headings": [
+        "Working Together",
+        "Group Checks",
+        "Using Each Ability",
+        "Strength",
+        "Strength Checks",
+        "Attack Rolls and Damage",
+        "Lifting and Carrying"
+      ],
+      "blank": false,
+      "source_glyphs": 4025,
+      "nonspace_glyphs": 3348,
+      "normalized_nonspace_characters": 3348,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 80,
+      "path": "pages/page-080.md",
+      "headings": [
+        "Variant: Encumbrance",
+        "Dexterity",
+        "Dexterity Checks",
+        "Attack Rolls and Damage",
+        "Armor Class",
+        "Initiative"
+      ],
+      "blank": false,
+      "source_glyphs": 4231,
+      "nonspace_glyphs": 3506,
+      "normalized_nonspace_characters": 3506,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 81,
+      "path": "pages/page-081.md",
+      "headings": [
+        "Constitution",
+        "Constitution Checks",
+        "Hit Points",
+        "Intelligence",
+        "Intelligence Checks"
+      ],
+      "blank": false,
+      "source_glyphs": 4384,
+      "nonspace_glyphs": 3683,
+      "normalized_nonspace_characters": 3683,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 82,
+      "path": "pages/page-082.md",
+      "headings": [
+        "Spellcasting Ability",
+        "Wisdom",
+        "Wisdom Checks",
+        "Spellcasting Ability",
+        "Charisma",
+        "Charisma Checks"
+      ],
+      "blank": false,
+      "source_glyphs": 4390,
+      "nonspace_glyphs": 3697,
+      "normalized_nonspace_characters": 3697,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 83,
+      "path": "pages/page-083.md",
+      "headings": [
+        "Spellcasting Ability",
+        "Saving Throws"
+      ],
+      "blank": false,
+      "source_glyphs": 1911,
+      "nonspace_glyphs": 1582,
+      "normalized_nonspace_characters": 1582,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 84,
+      "path": "pages/page-084.md",
+      "headings": [
+        "Time",
+        "Movement",
+        "Speed",
+        "Travel Pace",
+        "Travel Pace"
+      ],
+      "blank": false,
+      "source_glyphs": 4317,
+      "nonspace_glyphs": 3543,
+      "normalized_nonspace_characters": 3543,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 85,
+      "path": "pages/page-085.md",
+      "headings": [
+        "Difficult Terrain",
+        "Special Types of Movement",
+        "Climbing, Swimming, and Crawling",
+        "Jumping"
+      ],
+      "blank": false,
+      "source_glyphs": 2580,
+      "nonspace_glyphs": 2120,
+      "normalized_nonspace_characters": 2120,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 86,
+      "path": "pages/page-086.md",
+      "headings": [
+        "The Environment",
+        "Falling",
+        "Suffocating",
+        "Vision and Light",
+        "Blindsight",
+        "Darkvision",
+        "Truesight",
+        "Food and Water",
+        "Food"
+      ],
+      "blank": false,
+      "source_glyphs": 4088,
+      "nonspace_glyphs": 3401,
+      "normalized_nonspace_characters": 3401,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 87,
+      "path": "pages/page-087.md",
+      "headings": [
+        "Water",
+        "Interacting with Objects",
+        "Resting",
+        "Short Rest",
+        "Long Rest"
+      ],
+      "blank": false,
+      "source_glyphs": 4256,
+      "nonspace_glyphs": 3474,
+      "normalized_nonspace_characters": 3474,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 88,
+      "path": "pages/page-088.md",
+      "headings": [
+        "Between Adventures",
+        "Lifestyle Expenses",
+        "Downtime Activities",
+        "Crafting",
+        "Practicing a Profession",
+        "Recuperating"
+      ],
+      "blank": false,
+      "source_glyphs": 4383,
+      "nonspace_glyphs": 3627,
+      "normalized_nonspace_characters": 3627,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 89,
+      "path": "pages/page-089.md",
+      "headings": [
+        "Researching",
+        "Training"
+      ],
+      "blank": false,
+      "source_glyphs": 1533,
+      "nonspace_glyphs": 1264,
+      "normalized_nonspace_characters": 1264,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 90,
+      "path": "pages/page-090.md",
+      "headings": [
+        "The Order of Combat",
+        "Surprise",
+        "Initiative",
+        "Your Turn",
+        "Bonus Actions"
+      ],
+      "blank": false,
+      "source_glyphs": 4392,
+      "nonspace_glyphs": 3636,
+      "normalized_nonspace_characters": 3636,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 91,
+      "path": "pages/page-091.md",
+      "headings": [
+        "Other Activity on Your Turn",
+        "Reactions",
+        "Movement and Position",
+        "Breaking Up Your Move",
+        "Moving between Attacks",
+        "Using Different Speeds",
+        "Difficult Terrain",
+        "Being Prone"
+      ],
+      "blank": false,
+      "source_glyphs": 4272,
+      "nonspace_glyphs": 3504,
+      "normalized_nonspace_characters": 3504,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 92,
+      "path": "pages/page-092.md",
+      "headings": [
+        "Moving Around Other Creatures",
+        "Flying Movement",
+        "Creature Size",
+        "Size Categories",
+        "Space",
+        "Squeezing into a Smaller Space"
+      ],
+      "blank": false,
+      "source_glyphs": 3669,
+      "nonspace_glyphs": 3015,
+      "normalized_nonspace_characters": 3015,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 93,
+      "path": "pages/page-093.md",
+      "headings": [
+        "Actions in Combat",
+        "Attack",
+        "Cast a Spell",
+        "Dash",
+        "Disengage",
+        "Dodge",
+        "Help",
+        "Hide",
+        "Ready"
+      ],
+      "blank": false,
+      "source_glyphs": 4061,
+      "nonspace_glyphs": 3313,
+      "normalized_nonspace_characters": 3313,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 94,
+      "path": "pages/page-094.md",
+      "headings": [
+        "Search",
+        "Use an Object",
+        "Making an Attack",
+        "Attack Rolls",
+        "Modifiers to the Roll",
+        "Rolling 1 or 20",
+        "Unseen Attackers and Targets"
+      ],
+      "blank": false,
+      "source_glyphs": 4063,
+      "nonspace_glyphs": 3368,
+      "normalized_nonspace_characters": 3368,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 95,
+      "path": "pages/page-095.md",
+      "headings": [
+        "Ranged Attacks",
+        "Range",
+        "Ranged Attacks in Close Combat",
+        "Melee Attacks",
+        "Opportunity Attacks",
+        "Two-Weapon Fighting",
+        "Grappling"
+      ],
+      "blank": false,
+      "source_glyphs": 4283,
+      "nonspace_glyphs": 3524,
+      "normalized_nonspace_characters": 3524,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 96,
+      "path": "pages/page-096.md",
+      "headings": [
+        "Shoving a Creature",
+        "Cover",
+        "Damage and Healing",
+        "Hit Points",
+        "Damage Rolls",
+        "Critical Hits"
+      ],
+      "blank": false,
+      "source_glyphs": 4363,
+      "nonspace_glyphs": 3583,
+      "normalized_nonspace_characters": 3583,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 97,
+      "path": "pages/page-097.md",
+      "headings": [
+        "Damage Types",
+        "Damage Resistance and",
+        "Vulnerability",
+        "Healing",
+        "Dropping to 0 Hit Points"
+      ],
+      "blank": false,
+      "source_glyphs": 4101,
+      "nonspace_glyphs": 3392,
+      "normalized_nonspace_characters": 3392,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 98,
+      "path": "pages/page-098.md",
+      "headings": [
+        "Instant Death",
+        "Falling Unconscious",
+        "Death Saving Throws",
+        "Stabilizing a Creature",
+        "Monsters and Death",
+        "Knocking a Creature Out",
+        "Temporary Hit Points"
+      ],
+      "blank": false,
+      "source_glyphs": 4400,
+      "nonspace_glyphs": 3604,
+      "normalized_nonspace_characters": 3604,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 99,
+      "path": "pages/page-099.md",
+      "headings": [
+        "Mounted Combat",
+        "Mounting and Dismounting",
+        "Controlling a Mount",
+        "Underwater Combat"
+      ],
+      "blank": false,
+      "source_glyphs": 3284,
+      "nonspace_glyphs": 2687,
+      "normalized_nonspace_characters": 2687,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 100,
+      "path": "pages/page-100.md",
+      "headings": [
+        "Spellcasting",
+        "What Is a Spell?",
+        "Spell Level",
+        "Known and Prepared Spells",
+        "Spell Slots",
+        "Casting a Spell at a Higher Level"
+      ],
+      "blank": false,
+      "source_glyphs": 4697,
+      "nonspace_glyphs": 3874,
+      "normalized_nonspace_characters": 3874,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 101,
+      "path": "pages/page-101.md",
+      "headings": [
+        "Cantrips",
+        "Rituals",
+        "Casting a Spell",
+        "Casting Time",
+        "Bonus Action",
+        "Reactions",
+        "Longer Casting Times",
+        "Range",
+        "Components",
+        "Verbal (V)",
+        "Somatic (S)"
+      ],
+      "blank": false,
+      "source_glyphs": 4044,
+      "nonspace_glyphs": 3323,
+      "normalized_nonspace_characters": 3323,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 102,
+      "path": "pages/page-102.md",
+      "headings": [
+        "Material (M)",
+        "Duration",
+        "Instantaneous",
+        "Concentration",
+        "Targets",
+        "A Clear Path to the Target",
+        "Targeting Yourself",
+        "Areas of Effect"
+      ],
+      "blank": false,
+      "source_glyphs": 4123,
+      "nonspace_glyphs": 3420,
+      "normalized_nonspace_characters": 3420,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 103,
+      "path": "pages/page-103.md",
+      "headings": [
+        "Cone",
+        "Cube",
+        "Cylinder",
+        "Line",
+        "Sphere",
+        "Saving Throws",
+        "Attack Rolls"
+      ],
+      "blank": false,
+      "source_glyphs": 4668,
+      "nonspace_glyphs": 3857,
+      "normalized_nonspace_characters": 3857,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 104,
+      "path": "pages/page-104.md",
+      "headings": [
+        "Combining Magical Effects"
+      ],
+      "blank": false,
+      "source_glyphs": 1272,
+      "nonspace_glyphs": 1062,
+      "normalized_nonspace_characters": 1062,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 105,
+      "path": "pages/page-105.md",
+      "headings": [
+        "Spell Lists",
+        "Bard Spells",
+        "Cantrips (0 Level)",
+        "1st Level",
+        "2nd Level",
+        "3rd Level",
+        "4th Level",
+        "5th Level",
+        "6th Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1286,
+      "nonspace_glyphs": 1109,
+      "normalized_nonspace_characters": 1109,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 106,
+      "path": "pages/page-106.md",
+      "headings": [
+        "7th Level",
+        "8th Level",
+        "9th Level",
+        "Cleric Spells",
+        "Cantrips (0 Level)",
+        "1st Level",
+        "2nd Level",
+        "3rd Level",
+        "4th Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1364,
+      "nonspace_glyphs": 1163,
+      "normalized_nonspace_characters": 1163,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 107,
+      "path": "pages/page-107.md",
+      "headings": [
+        "5th Level",
+        "6th Level",
+        "7th Level",
+        "8th Level",
+        "9th Level",
+        "Druid Spells",
+        "Cantrips (0 Level)",
+        "1st Level",
+        "2nd Level",
+        "3rd Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1262,
+      "nonspace_glyphs": 1077,
+      "normalized_nonspace_characters": 1077,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 108,
+      "path": "pages/page-108.md",
+      "headings": [
+        "4th Level",
+        "5th Level",
+        "6th Level",
+        "7th Level",
+        "8th Level",
+        "9th Level",
+        "Paladin Spells",
+        "1st Level",
+        "2nd Level",
+        "3rd Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1346,
+      "nonspace_glyphs": 1145,
+      "normalized_nonspace_characters": 1145,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 109,
+      "path": "pages/page-109.md",
+      "headings": [
+        "4th Level",
+        "5th Level",
+        "Ranger Spells",
+        "1st Level",
+        "2nd Level",
+        "3rd Level",
+        "4th Level",
+        "5th Level",
+        "Sorcerer Spells",
+        "Cantrips (0 Level)",
+        "1st Level",
+        "2nd Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1283,
+      "nonspace_glyphs": 1096,
+      "normalized_nonspace_characters": 1096,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 110,
+      "path": "pages/page-110.md",
+      "headings": [
+        "3rd Level",
+        "4th Level",
+        "5th Level",
+        "6th Level",
+        "7th Level",
+        "8th Level",
+        "9th Level",
+        "Warlock Spells",
+        "Cantrips (0 Level)"
+      ],
+      "blank": false,
+      "source_glyphs": 1216,
+      "nonspace_glyphs": 1043,
+      "normalized_nonspace_characters": 1043,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 111,
+      "path": "pages/page-111.md",
+      "headings": [
+        "1st Level",
+        "2nd Level",
+        "3rd Level",
+        "4th Level",
+        "5th Level",
+        "6th Level",
+        "7th Level",
+        "8th Level",
+        "9th Level",
+        "Wizard Spells",
+        "Cantrips (0 Level)",
+        "1st Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1254,
+      "nonspace_glyphs": 1073,
+      "normalized_nonspace_characters": 1073,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 112,
+      "path": "pages/page-112.md",
+      "headings": [
+        "2nd Level",
+        "3rd Level",
+        "4th Level",
+        "5th Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1321,
+      "nonspace_glyphs": 1137,
+      "normalized_nonspace_characters": 1137,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 113,
+      "path": "pages/page-113.md",
+      "headings": [
+        "6th Level",
+        "7th Level",
+        "8th Level",
+        "9th Level"
+      ],
+      "blank": false,
+      "source_glyphs": 1117,
+      "nonspace_glyphs": 963,
+      "normalized_nonspace_characters": 963,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 114,
+      "path": "pages/page-114.md",
+      "headings": [
+        "Spell Descriptions",
+        "Acid Arrow",
+        "Acid Splash",
+        "Aid",
+        "Alarm",
+        "Alter Self"
+      ],
+      "blank": false,
+      "source_glyphs": 3536,
+      "nonspace_glyphs": 2909,
+      "normalized_nonspace_characters": 2909,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 115,
+      "path": "pages/page-115.md",
+      "headings": [
+        "Animal Friendship",
+        "Animal Messenger",
+        "Animal Shapes",
+        "Animate Dead"
+      ],
+      "blank": false,
+      "source_glyphs": 4270,
+      "nonspace_glyphs": 3503,
+      "normalized_nonspace_characters": 3503,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 116,
+      "path": "pages/page-116.md",
+      "headings": [
+        "Animate Objects",
+        "Animated Object Statistics",
+        "Antilife Shell"
+      ],
+      "blank": false,
+      "source_glyphs": 4472,
+      "nonspace_glyphs": 3655,
+      "normalized_nonspace_characters": 3655,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 117,
+      "path": "pages/page-117.md",
+      "headings": [
+        "Antimagic Field",
+        "Antipathy/Sympathy"
+      ],
+      "blank": false,
+      "source_glyphs": 4473,
+      "nonspace_glyphs": 3690,
+      "normalized_nonspace_characters": 3690,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 118,
+      "path": "pages/page-118.md",
+      "headings": [
+        "Arcane Eye",
+        "Arcane Hand",
+        "Arcane Lock"
+      ],
+      "blank": false,
+      "source_glyphs": 4364,
+      "nonspace_glyphs": 3555,
+      "normalized_nonspace_characters": 3555,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 119,
+      "path": "pages/page-119.md",
+      "headings": [
+        "Arcane Sword",
+        "Arcanist’s Magic Aura",
+        "Astral Projection"
+      ],
+      "blank": false,
+      "source_glyphs": 4386,
+      "nonspace_glyphs": 3598,
+      "normalized_nonspace_characters": 3598,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 120,
+      "path": "pages/page-120.md",
+      "headings": [
+        "Augury",
+        "Awaken",
+        "Bane",
+        "Banishment"
+      ],
+      "blank": false,
+      "source_glyphs": 3911,
+      "nonspace_glyphs": 3226,
+      "normalized_nonspace_characters": 3226,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 121,
+      "path": "pages/page-121.md",
+      "headings": [
+        "Barkskin",
+        "Beacon of Hope",
+        "Bestow Curse",
+        "Black Tentacles"
+      ],
+      "blank": false,
+      "source_glyphs": 3934,
+      "nonspace_glyphs": 3247,
+      "normalized_nonspace_characters": 3247,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 122,
+      "path": "pages/page-122.md",
+      "headings": [
+        "Blade Barrier",
+        "Bless",
+        "Blight",
+        "Blindness/Deafness",
+        "Blink"
+      ],
+      "blank": false,
+      "source_glyphs": 3827,
+      "nonspace_glyphs": 3130,
+      "normalized_nonspace_characters": 3130,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 123,
+      "path": "pages/page-123.md",
+      "headings": [
+        "Blur",
+        "Branding Smite",
+        "Burning Hands",
+        "Call Lightning",
+        "Calm Emotions"
+      ],
+      "blank": false,
+      "source_glyphs": 3922,
+      "nonspace_glyphs": 3227,
+      "normalized_nonspace_characters": 3227,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 124,
+      "path": "pages/page-124.md",
+      "headings": [
+        "Chain Lightning",
+        "Charm Person",
+        "Chill Touch",
+        "Circle of Death",
+        "Clairvoyance"
+      ],
+      "blank": false,
+      "source_glyphs": 3752,
+      "nonspace_glyphs": 3063,
+      "normalized_nonspace_characters": 3063,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 125,
+      "path": "pages/page-125.md",
+      "headings": [
+        "Clone",
+        "Cloudkill",
+        "Color Spray",
+        "Command"
+      ],
+      "blank": false,
+      "source_glyphs": 4074,
+      "nonspace_glyphs": 3357,
+      "normalized_nonspace_characters": 3357,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 126,
+      "path": "pages/page-126.md",
+      "headings": [
+        "Commune",
+        "Commune with Nature",
+        "Comprehend Languages",
+        "Compulsion"
+      ],
+      "blank": false,
+      "source_glyphs": 3778,
+      "nonspace_glyphs": 3116,
+      "normalized_nonspace_characters": 3116,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 127,
+      "path": "pages/page-127.md",
+      "headings": [
+        "Cone of Cold",
+        "Confusion",
+        "Conjure Animals",
+        "Conjure Celestial"
+      ],
+      "blank": false,
+      "source_glyphs": 3768,
+      "nonspace_glyphs": 3102,
+      "normalized_nonspace_characters": 3102,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 128,
+      "path": "pages/page-128.md",
+      "headings": [
+        "Conjure Elemental",
+        "Conjure Fey",
+        "Conjure Minor Elementals"
+      ],
+      "blank": false,
+      "source_glyphs": 4327,
+      "nonspace_glyphs": 3575,
+      "normalized_nonspace_characters": 3575,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 129,
+      "path": "pages/page-129.md",
+      "headings": [
+        "Conjure Woodland Beings",
+        "Contact Other Plane",
+        "Contagion"
+      ],
+      "blank": false,
+      "source_glyphs": 4116,
+      "nonspace_glyphs": 3433,
+      "normalized_nonspace_characters": 3433,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 130,
+      "path": "pages/page-130.md",
+      "headings": [
+        "Contingency",
+        "Continual Flame",
+        "Control Water"
+      ],
+      "blank": false,
+      "source_glyphs": 4322,
+      "nonspace_glyphs": 3547,
+      "normalized_nonspace_characters": 3547,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 131,
+      "path": "pages/page-131.md",
+      "headings": [
+        "Control Weather",
+        "Precipitation",
+        "Temperature",
+        "Wind",
+        "Counterspell",
+        "Create Food and Water"
+      ],
+      "blank": false,
+      "source_glyphs": 3373,
+      "nonspace_glyphs": 2756,
+      "normalized_nonspace_characters": 2756,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 132,
+      "path": "pages/page-132.md",
+      "headings": [
+        "Create or Destroy Water",
+        "Create Undead",
+        "Creation",
+        "Cure Wounds"
+      ],
+      "blank": false,
+      "source_glyphs": 3912,
+      "nonspace_glyphs": 3220,
+      "normalized_nonspace_characters": 3220,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 133,
+      "path": "pages/page-133.md",
+      "headings": [
+        "Dancing Lights",
+        "Darkness",
+        "Darkvision",
+        "Daylight",
+        "Death Ward",
+        "Delayed Blast Fireball"
+      ],
+      "blank": false,
+      "source_glyphs": 3458,
+      "nonspace_glyphs": 2833,
+      "normalized_nonspace_characters": 2833,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 134,
+      "path": "pages/page-134.md",
+      "headings": [
+        "Demiplane",
+        "Detect Evil and Good",
+        "Detect Magic",
+        "Detect Poison and Disease"
+      ],
+      "blank": false,
+      "source_glyphs": 3999,
+      "nonspace_glyphs": 3270,
+      "normalized_nonspace_characters": 3270,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 135,
+      "path": "pages/page-135.md",
+      "headings": [
+        "Detect Thoughts",
+        "Dimension Door",
+        "Disguise Self",
+        "Disintegrate"
+      ],
+      "blank": false,
+      "source_glyphs": 4188,
+      "nonspace_glyphs": 3438,
+      "normalized_nonspace_characters": 3438,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 136,
+      "path": "pages/page-136.md",
+      "headings": [
+        "Dispel Evil and Good",
+        "Dispel Magic",
+        "Divination",
+        "Divine Favor"
+      ],
+      "blank": false,
+      "source_glyphs": 3972,
+      "nonspace_glyphs": 3266,
+      "normalized_nonspace_characters": 3266,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 137,
+      "path": "pages/page-137.md",
+      "headings": [
+        "Divine Word",
+        "Dominate Beast",
+        "Dominate Monster"
+      ],
+      "blank": false,
+      "source_glyphs": 4169,
+      "nonspace_glyphs": 3414,
+      "normalized_nonspace_characters": 3414,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 138,
+      "path": "pages/page-138.md",
+      "headings": [
+        "Dominate Person",
+        "Dream",
+        "Druidcraft"
+      ],
+      "blank": false,
+      "source_glyphs": 4246,
+      "nonspace_glyphs": 3487,
+      "normalized_nonspace_characters": 3487,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 139,
+      "path": "pages/page-139.md",
+      "headings": [
+        "Earthquake",
+        "Eldritch Blast",
+        "Enhance Ability"
+      ],
+      "blank": false,
+      "source_glyphs": 4153,
+      "nonspace_glyphs": 3422,
+      "normalized_nonspace_characters": 3422,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 140,
+      "path": "pages/page-140.md",
+      "headings": [
+        "Enlarge/Reduce",
+        "Entangle",
+        "Enthrall",
+        "Etherealness"
+      ],
+      "blank": false,
+      "source_glyphs": 4009,
+      "nonspace_glyphs": 3311,
+      "normalized_nonspace_characters": 3311,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 141,
+      "path": "pages/page-141.md",
+      "headings": [
+        "Expeditious Retreat",
+        "Eyebite",
+        "Fabricate",
+        "Faerie Fire"
+      ],
+      "blank": false,
+      "source_glyphs": 4003,
+      "nonspace_glyphs": 3291,
+      "normalized_nonspace_characters": 3291,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 142,
+      "path": "pages/page-142.md",
+      "headings": [
+        "Faithful Hound",
+        "False Life",
+        "Fear",
+        "Feather Fall",
+        "Feeblemind"
+      ],
+      "blank": false,
+      "source_glyphs": 3519,
+      "nonspace_glyphs": 2899,
+      "normalized_nonspace_characters": 2899,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 143,
+      "path": "pages/page-143.md",
+      "headings": [
+        "Find Familiar",
+        "Find Steed",
+        "Find the Path"
+      ],
+      "blank": false,
+      "source_glyphs": 4514,
+      "nonspace_glyphs": 3700,
+      "normalized_nonspace_characters": 3700,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 144,
+      "path": "pages/page-144.md",
+      "headings": [
+        "Find Traps",
+        "Finger of Death",
+        "Fireball",
+        "Fire Bolt",
+        "Fire Shield"
+      ],
+      "blank": false,
+      "source_glyphs": 3520,
+      "nonspace_glyphs": 2895,
+      "normalized_nonspace_characters": 2895,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 145,
+      "path": "pages/page-145.md",
+      "headings": [
+        "Fire Storm",
+        "Flame Blade",
+        "Flame Strike",
+        "Flaming Sphere",
+        "Flesh to Stone"
+      ],
+      "blank": false,
+      "source_glyphs": 3824,
+      "nonspace_glyphs": 3121,
+      "normalized_nonspace_characters": 3121,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 146,
+      "path": "pages/page-146.md",
+      "headings": [
+        "Floating Disk",
+        "Fly",
+        "Fog Cloud",
+        "Forbiddance"
+      ],
+      "blank": false,
+      "source_glyphs": 4146,
+      "nonspace_glyphs": 3398,
+      "normalized_nonspace_characters": 3398,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 147,
+      "path": "pages/page-147.md",
+      "headings": [
+        "Forcecage",
+        "Foresight",
+        "Freedom of Movement",
+        "Freezing Sphere"
+      ],
+      "blank": false,
+      "source_glyphs": 3961,
+      "nonspace_glyphs": 3258,
+      "normalized_nonspace_characters": 3258,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 148,
+      "path": "pages/page-148.md",
+      "headings": [
+        "Gaseous Form",
+        "Gate",
+        "Geas",
+        "Gentle Repose"
+      ],
+      "blank": false,
+      "source_glyphs": 4003,
+      "nonspace_glyphs": 3287,
+      "normalized_nonspace_characters": 3287,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 149,
+      "path": "pages/page-149.md",
+      "headings": [
+        "Giant Insect",
+        "Glibness",
+        "Globe of Invulnerability",
+        "Glyph of Warding"
+      ],
+      "blank": false,
+      "source_glyphs": 3923,
+      "nonspace_glyphs": 3239,
+      "normalized_nonspace_characters": 3239,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 150,
+      "path": "pages/page-150.md",
+      "headings": [
+        "Goodberry",
+        "Grease",
+        "Greater Invisibility",
+        "Greater Restoration",
+        "Guardian of Faith"
+      ],
+      "blank": false,
+      "source_glyphs": 3816,
+      "nonspace_glyphs": 3155,
+      "normalized_nonspace_characters": 3155,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 151,
+      "path": "pages/page-151.md",
+      "headings": [
+        "Guards and Wards",
+        "Guidance",
+        "Guiding Bolt"
+      ],
+      "blank": false,
+      "source_glyphs": 3908,
+      "nonspace_glyphs": 3222,
+      "normalized_nonspace_characters": 3222,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 152,
+      "path": "pages/page-152.md",
+      "headings": [
+        "Gust of Wind",
+        "Hallow",
+        "Hallucinatory Terrain"
+      ],
+      "blank": false,
+      "source_glyphs": 4204,
+      "nonspace_glyphs": 3465,
+      "normalized_nonspace_characters": 3465,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 153,
+      "path": "pages/page-153.md",
+      "headings": [
+        "Harm",
+        "Haste",
+        "Heal",
+        "Healing Word",
+        "Heat Metal"
+      ],
+      "blank": false,
+      "source_glyphs": 3784,
+      "nonspace_glyphs": 3121,
+      "normalized_nonspace_characters": 3121,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 154,
+      "path": "pages/page-154.md",
+      "headings": [
+        "Hellish Rebuke",
+        "Heroes’ Feast",
+        "Heroism",
+        "Hideous Laughter",
+        "Hold Monster",
+        "Hold Person"
+      ],
+      "blank": false,
+      "source_glyphs": 3784,
+      "nonspace_glyphs": 3117,
+      "normalized_nonspace_characters": 3117,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 155,
+      "path": "pages/page-155.md",
+      "headings": [
+        "Holy Aura",
+        "Hunter’s Mark",
+        "Hypnotic Pattern",
+        "Ice Storm",
+        "Identify"
+      ],
+      "blank": false,
+      "source_glyphs": 3813,
+      "nonspace_glyphs": 3126,
+      "normalized_nonspace_characters": 3126,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 156,
+      "path": "pages/page-156.md",
+      "headings": [
+        "Illusory Script",
+        "Imprisonment"
+      ],
+      "blank": false,
+      "source_glyphs": 4367,
+      "nonspace_glyphs": 3588,
+      "normalized_nonspace_characters": 3588,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 157,
+      "path": "pages/page-157.md",
+      "headings": [
+        "Incendiary Cloud",
+        "Inflict Wounds",
+        "Insect Plague",
+        "Instant Summons",
+        "Invisibility"
+      ],
+      "blank": false,
+      "source_glyphs": 3831,
+      "nonspace_glyphs": 3154,
+      "normalized_nonspace_characters": 3154,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 158,
+      "path": "pages/page-158.md",
+      "headings": [
+        "Irresistible Dance",
+        "Jump",
+        "Knock",
+        "Legend Lore",
+        "Lesser Restoration",
+        "Levitate"
+      ],
+      "blank": false,
+      "source_glyphs": 3393,
+      "nonspace_glyphs": 2810,
+      "normalized_nonspace_characters": 2810,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 159,
+      "path": "pages/page-159.md",
+      "headings": [
+        "Light",
+        "Lightning Bolt",
+        "Locate Animals or Plants",
+        "Locate Creature",
+        "Locate Object"
+      ],
+      "blank": false,
+      "source_glyphs": 3749,
+      "nonspace_glyphs": 3068,
+      "normalized_nonspace_characters": 3068,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 160,
+      "path": "pages/page-160.md",
+      "headings": [
+        "Longstrider",
+        "Mage Armor",
+        "Mage Hand",
+        "Magic Circle",
+        "Magic Jar"
+      ],
+      "blank": false,
+      "source_glyphs": 3606,
+      "nonspace_glyphs": 2979,
+      "normalized_nonspace_characters": 2979,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 161,
+      "path": "pages/page-161.md",
+      "headings": [
+        "Magic Missile",
+        "Magic Mouth",
+        "Magic Weapon"
+      ],
+      "blank": false,
+      "source_glyphs": 4376,
+      "nonspace_glyphs": 3584,
+      "normalized_nonspace_characters": 3584,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 162,
+      "path": "pages/page-162.md",
+      "headings": [
+        "Magnificent Mansion",
+        "Major Image",
+        "Mass Cure Wounds"
+      ],
+      "blank": false,
+      "source_glyphs": 4436,
+      "nonspace_glyphs": 3659,
+      "normalized_nonspace_characters": 3659,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 163,
+      "path": "pages/page-163.md",
+      "headings": [
+        "Mass Heal",
+        "Mass Healing Word",
+        "Mass Suggestion",
+        "Maze",
+        "Meld into Stone"
+      ],
+      "blank": false,
+      "source_glyphs": 3795,
+      "nonspace_glyphs": 3128,
+      "normalized_nonspace_characters": 3128,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 164,
+      "path": "pages/page-164.md",
+      "headings": [
+        "Mending",
+        "Message",
+        "Meteor Swarm",
+        "Mind Blank",
+        "Minor Illusion"
+      ],
+      "blank": false,
+      "source_glyphs": 3621,
+      "nonspace_glyphs": 2978,
+      "normalized_nonspace_characters": 2978,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 165,
+      "path": "pages/page-165.md",
+      "headings": [
+        "Mirage Arcane",
+        "Mirror Image",
+        "Mislead",
+        "Misty Step"
+      ],
+      "blank": false,
+      "source_glyphs": 3917,
+      "nonspace_glyphs": 3233,
+      "normalized_nonspace_characters": 3233,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 166,
+      "path": "pages/page-166.md",
+      "headings": [
+        "Modify Memory",
+        "Moonbeam",
+        "Move Earth"
+      ],
+      "blank": false,
+      "source_glyphs": 4185,
+      "nonspace_glyphs": 3436,
+      "normalized_nonspace_characters": 3436,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 167,
+      "path": "pages/page-167.md",
+      "headings": [
+        "Nondetection",
+        "Pass without Trace",
+        "Passwall",
+        "Phantasmal Killer",
+        "Phantom Steed"
+      ],
+      "blank": false,
+      "source_glyphs": 3737,
+      "nonspace_glyphs": 3079,
+      "normalized_nonspace_characters": 3079,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 168,
+      "path": "pages/page-168.md",
+      "headings": [
+        "Planar Ally",
+        "Planar Binding",
+        "Plane Shift"
+      ],
+      "blank": false,
+      "source_glyphs": 4379,
+      "nonspace_glyphs": 3591,
+      "normalized_nonspace_characters": 3591,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 169,
+      "path": "pages/page-169.md",
+      "headings": [
+        "Plant Growth",
+        "Poison Spray",
+        "Polymorph"
+      ],
+      "blank": false,
+      "source_glyphs": 4060,
+      "nonspace_glyphs": 3338,
+      "normalized_nonspace_characters": 3338,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 170,
+      "path": "pages/page-170.md",
+      "headings": [
+        "Power Word Kill",
+        "Power Word Stun",
+        "Prayer of Healing",
+        "Prestidigitation",
+        "Prismatic Spray"
+      ],
+      "blank": false,
+      "source_glyphs": 3591,
+      "nonspace_glyphs": 2969,
+      "normalized_nonspace_characters": 2969,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 171,
+      "path": "pages/page-171.md",
+      "headings": [
+        "Prismatic Wall",
+        "Private Sanctum"
+      ],
+      "blank": false,
+      "source_glyphs": 4651,
+      "nonspace_glyphs": 3807,
+      "normalized_nonspace_characters": 3807,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 172,
+      "path": "pages/page-172.md",
+      "headings": [
+        "Produce Flame",
+        "Programmed Illusion",
+        "Project Image"
+      ],
+      "blank": false,
+      "source_glyphs": 4065,
+      "nonspace_glyphs": 3346,
+      "normalized_nonspace_characters": 3346,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 173,
+      "path": "pages/page-173.md",
+      "headings": [
+        "Protection from Energy",
+        "Protection from Evil and Good",
+        "Protection from Poison",
+        "Purify Food and Drink",
+        "Raise Dead"
+      ],
+      "blank": false,
+      "source_glyphs": 3828,
+      "nonspace_glyphs": 3184,
+      "normalized_nonspace_characters": 3184,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 174,
+      "path": "pages/page-174.md",
+      "headings": [
+        "Ray of Enfeeblement",
+        "Ray of Frost",
+        "Regenerate",
+        "Reincarnate",
+        "Remove Curse"
+      ],
+      "blank": false,
+      "source_glyphs": 3052,
+      "nonspace_glyphs": 2522,
+      "normalized_nonspace_characters": 2522,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 175,
+      "path": "pages/page-175.md",
+      "headings": [
+        "Resilient Sphere",
+        "Resistance",
+        "Resurrection",
+        "Reverse Gravity",
+        "Revivify"
+      ],
+      "blank": false,
+      "source_glyphs": 3920,
+      "nonspace_glyphs": 3248,
+      "normalized_nonspace_characters": 3248,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 176,
+      "path": "pages/page-176.md",
+      "headings": [
+        "Rope Trick",
+        "Sacred Flame",
+        "Sanctuary",
+        "Scorching Ray",
+        "Scrying"
+      ],
+      "blank": false,
+      "source_glyphs": 3581,
+      "nonspace_glyphs": 2946,
+      "normalized_nonspace_characters": 2946,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 177,
+      "path": "pages/page-177.md",
+      "headings": [
+        "Secret Chest",
+        "See Invisibility",
+        "Seeming",
+        "Sending"
+      ],
+      "blank": false,
+      "source_glyphs": 3998,
+      "nonspace_glyphs": 3270,
+      "normalized_nonspace_characters": 3270,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 178,
+      "path": "pages/page-178.md",
+      "headings": [
+        "Sequester",
+        "Shapechange",
+        "Shatter"
+      ],
+      "blank": false,
+      "source_glyphs": 4318,
+      "nonspace_glyphs": 3553,
+      "normalized_nonspace_characters": 3553,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 179,
+      "path": "pages/page-179.md",
+      "headings": [
+        "Shield",
+        "Shield of Faith",
+        "Shillelagh",
+        "Shocking Grasp",
+        "Silence",
+        "Silent Image"
+      ],
+      "blank": false,
+      "source_glyphs": 3382,
+      "nonspace_glyphs": 2787,
+      "normalized_nonspace_characters": 2787,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 180,
+      "path": "pages/page-180.md",
+      "headings": [
+        "Simulacrum",
+        "Sleep",
+        "Sleet Storm",
+        "Slow"
+      ],
+      "blank": false,
+      "source_glyphs": 4049,
+      "nonspace_glyphs": 3347,
+      "normalized_nonspace_characters": 3347,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 181,
+      "path": "pages/page-181.md",
+      "headings": [
+        "Spare the Dying",
+        "Speak with Animals",
+        "Speak with Dead",
+        "Speak with Plants"
+      ],
+      "blank": false,
+      "source_glyphs": 3933,
+      "nonspace_glyphs": 3253,
+      "normalized_nonspace_characters": 3253,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 182,
+      "path": "pages/page-182.md",
+      "headings": [
+        "Spider Climb",
+        "Spike Growth",
+        "Spirit Guardians",
+        "Spiritual Weapon",
+        "Stinking Cloud"
+      ],
+      "blank": false,
+      "source_glyphs": 3836,
+      "nonspace_glyphs": 3159,
+      "normalized_nonspace_characters": 3159,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 183,
+      "path": "pages/page-183.md",
+      "headings": [
+        "Stone Shape",
+        "Stoneskin",
+        "Storm of Vengeance",
+        "Suggestion"
+      ],
+      "blank": false,
+      "source_glyphs": 3922,
+      "nonspace_glyphs": 3232,
+      "normalized_nonspace_characters": 3232,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 184,
+      "path": "pages/page-184.md",
+      "headings": [
+        "Sunbeam",
+        "Sunburst",
+        "Symbol"
+      ],
+      "blank": false,
+      "source_glyphs": 4187,
+      "nonspace_glyphs": 3450,
+      "normalized_nonspace_characters": 3450,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 185,
+      "path": "pages/page-185.md",
+      "headings": [
+        "Telekinesis",
+        "Telepathic Bond",
+        "Teleport"
+      ],
+      "blank": false,
+      "source_glyphs": 4298,
+      "nonspace_glyphs": 3549,
+      "normalized_nonspace_characters": 3549,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 186,
+      "path": "pages/page-186.md",
+      "headings": [
+        "Teleportation Circle"
+      ],
+      "blank": false,
+      "source_glyphs": 4553,
+      "nonspace_glyphs": 3760,
+      "normalized_nonspace_characters": 3760,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 187,
+      "path": "pages/page-187.md",
+      "headings": [
+        "Thaumaturgy",
+        "Thunderwave",
+        "Time Stop",
+        "Tiny Hut",
+        "Tongues"
+      ],
+      "blank": false,
+      "source_glyphs": 3656,
+      "nonspace_glyphs": 3024,
+      "normalized_nonspace_characters": 3024,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 188,
+      "path": "pages/page-188.md",
+      "headings": [
+        "Transport via Plants",
+        "Tree Stride",
+        "True Polymorph"
+      ],
+      "blank": false,
+      "source_glyphs": 4329,
+      "nonspace_glyphs": 3543,
+      "normalized_nonspace_characters": 3543,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 189,
+      "path": "pages/page-189.md",
+      "headings": [
+        "True Resurrection",
+        "True Seeing",
+        "True Strike",
+        "Unseen Servant",
+        "Vampiric Touch",
+        "Vicious Mockery"
+      ],
+      "blank": false,
+      "source_glyphs": 3492,
+      "nonspace_glyphs": 2872,
+      "normalized_nonspace_characters": 2872,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 190,
+      "path": "pages/page-190.md",
+      "headings": [
+        "Wall of Fire",
+        "Wall of Force",
+        "Wall of Ice",
+        "Wall of Stone"
+      ],
+      "blank": false,
+      "source_glyphs": 4241,
+      "nonspace_glyphs": 3443,
+      "normalized_nonspace_characters": 3443,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 191,
+      "path": "pages/page-191.md",
+      "headings": [
+        "Wall of Thorns",
+        "Warding Bond",
+        "Water Breathing",
+        "Water Walk"
+      ],
+      "blank": false,
+      "source_glyphs": 4198,
+      "nonspace_glyphs": 3427,
+      "normalized_nonspace_characters": 3427,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 192,
+      "path": "pages/page-192.md",
+      "headings": [
+        "Web",
+        "Weird",
+        "Wind Walk",
+        "Wind Wall"
+      ],
+      "blank": false,
+      "source_glyphs": 4006,
+      "nonspace_glyphs": 3277,
+      "normalized_nonspace_characters": 3277,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 193,
+      "path": "pages/page-193.md",
+      "headings": [
+        "Wish",
+        "Word of Recall",
+        "Zone of Truth"
+      ],
+      "blank": false,
+      "source_glyphs": 4297,
+      "nonspace_glyphs": 3567,
+      "normalized_nonspace_characters": 3567,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 194,
+      "path": "pages/page-194.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 700,
+      "nonspace_glyphs": 573,
+      "normalized_nonspace_characters": 573,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 195,
+      "path": "pages/page-195.md",
+      "headings": [
+        "Traps",
+        "Traps in Play",
+        "Triggering a Trap",
+        "Detecting and Disabling a Trap"
+      ],
+      "blank": false,
+      "source_glyphs": 4675,
+      "nonspace_glyphs": 3870,
+      "normalized_nonspace_characters": 3870,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 196,
+      "path": "pages/page-196.md",
+      "headings": [
+        "Trap Effects",
+        "Trap Save DCs and Attack Bonuses",
+        "Damage Severity by Level",
+        "Complex Traps",
+        "Sample Traps",
+        "Collapsing Roof",
+        "Falling Net"
+      ],
+      "blank": false,
+      "source_glyphs": 4117,
+      "nonspace_glyphs": 3402,
+      "normalized_nonspace_characters": 3402,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 197,
+      "path": "pages/page-197.md",
+      "headings": [
+        "Fire-Breathing Statue",
+        "Pits",
+        "Poison Darts"
+      ],
+      "blank": false,
+      "source_glyphs": 4628,
+      "nonspace_glyphs": 3790,
+      "normalized_nonspace_characters": 3790,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 198,
+      "path": "pages/page-198.md",
+      "headings": [
+        "Poison Needle",
+        "Rolling Sphere",
+        "Sphere of Annihilation"
+      ],
+      "blank": false,
+      "source_glyphs": 3725,
+      "nonspace_glyphs": 3090,
+      "normalized_nonspace_characters": 3090,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 199,
+      "path": "pages/page-199.md",
+      "headings": [
+        "Diseases",
+        "Sample Diseases",
+        "Cackle Fever",
+        "Sewer Plague",
+        "Sight Rot"
+      ],
+      "blank": false,
+      "source_glyphs": 4601,
+      "nonspace_glyphs": 3813,
+      "normalized_nonspace_characters": 3813,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 200,
+      "path": "pages/page-200.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 594,
+      "nonspace_glyphs": 488,
+      "normalized_nonspace_characters": 488,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 201,
+      "path": "pages/page-201.md",
+      "headings": [
+        "Madness",
+        "Going Mad",
+        "Madness Effects",
+        "Short-Term Madness",
+        "Long-Term Madness"
+      ],
+      "blank": false,
+      "source_glyphs": 4302,
+      "nonspace_glyphs": 3619,
+      "normalized_nonspace_characters": 3619,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 202,
+      "path": "pages/page-202.md",
+      "headings": [
+        "Indefinite Madness",
+        "Curing Madness"
+      ],
+      "blank": false,
+      "source_glyphs": 1433,
+      "nonspace_glyphs": 1186,
+      "normalized_nonspace_characters": 1186,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 203,
+      "path": "pages/page-203.md",
+      "headings": [
+        "Objects",
+        "Statistics for Objects",
+        "Object Armor Class",
+        "Object Hit Points"
+      ],
+      "blank": false,
+      "source_glyphs": 3642,
+      "nonspace_glyphs": 3013,
+      "normalized_nonspace_characters": 3013,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 204,
+      "path": "pages/page-204.md",
+      "headings": [
+        "Poisons",
+        "Poisons",
+        "Sample Poisons"
+      ],
+      "blank": false,
+      "source_glyphs": 4286,
+      "nonspace_glyphs": 3543,
+      "normalized_nonspace_characters": 3543,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 205,
+      "path": "pages/page-205.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 1739,
+      "nonspace_glyphs": 1432,
+      "normalized_nonspace_characters": 1432,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 206,
+      "path": "pages/page-206.md",
+      "headings": [
+        "Magic Items",
+        "Attunement",
+        "Wearing and Wielding Items",
+        "Multiple Items of the Same Kind",
+        "Paired Items",
+        "Activating an Item"
+      ],
+      "blank": false,
+      "source_glyphs": 4481,
+      "nonspace_glyphs": 3683,
+      "normalized_nonspace_characters": 3683,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 207,
+      "path": "pages/page-207.md",
+      "headings": [
+        "Command Word",
+        "Consumables",
+        "Spells",
+        "Charges",
+        "Magic Items A-Z",
+        "Adamantine Armor",
+        "Ammunition, +1, +2, or +3",
+        "Amulet of Health",
+        "Amulet of Proof against Detection and",
+        "Location",
+        "Amulet of the Planes"
+      ],
+      "blank": false,
+      "source_glyphs": 3817,
+      "nonspace_glyphs": 3155,
+      "normalized_nonspace_characters": 3155,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 208,
+      "path": "pages/page-208.md",
+      "headings": [
+        "Animated Shield",
+        "Apparatus of the Crab",
+        "Apparatus of the Crab Levers",
+        "Armor, +1, +2, or +3",
+        "Armor of Invulnerability",
+        "Armor of Resistance"
+      ],
+      "blank": false,
+      "source_glyphs": 3915,
+      "nonspace_glyphs": 3223,
+      "normalized_nonspace_characters": 3223,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 209,
+      "path": "pages/page-209.md",
+      "headings": [
+        "Armor of Vulnerability",
+        "Arrow-Catching Shield",
+        "Arrow of Slaying",
+        "Bag of Beans"
+      ],
+      "blank": false,
+      "source_glyphs": 4286,
+      "nonspace_glyphs": 3504,
+      "normalized_nonspace_characters": 3504,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 210,
+      "path": "pages/page-210.md",
+      "headings": [
+        "Bag of Devouring",
+        "Bag of Holding",
+        "Bag of Tricks",
+        "Gray Bag of Tricks"
+      ],
+      "blank": false,
+      "source_glyphs": 4305,
+      "nonspace_glyphs": 3524,
+      "normalized_nonspace_characters": 3524,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 211,
+      "path": "pages/page-211.md",
+      "headings": [
+        "Rust Bag of Tricks",
+        "Tan Bag of Tricks",
+        "Bead of Force",
+        "Belt of Dwarvenkind",
+        "Belt of Giant Strength",
+        "Berserker Axe"
+      ],
+      "blank": false,
+      "source_glyphs": 3230,
+      "nonspace_glyphs": 2650,
+      "normalized_nonspace_characters": 2650,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 212,
+      "path": "pages/page-212.md",
+      "headings": [
+        "Boots of Elvenkind",
+        "Boots of Levitation",
+        "Boots of Speed",
+        "Boots of Striding and Springing",
+        "Boots of the Winterlands",
+        "Bowl of Commanding Water Elementals",
+        "Bracers of Archery",
+        "Bracers of Defense",
+        "Brazier of Commanding Fire Elementals",
+        "Brooch of Shielding"
+      ],
+      "blank": false,
+      "source_glyphs": 3704,
+      "nonspace_glyphs": 3071,
+      "normalized_nonspace_characters": 3071,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 213,
+      "path": "pages/page-213.md",
+      "headings": [
+        "Broom of Flying",
+        "Candle of Invocation",
+        "Cape of the Mountebank",
+        "Carpet of Flying",
+        "Censer of Controlling Air Elementals",
+        "Chime of Opening"
+      ],
+      "blank": false,
+      "source_glyphs": 3825,
+      "nonspace_glyphs": 3118,
+      "normalized_nonspace_characters": 3118,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 214,
+      "path": "pages/page-214.md",
+      "headings": [
+        "Circlet of Blasting",
+        "Cloak of Arachnida",
+        "Cloak of Displacement",
+        "Cloak of Elvenkind",
+        "Cloak of Protection",
+        "Cloak of the Bat",
+        "Cloak of the Manta Ray",
+        "Crystal Ball"
+      ],
+      "blank": false,
+      "source_glyphs": 3976,
+      "nonspace_glyphs": 3284,
+      "normalized_nonspace_characters": 3284,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 215,
+      "path": "pages/page-215.md",
+      "headings": [
+        "Cube of Force",
+        "Cube of Force Faces",
+        "Cubic Gate",
+        "Dagger of Venom",
+        "Dancing Sword"
+      ],
+      "blank": false,
+      "source_glyphs": 4136,
+      "nonspace_glyphs": 3367,
+      "normalized_nonspace_characters": 3367,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 216,
+      "path": "pages/page-216.md",
+      "headings": [
+        "Decanter of Endless Water",
+        "Deck of Illusions",
+        "Deck of Many Things"
+      ],
+      "blank": false,
+      "source_glyphs": 3873,
+      "nonspace_glyphs": 3168,
+      "normalized_nonspace_characters": 3168,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 217,
+      "path": "pages/page-217.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 4169,
+      "nonspace_glyphs": 3421,
+      "normalized_nonspace_characters": 3421,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 218,
+      "path": "pages/page-218.md",
+      "headings": [
+        "Avatar of Death",
+        "Defender",
+        "Demon Armor"
+      ],
+      "blank": false,
+      "source_glyphs": 3781,
+      "nonspace_glyphs": 3110,
+      "normalized_nonspace_characters": 3110,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 219,
+      "path": "pages/page-219.md",
+      "headings": [
+        "Dimensional Shackles",
+        "Dragon Scale Mail",
+        "Dragon Slayer",
+        "Dust of Disappearance",
+        "Dust of Dryness",
+        "Dust of Sneezing and Choking"
+      ],
+      "blank": false,
+      "source_glyphs": 4065,
+      "nonspace_glyphs": 3343,
+      "normalized_nonspace_characters": 3343,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 220,
+      "path": "pages/page-220.md",
+      "headings": [
+        "Dwarven Plate",
+        "Dwarven Thrower",
+        "Efficient Quiver",
+        "Efreeti Bottle",
+        "Elemental Gem",
+        "Elven Chain",
+        "Eversmoking Bottle",
+        "Eyes of Charming"
+      ],
+      "blank": false,
+      "source_glyphs": 3881,
+      "nonspace_glyphs": 3189,
+      "normalized_nonspace_characters": 3189,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 221,
+      "path": "pages/page-221.md",
+      "headings": [
+        "Eyes of Minute Seeing",
+        "Eyes of the Eagle",
+        "Feather Token",
+        "Figurine of Wondrous Power"
+      ],
+      "blank": false,
+      "source_glyphs": 4423,
+      "nonspace_glyphs": 3586,
+      "normalized_nonspace_characters": 3586,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 222,
+      "path": "pages/page-222.md",
+      "headings": [
+        "Giant Fly"
+      ],
+      "blank": false,
+      "source_glyphs": 4512,
+      "nonspace_glyphs": 3674,
+      "normalized_nonspace_characters": 3674,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 223,
+      "path": "pages/page-223.md",
+      "headings": [
+        "Flame Tongue",
+        "Folding Boat",
+        "Frost Brand",
+        "Gauntlets of Ogre Power",
+        "Gem of Brightness",
+        "Gem of Seeing"
+      ],
+      "blank": false,
+      "source_glyphs": 4001,
+      "nonspace_glyphs": 3264,
+      "normalized_nonspace_characters": 3264,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 224,
+      "path": "pages/page-224.md",
+      "headings": [
+        "Giant Slayer",
+        "Glamoured Studded Leather",
+        "Gloves of Missile Snaring",
+        "Gloves of Swimming and Climbing",
+        "Goggles of Night",
+        "Hammer of Thunderbolts",
+        "Handy Haversack"
+      ],
+      "blank": false,
+      "source_glyphs": 4061,
+      "nonspace_glyphs": 3328,
+      "normalized_nonspace_characters": 3328,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 225,
+      "path": "pages/page-225.md",
+      "headings": [
+        "Hat of Disguise",
+        "Headband of Intellect",
+        "Helm of Brilliance",
+        "Helm of Comprehending Languages",
+        "Helm of Telepathy",
+        "Helm of Teleportation",
+        "Holy Avenger"
+      ],
+      "blank": false,
+      "source_glyphs": 4081,
+      "nonspace_glyphs": 3351,
+      "normalized_nonspace_characters": 3351,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 226,
+      "path": "pages/page-226.md",
+      "headings": [
+        "Horn of Blasting",
+        "Horn of Valhalla",
+        "Horseshoes of a Zephyr",
+        "Horseshoes of Speed",
+        "Immovable Rod",
+        "Instant Fortress"
+      ],
+      "blank": false,
+      "source_glyphs": 4061,
+      "nonspace_glyphs": 3312,
+      "normalized_nonspace_characters": 3312,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 227,
+      "path": "pages/page-227.md",
+      "headings": [
+        "Ioun Stone"
+      ],
+      "blank": false,
+      "source_glyphs": 4785,
+      "nonspace_glyphs": 3900,
+      "normalized_nonspace_characters": 3900,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 228,
+      "path": "pages/page-228.md",
+      "headings": [
+        "Iron Bands of Binding",
+        "Iron Flask",
+        "Javelin of Lightning",
+        "Lantern of Revealing"
+      ],
+      "blank": false,
+      "source_glyphs": 3862,
+      "nonspace_glyphs": 3167,
+      "normalized_nonspace_characters": 3167,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 229,
+      "path": "pages/page-229.md",
+      "headings": [
+        "Luck Blade",
+        "Mace of Disruption",
+        "Mace of Smiting",
+        "Mace of Terror",
+        "Mantle of Spell Resistance",
+        "Manual of Bodily Health",
+        "Manual of Gainful Exercise",
+        "Manual of Golems"
+      ],
+      "blank": false,
+      "source_glyphs": 3972,
+      "nonspace_glyphs": 3238,
+      "normalized_nonspace_characters": 3238,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 230,
+      "path": "pages/page-230.md",
+      "headings": [
+        "Manual of Quickness of Action",
+        "Marvelous Pigments",
+        "Medallion of Thoughts",
+        "Mirror of Life Trapping"
+      ],
+      "blank": false,
+      "source_glyphs": 4557,
+      "nonspace_glyphs": 3746,
+      "normalized_nonspace_characters": 3746,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 231,
+      "path": "pages/page-231.md",
+      "headings": [
+        "Mithral Armor",
+        "Necklace of Adaptation",
+        "Necklace of Fireballs",
+        "Necklace of Prayer Beads",
+        "Nine Lives Stealer",
+        "Oathbow",
+        "Oil of Etherealness"
+      ],
+      "blank": false,
+      "source_glyphs": 3935,
+      "nonspace_glyphs": 3235,
+      "normalized_nonspace_characters": 3235,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 232,
+      "path": "pages/page-232.md",
+      "headings": [
+        "Oil of Sharpness",
+        "Oil of Slipperiness",
+        "Pearl of Power",
+        "Periapt of Health",
+        "Periapt of Proof against Poison",
+        "Periapt of Wound Closure",
+        "Philter of Love",
+        "Pipes of Haunting",
+        "Pipes of the Sewers"
+      ],
+      "blank": false,
+      "source_glyphs": 4007,
+      "nonspace_glyphs": 3296,
+      "normalized_nonspace_characters": 3296,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 233,
+      "path": "pages/page-233.md",
+      "headings": [
+        "Plate Armor of Etherealness",
+        "Portable Hole",
+        "Potion of Animal Friendship",
+        "Potion of Clairvoyance",
+        "Potion of Climbing",
+        "Potion of Diminution"
+      ],
+      "blank": false,
+      "source_glyphs": 4203,
+      "nonspace_glyphs": 3454,
+      "normalized_nonspace_characters": 3454,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 234,
+      "path": "pages/page-234.md",
+      "headings": [
+        "Potion of Flying",
+        "Potion of Gaseous Form",
+        "Potion of Giant Strength",
+        "Potion of Growth",
+        "Potion of Healing",
+        "Potions of Healing",
+        "Potion of Heroism",
+        "Potion of Invisibility",
+        "Potion of Mind Reading",
+        "Potion of Poison"
+      ],
+      "blank": false,
+      "source_glyphs": 3450,
+      "nonspace_glyphs": 2836,
+      "normalized_nonspace_characters": 2836,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 235,
+      "path": "pages/page-235.md",
+      "headings": [
+        "Potion of Resistance",
+        "Potion of Speed",
+        "Potion of Water Breathing",
+        "Restorative Ointment",
+        "Ring of Animal Influence",
+        "Ring of Djinni Summoning",
+        "Ring of Elemental Command"
+      ],
+      "blank": false,
+      "source_glyphs": 3664,
+      "nonspace_glyphs": 3017,
+      "normalized_nonspace_characters": 3017,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 236,
+      "path": "pages/page-236.md",
+      "headings": [
+        "Ring of Evasion",
+        "Ring of Feather Falling",
+        "Ring of Free Action",
+        "Ring of Invisibility",
+        "Ring of Jumping",
+        "Ring of Mind Shielding"
+      ],
+      "blank": false,
+      "source_glyphs": 3734,
+      "nonspace_glyphs": 3108,
+      "normalized_nonspace_characters": 3108,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 237,
+      "path": "pages/page-237.md",
+      "headings": [
+        "Ring of Protection",
+        "Ring of Regeneration",
+        "Ring of Resistance",
+        "Ring of Shooting Stars",
+        "Ring of Spell Storing",
+        "Ring of Spell Turning"
+      ],
+      "blank": false,
+      "source_glyphs": 3909,
+      "nonspace_glyphs": 3184,
+      "normalized_nonspace_characters": 3184,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 238,
+      "path": "pages/page-238.md",
+      "headings": [
+        "Ring of Swimming",
+        "Ring of Telekinesis",
+        "Ring of the Ram",
+        "Ring of Three Wishes",
+        "Ring of Warmth",
+        "Ring of Water Walking",
+        "Ring of X-ray Vision",
+        "Robe of Eyes",
+        "Robe of Scintillating Colors"
+      ],
+      "blank": false,
+      "source_glyphs": 3787,
+      "nonspace_glyphs": 3091,
+      "normalized_nonspace_characters": 3091,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 239,
+      "path": "pages/page-239.md",
+      "headings": [
+        "Robe of Stars",
+        "Robe of the Archmagi",
+        "Robe of Useful Items",
+        "Rod of Absorption"
+      ],
+      "blank": false,
+      "source_glyphs": 4060,
+      "nonspace_glyphs": 3317,
+      "normalized_nonspace_characters": 3317,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 240,
+      "path": "pages/page-240.md",
+      "headings": [
+        "Rod of Alertness",
+        "Rod of Lordly Might",
+        "Rod of Rulership"
+      ],
+      "blank": false,
+      "source_glyphs": 4635,
+      "nonspace_glyphs": 3761,
+      "normalized_nonspace_characters": 3761,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 241,
+      "path": "pages/page-241.md",
+      "headings": [
+        "Rod of Security",
+        "Rope of Climbing",
+        "Rope of Entanglement",
+        "Scarab of Protection",
+        "Scimitar of Speed"
+      ],
+      "blank": false,
+      "source_glyphs": 4102,
+      "nonspace_glyphs": 3350,
+      "normalized_nonspace_characters": 3350,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 242,
+      "path": "pages/page-242.md",
+      "headings": [
+        "Shield, +1, +2, or +3",
+        "Shield of Missile Attraction",
+        "Slippers of Spider Climbing",
+        "Sovereign Glue",
+        "Spell Scroll",
+        "Spell Scroll",
+        "Spellguard Shield",
+        "Sphere of Annihilation"
+      ],
+      "blank": false,
+      "source_glyphs": 3941,
+      "nonspace_glyphs": 3262,
+      "normalized_nonspace_characters": 3262,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 243,
+      "path": "pages/page-243.md",
+      "headings": [
+        "Staff of Charming",
+        "Staff of Fire",
+        "Staff of Frost",
+        "Staff of Healing",
+        "Staff of Power"
+      ],
+      "blank": false,
+      "source_glyphs": 4272,
+      "nonspace_glyphs": 3488,
+      "normalized_nonspace_characters": 3488,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 244,
+      "path": "pages/page-244.md",
+      "headings": [
+        "Staff of Striking",
+        "Staff of Swarming Insects",
+        "Staff of the Magi"
+      ],
+      "blank": false,
+      "source_glyphs": 4754,
+      "nonspace_glyphs": 3885,
+      "normalized_nonspace_characters": 3885,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 245,
+      "path": "pages/page-245.md",
+      "headings": [
+        "Staff of the Python",
+        "Staff of the Woodlands",
+        "Staff of Thunder and Lightning"
+      ],
+      "blank": false,
+      "source_glyphs": 4594,
+      "nonspace_glyphs": 3728,
+      "normalized_nonspace_characters": 3728,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 246,
+      "path": "pages/page-246.md",
+      "headings": [
+        "Staff of Withering",
+        "Stone of Controlling Earth Elementals",
+        "Stone of Good Luck (Luckstone)",
+        "Sun Blade",
+        "Sword of Life Stealing",
+        "Sword of Sharpness",
+        "Sword of Wounding"
+      ],
+      "blank": false,
+      "source_glyphs": 4350,
+      "nonspace_glyphs": 3566,
+      "normalized_nonspace_characters": 3566,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 247,
+      "path": "pages/page-247.md",
+      "headings": [
+        "Talisman of Pure Good",
+        "Talisman of the Sphere",
+        "Talisman of Ultimate Evil",
+        "Tome of Clear Thought",
+        "Tome of Leadership and Influence",
+        "Tome of Understanding",
+        "Trident of Fish Command"
+      ],
+      "blank": false,
+      "source_glyphs": 4252,
+      "nonspace_glyphs": 3496,
+      "normalized_nonspace_characters": 3496,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 248,
+      "path": "pages/page-248.md",
+      "headings": [
+        "Universal Solvent",
+        "Vicious Weapon",
+        "Vorpal Sword",
+        "Wand of Binding",
+        "Wand of Enemy Detection",
+        "Wand of Fear",
+        "Wand of Fireballs"
+      ],
+      "blank": false,
+      "source_glyphs": 4325,
+      "nonspace_glyphs": 3518,
+      "normalized_nonspace_characters": 3518,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 249,
+      "path": "pages/page-249.md",
+      "headings": [
+        "Wand of Lightning Bolts",
+        "Wand of Magic Detection",
+        "Wand of Magic Missiles",
+        "Wand of Paralysis",
+        "Wand of Polymorph",
+        "Wand of Secrets",
+        "Wand of the War Mage, +1, +2, or +3",
+        "Wand of Web",
+        "Wand of Wonder"
+      ],
+      "blank": false,
+      "source_glyphs": 3886,
+      "nonspace_glyphs": 3136,
+      "normalized_nonspace_characters": 3136,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 250,
+      "path": "pages/page-250.md",
+      "headings": [
+        "Weapon, +1, +2, or +3",
+        "Well of Many Worlds",
+        "Wind Fan"
+      ],
+      "blank": false,
+      "source_glyphs": 4508,
+      "nonspace_glyphs": 3679,
+      "normalized_nonspace_characters": 3679,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 251,
+      "path": "pages/page-251.md",
+      "headings": [
+        "Winged Boots",
+        "Wings of Flying",
+        "Sentient Magic Items",
+        "Creating Sentient Magic Items",
+        "Abilities",
+        "Communication",
+        "Senses",
+        "Alignment",
+        "Special Purpose"
+      ],
+      "blank": false,
+      "source_glyphs": 4014,
+      "nonspace_glyphs": 3328,
+      "normalized_nonspace_characters": 3328,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 252,
+      "path": "pages/page-252.md",
+      "headings": [
+        "Conflict",
+        "Artifacts",
+        "Orb of Dragonkind"
+      ],
+      "blank": false,
+      "source_glyphs": 4412,
+      "nonspace_glyphs": 3630,
+      "normalized_nonspace_characters": 3630,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 253,
+      "path": "pages/page-253.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 1421,
+      "nonspace_glyphs": 1176,
+      "normalized_nonspace_characters": 1176,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 254,
+      "path": "pages/page-254.md",
+      "headings": [
+        "Monsters",
+        "Size",
+        "Size Categories",
+        "Type"
+      ],
+      "blank": false,
+      "source_glyphs": 4422,
+      "nonspace_glyphs": 3693,
+      "normalized_nonspace_characters": 3693,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 255,
+      "path": "pages/page-255.md",
+      "headings": [
+        "Tags",
+        "Alignment",
+        "Armor Class",
+        "Hit Points"
+      ],
+      "blank": false,
+      "source_glyphs": 4550,
+      "nonspace_glyphs": 3796,
+      "normalized_nonspace_characters": 3796,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 256,
+      "path": "pages/page-256.md",
+      "headings": [
+        "Hit Dice by Size",
+        "Speed",
+        "Burrow",
+        "Climb",
+        "Fly",
+        "Swim",
+        "Ability Scores",
+        "Saving Throws",
+        "Proficiency Bonus by Challenge Rating",
+        "Skills"
+      ],
+      "blank": false,
+      "source_glyphs": 3122,
+      "nonspace_glyphs": 2577,
+      "normalized_nonspace_characters": 2577,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 257,
+      "path": "pages/page-257.md",
+      "headings": [
+        "Vulnerabilities, Resistances, and",
+        "Immunities",
+        "Senses",
+        "Blindsight",
+        "Darkvision",
+        "Tremorsense",
+        "Truesight",
+        "Languages",
+        "Telepathy"
+      ],
+      "blank": false,
+      "source_glyphs": 4112,
+      "nonspace_glyphs": 3449,
+      "normalized_nonspace_characters": 3449,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 258,
+      "path": "pages/page-258.md",
+      "headings": [
+        "Challenge",
+        "Experience Points",
+        "Experience Points by Challenge Rating",
+        "Special Traits",
+        "Innate Spellcasting",
+        "Spellcasting"
+      ],
+      "blank": false,
+      "source_glyphs": 3864,
+      "nonspace_glyphs": 3169,
+      "normalized_nonspace_characters": 3169,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 259,
+      "path": "pages/page-259.md",
+      "headings": [
+        "Psionics",
+        "Actions",
+        "Melee and Ranged Attacks",
+        "Multiattack",
+        "Ammunition",
+        "Reactions",
+        "Limited Usage",
+        "Equipment"
+      ],
+      "blank": false,
+      "source_glyphs": 4054,
+      "nonspace_glyphs": 3330,
+      "normalized_nonspace_characters": 3330,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 260,
+      "path": "pages/page-260.md",
+      "headings": [
+        "Legendary Creatures",
+        "Legendary Actions",
+        "A Legendary Creature’s Lair",
+        "Lair Actions",
+        "Regional Effects"
+      ],
+      "blank": false,
+      "source_glyphs": 2213,
+      "nonspace_glyphs": 1833,
+      "normalized_nonspace_characters": 1833,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 261,
+      "path": "pages/page-261.md",
+      "headings": [
+        "Monsters (A)",
+        "Aboleth",
+        "Angels",
+        "Deva"
+      ],
+      "blank": false,
+      "source_glyphs": 3513,
+      "nonspace_glyphs": 2908,
+      "normalized_nonspace_characters": 2908,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 262,
+      "path": "pages/page-262.md",
+      "headings": [
+        "Planetar",
+        "Solar"
+      ],
+      "blank": false,
+      "source_glyphs": 3339,
+      "nonspace_glyphs": 2786,
+      "normalized_nonspace_characters": 2786,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 263,
+      "path": "pages/page-263.md",
+      "headings": [
+        "Animated Objects",
+        "Animated Armor"
+      ],
+      "blank": false,
+      "source_glyphs": 3648,
+      "nonspace_glyphs": 3040,
+      "normalized_nonspace_characters": 3040,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 264,
+      "path": "pages/page-264.md",
+      "headings": [
+        "Flying Sword",
+        "Rug of Smothering",
+        "Ankheg"
+      ],
+      "blank": false,
+      "source_glyphs": 2886,
+      "nonspace_glyphs": 2403,
+      "normalized_nonspace_characters": 2403,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 265,
+      "path": "pages/page-265.md",
+      "headings": [
+        "Azer",
+        "Monsters (B)",
+        "Basilisk",
+        "Behir"
+      ],
+      "blank": false,
+      "source_glyphs": 3039,
+      "nonspace_glyphs": 2470,
+      "normalized_nonspace_characters": 2470,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 266,
+      "path": "pages/page-266.md",
+      "headings": [
+        "Bugbear",
+        "Bulette"
+      ],
+      "blank": false,
+      "source_glyphs": 3294,
+      "nonspace_glyphs": 2692,
+      "normalized_nonspace_characters": 2692,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 267,
+      "path": "pages/page-267.md",
+      "headings": [
+        "Monsters (C)",
+        "Centaur",
+        "Chimera",
+        "Chuul"
+      ],
+      "blank": false,
+      "source_glyphs": 3034,
+      "nonspace_glyphs": 2480,
+      "normalized_nonspace_characters": 2480,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 268,
+      "path": "pages/page-268.md",
+      "headings": [
+        "Cloaker",
+        "Cockatrice"
+      ],
+      "blank": false,
+      "source_glyphs": 3780,
+      "nonspace_glyphs": 3116,
+      "normalized_nonspace_characters": 3116,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 269,
+      "path": "pages/page-269.md",
+      "headings": [
+        "Couatl",
+        "Monsters (D)",
+        "Darkmantle"
+      ],
+      "blank": false,
+      "source_glyphs": 3196,
+      "nonspace_glyphs": 2634,
+      "normalized_nonspace_characters": 2634,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 270,
+      "path": "pages/page-270.md",
+      "headings": [
+        "Demons",
+        "Balor",
+        "Dretch"
+      ],
+      "blank": false,
+      "source_glyphs": 3699,
+      "nonspace_glyphs": 3056,
+      "normalized_nonspace_characters": 3056,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 271,
+      "path": "pages/page-271.md",
+      "headings": [
+        "Glabrezu",
+        "Hezrou"
+      ],
+      "blank": false,
+      "source_glyphs": 3379,
+      "nonspace_glyphs": 2809,
+      "normalized_nonspace_characters": 2809,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 272,
+      "path": "pages/page-272.md",
+      "headings": [
+        "Marilith",
+        "Nalfeshnee"
+      ],
+      "blank": false,
+      "source_glyphs": 3314,
+      "nonspace_glyphs": 2747,
+      "normalized_nonspace_characters": 2747,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 273,
+      "path": "pages/page-273.md",
+      "headings": [
+        "Quasit",
+        "Vrock"
+      ],
+      "blank": false,
+      "source_glyphs": 3494,
+      "nonspace_glyphs": 2878,
+      "normalized_nonspace_characters": 2878,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 274,
+      "path": "pages/page-274.md",
+      "headings": [
+        "Devils",
+        "Barbed Devil",
+        "Bearded Devil"
+      ],
+      "blank": false,
+      "source_glyphs": 3386,
+      "nonspace_glyphs": 2793,
+      "normalized_nonspace_characters": 2793,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 275,
+      "path": "pages/page-275.md",
+      "headings": [
+        "Bone Devil",
+        "Chain Devil"
+      ],
+      "blank": false,
+      "source_glyphs": 3418,
+      "nonspace_glyphs": 2833,
+      "normalized_nonspace_characters": 2833,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 276,
+      "path": "pages/page-276.md",
+      "headings": [
+        "Erinyes",
+        "Horned Devil"
+      ],
+      "blank": false,
+      "source_glyphs": 3287,
+      "nonspace_glyphs": 2714,
+      "normalized_nonspace_characters": 2714,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 277,
+      "path": "pages/page-277.md",
+      "headings": [
+        "Ice Devil",
+        "Imp"
+      ],
+      "blank": false,
+      "source_glyphs": 3526,
+      "nonspace_glyphs": 2903,
+      "normalized_nonspace_characters": 2903,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 278,
+      "path": "pages/page-278.md",
+      "headings": [
+        "Lemure",
+        "Pit Fiend"
+      ],
+      "blank": false,
+      "source_glyphs": 3293,
+      "nonspace_glyphs": 2720,
+      "normalized_nonspace_characters": 2720,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 279,
+      "path": "pages/page-279.md",
+      "headings": [
+        "Dinosaurs",
+        "Plesiosaurus",
+        "Triceratops",
+        "Tyrannosaurus Rex",
+        "Doppelganger"
+      ],
+      "blank": false,
+      "source_glyphs": 2482,
+      "nonspace_glyphs": 2025,
+      "normalized_nonspace_characters": 2025,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 280,
+      "path": "pages/page-280.md",
+      "headings": [
+        "Dragons, Chromatic",
+        "Black Dragon",
+        "Ancient Black Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3593,
+      "nonspace_glyphs": 2968,
+      "normalized_nonspace_characters": 2968,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 281,
+      "path": "pages/page-281.md",
+      "headings": [
+        "Adult Black Dragon",
+        "Young Black Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3264,
+      "nonspace_glyphs": 2671,
+      "normalized_nonspace_characters": 2671,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 282,
+      "path": "pages/page-282.md",
+      "headings": [
+        "Black Dragon Wyrmling",
+        "Blue Dragon",
+        "Ancient Blue Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3217,
+      "nonspace_glyphs": 2629,
+      "normalized_nonspace_characters": 2629,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 283,
+      "path": "pages/page-283.md",
+      "headings": [
+        "Adult Blue Dragon",
+        "Young Blue Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3411,
+      "nonspace_glyphs": 2795,
+      "normalized_nonspace_characters": 2795,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 284,
+      "path": "pages/page-284.md",
+      "headings": [
+        "Blue Dragon Wyrmling",
+        "Green Dragon",
+        "Ancient Green Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3115,
+      "nonspace_glyphs": 2559,
+      "normalized_nonspace_characters": 2559,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 285,
+      "path": "pages/page-285.md",
+      "headings": [
+        "Adult Green Dragon",
+        "Young Green Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3503,
+      "nonspace_glyphs": 2876,
+      "normalized_nonspace_characters": 2876,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 286,
+      "path": "pages/page-286.md",
+      "headings": [
+        "Green Dragon Wyrmling",
+        "Red Dragon",
+        "Ancient Red Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 2793,
+      "nonspace_glyphs": 2296,
+      "normalized_nonspace_characters": 2296,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 287,
+      "path": "pages/page-287.md",
+      "headings": [
+        "Adult Red Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3766,
+      "nonspace_glyphs": 3081,
+      "normalized_nonspace_characters": 3081,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 288,
+      "path": "pages/page-288.md",
+      "headings": [
+        "Young Red Dragon",
+        "Red Dragon Wyrmling",
+        "White Dragon",
+        "Ancient White Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 2829,
+      "nonspace_glyphs": 2316,
+      "normalized_nonspace_characters": 2316,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 289,
+      "path": "pages/page-289.md",
+      "headings": [
+        "Adult White Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3823,
+      "nonspace_glyphs": 3131,
+      "normalized_nonspace_characters": 3131,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 290,
+      "path": "pages/page-290.md",
+      "headings": [
+        "Young White Dragon",
+        "White Dragon Wyrmling",
+        "Dragons, Metallic",
+        "Brass Dragon",
+        "Ancient Brass Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 2820,
+      "nonspace_glyphs": 2305,
+      "normalized_nonspace_characters": 2305,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 291,
+      "path": "pages/page-291.md",
+      "headings": [
+        "Adult Brass Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3796,
+      "nonspace_glyphs": 3119,
+      "normalized_nonspace_characters": 3119,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 292,
+      "path": "pages/page-292.md",
+      "headings": [
+        "Young Brass Dragon",
+        "Brass Dragon Wyrmling"
+      ],
+      "blank": false,
+      "source_glyphs": 3536,
+      "nonspace_glyphs": 2888,
+      "normalized_nonspace_characters": 2888,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 293,
+      "path": "pages/page-293.md",
+      "headings": [
+        "Bronze Dragon",
+        "Ancient Bronze Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3615,
+      "nonspace_glyphs": 2976,
+      "normalized_nonspace_characters": 2976,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 294,
+      "path": "pages/page-294.md",
+      "headings": [
+        "Adult Bronze Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3867,
+      "nonspace_glyphs": 3177,
+      "normalized_nonspace_characters": 3177,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 295,
+      "path": "pages/page-295.md",
+      "headings": [
+        "Young Bronze Dragon",
+        "Bronze Dragon Wyrmling",
+        "Copper Dragon",
+        "Ancient Copper Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 2947,
+      "nonspace_glyphs": 2418,
+      "normalized_nonspace_characters": 2418,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 296,
+      "path": "pages/page-296.md",
+      "headings": [
+        "Adult Copper Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3743,
+      "nonspace_glyphs": 3074,
+      "normalized_nonspace_characters": 3074,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 297,
+      "path": "pages/page-297.md",
+      "headings": [
+        "Young Copper Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3454,
+      "nonspace_glyphs": 2821,
+      "normalized_nonspace_characters": 2821,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 298,
+      "path": "pages/page-298.md",
+      "headings": [
+        "Copper Dragon Wyrmling",
+        "Gold Dragon",
+        "Ancient Gold Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3452,
+      "nonspace_glyphs": 2820,
+      "normalized_nonspace_characters": 2820,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 299,
+      "path": "pages/page-299.md",
+      "headings": [
+        "Adult Gold Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3775,
+      "nonspace_glyphs": 3104,
+      "normalized_nonspace_characters": 3104,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 300,
+      "path": "pages/page-300.md",
+      "headings": [
+        "Young Gold Dragon",
+        "Gold Dragon Wyrmling"
+      ],
+      "blank": false,
+      "source_glyphs": 3442,
+      "nonspace_glyphs": 2827,
+      "normalized_nonspace_characters": 2827,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 301,
+      "path": "pages/page-301.md",
+      "headings": [
+        "Silver Dragon",
+        "Ancient Silver Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3674,
+      "nonspace_glyphs": 3025,
+      "normalized_nonspace_characters": 3025,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 302,
+      "path": "pages/page-302.md",
+      "headings": [
+        "Adult Silver Dragon"
+      ],
+      "blank": false,
+      "source_glyphs": 3716,
+      "nonspace_glyphs": 3055,
+      "normalized_nonspace_characters": 3055,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 303,
+      "path": "pages/page-303.md",
+      "headings": [
+        "Young Silver Dragon",
+        "Silver Dragon Wyrmling",
+        "Dragon Turtle"
+      ],
+      "blank": false,
+      "source_glyphs": 3071,
+      "nonspace_glyphs": 2507,
+      "normalized_nonspace_characters": 2507,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 304,
+      "path": "pages/page-304.md",
+      "headings": [
+        "Drider",
+        "Dryad"
+      ],
+      "blank": false,
+      "source_glyphs": 3168,
+      "nonspace_glyphs": 2628,
+      "normalized_nonspace_characters": 2628,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 305,
+      "path": "pages/page-305.md",
+      "headings": [
+        "Duergar",
+        "Monsters (E)",
+        "Elementals",
+        "Air Elemental"
+      ],
+      "blank": false,
+      "source_glyphs": 3549,
+      "nonspace_glyphs": 2929,
+      "normalized_nonspace_characters": 2929,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 306,
+      "path": "pages/page-306.md",
+      "headings": [
+        "Earth Elemental",
+        "Fire Elemental"
+      ],
+      "blank": false,
+      "source_glyphs": 3207,
+      "nonspace_glyphs": 2683,
+      "normalized_nonspace_characters": 2683,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 307,
+      "path": "pages/page-307.md",
+      "headings": [
+        "Water Elemental",
+        "Elf, Drow"
+      ],
+      "blank": false,
+      "source_glyphs": 3452,
+      "nonspace_glyphs": 2851,
+      "normalized_nonspace_characters": 2851,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 308,
+      "path": "pages/page-308.md",
+      "headings": [
+        "Ettercap",
+        "Ettin"
+      ],
+      "blank": false,
+      "source_glyphs": 2789,
+      "nonspace_glyphs": 2295,
+      "normalized_nonspace_characters": 2295,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 309,
+      "path": "pages/page-309.md",
+      "headings": [
+        "Monsters (F)",
+        "Fungi",
+        "Shrieker",
+        "Violet Fungus",
+        "Monsters (G)",
+        "Gargoyle"
+      ],
+      "blank": false,
+      "source_glyphs": 2175,
+      "nonspace_glyphs": 1814,
+      "normalized_nonspace_characters": 1814,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 310,
+      "path": "pages/page-310.md",
+      "headings": [
+        "Genies",
+        "Djinni",
+        "Efreeti"
+      ],
+      "blank": false,
+      "source_glyphs": 3218,
+      "nonspace_glyphs": 2679,
+      "normalized_nonspace_characters": 2679,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 311,
+      "path": "pages/page-311.md",
+      "headings": [
+        "Ghost",
+        "Ghouls",
+        "Ghast"
+      ],
+      "blank": false,
+      "source_glyphs": 3550,
+      "nonspace_glyphs": 2934,
+      "normalized_nonspace_characters": 2934,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 312,
+      "path": "pages/page-312.md",
+      "headings": [
+        "Ghoul",
+        "Giants",
+        "Cloud Giant",
+        "Fire Giant"
+      ],
+      "blank": false,
+      "source_glyphs": 2803,
+      "nonspace_glyphs": 2303,
+      "normalized_nonspace_characters": 2303,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 313,
+      "path": "pages/page-313.md",
+      "headings": [
+        "Frost Giant",
+        "Hill Giant",
+        "Stone Giant",
+        "Storm Giant"
+      ],
+      "blank": false,
+      "source_glyphs": 2606,
+      "nonspace_glyphs": 2135,
+      "normalized_nonspace_characters": 2135,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 314,
+      "path": "pages/page-314.md",
+      "headings": [
+        "Gibbering Mouther",
+        "Gnoll"
+      ],
+      "blank": false,
+      "source_glyphs": 3378,
+      "nonspace_glyphs": 2779,
+      "normalized_nonspace_characters": 2779,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 315,
+      "path": "pages/page-315.md",
+      "headings": [
+        "Gnome, Deep (Svirfneblin)",
+        "Goblin",
+        "Golems",
+        "Clay Golem"
+      ],
+      "blank": false,
+      "source_glyphs": 2905,
+      "nonspace_glyphs": 2401,
+      "normalized_nonspace_characters": 2401,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 316,
+      "path": "pages/page-316.md",
+      "headings": [
+        "Flesh Golem"
+      ],
+      "blank": false,
+      "source_glyphs": 3700,
+      "nonspace_glyphs": 3053,
+      "normalized_nonspace_characters": 3053,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 317,
+      "path": "pages/page-317.md",
+      "headings": [
+        "Iron Golem",
+        "Stone Golem",
+        "Gorgon"
+      ],
+      "blank": false,
+      "source_glyphs": 3190,
+      "nonspace_glyphs": 2650,
+      "normalized_nonspace_characters": 2650,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 318,
+      "path": "pages/page-318.md",
+      "headings": [
+        "Grick",
+        "Griffon",
+        "Grimlock"
+      ],
+      "blank": false,
+      "source_glyphs": 2892,
+      "nonspace_glyphs": 2372,
+      "normalized_nonspace_characters": 2372,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 319,
+      "path": "pages/page-319.md",
+      "headings": [
+        "Monsters (H)",
+        "Hags",
+        "Green Hag",
+        "Night Hag"
+      ],
+      "blank": false,
+      "source_glyphs": 3078,
+      "nonspace_glyphs": 2566,
+      "normalized_nonspace_characters": 2566,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 320,
+      "path": "pages/page-320.md",
+      "headings": [
+        "Sea Hag",
+        "Half-Dragon Template"
+      ],
+      "blank": false,
+      "source_glyphs": 4137,
+      "nonspace_glyphs": 3401,
+      "normalized_nonspace_characters": 3401,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 321,
+      "path": "pages/page-321.md",
+      "headings": [
+        "Half-Red Dragon Veteran",
+        "Harpy",
+        "Hell Hound"
+      ],
+      "blank": false,
+      "source_glyphs": 3313,
+      "nonspace_glyphs": 2711,
+      "normalized_nonspace_characters": 2711,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 322,
+      "path": "pages/page-322.md",
+      "headings": [
+        "Hippogriff",
+        "Hobgoblin",
+        "Homunculus"
+      ],
+      "blank": false,
+      "source_glyphs": 2637,
+      "nonspace_glyphs": 2158,
+      "normalized_nonspace_characters": 2158,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 323,
+      "path": "pages/page-323.md",
+      "headings": [
+        "Hydra",
+        "Monsters (I)",
+        "Invisible Stalker"
+      ],
+      "blank": false,
+      "source_glyphs": 2913,
+      "nonspace_glyphs": 2404,
+      "normalized_nonspace_characters": 2404,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 324,
+      "path": "pages/page-324.md",
+      "headings": [
+        "Monsters (K)",
+        "Kobold",
+        "Kraken"
+      ],
+      "blank": false,
+      "source_glyphs": 3616,
+      "nonspace_glyphs": 2984,
+      "normalized_nonspace_characters": 2984,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 325,
+      "path": "pages/page-325.md",
+      "headings": [
+        "Monsters (L)",
+        "Lamia",
+        "Lich"
+      ],
+      "blank": false,
+      "source_glyphs": 3227,
+      "nonspace_glyphs": 2686,
+      "normalized_nonspace_characters": 2686,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 326,
+      "path": "pages/page-326.md",
+      "headings": [
+        "Lizardfolk",
+        "Lycanthropes",
+        "Werebear"
+      ],
+      "blank": false,
+      "source_glyphs": 3328,
+      "nonspace_glyphs": 2747,
+      "normalized_nonspace_characters": 2747,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 327,
+      "path": "pages/page-327.md",
+      "headings": [
+        "Wereboar",
+        "Wererat"
+      ],
+      "blank": false,
+      "source_glyphs": 3420,
+      "nonspace_glyphs": 2811,
+      "normalized_nonspace_characters": 2811,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 328,
+      "path": "pages/page-328.md",
+      "headings": [
+        "Weretiger",
+        "Werewolf"
+      ],
+      "blank": false,
+      "source_glyphs": 3574,
+      "nonspace_glyphs": 2954,
+      "normalized_nonspace_characters": 2954,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 329,
+      "path": "pages/page-329.md",
+      "headings": [
+        "Monsters (M)",
+        "Magmin",
+        "Manticore"
+      ],
+      "blank": false,
+      "source_glyphs": 3084,
+      "nonspace_glyphs": 2530,
+      "normalized_nonspace_characters": 2530,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 330,
+      "path": "pages/page-330.md",
+      "headings": [
+        "Medusa",
+        "Mephits",
+        "Dust Mephit"
+      ],
+      "blank": false,
+      "source_glyphs": 3275,
+      "nonspace_glyphs": 2689,
+      "normalized_nonspace_characters": 2689,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 331,
+      "path": "pages/page-331.md",
+      "headings": [
+        "Ice Mephit",
+        "Magma Mephit",
+        "Steam Mephit"
+      ],
+      "blank": false,
+      "source_glyphs": 3021,
+      "nonspace_glyphs": 2490,
+      "normalized_nonspace_characters": 2490,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 332,
+      "path": "pages/page-332.md",
+      "headings": [
+        "Merfolk",
+        "Merrow",
+        "Mimic"
+      ],
+      "blank": false,
+      "source_glyphs": 2675,
+      "nonspace_glyphs": 2189,
+      "normalized_nonspace_characters": 2189,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 333,
+      "path": "pages/page-333.md",
+      "headings": [
+        "Minotaur",
+        "Mummies",
+        "Mummy"
+      ],
+      "blank": false,
+      "source_glyphs": 3120,
+      "nonspace_glyphs": 2575,
+      "normalized_nonspace_characters": 2575,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 334,
+      "path": "pages/page-334.md",
+      "headings": [
+        "Mummy Lord"
+      ],
+      "blank": false,
+      "source_glyphs": 3925,
+      "nonspace_glyphs": 3229,
+      "normalized_nonspace_characters": 3229,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 335,
+      "path": "pages/page-335.md",
+      "headings": [
+        "Monsters (N)",
+        "Nagas",
+        "Guardian Naga",
+        "Spirit Naga"
+      ],
+      "blank": false,
+      "source_glyphs": 3297,
+      "nonspace_glyphs": 2731,
+      "normalized_nonspace_characters": 2731,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 336,
+      "path": "pages/page-336.md",
+      "headings": [
+        "Nightmare",
+        "Monsters (O)",
+        "Ogre",
+        "Oni"
+      ],
+      "blank": false,
+      "source_glyphs": 2699,
+      "nonspace_glyphs": 2226,
+      "normalized_nonspace_characters": 2226,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 337,
+      "path": "pages/page-337.md",
+      "headings": [
+        "Oozes",
+        "Black Pudding",
+        "Gelatinous Cube"
+      ],
+      "blank": false,
+      "source_glyphs": 3355,
+      "nonspace_glyphs": 2757,
+      "normalized_nonspace_characters": 2757,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 338,
+      "path": "pages/page-338.md",
+      "headings": [
+        "Gray Ooze",
+        "Ochre Jelly"
+      ],
+      "blank": false,
+      "source_glyphs": 3314,
+      "nonspace_glyphs": 2723,
+      "normalized_nonspace_characters": 2723,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 339,
+      "path": "pages/page-339.md",
+      "headings": [
+        "Orc",
+        "Otyugh",
+        "Owlbear"
+      ],
+      "blank": false,
+      "source_glyphs": 3223,
+      "nonspace_glyphs": 2652,
+      "normalized_nonspace_characters": 2652,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 340,
+      "path": "pages/page-340.md",
+      "headings": [
+        "Monsters (P)",
+        "Pegasus",
+        "Pseudodragon",
+        "Purple Worm"
+      ],
+      "blank": false,
+      "source_glyphs": 2577,
+      "nonspace_glyphs": 2114,
+      "normalized_nonspace_characters": 2114,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 341,
+      "path": "pages/page-341.md",
+      "headings": [
+        "Monsters (R)",
+        "Rakshasa",
+        "Remorhaz"
+      ],
+      "blank": false,
+      "source_glyphs": 3257,
+      "nonspace_glyphs": 2687,
+      "normalized_nonspace_characters": 2687,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 342,
+      "path": "pages/page-342.md",
+      "headings": [
+        "Roc",
+        "Roper"
+      ],
+      "blank": false,
+      "source_glyphs": 3212,
+      "nonspace_glyphs": 2639,
+      "normalized_nonspace_characters": 2639,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 343,
+      "path": "pages/page-343.md",
+      "headings": [
+        "Rust Monster",
+        "Monsters (S)",
+        "Sahuagin"
+      ],
+      "blank": false,
+      "source_glyphs": 3291,
+      "nonspace_glyphs": 2697,
+      "normalized_nonspace_characters": 2697,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 344,
+      "path": "pages/page-344.md",
+      "headings": [
+        "Salamander",
+        "Satyr",
+        "Shadow"
+      ],
+      "blank": false,
+      "source_glyphs": 2877,
+      "nonspace_glyphs": 2384,
+      "normalized_nonspace_characters": 2384,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 345,
+      "path": "pages/page-345.md",
+      "headings": [
+        "Shambling Mound",
+        "Shield Guardian"
+      ],
+      "blank": false,
+      "source_glyphs": 3431,
+      "nonspace_glyphs": 2839,
+      "normalized_nonspace_characters": 2839,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 346,
+      "path": "pages/page-346.md",
+      "headings": [
+        "Skeletons",
+        "Skeleton",
+        "Minotaur Skeleton",
+        "Warhorse Skeleton",
+        "Specter"
+      ],
+      "blank": false,
+      "source_glyphs": 2531,
+      "nonspace_glyphs": 2082,
+      "normalized_nonspace_characters": 2082,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 347,
+      "path": "pages/page-347.md",
+      "headings": [
+        "Sphinxes",
+        "Androsphinx"
+      ],
+      "blank": false,
+      "source_glyphs": 3476,
+      "nonspace_glyphs": 2906,
+      "normalized_nonspace_characters": 2906,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 348,
+      "path": "pages/page-348.md",
+      "headings": [
+        "Gynosphinx",
+        "Sprite"
+      ],
+      "blank": false,
+      "source_glyphs": 3277,
+      "nonspace_glyphs": 2729,
+      "normalized_nonspace_characters": 2729,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 349,
+      "path": "pages/page-349.md",
+      "headings": [
+        "Stirge",
+        "Succubus/Incubus"
+      ],
+      "blank": false,
+      "source_glyphs": 3661,
+      "nonspace_glyphs": 3014,
+      "normalized_nonspace_characters": 3014,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 350,
+      "path": "pages/page-350.md",
+      "headings": [
+        "Monsters (T)",
+        "Tarrasque"
+      ],
+      "blank": false,
+      "source_glyphs": 4025,
+      "nonspace_glyphs": 3321,
+      "normalized_nonspace_characters": 3321,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 351,
+      "path": "pages/page-351.md",
+      "headings": [
+        "Treant",
+        "Troll",
+        "Monsters (U)",
+        "Unicorn"
+      ],
+      "blank": false,
+      "source_glyphs": 2866,
+      "nonspace_glyphs": 2358,
+      "normalized_nonspace_characters": 2358,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 352,
+      "path": "pages/page-352.md",
+      "headings": [
+        "Monsters (V)",
+        "Vampires",
+        "Vampire"
+      ],
+      "blank": false,
+      "source_glyphs": 3558,
+      "nonspace_glyphs": 2941,
+      "normalized_nonspace_characters": 2941,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 353,
+      "path": "pages/page-353.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 4531,
+      "nonspace_glyphs": 3739,
+      "normalized_nonspace_characters": 3739,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 354,
+      "path": "pages/page-354.md",
+      "headings": [
+        "Vampire Spawn",
+        "Monsters (W)",
+        "Wight"
+      ],
+      "blank": false,
+      "source_glyphs": 3346,
+      "nonspace_glyphs": 2771,
+      "normalized_nonspace_characters": 2771,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 355,
+      "path": "pages/page-355.md",
+      "headings": [
+        "Will-o’-Wisp",
+        "Wraith"
+      ],
+      "blank": false,
+      "source_glyphs": 3439,
+      "nonspace_glyphs": 2859,
+      "normalized_nonspace_characters": 2859,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 356,
+      "path": "pages/page-356.md",
+      "headings": [
+        "Wyvern",
+        "Monsters (X)",
+        "Xorn",
+        "Monsters (Z)",
+        "Zombies",
+        "Zombie"
+      ],
+      "blank": false,
+      "source_glyphs": 2683,
+      "nonspace_glyphs": 2200,
+      "normalized_nonspace_characters": 2200,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 357,
+      "path": "pages/page-357.md",
+      "headings": [
+        "Ogre Zombie"
+      ],
+      "blank": false,
+      "source_glyphs": 1203,
+      "nonspace_glyphs": 982,
+      "normalized_nonspace_characters": 982,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 358,
+      "path": "pages/page-358.md",
+      "headings": [
+        "Appendix PH-A:",
+        "Conditions",
+        "Blinded",
+        "Charmed",
+        "Deafened",
+        "Frightened",
+        "Grappled",
+        "Incapacitated",
+        "Invisible",
+        "Paralyzed"
+      ],
+      "blank": false,
+      "source_glyphs": 3700,
+      "nonspace_glyphs": 3138,
+      "normalized_nonspace_characters": 3138,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 359,
+      "path": "pages/page-359.md",
+      "headings": [
+        "Petrified",
+        "Poisoned",
+        "Prone",
+        "Restrained",
+        "Stunned",
+        "Unconscious"
+      ],
+      "blank": false,
+      "source_glyphs": 2016,
+      "nonspace_glyphs": 1746,
+      "normalized_nonspace_characters": 1746,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 360,
+      "path": "pages/page-360.md",
+      "headings": [
+        "Appendix PH-B:",
+        "Fantasy-Historical",
+        "Pantheons",
+        "The Celtic Pantheon",
+        "The Greek Pantheon",
+        "The Egyptian Pantheon",
+        "The Norse Pantheon",
+        "Celtic Deities"
+      ],
+      "blank": false,
+      "source_glyphs": 4087,
+      "nonspace_glyphs": 3383,
+      "normalized_nonspace_characters": 3383,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 361,
+      "path": "pages/page-361.md",
+      "headings": [
+        "Greek Deities",
+        "Egyptian Deities",
+        "Norse Deities"
+      ],
+      "blank": false,
+      "source_glyphs": 3076,
+      "nonspace_glyphs": 2554,
+      "normalized_nonspace_characters": 2554,
+      "regions": [
+        "Full-width region",
+        "Full-width region",
+        "Full-width region",
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 362,
+      "path": "pages/page-362.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 831,
+      "nonspace_glyphs": 683,
+      "normalized_nonspace_characters": 683,
+      "regions": [
+        "Full-width region",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 363,
+      "path": "pages/page-363.md",
+      "headings": [
+        "Appendix PH-C:",
+        "The Planes of",
+        "Existence",
+        "The Material Plane",
+        "Beyond the Material",
+        "Planar Travel",
+        "Transitive Planes"
+      ],
+      "blank": false,
+      "source_glyphs": 4363,
+      "nonspace_glyphs": 3644,
+      "normalized_nonspace_characters": 3644,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 364,
+      "path": "pages/page-364.md",
+      "headings": [
+        "Inner Planes",
+        "Outer Planes",
+        "Outer Planes",
+        "Demiplanes"
+      ],
+      "blank": false,
+      "source_glyphs": 4694,
+      "nonspace_glyphs": 3905,
+      "normalized_nonspace_characters": 3905,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 365,
+      "path": "pages/page-365.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 453,
+      "nonspace_glyphs": 376,
+      "normalized_nonspace_characters": 376,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 366,
+      "path": "pages/page-366.md",
+      "headings": [
+        "Appendix MM-A:",
+        "Miscellaneous",
+        "Creatures",
+        "Ape",
+        "Awakened Shrub",
+        "Awakened Tree",
+        "Axe Beak"
+      ],
+      "blank": false,
+      "source_glyphs": 2088,
+      "nonspace_glyphs": 1727,
+      "normalized_nonspace_characters": 1727,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 367,
+      "path": "pages/page-367.md",
+      "headings": [
+        "Baboon",
+        "Badger",
+        "Bat",
+        "Black Bear"
+      ],
+      "blank": false,
+      "source_glyphs": 2120,
+      "nonspace_glyphs": 1717,
+      "normalized_nonspace_characters": 1717,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 368,
+      "path": "pages/page-368.md",
+      "headings": [
+        "Blink Dog",
+        "Blood Hawk",
+        "Boar"
+      ],
+      "blank": false,
+      "source_glyphs": 2481,
+      "nonspace_glyphs": 2019,
+      "normalized_nonspace_characters": 2019,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 369,
+      "path": "pages/page-369.md",
+      "headings": [
+        "Brown Bear",
+        "Camel",
+        "Cat",
+        "Constrictor Snake"
+      ],
+      "blank": false,
+      "source_glyphs": 2220,
+      "nonspace_glyphs": 1796,
+      "normalized_nonspace_characters": 1796,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 370,
+      "path": "pages/page-370.md",
+      "headings": [
+        "Crab",
+        "Crocodile",
+        "Death Dog",
+        "Deer"
+      ],
+      "blank": false,
+      "source_glyphs": 2611,
+      "nonspace_glyphs": 2144,
+      "normalized_nonspace_characters": 2144,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 371,
+      "path": "pages/page-371.md",
+      "headings": [
+        "Dire Wolf",
+        "Draft Horse",
+        "Eagle",
+        "Elephant"
+      ],
+      "blank": false,
+      "source_glyphs": 2035,
+      "nonspace_glyphs": 1645,
+      "normalized_nonspace_characters": 1645,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 372,
+      "path": "pages/page-372.md",
+      "headings": [
+        "Elk",
+        "Flying Snake",
+        "Frog"
+      ],
+      "blank": false,
+      "source_glyphs": 2549,
+      "nonspace_glyphs": 2068,
+      "normalized_nonspace_characters": 2068,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 373,
+      "path": "pages/page-373.md",
+      "headings": [
+        "Giant Ape",
+        "Giant Badger",
+        "Giant Bat",
+        "Giant Boar"
+      ],
+      "blank": false,
+      "source_glyphs": 2372,
+      "nonspace_glyphs": 1924,
+      "normalized_nonspace_characters": 1924,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 374,
+      "path": "pages/page-374.md",
+      "headings": [
+        "Giant Centipede",
+        "Giant Constrictor Snake",
+        "Giant Crab",
+        "Giant Crocodile"
+      ],
+      "blank": false,
+      "source_glyphs": 2413,
+      "nonspace_glyphs": 1964,
+      "normalized_nonspace_characters": 1964,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 375,
+      "path": "pages/page-375.md",
+      "headings": [
+        "Giant Eagle",
+        "Giant Elk",
+        "Giant Fire Beetle"
+      ],
+      "blank": false,
+      "source_glyphs": 2914,
+      "nonspace_glyphs": 2371,
+      "normalized_nonspace_characters": 2371,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 376,
+      "path": "pages/page-376.md",
+      "headings": [
+        "Giant Frog",
+        "Giant Goat",
+        "Giant Hyena"
+      ],
+      "blank": false,
+      "source_glyphs": 2797,
+      "nonspace_glyphs": 2274,
+      "normalized_nonspace_characters": 2274,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 377,
+      "path": "pages/page-377.md",
+      "headings": [
+        "Giant Lizard",
+        "Giant Octopus",
+        "Giant Owl"
+      ],
+      "blank": false,
+      "source_glyphs": 2650,
+      "nonspace_glyphs": 2171,
+      "normalized_nonspace_characters": 2171,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 378,
+      "path": "pages/page-378.md",
+      "headings": [
+        "Giant Poisonous Snake",
+        "Giant Rat",
+        "Giant Scorpion",
+        "Giant Sea Horse"
+      ],
+      "blank": false,
+      "source_glyphs": 2853,
+      "nonspace_glyphs": 2315,
+      "normalized_nonspace_characters": 2315,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 379,
+      "path": "pages/page-379.md",
+      "headings": [
+        "Giant Shark",
+        "Giant Spider"
+      ],
+      "blank": false,
+      "source_glyphs": 2866,
+      "nonspace_glyphs": 2355,
+      "normalized_nonspace_characters": 2355,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 380,
+      "path": "pages/page-380.md",
+      "headings": [
+        "Giant Toad",
+        "Giant Vulture",
+        "Giant Wasp"
+      ],
+      "blank": false,
+      "source_glyphs": 3030,
+      "nonspace_glyphs": 2474,
+      "normalized_nonspace_characters": 2474,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 381,
+      "path": "pages/page-381.md",
+      "headings": [
+        "Giant Weasel",
+        "Giant Wolf Spider",
+        "Goat"
+      ],
+      "blank": false,
+      "source_glyphs": 2681,
+      "nonspace_glyphs": 2188,
+      "normalized_nonspace_characters": 2188,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 382,
+      "path": "pages/page-382.md",
+      "headings": [
+        "Hawk",
+        "Hunter Shark",
+        "Hyena",
+        "Jackal"
+      ],
+      "blank": false,
+      "source_glyphs": 2110,
+      "nonspace_glyphs": 1713,
+      "normalized_nonspace_characters": 1713,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 383,
+      "path": "pages/page-383.md",
+      "headings": [
+        "Killer Whale",
+        "Lion",
+        "Lizard"
+      ],
+      "blank": false,
+      "source_glyphs": 2458,
+      "nonspace_glyphs": 1998,
+      "normalized_nonspace_characters": 1998,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 384,
+      "path": "pages/page-384.md",
+      "headings": [
+        "Mammoth",
+        "Mastiff",
+        "Mule",
+        "Octopus"
+      ],
+      "blank": false,
+      "source_glyphs": 2396,
+      "nonspace_glyphs": 1958,
+      "normalized_nonspace_characters": 1958,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 385,
+      "path": "pages/page-385.md",
+      "headings": [
+        "Owl",
+        "Panther",
+        "Phase Spider"
+      ],
+      "blank": false,
+      "source_glyphs": 2674,
+      "nonspace_glyphs": 2187,
+      "normalized_nonspace_characters": 2187,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 386,
+      "path": "pages/page-386.md",
+      "headings": [
+        "Poisonous Snake",
+        "Polar Bear",
+        "Pony"
+      ],
+      "blank": false,
+      "source_glyphs": 2561,
+      "nonspace_glyphs": 2090,
+      "normalized_nonspace_characters": 2090,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 387,
+      "path": "pages/page-387.md",
+      "headings": [
+        "Quipper",
+        "Rat",
+        "Raven",
+        "Reef Shark"
+      ],
+      "blank": false,
+      "source_glyphs": 2164,
+      "nonspace_glyphs": 1763,
+      "normalized_nonspace_characters": 1763,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 388,
+      "path": "pages/page-388.md",
+      "headings": [
+        "Rhinoceros",
+        "Riding Horse",
+        "Saber-Toothed Tiger",
+        "Scorpion"
+      ],
+      "blank": false,
+      "source_glyphs": 2408,
+      "nonspace_glyphs": 1952,
+      "normalized_nonspace_characters": 1952,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 389,
+      "path": "pages/page-389.md",
+      "headings": [
+        "Sea Horse",
+        "Spider",
+        "Swarm of Bats",
+        "Swarm of Insects"
+      ],
+      "blank": false,
+      "source_glyphs": 2492,
+      "nonspace_glyphs": 2050,
+      "normalized_nonspace_characters": 2050,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 390,
+      "path": "pages/page-390.md",
+      "headings": [
+        "Swarm of Poisonous Snakes",
+        "Swarm of Quippers",
+        "Swarm of Rats"
+      ],
+      "blank": false,
+      "source_glyphs": 2877,
+      "nonspace_glyphs": 2381,
+      "normalized_nonspace_characters": 2381,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 391,
+      "path": "pages/page-391.md",
+      "headings": [
+        "Swarm of Ravens",
+        "Tiger"
+      ],
+      "blank": false,
+      "source_glyphs": 3150,
+      "nonspace_glyphs": 2598,
+      "normalized_nonspace_characters": 2598,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 392,
+      "path": "pages/page-392.md",
+      "headings": [
+        "Vulture",
+        "Warhorse",
+        "Weasel",
+        "Winter Wolf"
+      ],
+      "blank": false,
+      "source_glyphs": 2295,
+      "nonspace_glyphs": 1861,
+      "normalized_nonspace_characters": 1861,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 393,
+      "path": "pages/page-393.md",
+      "headings": [
+        "Wolf",
+        "Worg"
+      ],
+      "blank": false,
+      "source_glyphs": 3047,
+      "nonspace_glyphs": 2501,
+      "normalized_nonspace_characters": 2501,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 394,
+      "path": "pages/page-394.md",
+      "headings": [],
+      "blank": false,
+      "source_glyphs": 87,
+      "nonspace_glyphs": 71,
+      "normalized_nonspace_characters": 71,
+      "regions": [
+        "Left column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 395,
+      "path": "pages/page-395.md",
+      "headings": [
+        "Appendix MM-B:",
+        "Nonplayer",
+        "Characters",
+        "Customizing NPCs",
+        "Acolyte",
+        "Archmage"
+      ],
+      "blank": false,
+      "source_glyphs": 3190,
+      "nonspace_glyphs": 2659,
+      "normalized_nonspace_characters": 2659,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 396,
+      "path": "pages/page-396.md",
+      "headings": [
+        "Assassin",
+        "Bandit"
+      ],
+      "blank": false,
+      "source_glyphs": 3221,
+      "nonspace_glyphs": 2669,
+      "normalized_nonspace_characters": 2669,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 397,
+      "path": "pages/page-397.md",
+      "headings": [
+        "Bandit Captain",
+        "Berserker"
+      ],
+      "blank": false,
+      "source_glyphs": 3073,
+      "nonspace_glyphs": 2531,
+      "normalized_nonspace_characters": 2531,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 398,
+      "path": "pages/page-398.md",
+      "headings": [
+        "Commoner",
+        "Cultist",
+        "Cult Fanatic",
+        "Druid"
+      ],
+      "blank": false,
+      "source_glyphs": 2596,
+      "nonspace_glyphs": 2165,
+      "normalized_nonspace_characters": 2165,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 399,
+      "path": "pages/page-399.md",
+      "headings": [
+        "Gladiator",
+        "Guard"
+      ],
+      "blank": false,
+      "source_glyphs": 3022,
+      "nonspace_glyphs": 2504,
+      "normalized_nonspace_characters": 2504,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 400,
+      "path": "pages/page-400.md",
+      "headings": [
+        "Knight",
+        "Mage"
+      ],
+      "blank": false,
+      "source_glyphs": 2987,
+      "nonspace_glyphs": 2473,
+      "normalized_nonspace_characters": 2473,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 401,
+      "path": "pages/page-401.md",
+      "headings": [
+        "Noble",
+        "Priest",
+        "Scout"
+      ],
+      "blank": false,
+      "source_glyphs": 3015,
+      "nonspace_glyphs": 2487,
+      "normalized_nonspace_characters": 2487,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 402,
+      "path": "pages/page-402.md",
+      "headings": [
+        "Spy",
+        "Thug",
+        "Tribal Warrior"
+      ],
+      "blank": false,
+      "source_glyphs": 2798,
+      "nonspace_glyphs": 2310,
+      "normalized_nonspace_characters": 2310,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    },
+    {
+      "pdf_page": 403,
+      "path": "pages/page-403.md",
+      "headings": [
+        "Veteran"
+      ],
+      "blank": false,
+      "source_glyphs": 1864,
+      "nonspace_glyphs": 1530,
+      "normalized_nonspace_characters": 1530,
+      "regions": [
+        "Left column",
+        "Right column",
+        "Original page footer"
+      ]
+    }
+  ]
+}

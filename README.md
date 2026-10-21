@@ -188,6 +188,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [Agent 项目上下文](./docs/agent-context.md) | 新会话使用的精简项目地图和权威资料索引 |
 | [架构](./docs/architecture.md) | 产品范围、组件、事务与信任边界 |
 | [规则数据库分离设计](./docs/rule-database-separation.md) | 当前存储、双 schema 职责及 v2 采用边界 |
+| [SRD 5.1 本地原文索引](./docs/references/srd-5.1/README.md) | 按主题定位 403 页检索文本，核对本地 PDF 与官方出处 |
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |
 | [冻结 v1 规则规范](./docs/rules/srd-5.1.md) | 现有稳定键、算法、范围、规范化和模组关系 |
 | [职业特性 v2](./docs/rules/class-features-v2.md) | 12 职业/子职业特性矩阵、资源恢复与阻断边界 |
