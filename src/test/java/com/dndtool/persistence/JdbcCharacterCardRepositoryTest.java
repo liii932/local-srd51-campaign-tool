@@ -40,7 +40,7 @@ final class JdbcCharacterCardRepositoryTest {
         assertEquals(1, snapshot.skillProficiencies().size());
         assertEquals(1, snapshot.saveProficiencies().size());
         assertEquals(1, snapshot.items().size());
-        assertEquals(List.of("root", "fields", "classes", "skills", "saves", "items"),
+        assertEquals(List.of("root", "fields", "classes", "skills", "saves", "items", "grants", "creation"),
                 database.executed);
         assertTrue(database.committed);
         assertFalse(database.rolledBack);
@@ -137,12 +137,15 @@ final class JdbcCharacterCardRepositoryTest {
             if (normalized.startsWith("SELECT skill_key")) return "skills";
             if (normalized.startsWith("SELECT save_key")) return "saves";
             if (normalized.startsWith("SELECT id, source_kind")) return "items";
+            if (normalized.contains("FROM character_proficiency_grant_v2")) return "grants";
+            if (normalized.contains("FROM character_creation_snapshot_v2")) return "creation";
             throw new AssertionError(normalized);
         }
 
         private List<Map<String, Object>> rows(String operation) {
             return switch (operation) {
                 case "root" -> found ? List.of(root()) : List.of();
+                case "grants", "creation" -> List.of();
                 case "fields" -> List.of(Map.of(
                         "field_key", "ability.strength", "value_type", "INTEGER",
                         "integer_value", 10L));
@@ -165,6 +168,7 @@ final class JdbcCharacterCardRepositoryTest {
         private static Map<String, Object> root() {
             Map<String, Object> row = new HashMap<>();
             row.put("id", 11L);
+            row.put("module_release_id", 9L);
             row.put("character_key", CHARACTER_KEY);
             row.put("character_type", "PC");
             row.put("character_name", "Aria");

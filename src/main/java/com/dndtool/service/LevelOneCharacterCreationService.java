@@ -102,7 +102,8 @@ public final class LevelOneCharacterCreationService {
                         context.contentSha256(), expectedEventTail, previewDigest,
                         prepared.raceKey(), prepared.subraceKey(), prepared.backgroundKey(),
                         prepared.classKey(), prepared.baseAbilityScores(),
-                        prepared.finalAbilityScores(), selections, prepared.maximumHitPoints(),
+                        prepared.finalAbilityScores(), selections, prepared.proficiencyGrants(),
+                        prepared.maximumHitPoints(),
                         prepared.hitDieSides(), prepared.initialResources().stream()
                                 .map(value -> new LevelOneCharacterCreationRepository.InitialResource(
                                         value.resourceKey(), value.currentValue(),

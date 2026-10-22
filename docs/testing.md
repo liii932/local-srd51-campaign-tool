@@ -292,8 +292,16 @@ mvn '-Dtest=BuiltinModuleReleaseRegistryTest,BuiltinModuleHashManifestTest' test
 无权威写入、非法选择被拒绝、事件尾变化导致 stale preview、事务故障不留下部分角色，并且
 DRAFT 发布门保持关闭。
 
-V022 的空授予结构与迁移预检由 `CharacterProficiencyGrantSchemaTest` 静态核对；旧 DRAFT
-创建快照必须为空。这些检查不执行迁移，不证明真实 MySQL 触发器或权限，也不授予业务运行资格。
+[角色语言／工具授予](rules/character-proficiency-grants.md)的无数据库定向命令：
+
+```bash
+mvn '-DargLine=-Xmx256m' '-Dtest=CharacterProficiencyGrantTest,CharacterProficiencyGrantSchemaTest,LevelOneCharacterRulesTest,LevelOneCharacterCreationServiceTest,JdbcLevelOneCharacterCreationRepositoryTest,JdbcCharacterProficiencyGrantRepositoryTest,CharacterCardServiceTest,JdbcCharacterCardRepositoryTest,HostCharacterCardServletTest,CampaignArchiveV2CharacterStateTest,JdbcCampaignArchiveV2CharacterStateRepositoryTest,JdbcCampaignArchiveV2CharacterStateImportRepositoryTest,JdbcCampaignArchiveImportRepositoryTest,CampaignArchiveCapabilityBoundaryTest' test
+```
+
+覆盖固定和选择授予的准确父来源/槽、完整候选检查、幂等与写入失败回滚、角色卡真实读取、
+严格内部文件、来源缺失/伪造拒绝及直接恢复。V022 静态前置检查要求旧 DRAFT 创建快照为空；
+这些测试不执行迁移，不证明真实 MySQL 触发器或权限，也不将该旧目录链路视作 schema 2 业务运行。
+WAR 须包含授予模型、消费者和 V022；账号增量见[授予权限](../database/grants/character-proficiency-grants.sql)。
 
 升级的定向验证包括 `AdvancementValueProfileTest`、`LevelAdvancementRulesTest`、
 `LevelAdvancementServiceTest`、`JdbcLevelAdvancementRepositoryTest`、

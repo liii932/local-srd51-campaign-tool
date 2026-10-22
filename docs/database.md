@@ -28,11 +28,12 @@ V001—V024；未安装 V024 的数据库不能满足这个候选版本的 schem
 V021 追加 schema 2 INTERNAL 类型化组合、最终规则、完整覆盖链、永久守卫与操作收据；
 来源读取和原子转存合同见[来源到运行快照](rules/schema-2-runtime-snapshot.md)，增量授权见
 [schema 2 运行权限](../database/grants/schema2-runtime-snapshot.sql)。迁移和授权文件不表示已执行。
-V022 追加空的角色语言／工具授予事实表；V023 增加 schema 2 工具、工具集合和成员镜像。
+V022 增加[角色语言／工具授予事实](rules/character-proficiency-grants.md)，V023 增加 schema 2 工具、工具集合和成员镜像。
 V024 追加 schema 2 角色授予来源、稳定槽和类型化授予覆盖值；[初始授予计划](rules/schema-2-proficiency-grants.md)
 从实际运行快照读取这些字段，仍不创建战役、角色工作集或业务历史。
 V022 不推测旧 DRAFT 的授予来源；若已经有一级创建快照，预检拒绝迁移，须另行决定真实数据的处理方式。
-新增结构可用[只读核验 SQL](../database/verify/character-proficiency-grants.sql)盘点。
+新增结构可用[只读核验 SQL](../database/verify/character-proficiency-grants.sql)盘点；
+[授予权限](../database/grants/character-proficiency-grants.sql)与规则快照权限分别审核和应用。
 
 独立 `RULES` 链位于 `database/rules/migration/`，目标为 `dnd_tool_rules.rule_schema_meta`，
 本链包括 V001—V004，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。

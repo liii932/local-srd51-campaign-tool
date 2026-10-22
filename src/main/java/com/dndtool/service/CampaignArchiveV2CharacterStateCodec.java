@@ -2,6 +2,7 @@ package com.dndtool.service;
 
 import static com.dndtool.service.CampaignArchiveV2CharacterState.*;
 
+import com.dndtool.module.CharacterProficiencyGrant;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -32,7 +33,7 @@ final class CampaignArchiveV2CharacterStateCodec {
     private static final Set<String> ROOT_FIELDS = Set.of(
             "archiveFormatVersion", "eventTail", "stateEvents", "creationSnapshots",
             "creationSelections", "resources", "classLevels", "subclasses", "features",
-            "featureChoices", "feats", "multiclassProficiencies");
+            "featureChoices", "feats", "multiclassProficiencies", "proficiencyGrants");
 
     private CampaignArchiveV2CharacterStateCodec() {
     }
@@ -110,6 +111,17 @@ final class CampaignArchiveV2CharacterStateCodec {
                         "classKey", value.classKey(),
                         "proficiencyKey", value.proficiencyKey(),
                         "acquiredEventSequence", value.acquiredEventSequence())));
+        root.add("proficiencyGrants", array(state.proficiencyGrants(), value -> object(
+                "characterKey", value.characterKey(),
+                "category", value.grant().category().name(),
+                "sourceModuleKey", value.grant().sourceModuleKey(),
+                "sourceType", value.grant().sourceType(),
+                "sourceKey", value.grant().sourceKey(),
+                "grantSlotKey", value.grant().grantSlotKey(),
+                "grantKind", value.grant().grantKind().name(),
+                "targetModuleKey", value.grant().targetModuleKey(),
+                "proficiencyKey", value.grant().proficiencyKey(),
+                "suppressed", value.grant().suppressed())));
         return root.toString().getBytes(StandardCharsets.UTF_8);
     }
 
@@ -187,7 +199,17 @@ final class CampaignArchiveV2CharacterStateCodec {
                             string(value, "proficiencyKey"),
                             longValue(value, "acquiredEventSequence")),
                             "characterKey", "classKey", "proficiencyKey",
-                            "acquiredEventSequence"));
+                            "acquiredEventSequence"),
+                    values(root, "proficiencyGrants", value -> new ProficiencyGrant(
+                            string(value, "characterKey"), new CharacterProficiencyGrant(
+                                    CharacterProficiencyGrant.Category.valueOf(string(value, "category")),
+                                    string(value, "sourceModuleKey"), string(value, "sourceType"),
+                                    string(value, "sourceKey"), string(value, "grantSlotKey"),
+                                    CharacterProficiencyGrant.GrantKind.valueOf(string(value, "grantKind")),
+                                    string(value, "targetModuleKey"), string(value, "proficiencyKey"),
+                                    bool(value, "suppressed"))),
+                            "characterKey", "category", "sourceModuleKey", "sourceType", "sourceKey",
+                            "grantSlotKey", "grantKind", "targetModuleKey", "proficiencyKey", "suppressed"));
             return Result.ready(CampaignArchiveV2CharacterStateValidator.normalize(
                     decoded, characterKeys));
         } catch (ReadFailure | IllegalArgumentException | IllegalStateException exception) {

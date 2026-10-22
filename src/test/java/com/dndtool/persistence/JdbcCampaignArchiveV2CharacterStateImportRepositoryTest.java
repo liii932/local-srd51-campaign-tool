@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dndtool.service.CampaignArchiveV2CharacterState;
+import com.dndtool.service.CharacterProficiencyArchiveTestData;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -14,6 +15,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -30,7 +32,7 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
         new JdbcCampaignArchiveV2CharacterStateImportRepository()
                 .append(fixture.connection(), command);
 
-        assertEquals(12, fixture.executedSql.size());
+        assertEquals(19, fixture.executedSql.size());
         assertTrue(fixture.executedSql.stream().anyMatch(sql ->
                 sql.contains("INSERT INTO game_event")));
         assertTrue(fixture.executedSql.stream().anyMatch(sql ->
@@ -43,6 +45,19 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
         assertTrue(fixture.executedSql.stream().anyMatch(sql ->
                 sql.contains("character_multiclass_proficiency_v2")
                         && sql.contains("'ARCHIVE_RESTORE'")));
+        List<Map<Integer, Object>> grantWrites = new ArrayList<>();
+        for (int index = 0; index < fixture.executedSql.size(); index++) {
+            if (fixture.executedSql.get(index).contains("character_proficiency_grant_v2")) {
+                grantWrites.add(fixture.executedParams.get(index));
+            }
+        }
+        assertEquals(4, grantWrites.size());
+        assertEquals(List.of("background.acolyte", "class.fighter", "race.human", "background.acolyte"),
+                grantWrites.stream().map(row -> row.get(6)).toList());
+        assertEquals(List.of("language.celestial", "language.common", "language.common", "tool.smith_tools"),
+                grantWrites.stream().map(row -> row.get(11)).toList());
+        assertTrue(grantWrites.stream().allMatch(row -> row.get(1).equals(11L)
+                && row.get(2).equals(9L) && row.get(12).equals(false)));
         assertEquals(0, fixture.commitCount);
         assertEquals(0, fixture.rollbackCount);
     }
@@ -67,9 +82,31 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
         assertFalse(failed.executedSql.isEmpty());
     }
 
+    @Test
+    void rejectsWrongPhysicalCharacterBeforeAnyInsert() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.wrongCharacter = true;
+        assertThrows(SQLException.class, () -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
+                .append(fixture.connection(), command()));
+        assertTrue(fixture.executedSql.isEmpty());
+        assertEquals(0, fixture.commitCount);
+        assertEquals(0, fixture.rollbackCount);
+    }
+
+    @Test
+    void requiresCampaignOwnerToRestoreExactTailBeforeFirstInsert() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.wrongTail = true;
+        assertThrows(SQLException.class, () -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
+                .append(fixture.connection(), command()));
+        assertTrue(fixture.executedSql.isEmpty());
+        assertEquals(0, fixture.commitCount);
+        assertEquals(0, fixture.rollbackCount);
+    }
+
     private static CampaignArchiveV2CharacterStateImportRepository.Command command() {
         return new CampaignArchiveV2CharacterStateImportRepository.Command(
-                7, 9, Map.of(CHARACTER, 11L), state());
+                7, 9, Map.of(CHARACTER, 11L), state(), CharacterProficiencyArchiveTestData.catalog());
     }
 
     private static CampaignArchiveV2CharacterState state() {
@@ -89,7 +126,10 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
                         CHARACTER, 1, "a".repeat(64), "b".repeat(64),
                         "ability.standard_array_v1", "race.human", null,
                         "background.acolyte", "class.fighter", abilities, 12)),
-                List.of(new CreationSelection(CHARACTER, "SKILL", 1, "skill.athletics")),
+                List.of(new CreationSelection(CHARACTER, "SKILL", 1, "skill.athletics"),
+                        new CreationSelection(CHARACTER, "LANGUAGE", 1, "language.common"),
+                        new CreationSelection(CHARACTER, "LANGUAGE", 2, "language.celestial"),
+                        new CreationSelection(CHARACTER, "TOOL", 1, "tool.smith_tools")),
                 List.of(new ResourceState(
                         CHARACTER, "resource.hit_points", 12, 12, false)),
                 List.of(
@@ -105,12 +145,17 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
                         "character.feature", "feature.fighter.fighting_style.archery", 1)),
                 List.of(new FeatState(CHARACTER, "feat.grappler", 8)),
                 List.of(new MulticlassProficiency(
-                        CHARACTER, "class.rogue", "proficiency.armor.light", 8)));
+                        CHARACTER, "class.rogue", "proficiency.armor.light", 8)),
+                CharacterProficiencyArchiveTestData.grants().stream()
+                        .map(grant -> new ProficiencyGrant(CHARACTER, grant)).toList());
     }
 
     private static final class Fixture {
         private final List<String> executedSql = new ArrayList<>();
+        private final List<Map<Integer, Object>> executedParams = new ArrayList<>();
         private boolean autoCommit;
+        private boolean wrongCharacter;
+        private boolean wrongTail;
         private int executionCount;
         private int failAt = -1;
         private int generatedId = 100;
@@ -132,19 +177,53 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
         }
 
         private PreparedStatement statement(String sql, boolean generated) {
+            Map<Integer, Object> parameters = new HashMap<>();
             return (PreparedStatement) Proxy.newProxyInstance(
                     getClass().getClassLoader(), new Class<?>[] {PreparedStatement.class},
                     (proxy, method, args) -> switch (method.getName()) {
                         case "executeUpdate" -> {
                             executedSql.add(sql);
+                            executedParams.add(new HashMap<>(parameters));
                             if (++executionCount == failAt) {
                                 throw new SQLException("injected format-2 JDBC failure");
                             }
                             yield 1;
                         }
+                        case "executeQuery" -> rowSet(sql.contains("FROM module_release")
+                                ? Map.of("module_key", "dnd5e2014_srd51_se", "release_version", "1",
+                                        "canonical_format_version", 2, "hash_algorithm", "SHA-256",
+                                        "content_sha256", "a".repeat(64), "release_status", "DRAFT")
+                                : sql.contains("SELECT internal_event_tail FROM campaign")
+                                        ? Map.of("internal_event_tail", wrongTail ? 1L : 12L)
+                                        : Map.of("campaign_id", 7L, "module_release_id", 9L,
+                                                "character_key", wrongCharacter
+                                                        ? "22222222-2222-4222-8222-222222222222" : CHARACTER));
                         case "getGeneratedKeys" -> resultSet(generated ? ++generatedId : 0);
-                        case "close", "setQueryTimeout", "setLong", "setInt", "setString",
-                                "setNull" -> null;
+                        case "setLong", "setInt", "setString", "setBoolean" -> {
+                            parameters.put((Integer) args[0], args[1]); yield null;
+                        }
+                        case "setNull" -> { parameters.put((Integer) args[0], null); yield null; }
+                        case "close", "setQueryTimeout" -> null;
+                        default -> defaultValue(method.getReturnType());
+                    });
+        }
+
+        private ResultSet rowSet(Map<String, Object> values) {
+            final int[] index = {0};
+            final boolean[] wasNull = {false};
+            return (ResultSet) Proxy.newProxyInstance(getClass().getClassLoader(),
+                    new Class<?>[] {ResultSet.class}, (proxy, method, args) -> switch (method.getName()) {
+                        case "next" -> ++index[0] == 1;
+                        case "wasNull" -> wasNull[0];
+                        case "getString", "getLong", "getInt" -> {
+                            Object value = values.get(args[0]);
+                            wasNull[0] = value == null;
+                            yield switch (method.getName()) {
+                                case "getString" -> value == null ? null : value.toString();
+                                case "getLong" -> value == null ? 0L : ((Number) value).longValue();
+                                default -> value == null ? 0 : ((Number) value).intValue();
+                            };
+                        }
                         default -> defaultValue(method.getReturnType());
                     });
         }

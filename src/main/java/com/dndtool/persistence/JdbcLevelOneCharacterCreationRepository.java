@@ -1,5 +1,7 @@
 package com.dndtool.persistence;
 
+import com.dndtool.module.CharacterProficiencyGrant;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -146,6 +148,7 @@ public final class JdbcLevelOneCharacterCreationRepository
 
     @Override
     public Result confirm(Command command) throws SQLException {
+        validateProficiencyGrants(command);
         Connection connection = dataSource.getConnection();
         ConnectionState original = ConnectionState.capture(connection);
         try {
@@ -173,6 +176,7 @@ public final class JdbcLevelOneCharacterCreationRepository
             long characterId = insertCharacter(connection, campaign.id(), binding.releaseId(), command);
             insertSnapshot(connection, characterId, binding.releaseId(), command);
             insertSelections(connection, characterId, binding.releaseId(), command);
+            insertProficiencyGrants(connection, characterId, binding.releaseId(), command);
             insertClassLevel(connection, characterId, binding.releaseId(), command);
             insertResources(connection, characterId, binding.releaseId(), command);
             long eventSequence = campaign.eventTail() + 1;
@@ -322,6 +326,47 @@ public final class JdbcLevelOneCharacterCreationRepository
             statement.setLong(2, releaseId);
             statement.setString(3, command.classKey());
             statement.executeUpdate();
+        }
+    }
+
+    private static void validateProficiencyGrants(Command command) {
+        java.util.Set<CharacterProficiencyGrant> unique = new java.util.HashSet<>();
+        for (CharacterProficiencyGrant grant : command.proficiencyGrants()) {
+            String sourceKey = switch (grant.sourceType()) {
+                case "character.race" -> command.raceKey();
+                case "character.subrace" -> command.subraceKey();
+                case "character.background" -> command.backgroundKey();
+                case "character.class" -> command.classKey();
+                default -> null;
+            };
+            String slot = "creation." + grant.category().name().toLowerCase(java.util.Locale.ROOT)
+                    + "." + grant.grantKind().name().toLowerCase(java.util.Locale.ROOT);
+            if (!grant.sourceKey().equals(sourceKey) || !unique.add(grant)
+                    || !command.moduleKey().equals(grant.sourceModuleKey())
+                    || !command.moduleKey().equals(grant.targetModuleKey())
+                    || !slot.equals(grant.grantSlotKey()) || grant.suppressed()) {
+                throw new IllegalArgumentException("Invalid frozen creation proficiency provenance");
+            }
+        }
+        for (CharacterProficiencyGrant.Category category : CharacterProficiencyGrant.Category.values()) {
+            java.util.Set<String> granted = command.proficiencyGrants().stream()
+                    .filter(value -> value.category() == category)
+                    .map(CharacterProficiencyGrant::proficiencyKey).collect(java.util.stream.Collectors.toSet());
+            java.util.Set<String> selected = command.selections().stream()
+                    .filter(value -> value.kind().equals(category.name()))
+                    .map(Selection::key).collect(java.util.stream.Collectors.toSet());
+            if (!granted.equals(selected)) {
+                throw new IllegalArgumentException("Creation proficiency facts differ from selections");
+            }
+        }
+    }
+
+    private static void insertProficiencyGrants(Connection connection, long characterId,
+            long releaseId, Command command) throws SQLException {
+        if (command.proficiencyGrants().isEmpty()) return;
+        JdbcCharacterProficiencyGrantRepository repository = new JdbcCharacterProficiencyGrantRepository();
+        for (CharacterProficiencyGrant grant : command.proficiencyGrants()) {
+            repository.append(connection, characterId, releaseId, grant);
         }
     }
 

@@ -90,10 +90,15 @@ public final class JdbcCampaignArchiveV2CharacterStateImportRepository
         requireCallerTransaction(connection);
         Objects.requireNonNull(command, "format-2 character import command");
         CampaignArchiveV2CharacterState state = command.state().validated(
-                command.characterIds().keySet());
+                command.characterIds().keySet(), command.catalog());
+        JdbcCharacterProficiencyGrantRepository.verifyCatalog(
+                connection, command.moduleReleaseId(), command.catalog());
+        verifyCampaignTail(connection, command);
+        verifyCharacters(connection, command);
         Map<Long, Long> eventIds = insertEvents(connection, command, state);
         insertSnapshots(connection, command, state);
         insertSelections(connection, command, state);
+        insertProficiencyGrants(connection, command, state);
         insertResources(connection, command, state);
         insertClasses(connection, command, state);
         insertSubclasses(connection, command, state, eventIds);
@@ -101,6 +106,49 @@ public final class JdbcCampaignArchiveV2CharacterStateImportRepository
         insertFeatureChoices(connection, command, state, eventIds);
         insertFeats(connection, command, state, eventIds);
         insertMulticlassProficiencies(connection, command, state, eventIds);
+    }
+
+    private static void verifyCampaignTail(Connection connection, Command command) throws SQLException {
+        String sql = "SELECT internal_event_tail FROM campaign WHERE id = ? FOR UPDATE";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setLong(1, command.campaignId());
+            try (ResultSet row = statement.executeQuery()) {
+                if (!row.next() || row.getLong("internal_event_tail") != command.state().eventTail()
+                        || row.wasNull() || row.next()) {
+                    throw invalidState("Campaign initializer has not restored the exact event tail");
+                }
+            }
+        }
+    }
+
+    private static void verifyCharacters(Connection connection, Command command) throws SQLException {
+        if (new java.util.HashSet<>(command.characterIds().values()).size()
+                != command.characterIds().size()) throw invalidState("Duplicate character mapping");
+        String sql = "SELECT campaign_id, module_release_id, character_key FROM character_record "
+                + "WHERE id = ? FOR UPDATE";
+        for (var entry : command.characterIds().entrySet().stream()
+                .sorted(Map.Entry.comparingByValue()).toList()) {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+                statement.setLong(1, entry.getValue());
+                try (ResultSet row = statement.executeQuery()) {
+                    if (!row.next() || command.campaignId() != row.getLong("campaign_id")
+                            || row.wasNull() || command.moduleReleaseId() != row.getLong("module_release_id")
+                            || row.wasNull() || !entry.getKey().equals(row.getString("character_key"))
+                            || row.next()) throw invalidState("Character import identity differs from root");
+                }
+            }
+        }
+    }
+
+    private static void insertProficiencyGrants(
+            Connection connection, Command command, CampaignArchiveV2CharacterState state)
+            throws SQLException {
+        for (ProficiencyGrant row : state.proficiencyGrants()) {
+            new JdbcCharacterProficiencyGrantRepository().append(connection,
+                    character(command, row.characterKey()), command.moduleReleaseId(), row.grant());
+        }
     }
 
     private static Map<Long, Long> insertEvents(

@@ -1,5 +1,7 @@
 package com.dndtool.service;
 
+import com.dndtool.module.CharacterProficiencyGrant;
+import com.dndtool.module.ModuleCatalog;
 import java.util.List;
 import java.util.Set;
 
@@ -19,7 +21,8 @@ public record CampaignArchiveV2CharacterState(
         List<FeatureState> features,
         List<FeatureChoice> featureChoices,
         List<FeatState> feats,
-        List<MulticlassProficiency> multiclassProficiencies) {
+        List<MulticlassProficiency> multiclassProficiencies,
+        List<ProficiencyGrant> proficiencyGrants) {
     public static final int FORMAT_VERSION = 2;
 
     public CampaignArchiveV2CharacterState {
@@ -33,11 +36,43 @@ public record CampaignArchiveV2CharacterState(
         featureChoices = List.copyOf(featureChoices);
         feats = List.copyOf(feats);
         multiclassProficiencies = List.copyOf(multiclassProficiencies);
+        proficiencyGrants = List.copyOf(proficiencyGrants);
     }
 
     /** Revalidates all document-local identities and returns canonical archive ordering. */
     public CampaignArchiveV2CharacterState validated(Set<String> characterKeys) {
         return CampaignArchiveV2CharacterStateValidator.normalize(this, characterKeys);
+    }
+
+    /** Validates the complete grant provenance against the exact frozen DRAFT catalog. */
+    public CampaignArchiveV2CharacterState validated(
+            Set<String> characterKeys, ModuleCatalog catalog) {
+        CampaignArchiveV2CharacterState state = validated(characterKeys);
+        for (CreationSnapshot snapshot : state.creationSnapshots()) {
+            List<String> languages = state.creationSelections().stream()
+                    .filter(value -> value.characterKey().equals(snapshot.characterKey())
+                            && value.selectionKind().equals("LANGUAGE"))
+                    .map(CreationSelection::selectionKey).toList();
+            List<String> tools = state.creationSelections().stream()
+                    .filter(value -> value.characterKey().equals(snapshot.characterKey())
+                            && value.selectionKind().equals("TOOL"))
+                    .map(CreationSelection::selectionKey).toList();
+            List<CharacterProficiencyGrant> expected = LevelOneCharacterRules
+                    .reconstructProficiencyGrants(catalog, snapshot.raceKey(),
+                            snapshot.subraceKey(), snapshot.backgroundKey(),
+                            snapshot.classKey(), languages, tools);
+            List<CharacterProficiencyGrant> actual = state.proficiencyGrants().stream()
+                    .filter(value -> value.characterKey().equals(snapshot.characterKey()))
+                    .map(ProficiencyGrant::grant).toList();
+            if (actual.size() != expected.size()
+                    || !Set.copyOf(actual).equals(Set.copyOf(expected))) {
+                throw new IllegalArgumentException("Archive proficiency provenance differs from rules");
+            }
+        }
+        return state;
+    }
+
+    public record ProficiencyGrant(String characterKey, CharacterProficiencyGrant grant) {
     }
 
     /** Root events needed by current state, not an unbounded event history. */

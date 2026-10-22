@@ -166,7 +166,30 @@ public final class HostCharacterCardServlet extends HttpServlet {
         appendTiers(json, card.tiers());
         appendTemplates(json, card.itemTemplates());
         appendItems(json, card.items());
+        appendProficiencyGrants(json, card.proficiencyGrants());
         return json.append("}}").toString();
+    }
+
+    private static void appendProficiencyGrants(
+            StringBuilder json, List<CharacterCardService.ProficiencyGrantView> values) {
+        json.append(",\"proficiencyGrants\":[");
+        for (int index = 0; index < values.size(); index++) {
+            if (index > 0) json.append(',');
+            var value = values.get(index);
+            var grant = value.grant();
+            json.append("{\"category\":").append(JsonSupport.quote(grant.category().name()))
+                    .append(",\"displayName\":").append(JsonSupport.quote(value.displayName()))
+                    .append(",\"sourceDisplayName\":").append(JsonSupport.quote(value.sourceDisplayName()))
+                    .append(",\"sourceModuleKey\":").append(JsonSupport.quote(grant.sourceModuleKey()))
+                    .append(",\"sourceType\":").append(JsonSupport.quote(grant.sourceType()))
+                    .append(",\"sourceKey\":").append(JsonSupport.quote(grant.sourceKey()))
+                    .append(",\"grantSlotKey\":").append(JsonSupport.quote(grant.grantSlotKey()))
+                    .append(",\"grantKind\":").append(JsonSupport.quote(grant.grantKind().name()))
+                    .append(",\"targetModuleKey\":").append(JsonSupport.quote(grant.targetModuleKey()))
+                    .append(",\"proficiencyKey\":").append(JsonSupport.quote(grant.proficiencyKey()))
+                    .append(",\"suppressed\":").append(grant.suppressed()).append('}');
+        }
+        json.append(']');
     }
 
     private static void appendFields(

@@ -3,6 +3,11 @@ package com.dndtool.persistence;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import com.dndtool.module.CharacterProficiencyGrant;
+import com.dndtool.module.CharacterProficiencyGrant.Category;
+import com.dndtool.module.CharacterProficiencyGrant.GrantKind;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -36,7 +41,15 @@ class JdbcLevelOneCharacterCreationRepositoryTest {
                             "ability.constitution", 16, "ability.intelligence", 10,
                             "ability.wisdom", 14, "ability.charisma", 8),
                     List.of(new LevelOneCharacterCreationRepository.Selection(
-                            "SKILL", "skill.athletics")), 13, 10,
+                            "SKILL", "skill.athletics"),
+                            new LevelOneCharacterCreationRepository.Selection("LANGUAGE", "language.common"),
+                            new LevelOneCharacterCreationRepository.Selection("TOOL", "tool.smith_tools")),
+                    List.of(new CharacterProficiencyGrant(Category.LANGUAGE, "dnd5e2014_srd51_se",
+                                    "character.race", "race.dwarf", "creation.language.fixed", GrantKind.FIXED,
+                                    "dnd5e2014_srd51_se", "language.common", false),
+                            new CharacterProficiencyGrant(Category.TOOL, "dnd5e2014_srd51_se",
+                                    "character.race", "race.dwarf", "creation.tool.choice", GrantKind.CHOICE,
+                                    "dnd5e2014_srd51_se", "tool.smith_tools", false)), 13, 10,
                     List.of(
                             new LevelOneCharacterCreationRepository.InitialResource(
                                     "resource.hit_dice.d10", 1, 1, false),
@@ -51,7 +64,7 @@ class JdbcLevelOneCharacterCreationRepositoryTest {
         new JdbcLevelOneCharacterCreationRepository(fixture.dataSource()).confirm(COMMAND);
 
         for (String target : List.of("character_record", "character_creation_snapshot_v2",
-                "character_creation_selection_v2", "character_class_level_v2",
+                "character_creation_selection_v2", "character_proficiency_grant_v2", "character_class_level_v2",
                 "character_resource_state_v2",
                 "campaign", "game_event", "field_change", "host_operation")) {
             assertTrue(fixture.targets.contains(target), target);
@@ -60,6 +73,12 @@ class JdbcLevelOneCharacterCreationRepositoryTest {
         assertFalse(fixture.rolledBack);
         assertTrue(fixture.serializable);
         assertTrue(fixture.closed);
+        assertEquals(List.of(
+                List.of(101L, 9L, "LANGUAGE", "dnd5e2014_srd51_se", "character.race", "race.dwarf",
+                        "creation.language.fixed", "FIXED", "dnd5e2014_srd51_se", "character.language", "language.common", false),
+                List.of(101L, 9L, "TOOL", "dnd5e2014_srd51_se", "character.race", "race.dwarf",
+                        "creation.tool.choice", "CHOICE", "dnd5e2014_srd51_se", "character.tool", "tool.smith_tools", false)),
+                fixture.grantRows);
     }
 
     @Test
@@ -116,6 +135,49 @@ class JdbcLevelOneCharacterCreationRepositoryTest {
         assertFalse(fixture.committed);
     }
 
+    @Test
+    void grantWriteFailureRollsBackRootSelectionsAndAllFollowingBusinessWrites() {
+        Fixture fixture = new Fixture();
+        fixture.failTarget = "character_proficiency_grant_v2";
+        assertThrows(SQLException.class, () ->
+                new JdbcLevelOneCharacterCreationRepository(fixture.dataSource()).confirm(COMMAND));
+        assertTrue(fixture.targets.contains("character_record"));
+        assertTrue(fixture.targets.contains("character_creation_selection_v2"));
+        assertFalse(fixture.targets.contains("character_class_level_v2"));
+        assertFalse(fixture.targets.contains("game_event"));
+        assertFalse(fixture.targets.contains("host_operation"));
+        assertTrue(fixture.rolledBack);
+        assertFalse(fixture.committed);
+    }
+
+    @Test
+    void rejectsMissingAndForeignSourceFactsBeforeBorrowingAConnection() {
+        List<CharacterProficiencyGrant> foreignSource = List.of(
+                new CharacterProficiencyGrant(Category.LANGUAGE, "dnd5e2014_srd51_se",
+                        "character.race", "race.human", "creation.language.fixed", GrantKind.FIXED,
+                        "dnd5e2014_srd51_se", "language.common", false),
+                COMMAND.proficiencyGrants().get(1));
+        for (List<CharacterProficiencyGrant> grants : List.of(List.<CharacterProficiencyGrant>of(), foreignSource)) {
+            Fixture fixture = new Fixture();
+            assertThrows(IllegalArgumentException.class, () ->
+                    new JdbcLevelOneCharacterCreationRepository(fixture.dataSource())
+                            .confirm(copyWithGrants(grants)));
+            assertEquals(0, fixture.borrowedConnections);
+            assertTrue(fixture.targets.isEmpty());
+        }
+    }
+
+    private static LevelOneCharacterCreationRepository.Command copyWithGrants(
+            List<CharacterProficiencyGrant> grants) {
+        return new LevelOneCharacterCreationRepository.Command(COMMAND.requestId(),
+                COMMAND.requestDigestSha256(), COMMAND.characterKey(), COMMAND.campaignKey(),
+                COMMAND.characterName(), COMMAND.moduleKey(), COMMAND.releaseVersion(),
+                COMMAND.contentSha256(), COMMAND.expectedEventTail(), COMMAND.previewDigestSha256(),
+                COMMAND.raceKey(), COMMAND.subraceKey(), COMMAND.backgroundKey(), COMMAND.classKey(),
+                COMMAND.baseAbilityScores(), COMMAND.finalAbilityScores(), COMMAND.selections(), grants,
+                COMMAND.maximumHitPoints(), COMMAND.hitDieSides(), COMMAND.initialResources(), null);
+    }
+
     private static LevelOneCharacterCreationRepository.Command copyWithTransition(
             ClassFeatureRules.Transition transition) {
         return new LevelOneCharacterCreationRepository.Command(COMMAND.requestId(),
@@ -124,12 +186,13 @@ class JdbcLevelOneCharacterCreationRepositoryTest {
                 COMMAND.contentSha256(), COMMAND.expectedEventTail(),
                 COMMAND.previewDigestSha256(), COMMAND.raceKey(), COMMAND.subraceKey(),
                 COMMAND.backgroundKey(), "class.cleric", COMMAND.baseAbilityScores(),
-                COMMAND.finalAbilityScores(), COMMAND.selections(), COMMAND.maximumHitPoints(),
+                COMMAND.finalAbilityScores(), COMMAND.selections(), COMMAND.proficiencyGrants(), COMMAND.maximumHitPoints(),
                 COMMAND.hitDieSides(), COMMAND.initialResources(), transition);
     }
 
     private static final class Fixture {
         private final List<String> targets = new ArrayList<>();
+        private final List<List<Object>> grantRows = new ArrayList<>();
         private boolean autoCommit = true;
         private boolean readOnly;
         private int isolation = Connection.TRANSACTION_READ_COMMITTED;
@@ -138,12 +201,17 @@ class JdbcLevelOneCharacterCreationRepositoryTest {
         private boolean rolledBack;
         private boolean closed;
         private String failTarget;
+        private int borrowedConnections;
 
         DataSource dataSource() {
             Connection connection = proxy(Connection.class, this::connection);
-            return proxy(DataSource.class, (ignored, method, arguments) ->
-                    "getConnection".equals(method.getName()) ? connection
-                            : defaultValue(method.getReturnType()));
+            return proxy(DataSource.class, (ignored, method, arguments) -> {
+                if ("getConnection".equals(method.getName())) {
+                    borrowedConnections++;
+                    return connection;
+                }
+                return defaultValue(method.getReturnType());
+            });
         }
 
         private Object connection(Object ignored, Method method, Object[] arguments) {
@@ -167,13 +235,21 @@ class JdbcLevelOneCharacterCreationRepositoryTest {
         }
 
         private PreparedStatement statement(String sql, Object[] prepareArguments) {
+            Map<Integer, Object> parameters = new java.util.TreeMap<>();
             boolean generated = prepareArguments != null && prepareArguments.length > 1
                     && Integer.valueOf(Statement.RETURN_GENERATED_KEYS).equals(prepareArguments[1]);
             return proxy(PreparedStatement.class, (ignored, method, arguments) -> switch (method.getName()) {
-                case "setString", "setLong", "setInt", "setBoolean", "setNull",
-                        "setQueryTimeout" -> null;
+                case "setString", "setLong", "setInt", "setBoolean" -> {
+                    parameters.put((Integer) arguments[0], arguments[1]); yield null;
+                }
+                case "setNull", "setQueryTimeout" -> null;
                 case "executeQuery" -> resultSet(rows(sql));
-                case "executeUpdate" -> update(sql);
+                case "executeUpdate" -> {
+                    int count = update(sql);
+                    if (sql.contains("INSERT INTO character_proficiency_grant_v2"))
+                        grantRows.add(List.copyOf(parameters.values()));
+                    yield count;
+                }
                 case "addBatch" -> null;
                 case "executeBatch" -> new int[] {update(sql)};
                 case "getGeneratedKeys" -> generated ? resultSet(List.of(Map.of("1",

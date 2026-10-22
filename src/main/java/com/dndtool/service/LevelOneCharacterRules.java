@@ -2,6 +2,9 @@ package com.dndtool.service;
 
 import com.dndtool.module.LevelOneRuleProfile;
 import com.dndtool.module.ModuleCatalog;
+import com.dndtool.module.CharacterProficiencyGrant;
+import com.dndtool.module.CharacterProficiencyGrant.Category;
+import com.dndtool.module.CharacterProficiencyGrant.GrantKind;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -80,6 +83,9 @@ public final class LevelOneCharacterRules {
                 request.languageChoices(), profiles, SelectionType.LANGUAGE);
         List<String> tools = validateSelections(
                 request.toolChoices(), profiles, SelectionType.TOOL);
+        List<CharacterProficiencyGrant> proficiencyGrants = reconstructProficiencyGrants(
+                catalog, request.raceKey(), request.subraceKey(), request.backgroundKey(),
+                request.classKey(), languages, tools);
         List<String> starts = validateSelections(
                 request.startingOptionChoices(), profiles, SelectionType.STARTING_OPTION);
         List<String> saves = canonicalFixed(profiles, SelectionType.SAVE);
@@ -105,7 +111,7 @@ public final class LevelOneCharacterRules {
                 tools, starts, expectedEventTail, contentSha256);
         return new Prepared(name, request.raceKey(), request.subraceKey(),
                 request.backgroundKey(), request.classKey(), baseScores, finalScores,
-                abilityChoices, skills, saves, languages, tools, starts,
+                abilityChoices, skills, saves, languages, tools, proficiencyGrants, starts,
                 maximumHitPoints, initial.hitDieSides(), initial.resources().stream()
                         .map(value -> new InitialResource(value.resourceKey(), value.currentValue(),
                                 value.maximumValue(), value.unlimited()))
@@ -195,6 +201,90 @@ public final class LevelOneCharacterRules {
         });
     }
 
+    /** Rebuilds provenance from the frozen creation parents and their complete stored selections. */
+    public static List<CharacterProficiencyGrant> reconstructProficiencyGrants(
+            ModuleCatalog catalog, String raceKey, String subraceKey, String backgroundKey,
+            String classKey, List<String> languages, List<String> tools) {
+        if (catalog == null || catalog.release() == null) throw invalid("MALFORMED_FROZEN_CATALOG");
+        Map<String, ModuleCatalog.CatalogDefinition> definitions = definitions(catalog);
+        requireDefinition(definitions, "character.race", raceKey);
+        requireDefinition(definitions, "character.background", backgroundKey);
+        requireDefinition(definitions, "character.class", classKey);
+        List<GrantSource> sources = new ArrayList<>();
+        LevelOneRuleProfile race = profile(catalog, "character.race", raceKey);
+        sources.add(new GrantSource("character.race", raceKey, race));
+        if (race.subraceRequired()) {
+            requireDefinition(definitions, "character.subrace", subraceKey);
+            requireSubraceParent(catalog, subraceKey, raceKey);
+            sources.add(new GrantSource("character.subrace", subraceKey,
+                    profile(catalog, "character.subrace", subraceKey)));
+        } else if (subraceKey != null) throw invalid("INVALID_SUBRACE");
+        sources.add(new GrantSource("character.background", backgroundKey,
+                profile(catalog, "character.background", backgroundKey)));
+        sources.add(new GrantSource("character.class", classKey,
+                profile(catalog, "character.class", classKey)));
+        for (GrantSource source : sources) {
+            validateProficiencyReferences(definitions, source.profile(), SelectionType.LANGUAGE);
+            validateProficiencyReferences(definitions, source.profile(), SelectionType.TOOL);
+        }
+        List<CharacterProficiencyGrant> result = new ArrayList<>();
+        collectGrants(catalog.release().moduleKey(), sources, SelectionType.LANGUAGE, languages, result);
+        collectGrants(catalog.release().moduleKey(), sources, SelectionType.TOOL, tools, result);
+        return result.stream().sorted(CharacterProficiencyGrant.ORDER).toList();
+    }
+
+    private static void collectGrants(String moduleKey, List<GrantSource> sources,
+            SelectionType type, List<String> complete,
+            List<CharacterProficiencyGrant> result) {
+        List<LevelOneRuleProfile> profiles = sources.stream().map(GrantSource::profile).toList();
+        List<String> canonical = canonicalSelection(complete, type.prefix);
+        List<String> fixed = canonicalFixed(profiles, type);
+        if (!canonical.containsAll(fixed)) throw invalid("INVALID_SELECTION_COUNT");
+        List<String> selected = canonical.stream().filter(value -> !fixed.contains(value)).toList();
+        if (!validateSelections(selected, profiles, type).equals(canonical)) {
+            throw invalid("INVALID_SELECTION_COUNT");
+        }
+        List<LevelOneRuleProfile.Choice> choices = new ArrayList<>();
+        List<GrantSource> choiceSources = new ArrayList<>();
+        Category category = type == SelectionType.LANGUAGE ? Category.LANGUAGE : Category.TOOL;
+        String slot = type == SelectionType.LANGUAGE ? "creation.language." : "creation.tool.";
+        for (GrantSource source : sources) {
+            for (String local : fixed(source.profile(), type)) {
+                result.add(new CharacterProficiencyGrant(category, moduleKey, source.type(),
+                        source.key(), slot + "fixed", GrantKind.FIXED, moduleKey,
+                        qualify(type.prefix, local), false));
+            }
+            LevelOneRuleProfile.Choice choice = choice(source.profile(), type);
+            if (choice != null) { choices.add(choice); choiceSources.add(source); }
+        }
+        int[] assignments = new int[selected.size()];
+        if (!assignable(selected, choices, type.prefix, 0, new int[choices.size()], assignments)) {
+            throw invalid("INVALID_SELECTION_COUNT");
+        }
+        for (int index = 0; index < selected.size(); index++) {
+            GrantSource source = choiceSources.get(assignments[index]);
+            result.add(new CharacterProficiencyGrant(category, moduleKey, source.type(),
+                    source.key(), slot + "choice", GrantKind.CHOICE, moduleKey,
+                    selected.get(index), false));
+        }
+    }
+
+    private record GrantSource(String type, String key, LevelOneRuleProfile profile) { }
+
+    private static void validateProficiencyReferences(
+            Map<String, ModuleCatalog.CatalogDefinition> definitions,
+            LevelOneRuleProfile profile, SelectionType type) {
+        Set<String> references = new HashSet<>(fixed(profile, type));
+        LevelOneRuleProfile.Choice choice = choice(profile, type);
+        if (choice != null) references.addAll(choice.candidates());
+        String catalogType = type == SelectionType.LANGUAGE ? "character.language" : "character.tool";
+        for (String local : references) {
+            if (!definitions.containsKey(catalogType + '\0' + qualify(type.prefix, local))) {
+                throw invalid("MALFORMED_FROZEN_CATALOG");
+            }
+        }
+    }
+
     private static List<String> validateSelections(List<String> requested,
             List<LevelOneRuleProfile> profiles, SelectionType type) {
         List<String> fixed = canonicalFixed(profiles, type);
@@ -205,6 +295,7 @@ public final class LevelOneCharacterRules {
         int expected = choices.stream().mapToInt(LevelOneRuleProfile.Choice::count).sum();
         String prefix = type.prefix;
         List<String> selected = canonicalSelection(requested, prefix);
+        if (selected.stream().anyMatch(fixed::contains)) throw invalid("DUPLICATE_SELECTION");
         if (selected.size() != expected) throw invalid("INVALID_SELECTION_COUNT");
         Set<String> candidates = new HashSet<>();
         choices.forEach(value -> value.candidates().forEach(
@@ -214,7 +305,7 @@ public final class LevelOneCharacterRules {
             throw invalid("INVALID_SELECTION_COUNT");
         }
         LinkedHashSet<String> combined = new LinkedHashSet<>(fixed);
-        if (!combined.addAll(selected)) throw invalid("DUPLICATE_SELECTION");
+        combined.addAll(selected);
         return combined.stream().sorted().toList();
     }
 
@@ -223,7 +314,10 @@ public final class LevelOneCharacterRules {
         LinkedHashSet<String> values = new LinkedHashSet<>();
         for (LevelOneRuleProfile profile : profiles) {
             for (String local : fixed(profile, type)) {
-                if (!values.add(qualify(type.prefix, local))) throw invalid("DUPLICATE_SELECTION");
+                if (!values.add(qualify(type.prefix, local))
+                        && type != SelectionType.LANGUAGE && type != SelectionType.TOOL) {
+                    throw invalid("DUPLICATE_SELECTION");
+                }
             }
         }
         return values.stream().sorted().toList();
@@ -232,6 +326,13 @@ public final class LevelOneCharacterRules {
     private static boolean assignable(List<String> selected,
             List<LevelOneRuleProfile.Choice> choices, String prefix,
             int selectedIndex, int[] assigned) {
+        return assignable(selected, choices, prefix, selectedIndex, assigned,
+                new int[selected.size()]);
+    }
+
+    private static boolean assignable(List<String> selected,
+            List<LevelOneRuleProfile.Choice> choices, String prefix,
+            int selectedIndex, int[] assigned, int[] assignments) {
         if (selectedIndex == selected.size()) {
             for (int index = 0; index < choices.size(); index++) {
                 if (assigned[index] != choices.get(index).count()) return false;
@@ -246,7 +347,8 @@ public final class LevelOneCharacterRules {
                     .map(key -> qualify(prefix, key)).anyMatch(value::equals);
             if (!candidate) continue;
             assigned[index]++;
-            if (assignable(selected, choices, prefix, selectedIndex + 1, assigned)) return true;
+            assignments[selectedIndex] = index;
+            if (assignable(selected, choices, prefix, selectedIndex + 1, assigned, assignments)) return true;
             assigned[index]--;
         }
         return false;
@@ -384,6 +486,7 @@ public final class LevelOneCharacterRules {
             List<String> saves,
             List<String> languages,
             List<String> tools,
+            List<CharacterProficiencyGrant> proficiencyGrants,
             List<String> startingOptions,
             int maximumHitPoints,
             int hitDieSides,
@@ -399,6 +502,7 @@ public final class LevelOneCharacterRules {
             saves = List.copyOf(saves);
             languages = List.copyOf(languages);
             tools = List.copyOf(tools);
+            proficiencyGrants = List.copyOf(proficiencyGrants);
             startingOptions = List.copyOf(startingOptions);
             initialResources = List.copyOf(initialResources);
         }

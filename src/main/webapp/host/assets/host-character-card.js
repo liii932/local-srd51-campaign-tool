@@ -14,6 +14,7 @@
     const classesNode = document.getElementById("character-card-classes");
     const skillsNode = document.getElementById("character-card-skills");
     const savesNode = document.getElementById("character-card-saves");
+    const grantsNode = document.getElementById("character-card-proficiency-grants");
     const itemsNode = document.getElementById("character-card-items");
     const moduleItemForm = document.getElementById("add-module-item-form");
     const temporaryItemForm = document.getElementById("add-temporary-item-form");
@@ -163,6 +164,20 @@
         return row;
     }
 
+    function renderProficiencyGrants() {
+        clear(grantsNode);
+        if (!card.proficiencyGrants.length) {
+            grantsNode.append(element("p", "没有语言或工具授予记录。"));
+            return;
+        }
+        for (const grant of card.proficiencyGrants) {
+            const category = grant.category === "LANGUAGE" ? "语言" : "工具";
+            const kind = grant.grantKind === "FIXED" ? "固定授予" : "选择授予";
+            const status = grant.suppressed ? "已压制" : "生效";
+            grantsNode.append(element("p", `${category}：${grant.displayName} · ${kind} · ${status} · 来源 ${grant.sourceDisplayName}`));
+        }
+    }
+
     function renderFields() {
         clear(fieldsNode);
         for (const field of card.fields) {
@@ -254,6 +269,7 @@
         summary.textContent = `状态 ${card.characterStatus}；版本 ${card.rowVersion}；`
             + `总等级 ${card.totalLevel}；熟练加值 ${signed(card.proficiencyBonus)}`;
         renderFields();
+        renderProficiencyGrants();
         renderClasses();
         renderProficiencies(
             skillsNode, card.skills, "SET_SKILL_PROFICIENCY");

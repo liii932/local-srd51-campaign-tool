@@ -85,7 +85,7 @@ final class JdbcCampaignArchiveImportRepositoryTest {
         assertEquals(7L, campaignId);
         List<Executed> deletes = fixture.executed.stream()
                 .filter(write -> write.sql().startsWith("DELETE ")).toList();
-        assertEquals(34, deletes.size());
+        assertEquals(35, deletes.size());
         assertTrue(deletes.stream().allMatch(write -> Long.valueOf(7L).equals(write.bound().get(1))));
         for (String table : List.of(
                 "host_operation", "character_feature_adjudication_v2",
@@ -95,7 +95,7 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 "character_ability_score_change_v2", "character_advancement_choice_v2",
                 "character_level_resource_change_v2", "character_level_advancement_v2",
                 "character_class_level_v2", "character_resource_state_v2",
-                "character_creation_selection_v2", "character_creation_snapshot_v2",
+                "character_proficiency_grant_v2", "character_creation_selection_v2", "character_creation_snapshot_v2",
                 "check_effect_parameter_value", "check_effect", "dice_roll",
                 "field_change", "check_execution", "entity_position", "battle_participant",
                 "battle_state", "party_world_position", "map_instance", "item_instance",
@@ -110,6 +110,17 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                         1, "测试战役", 2, "ACTIVE", 3, HOST_STATE_EPOCH,
                         4, 9L, 5, 7L, 6, CAMPAIGN),
                 update.bound());
+        int grantDelete = java.util.stream.IntStream.range(0, deletes.size())
+                .filter(index -> deletes.get(index).sql().contains("character_proficiency_grant_v2"))
+                .findFirst().orElseThrow();
+        int snapshotDelete = java.util.stream.IntStream.range(0, deletes.size())
+                .filter(index -> deletes.get(index).sql().contains("character_creation_snapshot_v2"))
+                .findFirst().orElseThrow();
+        int characterDelete = java.util.stream.IntStream.range(0, deletes.size())
+                .filter(index -> deletes.get(index).sql().startsWith("DELETE FROM character_record"))
+                .findFirst().orElseThrow();
+        assertTrue(grantDelete < snapshotDelete);
+        assertTrue(snapshotDelete < characterDelete);
         assertTrue(update.sql().contains("host_state_epoch = ?"));
         assertTrue(update.sql().contains("row_version = 0"));
         assertTrue(fixture.executed.indexOf(update) > fixture.executed.indexOf(deletes.getLast()));
