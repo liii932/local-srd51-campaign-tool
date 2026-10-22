@@ -32,8 +32,15 @@ RUNTIME = "dnd_tool_se"
 LABEL = "com.dndtool.language-jdbc-acceptance"
 SOURCE_TABLES = sorted(("rule_schema_meta", "rule_release", "rule_language", "rule_tool",
                        "rule_package_installation", "rule_package_installation_partition",
-                       "rule_installation_control"))
-RUNTIME_TABLES = sorted(("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language", "runtime_rule_tool"))
+                       "rule_installation_control", "rule_schema2_artifact", "rule_schema2_acceptance",
+                       "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change"))
+SCHEMA2_RUNTIME_TABLES = sorted(("s2_runtime_identity", "s2_runtime_snapshot", "s2_runtime_member",
+                                "s2_runtime_language", "s2_runtime_language_set", "s2_runtime_language_entry",
+                                "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation",
+                                "s2_runtime_control", "s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry",
+                                "s2_runtime_character_source", "s2_runtime_proficiency_grant"))
+RUNTIME_TABLES = sorted(("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language", "runtime_rule_tool",
+                         *SCHEMA2_RUNTIME_TABLES))
 ACCOUNTS = {
     "root": "localhost",
     "dnd_tool_se_migration_replay": "localhost",
@@ -78,14 +85,14 @@ def manifests():
         digest = re.search(rf'{prefix}_APPROVED_SHA256 =\s*"([0-9a-f]{{64}})";', java)
         require(name and digest and name[1].startswith(prefix + "__"), "Invalid migration constant")
         result.append((RUNTIME, number, name[1], digest[1], ROOT / "src/main/resources/db/migration" / name[1]))
-    require(len(result) == 20, "This acceptance profile requires review when the runtime chain changes")
+    require(len(result) == 24, "This acceptance profile requires review when the runtime chain changes")
     java = (ROOT / "src/main/java/com/dndtool/persistence/RuleSchemaMigrations.java").read_text("utf-8")
     block = re.search(r"APPROVED = List[.]of\((.*?)\);", java, re.S)
     require(block is not None, "Rules manifest not recognized")
     pattern = r'new Expectation\(\s*SCHEMA_ROLE, ([0-9]+), "([a-zA-Z0-9_.-]+[.]sql)",\s*"([0-9a-f]{64})"\)'
     rules = re.findall(pattern, block[1])
     require(re.sub(pattern, "", block[1]).replace(",", "").strip() == "", "Unexpected rules manifest entry")
-    require(len(rules) == 2, "This acceptance profile requires review when the RULES chain changes")
+    require(len(rules) == 4, "This acceptance profile requires review when the RULES chain changes")
     for expected, (version, name, digest) in enumerate(rules, 1):
         require(int(version) == expected and name.startswith(f"V{expected:03d}__"), "Unordered rules manifest")
         result.append((SOURCE, expected, name, digest, ROOT / "database/rules/migration" / name))
@@ -418,8 +425,23 @@ class Acceptance:
             "SELECT (SELECT COUNT(*) FROM rule_release),(SELECT COUNT(*) FROM rule_language),(SELECT COUNT(*) FROM rule_tool),"
             "(SELECT COUNT(*) FROM rule_package_installation),(SELECT COUNT(*) FROM rule_package_installation_partition);", user="dnd_tool_rules_app", schema=SOURCE)
         require(captures["fresh-history"] == "1\t1\t1\t0\n0\t0\t0\t0\t0\n", "Source is not freshly migrated")
+        captures["schema2-fresh-history"] = self.mysql(
+            "SELECT control_id,protocol_version,metadata_row_count,installation_count,acceptance_count,raw_zip_byte_count,row_version FROM rule_schema2_control;"
+            "SELECT (SELECT COUNT(*) FROM rule_schema2_artifact),(SELECT COUNT(*) FROM rule_schema2_acceptance),"
+            "(SELECT COUNT(*) FROM rule_schema2_character_source),(SELECT COUNT(*) FROM rule_schema2_proficiency_grant),(SELECT COUNT(*) FROM rule_schema2_character_change);",
+            user="dnd_tool_rules_app", schema=SOURCE)
+        require(captures["schema2-fresh-history"] == "1\t1\t1\t0\t0\t0\t0\n0\t0\t0\t0\t0\n",
+                "Schema 2 source is not freshly migrated")
         require(self.mysql("SELECT (SELECT COUNT(*) FROM runtime_run_identity),(SELECT COUNT(*) FROM runtime_rule_snapshot),"
                            "(SELECT COUNT(*) FROM runtime_rule_language),(SELECT COUNT(*) FROM runtime_rule_tool);", user="dnd_tool_se_validation_ro", schema=RUNTIME) == "0\t0\t0\t0\n", "Runtime not empty")
+        # V021/V023/V024 are installed and audited, but this language/tool profile never writes schema 2 material.
+        schema2_content_tables = [table for table in SCHEMA2_RUNTIME_TABLES if table != "s2_runtime_control"]
+        captures["schema2-runtime-history"] = self.mysql(
+            "SELECT " + ",".join(f"(SELECT COUNT(*) FROM {table})" for table in schema2_content_tables) + ";"
+            "SELECT control_id,protocol_version,row_version,snapshot_count FROM s2_runtime_control;",
+            user="dnd_tool_se_validation_ro", schema=RUNTIME)
+        require(captures["schema2-runtime-history"] == "\t".join("0" for _ in schema2_content_tables) + "\n1\t1\t0\t0\n",
+                "Schema 2 runtime is not freshly migrated")
         captures["runtime-counts"] = self.mysql("SELECT table_name, table_type, engine FROM information_schema.tables WHERE table_schema='dnd_tool_se' ORDER BY table_name;", user="dnd_tool_se_validation_ro")
         self.legacy_sql = "SELECT module_key,release_version,canonical_format_version,hash_algorithm,content_sha256,release_status FROM module_release ORDER BY module_key,release_version;"
         captures["legacy-releases"] = self.mysql(self.legacy_sql, user="dnd_tool_se_validation_ro", schema=RUNTIME)
@@ -438,7 +460,8 @@ class Acceptance:
                       "Approved raw migrations, complete definitions/constraints/definers and effective grants reviewed before installation.\n",
             "history": f"New disposable container {self.container}; image {self.image}; server UUID {self.server_uuid}.\n"
                        "Data directory is fresh tmpfs, no restore or previous executor. Approved raw chains replayed once.\n"
-                       "Initial control (1,1,1,0), no roots/languages/installations/partitions; history lower bound 0.\n",
+                       "Initial control (1,1,1,0), no roots/languages/installations/partitions; history lower bound 0.\n"
+                       "Schema 2 source and runtime controls retain their migration seed and all material/history tables are empty.\n",
             "isolation": f"Owned container label {LABEL}={self.token}; only loopback port {self.port}; no persistent volumes.\n"
                          "Dedicated random credentials, no inherited roles. Migration/admin sessions ended before installer.\n"
                          "One ordered acceptance executor uses one owner-only state directory for the entire ticket history.\n"
@@ -476,7 +499,9 @@ def main():
     parser.add_argument("--execute-disposable", action="store_true", help="execute authorized disposable migrations and JDBC acceptance")
     args = parser.parse_args()
     migrations = manifests()
-    print("Approved payloads verified: runtime V001-V020 and RULES V001-V002. SQL files remain unchanged.", flush=True)
+    runtime_version = max(version for schema, version, *_ in migrations if schema == RUNTIME)
+    source_version = max(version for schema, version, *_ in migrations if schema == SOURCE)
+    print(f"Approved payloads verified: runtime V001-V{runtime_version:03d} and RULES V001-V{source_version:03d}. SQL files remain unchanged.", flush=True)
     if not args.execute_disposable:
         return
     require(os.name == "posix" and Path("/var/run/docker.sock").is_socket(), "Requires native Linux/WSL and the local Docker socket")

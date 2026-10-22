@@ -2,11 +2,14 @@
 
 规则源链位于 `database/rules/migration/`，角色为 `RULES`，显式默认库为 `dnd_tool_rules`。
 它与运行链 `src/main/resources/db/migration/`、`dnd_tool_se.schema_meta` 分开编号和批准。
-规则链由 `V001__rule-source-schema.sql` 与 `V002__tool-catalog.sql` 组成；已应用文件不可改写，后续变更追加本链下一个
+规则链由 `V001__rule-source-schema.sql`、`V002__tool-catalog.sql`、
+`V003__schema2-source-ledger.sql` 与 `V004__schema2-character-grant-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个
 连续编号。运行 V001—V018、RELEASED v1、旧默认发布及现有 JNDI 合同保持不变。
 
-本合同提供离线 schema 源、批准元数据、窄权限模板和独立只读账本核验器。它不接入 Web、
-JNDI、health、规则安装或加载入口，不表示已创建数据库或已通过真实 MySQL 验收。
+本合同提供离线 schema 源、批准元数据、窄权限模板和独立只读账本核验器。
+离线安装分别使用[角色目录流程](rules/offline-language-installation.md)与
+[schema 2 制品/验收账本](rules/schema-2-source-ledger.md)；不接入 Web、JNDI 或 health，
+不表示已创建数据库或已通过真实 MySQL 验收。
 完整规则族保持 DRAFT，语言片段不能批准完整内容、激活 archive format 2 或改变新战役默认。
 
 ## 两条独立批准链
@@ -31,7 +34,9 @@ JNDI、health、规则安装或加载入口，不表示已创建数据库或已�
 
 ## 表与列
 
-七表均为 InnoDB（包含独立账本）。源本地 ID、安装代次与计数使用有符号 BIGINT；只有发布根 `id` 自增。
+原有七表均为 InnoDB（包含独立账本）；V003 增加三个账本表，V004 增加三个初始熟练作者材料表，定义见
+[schema 2 账本](rules/schema-2-source-ledger.md)。下表和角色目录计数属于原有 schema 1 域。
+源本地 ID、安装代次与计数使用有符号 BIGINT；只有发布根 `id` 自增。
 FK 只指向源内同一发布，全部 UPDATE/DELETE RESTRICT，不级联，不引用运行 schema。
 技术键、版本、枚举和摘要使用 VARBINARY，保留全部字节的大小写与尾字符区别。
 SQL 将二进制输入无损映射到 latin1 字符进行大小写敏感的 ASCII 白名单检查；不用 binary
@@ -82,21 +87,26 @@ PARTITION 事实的 observed 摘要恒 NULL，COMPLETE 恒非 NULL。当前事�
 这些防线也阻断受保护根/事实的 REPLACE 删除再插入路径；不使用客户端可伪造的 session 标志。
 控制行身份/协议不可改，不能删除；UTC 时间由触发器生成，不能靠客户端指定时间制造事实。
 
-唯一空源种子为 S `(control_id, protocol_version, metadata_row_count, row_version)=(1,1,1,0)`。
+原有域唯一空源种子为 S `(control_id, protocol_version, metadata_row_count, row_version)=(1,1,1,0)`。
 不种规则头、语言、工具或安装事实。16384 是工程验证基线，未完成容量验收不能称为发布容量。
-受控安装须先锁 S，再锁已有根；新根也必须在 S 下建立。u 等于 S、根、事实、分区的全源
+受控安装须先锁 S，再锁已有根；新根也必须在 S 下建立。u 等于 S、根、事实、分区的原有域
 行数之和；v 等于成功安装事实数。新安装按新增根 b 与分区数 p 收费 `u+b+1+p`、`v+1`；
 重放/查证/发布不收费。安装器必须把领域行、头代次/摘要、事实、分区与计数同事务提交。
-这组 schema 不自动维护计数，不实现安装服务、提交不明查证、配额闭包或发布入口。
+这些计数由受控安装事务维护。schema 2 与原有安装共享 S，但另有独立计数，不修改此处的
+原有计数语义。离线服务和提交查证合同见前述流程；本 schema 不提供发布入口。
 
 ## 账号与验收
 
-管理员分别审核 `database/grants/rule-source-{app,agent,installer,migrator}.sql`；文件不创建
-账号或设置密码。app/agent 只对七个准确源表 SELECT，没有 schema 通配或写权限；普通只读
+管理员分别审核 `database/grants/rule-source-{app,agent,installer,accepter,migrator}.sql`；文件不创建
+账号或设置密码。app/agent 只对十三个准确源表 SELECT，没有 schema 通配或写权限；普通只读
 核验不能借此声明取得源提交查证屏障。installer 只获明确列级根 INSERT/UPDATE、语言/工具内容
 写权、事实/分区 INSERT、S 两计数列 UPDATE，不能写账本、状态/发布时间、根身份、永久事实
 或 S 身份。独立 migrator 仅源 schema 所需 CREATE/CREATE TEMPORARY TABLES/ALTER/INDEX/REFERENCES/TRIGGER/DML，
-没有全局权限、账号管理或 GRANT OPTION；不把其能力传给 Web/installer。
+没有全局权限、账号管理或 GRANT OPTION；不把其能力传给 Web/installer/accepter。
+schema 2 安装与独立验收使用不同写权限；accepter 不能插入制品，installer 不能插入验收。
+两者在 S 上的锁读能力及新增精确列级权限见 schema 2 账本合同。V004 作者来源、授予槽及
+完整操作的 INSERT 只授予 installer；accepter/app/agent 只读。来源/槽/操作与准确原包
+同事务写入并逐列读回校验，不通过独立权限补写旧事实。
 
 库级 GRANT 中的下划线在 `partial_revokes=OFF` 时是通配符，反引号本身不能消除该语义。
 migrator 模板使用 `dnd\_tool\_rules`；管理员先读取 `@@GLOBAL.partial_revokes`，若为 ON，
@@ -113,12 +123,17 @@ migrator 模板使用 `dnd\_tool\_rules`；管理员先读取 `@@GLOBAL.partial_
 另行账号授权验收。迁移前必须确认默认库精确为 `dnd_tool_rules`、无既有对象且前序历史一致，
 不能以默认库未知或可改名目标试跑。DDL 可能隐式提交，中途失败立即维护阻断，不 IF NOT EXISTS
 跳过、不盲重跑、不补造账本。V001 自检初始六表/十八触发器及空源种子；V002 验证准确前序
-账本，再增加工具表、三个触发器和分区键约束。账本不能替代完整定义核验或使多条 DDL 获得整体回滚。
+账本，再增加工具表、三个触发器和分区键约束。V003 验证准确 V001/V002 历史，增加三个
+永久表与九个触发器；V004 验证准确三版前序历史后，仅新增三个类型化作者材料表及九个触发器，
+保留已有制品与接受事实，不要求旧账本为空；现行合计十三表、三十九触发器。
+新领域原包缺少对应类型化行时完整 reader 拒绝，不猜测自动回填。
+账本不能替代完整定义核验或使多条 DDL 获得整体回滚。
 
 `database/verify/rule-source-schema.sql` 只有 SELECT/SHOW，输出默认库、账本、种子、列、索引、
 FK、CHECK、触发器/视图/例程及权限材料。触发器元数据被 MySQL 权限过滤，须由 migrator 在
 停止写入后只读核验，不扩大 app/agent 权限。其空源计数只用于迁移检查点，不作为安装后准入。
-工具增量使用 `database/verify/rule-tool-catalog.sql`，与前述全源元数据核验共同执行。
+工具增量使用 `database/verify/rule-tool-catalog.sql`，schema 2 使用
+`database/verify/rule-schema2-source-ledger.sql`，均与前述全源元数据核验共同执行。
 
 无 DB 测试检查源摘要、独立清单、结构和 grant 防回归以及 JDBC 只读/资源关闭边界。
 真实 MySQL 验收还必须覆盖非法高字节/尾空格/NUL、版本逐字节不同、18 项关系、补充平面文本

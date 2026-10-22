@@ -1,0 +1,293 @@
+[
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.initial"
+      },
+      "collection_key": "members",
+      "module_key": "grants_base",
+      "entry_key": "common"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.language",
+      "rule_key": "language.common"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.initial"
+      },
+      "collection_key": "members",
+      "module_key": "grants_base",
+      "entry_key": "elvish"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.language",
+      "rule_key": "language.elvish"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.initial"
+      },
+      "collection_key": "members",
+      "module_key": "grants_base",
+      "entry_key": "dwarvish"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.language",
+      "rule_key": "language.dwarvish"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.initial"
+      },
+      "collection_key": "members",
+      "module_key": "grants_base",
+      "entry_key": "flute"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.flute"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.initial"
+      },
+      "collection_key": "members",
+      "module_key": "grants_base",
+      "entry_key": "herbalism"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.herbalism"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.initial"
+      },
+      "collection_key": "members",
+      "module_key": "grants_base",
+      "entry_key": "smith_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "grants_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.smith_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.race",
+        "rule_key": "race.human"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "grants_base",
+      "entry_key": "native_language"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.language",
+        "rule_key": "language.common"
+      }
+    },
+    "author_note": "Native source slot."
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.race",
+        "rule_key": "race.human"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "grants_base",
+      "entry_key": "extra_languages"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.initial"
+      },
+      "count": 2
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.subrace",
+        "rule_key": "subrace.north"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "grants_base",
+      "entry_key": "instrument"
+    },
+    "grant": {
+      "category": "TOOL",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.tool",
+        "rule_key": "tool.flute"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.background",
+        "rule_key": "background.sailor"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "grants_base",
+      "entry_key": "shared_language"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.language",
+        "rule_key": "language.common"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.background",
+        "rule_key": "background.sailor"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "grants_base",
+      "entry_key": "trade_tools"
+    },
+    "grant": {
+      "category": "TOOL",
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.initial"
+      },
+      "count": 1
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.class",
+        "rule_key": "class.scholar"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "grants_base",
+      "entry_key": "disabled_tool"
+    },
+    "grant": {
+      "category": "TOOL",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.tool",
+        "rule_key": "tool.herbalism"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.class",
+        "rule_key": "class.scholar"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "grants_base",
+      "entry_key": "lost_language"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "grants_base",
+        "rule_type": "character.language",
+        "rule_key": "language.dwarvish"
+      }
+    }
+  }
+]

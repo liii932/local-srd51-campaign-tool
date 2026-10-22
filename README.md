@@ -23,6 +23,15 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
   等于发布或开放可达业务入口，完整规则族会保持 DRAFT，直到主要规则领域完成跨领域发布候选验收；
 - DRAFT 的[语言与工具熟练目录](./docs/rules/tool-catalog-partition.md)提供严格作者包、双分区离线安装、
   来源读取与调用方事务运行镜像；仅为 PARTITION，不提供完整规则或游戏运行资格；
+- schema 2 的[生产制品](./docs/rules/schema-2-rule-artifacts.md)提供原始 ZIP 校验和独立规范摘要，
+  [离线安装与接受](./docs/rules/schema-2-installation-and-acceptance.md)分开保存制品与本地接受事实；
+  完整基础及尚未接入运行消费者的规则内容仍拒绝，安装或接受不开放新战役；
+- schema 2 的[来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md)提供只读来源复核、
+  类型化最终规则与完整覆盖链的原子保存、独立读回、操作查证和准确恢复绑定；范围为内部材料，
+  尚不创建战役或开放游戏执行；
+- schema 2 的[初始授予计划](./docs/rules/schema-2-proficiency-grants.md)将真实角色来源、稳定授予槽和
+  跨模组目标纳入严格作者输入、类型化来源及运行快照，由实际快照读回生成固定／选择授予与抑制事实；
+  仍属内部计划，不写角色工作集、不开放新运行或工具检定；
 - DRAFT 的[成长区间](./docs/rules/level-advancement-v2.md)与[资源恢复区间](./docs/rules/class-features-v2.md)
   使用共用不可变规则模型，逐级核验 1—20 级熟练加值，资源恢复按权威魅力值求值；
   角色领域的作者源、两侧存储链路及完整休息事务仍待接入；
@@ -49,7 +58,9 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 本文所列目标不是对当前版本已完成功能的声明。
 
 [产品说明](./docs/product.md)区分当前行为和 v2 使用流程；[v2 设计基线](./docs/design/v2/README.md)
-记录领域关系表、完整运行快照、战役工作集、自动保存和可靠结束等目标及采用边界。
+记录[模组接口与组合](./docs/design/v2/module-interface-baseline.md)、领域关系表、完整运行快照、
+战役工作集、自动保存和可靠结束等目标及采用边界。
+具体机制的设计与采用按[机制接入责任清单](./docs/design/v2/mechanism-integration-checklist.md)逐项核对。
 设计进入项目文档不表示功能已实现或完整规则已发布。
 
 ## 产品边界
@@ -136,7 +147,7 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
 
 当前自动化使用 `dnd_tool_se` 作为本地部署运行库，使用 `dnd_tool_se_it` 执行临时表集成测试；
-完整 V001—V020 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
+完整 V001—V024 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
 运行实例内创建改名 schema，也不改写迁移 SQL。运行、只读核验、正式迁移、集成测试和隔离重放
 使用不同账号。现有少量测试数据的运行库可继续作为开发部署目标，但不能作为集成测试或迁移重放
 目标，使用前仍需盘点和备份。精确账号权限与 Agent 检查点见[数据库说明](./docs/database.md)。
@@ -169,7 +180,7 @@ src/main/java/com/dndtool/
   service/         业务验证、诊断编排、事务、幂等和存档服务
   web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V020 只增不改运行数据库迁移
+                    V001—V024 只增不改运行数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
@@ -188,6 +199,9 @@ tools/              数据库备份和独立规则哈希验证工具
 | [Agent 项目上下文](./docs/agent-context.md) | 新会话使用的精简项目地图和权威资料索引 |
 | [架构](./docs/architecture.md) | 产品范围、组件、事务与信任边界 |
 | [规则数据库分离设计](./docs/rule-database-separation.md) | 当前存储、双 schema 职责及 v2 采用边界 |
+| [schema 2 制品与安装接受](./docs/rules/schema-2-installation-and-acceptance.md) | 原始 ZIP、生产摘要、审阅绑定、独立接受和提交查证 |
+| [schema 2 来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md) | 来源只读复核、类型化快照和完整链、原子转存、查证与准确恢复绑定 |
+| [schema 2 初始语言／工具授予](./docs/rules/schema-2-proficiency-grants.md) | 真实来源与稳定槽、原子授予字段、跨模组选择和固定快照计划 |
 | [SRD 5.1 本地原文索引](./docs/references/srd-5.1/README.md) | 按主题定位 403 页检索文本，核对本地 PDF 与官方出处 |
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |
 | [冻结 v1 规则规范](./docs/rules/srd-5.1.md) | 现有稳定键、算法、范围、规范化和模组关系 |

@@ -1,0 +1,4 @@
+[
+  {"identity":{"kind":"entry","rule":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"collection_key":"members","module_key":"validation_base","entry_key":"common"},"language":{"kind":"rule","module_key":"validation_base","rule_type":"character.language","rule_key":"language.common"},"author_note":"Base common relation."},
+  {"identity":{"kind":"entry","rule":{"kind":"rule","module_key":"validation_base","rule_type":"catalog.language_set","rule_key":"language_set.standard"},"collection_key":"members","module_key":"validation_base","entry_key":"dwarvish"},"language":{"kind":"rule","module_key":"validation_base","rule_type":"character.language","rule_key":"language.dwarvish"}}
+]

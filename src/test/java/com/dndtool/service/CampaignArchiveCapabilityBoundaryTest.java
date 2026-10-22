@@ -100,7 +100,8 @@ final class CampaignArchiveCapabilityBoundaryTest {
         try (Stream<Path> migrations = Files.list(Path.of("src/main/resources/db/migration"))) {
             for (Path migration : migrations.filter(Files::isRegularFile).toList()) {
                 // These migrations store rule content, with no campaign recovery capability.
-                if (!Set.of("V019__runtime-language-snapshot.sql", "V020__runtime-tool-snapshot.sql")
+                if (!Set.of("V019__runtime-language-snapshot.sql", "V020__runtime-tool-snapshot.sql",
+                        "V021__schema2-runtime-snapshot.sql")
                         .contains(migration.getFileName().toString())) {
                     assertFalse(RECOVERY_NAME.matcher(migration.getFileName().toString()).find(),
                             migration.toString());

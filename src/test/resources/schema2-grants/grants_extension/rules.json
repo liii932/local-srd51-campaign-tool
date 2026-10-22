@@ -1,0 +1,36 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_extension",
+      "rule_type": "character.language",
+      "rule_key": "language.common"
+    },
+    "display_name": "Common",
+    "description": "Common catalog target.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_extension",
+      "rule_type": "character.race",
+      "rule_key": "race.elf"
+    },
+    "display_name": "Elf",
+    "description": "Elf initial proficiency source.",
+    "source_page": 10
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "grants_extension",
+      "rule_type": "character.class",
+      "rule_key": "class.retired"
+    },
+    "display_name": "Retired",
+    "description": "Retired initial proficiency source.",
+    "source_page": 10
+  }
+]

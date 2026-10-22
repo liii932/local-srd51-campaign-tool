@@ -1,0 +1,71 @@
+[
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.alchemist_supplies"
+    },
+    "field": "description",
+    "value": "Alchemy tools in this selection."
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.alchemist_supplies"
+    },
+    "field": "author_note"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.alchemist_supplies"
+    },
+    "field": "source_page",
+    "value": 71
+  },
+  {
+    "op": "set_enabled",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.bagpipes"
+    },
+    "value": false
+  },
+  {
+    "op": "set_enabled",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "tools_base",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.all"
+      },
+      "collection_key": "members",
+      "module_key": "tools_base",
+      "entry_key": "thieves_tools"
+    },
+    "value": false
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "tools_base",
+      "rule_type": "catalog.tool_set",
+      "rule_key": "tool_set.all"
+    },
+    "field": "minimum_enabled_members",
+    "value": 38
+  }
+]

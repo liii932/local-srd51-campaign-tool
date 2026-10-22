@@ -74,6 +74,7 @@ class RuleSourceSchemaContractTest {
             while (matcher.find()) tables.add(matcher.group(1));
             var currentTables = new java.util.HashSet<>(TABLES);
             currentTables.add("rule_tool");
+            currentTables.addAll(Set.of("rule_schema2_artifact", "rule_schema2_acceptance", "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change"));
             assertEquals(currentTables, tables);
             assertEquals("", matcher.replaceAll("").trim());
         }
@@ -86,14 +87,20 @@ class RuleSourceSchemaContractTest {
             if (privilege.equals("SELECT")) reads++;
             else assertNull(writes.put(matcher.group(2), privilege));
         }
-        assertEquals(6, reads);
-        assertEquals(Map.of(
+        assertEquals(12, reads);
+        Map<String, String> expectedWrites = new LinkedHashMap<>(Map.of(
                 "rule_release", "INSERT (module_key, release_version, canonical_format_version, archive_format_version, hash_algorithm), UPDATE (canonical_format_version, archive_format_version, hash_algorithm, content_sha256, installation_revision)",
                 "rule_language", "INSERT, DELETE, UPDATE (display_name, description, category, source_page, sort_order)",
                 "rule_tool", "SELECT, INSERT, DELETE",
                 "rule_package_installation", "INSERT (release_id, installation_revision, source_operation_id, operation_fingerprint_version, operation_digest_sha256, author_schema_version, installation_manifest_version, installation_manifest_sha256, package_display_name, verification_scope, observed_content_sha256)",
                 "rule_package_installation_partition", "INSERT",
-                "rule_installation_control", "UPDATE (metadata_row_count, row_version)"), writes);
+                "rule_installation_control", "UPDATE (metadata_row_count, row_version)",
+                "rule_schema2_artifact", "INSERT (module_key, release_version, installation_sequence, source_operation_id, operation_fingerprint_version, operation_digest_sha256, author_schema_version, artifact_protocol_version, canonical_profile, package_role, raw_zip_sha256, logical_sha256, raw_zip_byte_length, expanded_byte_length, original_zip)",
+                "rule_schema2_control", "UPDATE (metadata_row_count, installation_count, raw_zip_byte_count, row_version)"));
+        expectedWrites.put("rule_schema2_character_source", "INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, parent_race_module_key, parent_race_rule_key, author_note)");
+        expectedWrites.put("rule_schema2_proficiency_grant", "INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, grant_category, grant_kind, grant_target_module_key, grant_target_rule_key, grant_count, author_note)");
+        expectedWrites.put("rule_schema2_character_change", "INSERT (artifact_module_key, release_version, author_index, target_kind, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, operation, field_key, text_value, integer_value, boolean_value, reference_module_key, reference_rule_type, reference_rule_key, grant_category, grant_kind, grant_target_module_key, grant_target_rule_key, grant_count)");
+        assertEquals(expectedWrites, writes);
         assertEquals("", matcher.replaceAll("").trim());
     }
 

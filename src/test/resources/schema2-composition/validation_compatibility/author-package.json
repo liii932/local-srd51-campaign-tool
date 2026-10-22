@@ -1,0 +1,11 @@
+{
+  "author_schema_version": 2,
+  "module_key": "validation_compatibility",
+  "release_version": "1",
+  "package_display_name": "Validation compatibility",
+  "role": "compatibility",
+  "dependencies": [{"module_key":"validation_base","supported_versions":["1"]},{"module_key":"validation_extension","supported_versions":["1"]}],
+  "compatible_combinations": [{"validation_base":"1","validation_extension":"1"}],
+  "load_order_constraints": [{"before":"validation_extension","after":"validation_compatibility"}],
+  "files": [{"kind":"changes","path":"changes.json"}]
+}

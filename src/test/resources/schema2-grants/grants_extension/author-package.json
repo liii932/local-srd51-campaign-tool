@@ -1,0 +1,35 @@
+{
+  "author_schema_version": 2,
+  "module_key": "grants_extension",
+  "release_version": "1",
+  "package_display_name": "Grants Extension",
+  "role": "extension",
+  "dependencies": [
+    {
+      "module_key": "grants_base",
+      "supported_versions": [
+        "1"
+      ]
+    }
+  ],
+  "compatible_combinations": [
+    {
+      "grants_base": "1"
+    }
+  ],
+  "load_order_constraints": [],
+  "files": [
+    {
+      "kind": "definitions",
+      "path": "rules.json"
+    },
+    {
+      "kind": "entries",
+      "path": "members.json"
+    },
+    {
+      "kind": "changes",
+      "path": "changes.json"
+    }
+  ]
+}

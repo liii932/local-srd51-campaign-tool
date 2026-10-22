@@ -39,6 +39,10 @@ public final class TicketStore implements AutoCloseable {
         String name=ticket.operationId()+".json";writeNew(name,ticket.encode());
         if(!load(name).equals(ticket))throw new IOException("Ticket readback mismatch");return name;
     }
+    public String save(Schema2OperationTicket ticket) throws IOException {
+        String name=ticket.operationId()+".json";writeNew(name,ticket.encode());
+        if(!loadSchema2(name).equals(ticket))throw new IOException("Ticket readback mismatch");return name;
+    }
     void bind(MaintenanceEvidence evidence)throws IOException {
         if(!directory.equals(evidence.stateDirectory()))throw new IOException("Uncontrolled state directory");
         byte[] binding=(evidence.target()+"\n"+evidence.lineage()+"\n").getBytes(java.nio.charset.StandardCharsets.US_ASCII);
@@ -50,7 +54,17 @@ public final class TicketStore implements AutoCloseable {
         var ticket=OperationTicket.decode(SecureFiles.read(root,name,8192));
         if(!name.equals(ticket.operationId()+".json"))throw OfflineJson.bad();return ticket;
     }
-    public void requireClear() throws IOException {if(pending()!=null)throw new IOException("Unresolved maintenance attempt; explicit resolution required");}
+    public Schema2OperationTicket loadSchema2(String name) throws IOException {
+        if(!name.matches("[0-9a-f-]{36}[.]json"))throw OfflineJson.bad();
+        var ticket=Schema2OperationTicket.decode(SecureFiles.read(root,name,8192));
+        if(!name.equals(ticket.operationId()+".json"))throw OfflineJson.bad();return ticket;
+    }
+    /** Every protocol shares this marker; an unknown or malformed marker also blocks new work. */
+    public void requireClear() throws IOException {
+        try {SecureFiles.read(root,"pending",8192);}
+        catch(NoSuchFileException absent){return;}
+        throw new IOException("Unresolved maintenance attempt; explicit resolution required");
+    }
     public void begin(OperationTicket ticket) throws IOException {
         requireClear();if(!load(ticket.operationId()+".json").equals(ticket))throw new IOException("Unsaved ticket");
         writeNew("pending",ticket.encode());
@@ -60,8 +74,38 @@ public final class TicketStore implements AutoCloseable {
         try{return OperationTicket.decode(SecureFiles.read(root,"pending",8192));}
         catch(NoSuchFileException absent){return null;}
     }
+    public void begin(Schema2OperationTicket ticket) throws IOException {
+        requireClear();if(!loadSchema2(ticket.operationId()+".json").equals(ticket))throw new IOException("Unsaved ticket");
+        writeNew("pending",ticket.encode());
+        if(!ticket.equals(pendingSchema2()))throw new IOException("Pending intent readback mismatch");
+    }
+    public Schema2OperationTicket pendingSchema2() throws IOException {
+        try{return Schema2OperationTicket.decode(SecureFiles.read(root,"pending",8192));}
+        catch(NoSuchFileException absent){return null;}
+    }
+    public void saveReview(Schema2OperationTicket ticket,byte[] review,byte[] zip) throws IOException {
+        if(ticket.kind()!=Schema2OperationTicket.Kind.ACCEPT || review.length>Schema2Review.MAX_BYTES
+                || zip.length>com.dndtool.module.composition.ProductionRuleArtifact.MAX_ZIP_BYTES
+                || !ticket.reviewSha256().equals(RuleArtifact.sha256(review))
+                || !ticket.rawZipSha256().equals(RuleArtifact.sha256(zip)))throw new IOException("Review binding mismatch");
+        writeNew(ticket.operationId()+".review.txt",review);
+        writeNew(ticket.operationId()+".review.zip",zip);
+    }
+    byte[] review(Schema2OperationTicket ticket) throws IOException {
+        return SecureFiles.read(root,ticket.operationId()+".review.txt",Schema2Review.MAX_BYTES);
+    }
+    byte[] reviewZip(Schema2OperationTicket ticket) throws IOException {
+        return SecureFiles.read(root,ticket.operationId()+".review.zip",com.dndtool.module.composition.ProductionRuleArtifact.MAX_ZIP_BYTES);
+    }
+    public Path reviewPath(Schema2OperationTicket ticket) {return directory.resolve(ticket.operationId()+".review.txt");}
     public void resolved(OperationTicket ticket) throws IOException {
         OperationTicket pending=pending();
+        if(pending==null)return;
+        if(!pending.equals(ticket))throw new IOException("Different unresolved operation");
+        root.deleteFile(Path.of("pending"));directoryChannel.force(true);
+    }
+    public void resolved(Schema2OperationTicket ticket) throws IOException {
+        Schema2OperationTicket pending=pendingSchema2();
         if(pending==null)return;
         if(!pending.equals(ticket))throw new IOException("Different unresolved operation");
         root.deleteFile(Path.of("pending"));directoryChannel.force(true);
@@ -72,7 +116,7 @@ public final class TicketStore implements AutoCloseable {
             ByteBuffer buffer=ByteBuffer.wrap(bytes);while(buffer.hasRemaining())channel.write(buffer);channel.force(true);
         }
         directoryChannel.force(true);
-        if(!Arrays.equals(bytes,SecureFiles.read(root,name,8192)))throw new IOException("Durable readback mismatch");
+        if(!Arrays.equals(bytes,SecureFiles.read(root,name,Math.max(8192,bytes.length))))throw new IOException("Durable readback mismatch");
     }
     @Override public void close() throws IOException {
         try{lock.release();}finally{try{lockChannel.close();}finally{try{directoryChannel.close();}finally{root.close();}}}

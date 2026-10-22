@@ -20,7 +20,7 @@ class RuleDatabaseSchemaVerifierTest {
     void exactRoleAndWholeHistoryCloseResourcesWithoutMutation() throws Exception {
         Fixture f = new Fixture();
         new RuleDatabaseSchemaVerifier().verify(f.source());
-        assertEquals(List.of(2, 3), f.limits);
+        assertEquals(List.of(2, RuleSchemaMigrations.expectations().size() + 1), f.limits);
         assertEquals(List.of(5, 5), f.timeouts);
         assertEquals(2, f.closedResults);
         assertEquals(2, f.closedStatements);

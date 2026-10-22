@@ -75,12 +75,48 @@ class AcceptanceBoundaryTest(unittest.TestCase):
 
     def test_approved_manifest_is_read_only_and_complete(self):
         migrations = module.manifests()
-        self.assertEqual(22, len(migrations))
-        self.assertEqual(list(range(1, 21)), [item[1] for item in migrations[:20]])
-        self.assertEqual([1, 2], [item[1] for item in migrations[20:]])
+        self.assertEqual(28, len(migrations))
+        self.assertEqual(list(range(1, 25)), [item[1] for item in migrations if item[0] == module.RUNTIME])
+        self.assertEqual([1, 2, 3, 4], [item[1] for item in migrations if item[0] == module.SOURCE])
         for _, _, _, digest, path, raw in migrations:
             self.assertEqual(raw, path.read_bytes())
             self.assertEqual(digest, module.payload_digest(raw))
+
+    def test_default_entry_validates_current_manifests_without_external_execution(self):
+        with patch("sys.argv", ["verify-language-jdbc.py"]), \
+                patch.object(module, "Acceptance", side_effect=AssertionError("No disposable executor")), \
+                patch.object(module.subprocess, "run", side_effect=AssertionError("No subprocess")), \
+                patch.object(module.subprocess, "Popen", side_effect=AssertionError("No subprocess")), \
+                patch.object(module.tempfile, "mkdtemp", side_effect=AssertionError("No audit directory")), \
+                patch.object(module.socket, "socket", side_effect=AssertionError("No network")), \
+                patch("builtins.print") as output:
+            module.main()
+        self.assertEqual("Approved payloads verified: runtime V001-V024 and RULES V001-V004. SQL files remain unchanged.",
+                         output.call_args.args[0])
+
+    def test_disposable_replay_covers_current_chains_and_retains_narrow_language_tool_grants(self):
+        acceptance = object.__new__(module.Acceptance)
+        acceptance.migrations = module.manifests()
+        acceptance.passwords = {name: "unused-fixture" for name in module.ACCOUNTS}
+        acceptance.mysql = Mock()
+        with patch("builtins.print"):
+            acceptance.migrate()
+        replays = [call.kwargs for call in acceptance.mysql.call_args_list if "approved" in call.kwargs]
+        self.assertEqual(28, len(replays))
+        self.assertEqual({"V021__schema2-runtime-snapshot.sql", "V003__schema2-source-ledger.sql"},
+                         {call["path"].name for call in replays if call["path"].name.startswith(("V021__", "V003__schema2"))})
+        grants = [call.kwargs["path"].name for call in acceptance.mysql.call_args_list
+                  if "path" in call.kwargs and "approved" not in call.kwargs]
+        self.assertEqual(["rule-source-migrator.sql", "rule-source-installer.sql", "rule-source-app.sql",
+                          "runtime-language-snapshot.sql", "runtime-tool-snapshot.sql"], grants)
+        self.assertNotIn("dnd_tool_rules_accepter", module.ACCOUNTS)
+        self.assertEqual({"rule_schema2_artifact", "rule_schema2_acceptance", "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change"},
+                         {table for table in module.SOURCE_TABLES if table.startswith("rule_schema2_")})
+        expected_runtime = {"s2_runtime_identity", "s2_runtime_snapshot", "s2_runtime_member", "s2_runtime_language",
+                            "s2_runtime_language_set", "s2_runtime_language_entry", "s2_runtime_field_chain",
+                            "s2_runtime_chain_step", "s2_runtime_operation", "s2_runtime_control", "s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry", "s2_runtime_character_source", "s2_runtime_proficiency_grant"}
+        self.assertEqual(expected_runtime, set(module.SCHEMA2_RUNTIME_TABLES))
+        self.assertTrue(expected_runtime.issubset(module.RUNTIME_TABLES))
 
     def test_checksum_normalizes_only_for_comparison_and_rejects_bad_scopes(self):
         raw = b"-- CHECKSUM-SCOPE-BEGIN\nSELECT 1;\n-- CHECKSUM-SCOPE-END\n"

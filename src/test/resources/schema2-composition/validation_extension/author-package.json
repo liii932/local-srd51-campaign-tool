@@ -1,0 +1,11 @@
+{
+  "author_schema_version": 2,
+  "module_key": "validation_extension",
+  "release_version": "1",
+  "package_display_name": "Validation extension",
+  "role": "extension",
+  "dependencies": [{"module_key":"validation_base","supported_versions":["1"]}],
+  "compatible_combinations": [{"validation_base":"1"}],
+  "load_order_constraints": [{"before":"validation_base","after":"validation_extension"}],
+  "files": [{"kind":"definitions","path":"rules.json"},{"kind":"entries","path":"members.json"},{"kind":"changes","path":"changes.json"}]
+}

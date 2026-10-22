@@ -1,0 +1,11 @@
+{
+  "author_schema_version": 2,
+  "module_key": "validation_base",
+  "release_version": "1",
+  "package_display_name": "Validation base projection",
+  "role": "base",
+  "dependencies": [],
+  "compatible_combinations": [{}],
+  "load_order_constraints": [],
+  "files": [{"kind":"definitions","path":"rules.json"},{"kind":"entries","path":"members.json"}]
+}

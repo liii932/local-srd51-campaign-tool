@@ -99,7 +99,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V020 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V024 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -107,6 +107,77 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 账号/schema 合同及现有运行库的阶段性使用决策见[数据库说明](database.md)。
 
 ## 4. 迁移与规则测试
+
+[schema 2 有限组合内核](design/v2/schema-2-composition-validation.md#9-内部组合内核)的无数据库定向命令：
+
+```bash
+mvn '-Dtest=Schema2CompositionGoldenTest,Schema2CompositionRejectionTest,Schema2CompositionParsingTest,CharacterCatalogAuthorPackageReaderTest,ToolAuthorPartitionTest,ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,BuiltinModuleReleaseRegistryTest,CampaignArchiveCapabilityBoundaryTest' test
+```
+
+新内核测试从固定作者字节核对独立最终字段、31 条覆盖链及验证专用摘要，覆盖 N01—N30、
+严格解析与预算、依赖/联合版本/顺序、启停与清空、同值覆盖、不可变性及链篡改；相邻测试
+保护既有 schema 1、canonical 和发布门。期望在 `src/test/resources/schema2-composition/`，
+固定验证 ZIP 以十六进制文本保存，不依赖运行时读取设计文档或被测实现生成期望。
+通过只证明这组有限类型的内部纯计算；生产资格仍拒绝，不涉及安装、SQL、HTTP 或业务执行。
+WAR 须包含 `module/composition` 的内核类，并排除全部作者、验证 ZIP 和测试向量。
+
+[schema 2 生产制品](rules/schema-2-rule-artifacts.md)与
+[安装、独立接受链路](rules/schema-2-installation-and-acceptance.md)的无数据库定向命令：
+
+```bash
+mvn '-Dtest=ProductionRuleArtifactTest,Schema2CompositionGoldenTest,Schema2CompositionRejectionTest,Schema2CompositionParsingTest' test
+mvn '-DargLine=-Xmx256m' '-Dtest=Schema2SourceInstallationTest,Schema2OperationTicketTest,Schema2RulePackageCliTest,JdbcSchema2RuleSourceTest,Schema2SourceLedgerContractTest,TicketStoreTest,SourceInstallationTest,RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSchemaVerifierTest' test
+```
+
+第一组核对有界 ZIP、安全路径、原始字节、生产编码及独立摘要向量，并保护既有组合语义。
+第二组覆盖原包与接受事实分别不可改写、来源双摘要回读、独立操作指纹、实际协调器与 JDBC
+仓储衔接、共享维护锁/未决标记、显式审阅、旧票据、故障回滚及提交结果未知后的原操作查证。
+CLI 子进程测试核对真实命令的稳定诊断；共用存储和旧离线安装测试保护 schema 1 路径。
+来源容量用例在 256 MiB 测试堆中保留前像，安装接近 raw/expanded 各 8 MiB 总限额的最后一个包，
+核对完整后像，并证明下一包在 DML 前拒绝；这不替代真实驱动的容量与时限验收。
+来源 schema/授权的静态测试和 JDBC 协议代理不替代真实 MySQL 的权限、约束、并发及持久化验收。
+当前仅无内容扩展/兼容包可安装和接受；不完整基础包与尚未集成的机制仍失败关闭，接受事实
+不等于可运行组合或完整规则发布资格。生产纯制品类进入 WAR，离线 CLI、来源 SQL、原包、
+审阅导出、维护证据和全部测试向量必须留在 WAR 外。
+
+[schema 2 来源到运行快照](rules/schema-2-runtime-snapshot.md)的无数据库定向命令：
+
+```bash
+mvn '-DargLine=-Xmx256m' '-Dtest=JdbcSourceSchema2RepositoryTest,JdbcSchema2RuntimeSnapshotRepositoryTest,Schema2SnapshotTransferServiceTest,ProductionSchema2StoredProjectionTest,Schema2RuntimeSnapshotSchemaTest,ProductionRuleArtifactTest,Schema2CompositionGoldenTest,Schema2CompositionRejectionTest,Schema2CompositionParsingTest,JdbcSchema2RuleSourceTest,Schema2SourceInstallationTest,SchemaMigrationsTest,ToolCatalogSchemaTest,RuleSchemaMigrationsTest,V011CompleteCharacterCatalogDraftTest,DatabaseDiagnosticsTest,DatabaseSchemaVerifierTest,CampaignArchiveCapabilityBoundaryTest' test
+```
+
+测试使用真实协调器和 JDBC 仓储，以及具有事务前像的 SQL 代理；独立固定向量核对实际类型化
+回读的组合、最终规则与完整覆盖链。覆盖来源事务关闭后才获取运行连接、守卫为首条运行 SQL、
+精确恢复绑定、逐表写入失败、回读篡改、幂等冲突、提交结果未知和隔离后的无来源查证。
+有限基础包仅作为账本完整性测试材料；测试不通过离线安装资格门，也不授予游戏执行资格。
+V021/V023 静态结构与授权测试不能代替真实 MySQL 迁移、权限、锁、连接池或持久化验收。
+WAR 包含运行仓储、协调器、生产组合类和 V021/V023；来源 SQL、原包及测试向量仍排除。
+
+[schema 2 工具组合与运行材料](rules/schema-2-runtime-snapshot.md)的定向命令：
+
+```bash
+mvn '-DargLine=-Xmx256m' '-Dtest=Schema2ToolCompositionTest,JdbcSchema2ToolSnapshotTest,Schema2ToolSnapshotSchemaTest,Schema2CompositionGoldenTest,ProductionSchema2StoredProjectionTest,SchemaMigrationsTest' test
+```
+
+固定三包向量在 `src/test/resources/schema2-tools/`，由独立作者字节、最终字段/链/摘要组成。
+测试覆盖 37 项工具字段、跨模组条目、类型不匹配、候选去重、混合目录序号、真实查询行重建与
+各新增表写入失败回滚。有限组合仍受安装资格门约束，不能将向量通过作为基础模组可用证据。
+
+[schema 2 初始语言／工具授予](rules/schema-2-proficiency-grants.md)的无数据库定向命令：
+
+```bash
+python3 src/test/resources/schema2-grants/oracle.py
+mvn '-DargLine=-Xmx256m' '-Dtest=Schema2GrantCompositionTest,Schema2InitialProficiencyRulesTest,Schema2InitialCharacterPlanServiceTest,Schema2InitialCharacterPlanIntegrationTest,JdbcSchema2CharacterSourceRepositoryTest,JdbcSchema2GrantSnapshotTest,Schema2CharacterGrantSchemaTest' test
+```
+
+标准库 oracle 从固定作者 JSON 独立复算原始 ZIP、逻辑、组合、最终字段、完整链及摘要，
+默认只做逐字节核对。测试覆盖真实来源/父关系、完整槽身份、跨模组目标、原子授予覆盖、
+固定与选择授予、禁用与重复选择、源类型化行和原包不一致、运行行/历史损坏以及事务失败。
+完整链路测试通过实际源仓储、转存协调器、运行仓储和默认初始计划服务，核对手写的八条授予事实，
+并证明源连接关闭或不可用后只读计划不访问来源、不提交调用方事务、不写业务数据。
+改动共用 ledger、快照或迁移清单时，补选上面的原包安装、转存、工具及 schema 测试；
+V004/V024 静态与 JDBC 代理证据不替代真实 MySQL 约束、触发器和权限验收。
+WAR 包含初始计划服务、类型化仓储和运行 V024；来源 V004、作者包、oracle 及全部测试向量均排除。
 
 [语言分区链路等价核验](rules/language-partition-equivalence.md) 的无数据库定向命令：
 
@@ -187,7 +258,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V020 完整运行清单及来源 V001—V002。
+并核对 V001—V024 完整运行清单及来源 V001—V004。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -220,6 +291,9 @@ mvn '-Dtest=BuiltinModuleReleaseRegistryTest,BuiltinModuleHashManifestTest' test
 `V012LevelOneCharacterCreationSchemaTest` 和 `LevelOneCharacterRuntimeGrantsTest`。它们证明预览
 无权威写入、非法选择被拒绝、事件尾变化导致 stale preview、事务故障不留下部分角色，并且
 DRAFT 发布门保持关闭。
+
+V022 的空授予结构与迁移预检由 `CharacterProficiencyGrantSchemaTest` 静态核对；旧 DRAFT
+创建快照必须为空。这些检查不执行迁移，不证明真实 MySQL 触发器或权限，也不授予业务运行资格。
 
 升级的定向验证包括 `AdvancementValueProfileTest`、`LevelAdvancementRulesTest`、
 `LevelAdvancementServiceTest`、`JdbcLevelAdvancementRepositoryTest`、
@@ -279,7 +353,7 @@ Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V020 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V024 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 

@@ -81,13 +81,19 @@ provider 失败关闭，使用 Linux/WSL 受控本地介质。构建输出父目
 | history_minimum_version | 已独立保管历史检查点的非负安装计数下界 |
 | state_directory | 固定、绝对、owner-only 的共享状态目录 |
 
-`schema-audit.txt` 必须记录：批准规则链完整定义比较；七个准确 InnoDB 表及全部列、
-索引、CHECK、21 个触发器和其 DEFINER；源内 RESTRICT FK 与**所有 schema 的入向引用**；
+`schema-audit.txt` 必须记录：批准规则链完整定义比较；当前批准链中全部准确 InnoDB 表及全部列、
+索引、CHECK、触发器和其 DEFINER；V001—V004 的完整对象范围见
+[schema 2 来源账本](schema-2-source-ledger.md)，新增对象也必须纳入审计，不能继续只检查旧七表；
+源内 RESTRICT FK 与**所有 schema 的入向引用**；
 无额外表/视图/函数/例程/触发器副作用或运行库访问；所有授予和继承能力与
 `rule-source-installer.sql` 的最小权限相符；实际列级 S/root FOR UPDATE 可用；
 所有内容安装/发布入口共享 S 且永久事实不能旁路删除；迁移/发布/DDL 已隔离。
 用有足够可见性的独立管理员/migrator 身份只读审计并记录实际材料与批准来源。
 窄 installer 看不到的元数据不能以空结果视为安全，也不能为了审计扩大 installer 权限。
+
+本页仍描述 schema 1 角色目录 PARTITION 票据和版本 1 维护证据；schema 2 的独立制品安装、
+本地 DM 内容审查/接受及版本 2 证据见[专用流程](schema-2-installation-and-acceptance.md)。
+两个协议必须共用同一源谱系的持久状态目录、文件锁和未决阻断，不因新协议新建空状态目录。
 
 `history-audit.txt` 必须给出 target/lineage 的独立保管与接管链、原源与后继关联、
 完整永久非删除接受历史、无备份回退/空克隆/人工删改/滞后副本、检查点版本及所有

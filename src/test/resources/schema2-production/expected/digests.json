@@ -1,0 +1,15 @@
+{
+  "raw": {
+    "validation_base": "294bfdc2b1bf26b7ff8c9387b1cea399361d80765372e9358c11f9746e2a4d9a",
+    "validation_extension": "abb05b9f714e43779707309ab9583a7797783112600e8586e36df1fe53d0ba1c",
+    "validation_compatibility": "558babf0b727df6d622217cb16b16fc5ebd6abbf40509e5954b282ec1c3e8f5b"
+  },
+  "logic": {
+    "validation_base": "d5981c94fda41bf1f20784d3b6fb3a38d8a8591df4e26e13caed7a24f186d4bd",
+    "validation_extension": "05406b8eda3d539bfc4e7aa9b21aa97c075bad768f50ab6ee1a55d069b11ff37",
+    "validation_compatibility": "e9b58da8b5429d1e11f010bd157518b53045e3cc1c16e1aeaec4743e31985e5f"
+  },
+  "config": "03f15c08f2f8b24e242e2f710ce4a7786efee6091b030b1b2b44b0d78b6a30ed",
+  "rules": "8849057fb5f61b348636b6f3d383a8f38d17332fc224a845f01b9589c2bc3981",
+  "chain": "31197ee3af08246980ddae51f0286ce9ea704884c7945c745eb7a4e4ca7ec8e6"
+}
