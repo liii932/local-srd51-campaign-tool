@@ -77,13 +77,14 @@ class JdbcRuntimeLanguageSnapshotRepositoryTest {
 
     @Test void appendsAllFieldsAndActuallyReadsSameTransactionBeforeCallerCommit() throws Exception {
         Fixture f = new Fixture();
-        var actual = REPOSITORY.append(f.connection, ID, partition());
-        assertEquals(ID, actual.identity()); assertEquals(partition(), actual.partition());
-        assertEquals(List.of("schema", "identity", "head", "language"), f.writeOrder.stream().distinct().toList());
-        assertEquals(20, f.pending); assertEquals(0, f.committed);
-        assertEquals(0, f.commits); assertEquals(0, f.rollbacks);
-        assertEquals(3, f.queries); f.assertClosed();
-        f.connection.commit();
+        try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+            var actual = REPOSITORY.append(transaction.connection(), ID, partition());
+            assertEquals(ID, actual.identity()); assertEquals(partition(), actual.partition());
+            assertEquals(List.of("schema", "identity", "head", "language"), f.writeOrder.stream().distinct().toList());
+            assertEquals(20, f.pending); assertEquals(0, f.committed);
+            assertEquals(0, f.commits); assertEquals(0, f.rollbacks);
+            assertEquals(3, f.queries); f.assertClosed(); transaction.commit();
+        }
         assertEquals(20, f.committed); assertEquals(0, f.pending);
         assertEquals(partition(), REPOSITORY.read(f.connection, ID).partition());
     }
@@ -92,9 +93,10 @@ class JdbcRuntimeLanguageSnapshotRepositoryTest {
         for (int point = 1; point <= 20; point++) {
             for (int affected : new int[] {-1, 0, 2}) {
                 Fixture f = new Fixture(); f.failWrite = point; f.affected = affected;
-                assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, ID, partition()));
-                assertEquals(0, f.commits); assertEquals(0, f.rollbacks);
-                f.connection.rollback();
+                try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+                    assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), ID, partition()));
+                    assertEquals(0, f.commits); assertEquals(0, f.rollbacks); transaction.rollback();
+                }
                 assertEquals(0, f.pending); assertEquals(0, f.committed); f.assertClosed();
             }
         }
@@ -102,10 +104,12 @@ class JdbcRuntimeLanguageSnapshotRepositoryTest {
 
     @Test void laterCallerBusinessFailureRollsBackRegistrationAndWholePartition() throws Exception {
         Fixture f = new Fixture();
-        try {
-            REPOSITORY.append(f.connection, ID, partition());
-            throw new SQLException("later business failure");
-        } catch (SQLException expected) { f.connection.rollback(); }
+        assertThrows(SQLException.class, () -> {
+            try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+                REPOSITORY.append(transaction.connection(), ID, partition());
+                throw new SQLException("later business failure");
+            }
+        });
         assertEquals(0, f.pending); assertEquals(0, f.committed);
         assertEquals(1, f.rollbacks); assertEquals(0, f.commits);
     }
@@ -113,48 +117,66 @@ class JdbcRuntimeLanguageSnapshotRepositoryTest {
     @Test void collisionAfterCommitOrSnapshotCleanupIsNeverReplay() throws Exception {
         for (boolean cleaned : List.of(false, true)) {
             Fixture f = new Fixture(); f.registered = true; f.cleaned = cleaned;
-            assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, ID, partition()));
-            assertEquals(1, f.writes); assertEquals(0, f.pending);
-            f.connection.rollback(); assertTrue(f.registered);
+            try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+                assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), ID, partition()));
+                assertEquals(1, f.writes); assertEquals(0, f.pending); transaction.rollback();
+            }
+            assertTrue(f.registered);
         }
         for (boolean runCollision : List.of(false, true)) {
             Fixture f = new Fixture(); f.registered = true;
             f.previousRun = runCollision ? U : W;
             f.previousSnapshot = runCollision ? W : V;
             assertDoesNotThrow(() -> Identity.fromBytes(f.previousRun, f.previousSnapshot));
-            assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, ID, partition()));
-            assertEquals(1, f.writes); assertEquals(0, f.pending);
-            f.connection.rollback(); assertTrue(f.registered);
+            try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+                assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), ID, partition()));
+                assertEquals(1, f.writes); assertEquals(0, f.pending); transaction.rollback();
+            }
+            assertTrue(f.registered);
         }
     }
 
     @Test void sameContentHasIndependentRunAndSnapshotIdentityWithoutDeduplication() throws Exception {
         Identity second = new Identity(ID.snapshotId(), ID.runId());
         Fixture a = new Fixture(ID); Fixture b = new Fixture(second);
-        var firstResult = REPOSITORY.append(a.connection, ID, partition());
-        var secondResult = REPOSITORY.append(b.connection, second, partition());
-        assertEquals(firstResult.partition(), secondResult.partition());
-        assertNotEquals(firstResult.identity(), secondResult.identity());
-        assertEquals(20, a.pending); assertEquals(20, b.pending);
-        a.connection.commit(); b.connection.commit();
+        JdbcRuntimeLanguageSnapshotRepository.Snapshot firstResult;
+        try (var transaction = BusinessWriteTestSupport.partition(a.connection)) {
+            firstResult = REPOSITORY.append(transaction.connection(), ID, partition());
+            assertEquals(20, a.pending); transaction.commit();
+        }
+        try (var transaction = BusinessWriteTestSupport.partition(b.connection)) {
+            var secondResult = REPOSITORY.append(transaction.connection(), second, partition());
+            assertEquals(firstResult.partition(), secondResult.partition());
+            assertNotEquals(firstResult.identity(), secondResult.identity());
+            assertEquals(20, b.pending); transaction.commit();
+        }
         assertEquals(20, a.committed); assertEquals(20, b.committed);
     }
 
     @Test void transactionAndExactDefaultSchemaAreRequiredBeforeWrites() throws Exception {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw -> REPOSITORY.append(raw, ID, partition()));
         for (Consumer<Fixture> change : List.<Consumer<Fixture>>of(
                 f -> f.autoCommit = true, f -> f.readOnly = true,
                 f -> f.isolation = Connection.TRANSACTION_NONE,
-                f -> f.isolation = Connection.TRANSACTION_READ_UNCOMMITTED,
-                f -> f.schema = bytes("dnd_tool_rules"), f -> f.schema = bytes("dnd_tool_se "),
-                f -> f.schema = "dnd_tool_se", f -> f.schema = null)) {
+                f -> f.isolation = Connection.TRANSACTION_READ_UNCOMMITTED)) {
             Fixture f = new Fixture(); change.accept(f);
             assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, ID, partition()));
             assertEquals(0, f.writes); f.assertClosed();
         }
+        for (Object schema : Arrays.asList(bytes("dnd_tool_rules"), bytes("dnd_tool_se "), "dnd_tool_se", null)) {
+            Fixture f = new Fixture(); f.schema = schema;
+            try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+                assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), ID, partition()));
+                assertEquals(0, f.writes); transaction.rollback();
+            }
+            f.assertClosed();
+        }
         for (int isolation : new int[] {Connection.TRANSACTION_READ_COMMITTED,
                 Connection.TRANSACTION_REPEATABLE_READ, Connection.TRANSACTION_SERIALIZABLE}) {
             Fixture f = new Fixture(); f.isolation = isolation;
-            REPOSITORY.append(f.connection, ID, partition()); f.connection.rollback();
+            try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+                REPOSITORY.append(transaction.connection(), ID, partition()); transaction.rollback();
+            }
         }
     }
 
@@ -229,23 +251,29 @@ class JdbcRuntimeLanguageSnapshotRepositoryTest {
     @Test void queryFailureAndReadOnlyApiRequireBindingAndLeaveRollbackToCaller() throws Exception {
         for (int point = 1; point <= 3; point++) {
             Fixture f = new Fixture(); f.failQuery = point;
-            assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, ID, partition()));
-            assertEquals(0, f.rollbacks); f.connection.rollback();
+            try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+                assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), ID, partition()));
+                assertEquals(0, f.rollbacks); transaction.rollback();
+            }
             assertEquals(0, f.pending); assertEquals(0, f.committed); f.assertClosed();
         }
         Fixture f = new Fixture();
         assertThrows(SQLException.class, () -> REPOSITORY.read(f.connection, null));
         assertEquals(0, f.queries);
-        assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, null, partition()));
-        assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, ID, null));
-        assertEquals(0, f.writes);
+        try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+            assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), null, partition()));
+            assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), ID, null));
+            assertEquals(0, f.writes); transaction.rollback();
+        }
     }
 
     private static void failedReadback(Consumer<Fixture> change) throws Exception {
         Fixture f = new Fixture(); change.accept(f);
-        assertThrows(SQLException.class, () -> REPOSITORY.append(f.connection, ID, partition()));
-        assertEquals(0, f.commits); assertEquals(0, f.rollbacks);
-        f.connection.rollback(); assertEquals(0, f.pending); assertEquals(0, f.committed); f.assertClosed();
+        try (var transaction = BusinessWriteTestSupport.partition(f.connection)) {
+            assertThrows(SQLException.class, () -> REPOSITORY.append(transaction.connection(), ID, partition()));
+            assertEquals(0, f.commits); assertEquals(0, f.rollbacks); transaction.rollback();
+        }
+        assertEquals(0, f.pending); assertEquals(0, f.committed); f.assertClosed();
     }
 
     private static LanguagePartition partition() {

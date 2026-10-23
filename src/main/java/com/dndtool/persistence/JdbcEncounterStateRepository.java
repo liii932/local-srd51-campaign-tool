@@ -120,6 +120,7 @@ public final class JdbcEncounterStateRepository implements EncounterStateReposit
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         Objects.requireNonNull(connection, "connection");
         if (connection.getAutoCommit()
                 || connection.isReadOnly()

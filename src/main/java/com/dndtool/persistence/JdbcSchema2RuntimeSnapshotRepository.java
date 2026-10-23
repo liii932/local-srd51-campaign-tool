@@ -23,6 +23,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                     projection.projection().entries(), projection.projection().chains());
             sameProjection(projection, expected);
         } catch (RuntimeException malformed) { throw invalid(); }
+        BusinessWriteTransactions.requireGuarded(connection);
         checkConnection(connection, true);
         insert(connection, "s2_runtime_identity", "run_id, snapshot_id", identity.runBytes(), identity.snapshotBytes());
         var typed = expected.projection();

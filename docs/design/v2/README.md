@@ -21,7 +21,8 @@ canonical/archive 目标为 `2/2`，发布状态保持 DRAFT。它不是所有�
 | schema 2 作者包到组合结果 | [最小组合链路验证](schema-2-composition-validation.md) | 有限严格读取与纯组合内核、完整作者输入、最终字段和覆盖链的独立向量；内部可测与完整基础模组接纳分别判断 |
 | schema 2 生产制品及离线接受 | [制品编码](../../rules/schema-2-rule-artifacts.md)、[安装与接受](../../rules/schema-2-installation-and-acceptance.md) | 有界原始 ZIP、独立生产摘要、不可变来源事实和显式审阅绑定；不代替完整基础、机制、运行与真实数据库采用门 |
 | schema 2 来源到运行快照 | [内部转存与恢复绑定](../../rules/schema-2-runtime-snapshot.md) | 来源一致读取、类型化快照与完整覆盖链原子转存、实际回读、提交查证；有限内部链路，不开放游戏初始化 |
-| schema 2 初始语言／工具授予 | [初始授予合同](../../rules/schema-2-proficiency-grants.md) | 真实角色来源、稳定槽、完整原子授予、来源与快照读回、绑定计划；共同业务初始化仍待接合 |
+| schema 2 初始语言／工具授予 | [初始授予合同](../../rules/schema-2-proficiency-grants.md) | 真实角色来源、稳定槽、完整原子授予、来源与快照读回、绑定计划；完整业务/历史初始化仍待接合 |
+| 共同业务守卫 | [共同业务事务](../../rules/business-write-transactions.md) | 全部现有写入口共享接纳与故障边界；初始计划持久化与完整业务/历史初始化仍须采用 |
 | 单个机制怎样完整接入 | [机制接入责任清单](mechanism-integration-checklist.md) | 规则、执行、状态、历史、恢复和验证的责任及采用门；供每个机制逐项填写 |
 | 攻击、移动、施法和反应的暂停与继续 | [动作继续协议](action-continuation-protocol.md) | 唯一动作流、类型化阶段、反应与选择、一次消费和精确恢复；具体机制另按责任清单采用 |
 | 持续效果的生效、压制、恢复贡献与结束 | [持续效果协议](ongoing-effect-protocol.md) | 来源与目标实例、贡献选择、独立压制原因、到期/专注/结束及与动作流的接合 |

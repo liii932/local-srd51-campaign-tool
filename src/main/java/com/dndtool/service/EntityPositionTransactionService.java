@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.CharacterVersionRepository;
 import com.dndtool.persistence.EntityPositionCommandRepository;
 import java.sql.Connection;
@@ -30,67 +31,56 @@ public final class EntityPositionTransactionService {
     public Result position(EntityPositionService.Request request) throws SQLException {
         // Frozen-catalog validation happens before a connection, lock or idempotency range is used.
         EntityPositionService.PreparedRequest prepared = commandService.prepare(request);
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-
-                EntityPositionCommandRepository.Lookup existing = repository.find(
-                        connection,
-                        new EntityPositionCommandRepository.IdempotencyCommand(
-                                prepared.requestId(), prepared.requestDigestSha256(),
-                                prepared.campaignId()));
-                if (existing.status() == EntityPositionCommandRepository.Status.CONFLICT) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.idempotencyConflict();
-                }
-                if (existing.status() == EntityPositionCommandRepository.Status.REPLAY) {
-                    if (!prepared.characterKey().equals(existing.replay().characterKey())
-                            || !prepared.nodeKey().equals(existing.replay().nodeKey())) {
-                        throw new SQLException("Replayed direct-position result is inconsistent");
-                    }
-                    connection.commit();
-                    restore(connection, original);
-                    return Result.replayed(existing.replay());
-                }
-
-                CharacterVersionService.Result<WorkResult> versioned =
-                        versionService.executeLocked(
-                                connection,
-                                prepared.versionRequest(),
-                                Set.of(),
-                                (transaction, scope) -> executeLocked(
-                                        transaction, scope, prepared));
-                if (versioned.status() != CharacterVersionRepository.Status.LOCKED) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.rejected(
-                            versioned.status(), versioned.rejectedCharacterKey(),
-                            versioned.currentRowVersion());
-                }
-
-                WorkResult work = versioned.value();
-                Long rowVersion = work.move().changed()
-                        ? versioned.advancedRowVersions().get(work.event().characterId())
-                        : prepared.expectedRowVersion();
-                if (rowVersion == null) {
-                    throw new SQLException("Direct-position version result is missing");
-                }
-                repository.complete(
-                        connection,
-                        new EntityPositionCommandRepository.Completion(
-                                prepared.requestId(), prepared.requestDigestSha256(),
-                                prepared.campaignId(), work.event().gameEventId()));
-                connection.commit();
-                restore(connection, original);
-                return Result.completed(work.move(), work.event(), rowVersion);
-            } catch (SQLException | RuntimeException failure) {
-                rollbackAndRestore(connection, original, failure);
-                throw failure;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            EntityPositionCommandRepository.Lookup existing = repository.find(
+                    connection,
+                    new EntityPositionCommandRepository.IdempotencyCommand(
+                            prepared.requestId(), prepared.requestDigestSha256(),
+                            prepared.campaignId()));
+            if (existing.status() == EntityPositionCommandRepository.Status.CONFLICT) {
+                writeTransaction.rollback();
+                return Result.idempotencyConflict();
             }
+            if (existing.status() == EntityPositionCommandRepository.Status.REPLAY) {
+                if (!prepared.characterKey().equals(existing.replay().characterKey())
+                        || !prepared.nodeKey().equals(existing.replay().nodeKey())) {
+                    throw new SQLException("Replayed direct-position result is inconsistent");
+                }
+                writeTransaction.commit();
+                return Result.replayed(existing.replay());
+            }
+
+            CharacterVersionService.Result<WorkResult> versioned =
+                    versionService.executeLocked(
+                            connection,
+                            prepared.versionRequest(),
+                            Set.of(),
+                            (transaction, scope) -> executeLocked(
+                                    transaction, scope, prepared));
+            if (versioned.status() != CharacterVersionRepository.Status.LOCKED) {
+                writeTransaction.rollback();
+                return Result.rejected(
+                        versioned.status(), versioned.rejectedCharacterKey(),
+                        versioned.currentRowVersion());
+            }
+
+            WorkResult work = versioned.value();
+            Long rowVersion = work.move().changed()
+                    ? versioned.advancedRowVersions().get(work.event().characterId())
+                    : prepared.expectedRowVersion();
+            if (rowVersion == null) {
+                throw new SQLException("Direct-position version result is missing");
+            }
+            repository.complete(
+                    connection,
+                    new EntityPositionCommandRepository.Completion(
+                            prepared.requestId(), prepared.requestDigestSha256(),
+                            prepared.campaignId(), work.event().gameEventId()));
+            writeTransaction.commit();
+            return Result.completed(work.move(), work.event(), rowVersion);
         }
     }
 
@@ -115,27 +105,6 @@ public final class EntityPositionTransactionService {
         Set<Long> modified = move.changed() ? Set.of(target.id()) : Set.of();
         return new CharacterVersionService.LockedWorkResult<>(
                 new WorkResult(move, event), modified);
-    }
-
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.isolation());
     }
 
     public record Result(
@@ -196,13 +165,5 @@ public final class EntityPositionTransactionService {
     private record WorkResult(
             EntityPositionCommandRepository.MoveResult move,
             EntityPositionCommandRepository.SavedEvent event) {
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
-        }
     }
 }

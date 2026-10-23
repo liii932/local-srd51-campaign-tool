@@ -25,19 +25,29 @@ final class JdbcEntityPositionCommandRepositoryTest {
     private static final String CHARACTER = "11111111-1111-4111-8111-111111111111";
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcEntityPositionCommandRepository().move(raw, moveCommand()));
+    }
+
+    @Test
     void movesExistingParticipantThenAppendsRootAndOperationWithoutTopologySql() throws Exception {
         Fixture fixture = new Fixture();
         JdbcEntityPositionCommandRepository repository = new JdbcEntityPositionCommandRepository();
 
         assertEquals(EntityPositionCommandRepository.Status.NEW,
-                repository.find(fixture.connection(), identity()).status());
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(guarded, identity())).status());
         EntityPositionCommandRepository.MoveResult move =
-                repository.move(fixture.connection(), moveCommand());
-        EntityPositionCommandRepository.SavedEvent event = repository.appendEvent(
-                fixture.connection(), new EntityPositionCommandRepository.EventCommand(
-                        7L, 8L, 41L, "node.cellar_floor"));
-        repository.complete(fixture.connection(), new EntityPositionCommandRepository.Completion(
-                REQUEST, "b".repeat(64), 7L, event.gameEventId()));
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.move(guarded, moveCommand()));
+        EntityPositionCommandRepository.SavedEvent event = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.appendEvent(
+                guarded, new EntityPositionCommandRepository.EventCommand(
+                        7L, 8L, 41L, "node.cellar_floor")));
+        BusinessWriteTestSupport.write(fixture.connection(),
+                guarded -> repository.complete(guarded, new EntityPositionCommandRepository.Completion(
+                REQUEST, "b".repeat(64), 7L, event.gameEventId())));
 
         assertTrue(move.changed());
         assertEquals("node.cellar_stairs", move.previousNodeKey());
@@ -60,8 +70,9 @@ final class JdbcEntityPositionCommandRepositoryTest {
         fixture.currentNode = "node.cellar_floor";
 
         EntityPositionCommandRepository.MoveResult move =
-                new JdbcEntityPositionCommandRepository().move(
-                        fixture.connection(), moveCommand());
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                        guarded, moveCommand()));
 
         assertFalse(move.changed());
         assertTrue(fixture.writeTargets.isEmpty());
@@ -72,8 +83,9 @@ final class JdbcEntityPositionCommandRepositoryTest {
         Fixture fixture = new Fixture();
         fixture.participantMissing = true;
 
-        assertThrows(SQLException.class, () -> new JdbcEntityPositionCommandRepository().move(
-                fixture.connection(), moveCommand()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                guarded, moveCommand())));
 
         assertTrue(fixture.writeTargets.isEmpty());
     }
@@ -82,14 +94,16 @@ final class JdbcEntityPositionCommandRepositoryTest {
     void rejectsFrozenNodeOrEncounterMismatchBeforeAnyWrite() {
         Fixture missingNode = new Fixture();
         missingNode.nodeMissing = true;
-        assertThrows(SQLException.class, () -> new JdbcEntityPositionCommandRepository().move(
-                missingNode.connection(), moveCommand()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(missingNode.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                guarded, moveCommand())));
         assertTrue(missingNode.writeTargets.isEmpty());
 
         Fixture wrongRelease = new Fixture();
         wrongRelease.battleReleaseId = 12L;
-        assertThrows(SQLException.class, () -> new JdbcEntityPositionCommandRepository().move(
-                wrongRelease.connection(), moveCommand()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(wrongRelease.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                guarded, moveCommand())));
         assertTrue(wrongRelease.writeTargets.isEmpty());
     }
 
@@ -98,7 +112,8 @@ final class JdbcEntityPositionCommandRepositoryTest {
         Fixture replay = new Fixture();
         replay.existingOperation = true;
         EntityPositionCommandRepository.Lookup found =
-                new JdbcEntityPositionCommandRepository().find(replay.connection(), identity());
+                BusinessWriteTestSupport.inTransaction(replay.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().find(guarded, identity()));
         assertEquals(EntityPositionCommandRepository.Status.REPLAY, found.status());
         assertEquals(71L, found.replay().gameEventId());
         assertEquals("node.cellar_floor", found.replay().nodeKey());
@@ -107,7 +122,8 @@ final class JdbcEntityPositionCommandRepositoryTest {
         conflict.existingOperation = true;
         conflict.existingDigest = "c".repeat(64);
         EntityPositionCommandRepository.Lookup rejected =
-                new JdbcEntityPositionCommandRepository().find(conflict.connection(), identity());
+                BusinessWriteTestSupport.inTransaction(conflict.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().find(guarded, identity()));
         assertEquals(EntityPositionCommandRepository.Status.CONFLICT, rejected.status());
         assertEquals(1, conflict.preparedSql.size());
     }
@@ -116,16 +132,19 @@ final class JdbcEntityPositionCommandRepositoryTest {
     void requiresWritableSerializableCallerTransactionBeforeSql() {
         Fixture fixture = new Fixture();
         fixture.autoCommit = true;
-        assertThrows(SQLException.class, () -> new JdbcEntityPositionCommandRepository().move(
-                fixture.connection(), moveCommand()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                guarded, moveCommand())));
         fixture.autoCommit = false;
         fixture.readOnly = true;
-        assertThrows(SQLException.class, () -> new JdbcEntityPositionCommandRepository().move(
-                fixture.connection(), moveCommand()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                guarded, moveCommand())));
         fixture.readOnly = false;
         fixture.isolation = Connection.TRANSACTION_READ_COMMITTED;
-        assertThrows(SQLException.class, () -> new JdbcEntityPositionCommandRepository().move(
-                fixture.connection(), moveCommand()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                guarded, moveCommand())));
         assertTrue(fixture.preparedSql.isEmpty());
     }
 
@@ -134,8 +153,9 @@ final class JdbcEntityPositionCommandRepositoryTest {
         Fixture fixture = new Fixture();
         fixture.failTarget = "entity_position";
 
-        assertThrows(SQLException.class, () -> new JdbcEntityPositionCommandRepository().move(
-                fixture.connection(), moveCommand()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcEntityPositionCommandRepository().move(
+                guarded, moveCommand())));
 
         assertFalse(fixture.committed);
         assertFalse(fixture.rolledBack);

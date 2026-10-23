@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.EncounterStateRepository;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -32,44 +33,15 @@ public final class EncounterStateTransactionService {
                 request.partyNodeKey(),
                 request.participants());
 
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-                EncounterStateRepository.SavedEncounter saved =
-                        repository.initialize(connection, command);
-                connection.commit();
-                restore(connection, original);
-                return saved;
-            } catch (SQLException | RuntimeException failure) {
-                rollbackAndRestore(connection, original, failure);
-                throw failure;
-            }
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            EncounterStateRepository.SavedEncounter saved =
+                    repository.initialize(connection, command);
+            writeTransaction.commit();
+            return saved;
         }
-    }
-
-    private static void rollbackAndRestore(
-            Connection connection,
-            ConnectionState original,
-            Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original) throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.isolation());
     }
 
     public record Request(
@@ -79,15 +51,6 @@ public final class EncounterStateTransactionService {
             List<EncounterStateService.ParticipantRequest> participants) {
         public Request {
             participants = participants == null ? null : List.copyOf(participants);
-        }
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(),
-                    connection.isReadOnly(),
-                    connection.getTransactionIsolation());
         }
     }
 }

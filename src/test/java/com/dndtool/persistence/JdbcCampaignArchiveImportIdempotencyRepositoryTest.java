@@ -25,11 +25,18 @@ final class JdbcCampaignArchiveImportIdempotencyRepositoryTest {
             new JdbcCampaignArchiveImportIdempotencyRepository();
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCampaignArchiveImportIdempotencyRepository().find(raw, command()));
+    }
+
+    @Test
     void missingRequestLocksGlobalIdentityWithoutOwningTransaction() throws Exception {
         Fixture fixture = new Fixture();
 
-        CampaignArchiveImportIdempotencyRepository.Lookup lookup = repository.find(
-                fixture.connection(), command());
+        CampaignArchiveImportIdempotencyRepository.Lookup lookup = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(
+                guarded, command()));
 
         assertEquals(CampaignArchiveImportIdempotencyRepository.Status.NEW, lookup.status());
         assertTrue(fixture.preparedSql.getFirst().contains("FOR UPDATE"));
@@ -41,8 +48,9 @@ final class JdbcCampaignArchiveImportIdempotencyRepositoryTest {
     void sameDigestAndOperationReplaysOriginalCampaign() throws Exception {
         Fixture fixture = replayFixture();
 
-        CampaignArchiveImportIdempotencyRepository.Lookup lookup = repository.find(
-                fixture.connection(), command());
+        CampaignArchiveImportIdempotencyRepository.Lookup lookup = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(
+                guarded, command()));
 
         assertEquals(CampaignArchiveImportIdempotencyRepository.Status.REPLAY, lookup.status());
         assertEquals(7L, lookup.campaignId());
@@ -57,8 +65,9 @@ final class JdbcCampaignArchiveImportIdempotencyRepositoryTest {
                     "request_digest_sha256".equals(changedColumn)
                             ? "b".repeat(64) : "CREATE_CAMPAIGN");
 
-            CampaignArchiveImportIdempotencyRepository.Lookup lookup = repository.find(
-                    fixture.connection(), command());
+            CampaignArchiveImportIdempotencyRepository.Lookup lookup = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(
+                    guarded, command()));
 
             assertEquals(CampaignArchiveImportIdempotencyRepository.Status.CONFLICT,
                     lookup.status());
@@ -71,7 +80,8 @@ final class JdbcCampaignArchiveImportIdempotencyRepositoryTest {
         fixture.rows.getFirst().put("campaign_id", null);
 
         SQLException exception = assertThrows(SQLException.class,
-                () -> repository.find(fixture.connection(), command()));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(guarded, command())));
 
         assertTrue(exception.getMessage().contains("incomplete"));
     }
@@ -80,10 +90,11 @@ final class JdbcCampaignArchiveImportIdempotencyRepositoryTest {
     void completionRecordsSuccessfulCampaignWithoutCommitOrRollback() throws Exception {
         Fixture fixture = new Fixture();
 
-        repository.complete(
-                fixture.connection(),
+        BusinessWriteTestSupport.write(fixture.connection(),
+                guarded -> repository.complete(
+                guarded,
                 new CampaignArchiveImportIdempotencyRepository.Completion(
-                        REQUEST, DIGEST, 7L));
+                        REQUEST, DIGEST, 7L)));
 
         assertTrue(fixture.preparedSql.getFirst().startsWith("INSERT INTO host_operation"));
         assertEquals(Map.of(
@@ -101,11 +112,13 @@ final class JdbcCampaignArchiveImportIdempotencyRepositoryTest {
         fixture.autoCommit = true;
 
         assertThrows(SQLException.class,
-                () -> repository.find(fixture.connection(), command()));
-        assertThrows(IllegalArgumentException.class, () -> repository.find(
-                fixture.connection(),
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(guarded, command())));
+        assertThrows(IllegalArgumentException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(
+                guarded,
                 new CampaignArchiveImportIdempotencyRepository.Command(
-                        "not-a-uuid", DIGEST)));
+                        "not-a-uuid", DIGEST))));
     }
 
     private static CampaignArchiveImportIdempotencyRepository.Command command() {

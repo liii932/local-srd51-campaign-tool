@@ -83,28 +83,33 @@ final class MySqlIntegrationIT {
         try (Connection connection = MySqlIntegrationTestSupport.open()) {
             createIdempotencyTables(connection);
             insertCheckSnapshot(connection);
-            connection.setAutoCommit(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            DataSource source = MySqlIntegrationTestSupport.singleConnectionDataSource(connection);
             JdbcCheckIdempotencyRepository repository = new JdbcCheckIdempotencyRepository();
             CheckIdempotencyRepository.Command command =
                     new CheckIdempotencyRepository.Command(REQUEST_ID, REQUEST_DIGEST, 7);
-            assertEquals(CheckIdempotencyRepository.Status.NEW,
-                    repository.find(connection, command).status());
-            repository.complete(connection, new CheckIdempotencyRepository.Completion(
-                    REQUEST_ID, REQUEST_DIGEST, 7, 91));
-            connection.commit();
+            try (BusinessWriteTransactions.Session transaction = BusinessWriteTransactions.openLegacy(
+                    source, Connection.TRANSACTION_SERIALIZABLE)) {
+                Connection guarded = transaction.connection();
+                assertEquals(CheckIdempotencyRepository.Status.NEW,
+                        repository.find(guarded, command).status());
+                repository.complete(guarded, new CheckIdempotencyRepository.Completion(
+                        REQUEST_ID, REQUEST_DIGEST, 7, 91));
+                transaction.commit();
+            }
 
-            connection.setAutoCommit(false);
-            CheckIdempotencyRepository.Lookup replay = repository.find(connection, command);
-            assertEquals(CheckIdempotencyRepository.Status.REPLAY, replay.status());
-            assertEquals(91L, replay.replay().savedCheck().gameEventId());
-            assertEquals(17, replay.replay().calculation().selectedValue());
-            CheckIdempotencyRepository.Lookup conflict = repository.find(connection,
-                    new CheckIdempotencyRepository.Command(REQUEST_ID,
-                            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", 7));
-            assertEquals(CheckIdempotencyRepository.Status.CONFLICT, conflict.status());
-            connection.rollback();
-            connection.setAutoCommit(true);
+            try (BusinessWriteTransactions.Session transaction = BusinessWriteTransactions.openLegacy(
+                    source, Connection.TRANSACTION_SERIALIZABLE)) {
+                Connection guarded = transaction.connection();
+                CheckIdempotencyRepository.Lookup replay = repository.find(guarded, command);
+                assertEquals(CheckIdempotencyRepository.Status.REPLAY, replay.status());
+                assertEquals(91L, replay.replay().savedCheck().gameEventId());
+                assertEquals(17, replay.replay().calculation().selectedValue());
+                CheckIdempotencyRepository.Lookup conflict = repository.find(guarded,
+                        new CheckIdempotencyRepository.Command(REQUEST_ID,
+                                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", 7));
+                assertEquals(CheckIdempotencyRepository.Status.CONFLICT, conflict.status());
+                transaction.rollback();
+            }
             assertTrue(connection.getAutoCommit());
         }
     }
@@ -114,19 +119,22 @@ final class MySqlIntegrationIT {
         try (Connection connection = MySqlIntegrationTestSupport.open()) {
             createArchiveTables(connection);
             insertRelease(connection);
-            connection.setAutoCommit(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-            CampaignArchiveDocument document = emptyArchive();
-            long campaignId = new JdbcCampaignArchiveImportRepository().importArchive(
-                    connection,
-                    new CampaignArchiveImportRepository.Command(document, null, 987654321L));
-            assertTrue(campaignId > 0);
-            assertEquals(1, scalarInt(connection, "SELECT COUNT(*) FROM campaign"));
-            assertEquals(1, scalarInt(connection, "SELECT COUNT(*) FROM campaign_module"));
-            connection.rollback();
+            DataSource source = MySqlIntegrationTestSupport.singleConnectionDataSource(connection);
+            try (BusinessWriteTransactions.Session transaction = BusinessWriteTransactions.openLegacy(
+                    source, Connection.TRANSACTION_SERIALIZABLE)) {
+                Connection guarded = transaction.connection();
+                CampaignArchiveDocument document = emptyArchive();
+                long campaignId = new JdbcCampaignArchiveImportRepository().importArchive(
+                        guarded,
+                        new CampaignArchiveImportRepository.Command(document, null, 987654321L));
+                assertTrue(campaignId > 0);
+                assertEquals(1, scalarInt(guarded, "SELECT COUNT(*) FROM campaign"));
+                assertEquals(1, scalarInt(guarded, "SELECT COUNT(*) FROM campaign_module"));
+                transaction.rollback();
+            }
             assertEquals(0, scalarInt(connection, "SELECT COUNT(*) FROM campaign"));
             assertEquals(0, scalarInt(connection, "SELECT COUNT(*) FROM campaign_module"));
-            connection.setAutoCommit(true);
+            assertTrue(connection.getAutoCommit());
         }
     }
 
@@ -163,75 +171,78 @@ final class MySqlIntegrationIT {
         try (Connection connection = MySqlIntegrationTestSupport.open()) {
             createAtomicCheckTables(connection);
             insertAtomicCheckFixture(connection);
-            connection.setAutoCommit(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            CheckExecutionRepository.SavedCheck saved;
+            DataSource source = MySqlIntegrationTestSupport.singleConnectionDataSource(connection);
+            try (BusinessWriteTransactions.Session transaction = BusinessWriteTransactions.openLegacy(
+                    source, Connection.TRANSACTION_SERIALIZABLE)) {
+                Connection guarded = transaction.connection();
+                D20CheckCalculator.Result calculation = new D20CheckCalculator.Result(
+                        "roll.advantage",
+                        List.of(new D20CheckCalculator.Candidate(1, 12, false),
+                                new D20CheckCalculator.Candidate(2, 18, true)),
+                        18, 2, 20, 15, D20CheckCalculator.Outcome.SUCCESS);
+                saved = new JdbcCheckExecutionRepository().append(
+                        guarded,
+                        new CheckExecutionRepository.Command(
+                                7, 0, 9, 1, "event.ability_check", "check.ability",
+                                "ability.strength", null, calculation));
 
-            D20CheckCalculator.Result calculation = new D20CheckCalculator.Result(
-                    "roll.advantage",
-                    List.of(new D20CheckCalculator.Candidate(1, 12, false),
-                            new D20CheckCalculator.Candidate(2, 18, true)),
-                    18, 2, 20, 15, D20CheckCalculator.Outcome.SUCCESS);
-            CheckExecutionRepository.SavedCheck saved = new JdbcCheckExecutionRepository().append(
-                    connection,
-                    new CheckExecutionRepository.Command(
-                            7, 0, 9, 1, "event.ability_check", "check.ability",
-                            "ability.strength", null, calculation));
+                CheckRequestPolicy.PreparedEffect plannedHp = new CheckRequestPolicy.PreparedEffect(
+                        "effect.adjust_current_hp", "ADJUST_CURRENT_HP_CLAMP_V1", List.of(
+                                new CheckRequestPolicy.PreparedParameter(
+                                        "target_character", 1, "REFERENCE",
+                                        new CheckRequestPolicy.ReferenceValue(TARGET_CHARACTER_KEY)),
+                                new CheckRequestPolicy.PreparedParameter(
+                                        "amount", 2, "INTEGER",
+                                        new CheckRequestPolicy.IntegerValue(-3))));
+                CheckEffectPlanRepository.BranchPlan success = new CheckEffectPlanRepository.BranchPlan(
+                        CheckEffectPlanRepository.EffectBranch.SUCCESS,
+                        List.of(new CheckEffectPlanRepository.EffectPlan(1, plannedHp)));
+                CheckEffectPlanRepository.BranchPlan failure = new CheckEffectPlanRepository.BranchPlan(
+                        CheckEffectPlanRepository.EffectBranch.FAILURE,
+                        List.of(new CheckEffectPlanRepository.EffectPlan(1,
+                                new CheckRequestPolicy.PreparedEffect(
+                                        "effect.append_event_message", "APPEND_EVENT_MESSAGE_V1", List.of(
+                                                new CheckRequestPolicy.PreparedParameter(
+                                                        "message", 1, "TEXT",
+                                                        new CheckRequestPolicy.TextValue("failure")))))));
+                new JdbcCheckEffectPlanRepository().append(guarded,
+                        new CheckEffectPlanRepository.Command(saved.checkExecutionId(), 9, success, failure));
 
-            CheckRequestPolicy.PreparedEffect plannedHp = new CheckRequestPolicy.PreparedEffect(
-                    "effect.adjust_current_hp", "ADJUST_CURRENT_HP_CLAMP_V1", List.of(
-                            new CheckRequestPolicy.PreparedParameter(
-                                    "target_character", 1, "REFERENCE",
-                                    new CheckRequestPolicy.ReferenceValue(TARGET_CHARACTER_KEY)),
-                            new CheckRequestPolicy.PreparedParameter(
-                                    "amount", 2, "INTEGER",
-                                    new CheckRequestPolicy.IntegerValue(-3))));
-            CheckEffectPlanRepository.BranchPlan success = new CheckEffectPlanRepository.BranchPlan(
-                    CheckEffectPlanRepository.EffectBranch.SUCCESS,
-                    List.of(new CheckEffectPlanRepository.EffectPlan(1, plannedHp)));
-            CheckEffectPlanRepository.BranchPlan failure = new CheckEffectPlanRepository.BranchPlan(
-                    CheckEffectPlanRepository.EffectBranch.FAILURE,
-                    List.of(new CheckEffectPlanRepository.EffectPlan(1,
-                            new CheckRequestPolicy.PreparedEffect(
-                                    "effect.append_event_message", "APPEND_EVENT_MESSAGE_V1", List.of(
-                                            new CheckRequestPolicy.PreparedParameter(
-                                                    "message", 1, "TEXT",
-                                                    new CheckRequestPolicy.TextValue("failure")))))));
-            new JdbcCheckEffectPlanRepository().append(connection,
-                    new CheckEffectPlanRepository.Command(saved.checkExecutionId(), 9, success, failure));
+                CheckEffectExecutionRepository.AppliedEffects applied =
+                        new JdbcCheckEffectExecutionRepository().execute(
+                                guarded,
+                                new CheckEffectExecutionRepository.Command(
+                                        saved.checkExecutionId(), 7, 9, saved.gameEventId(),
+                                        new CheckEffectExecutionRepository.BranchActions(
+                                                CheckEffectPlanRepository.EffectBranch.SUCCESS,
+                                                List.of(new CheckEffectExecutionRepository.AdjustCurrentHp(
+                                                        1, 2, TARGET_CHARACTER_KEY, -3))),
+                                        new CheckEffectExecutionRepository.BranchActions(
+                                                CheckEffectPlanRepository.EffectBranch.FAILURE, List.of())));
+                assertEquals(Set.of(2L), applied.modifiedCharacterIds());
+                assertEquals(1, applied.fieldChangeCount());
 
-            CheckEffectExecutionRepository.AppliedEffects applied =
-                    new JdbcCheckEffectExecutionRepository().execute(
-                            connection,
-                            new CheckEffectExecutionRepository.Command(
-                                    saved.checkExecutionId(), 7, 9, saved.gameEventId(),
-                                    new CheckEffectExecutionRepository.BranchActions(
-                                            CheckEffectPlanRepository.EffectBranch.SUCCESS,
-                                            List.of(new CheckEffectExecutionRepository.AdjustCurrentHp(
-                                                    1, 2, TARGET_CHARACTER_KEY, -3))),
-                                    new CheckEffectExecutionRepository.BranchActions(
-                                            CheckEffectPlanRepository.EffectBranch.FAILURE, List.of())));
-            assertEquals(Set.of(2L), applied.modifiedCharacterIds());
-            assertEquals(1, applied.fieldChangeCount());
+                CharacterVersionRepository.LockedCharacter executor =
+                        new CharacterVersionRepository.LockedCharacter(
+                                1, EXECUTOR_CHARACTER_KEY, 7, 9, 0);
+                CharacterVersionRepository.LockedCharacter target =
+                        new CharacterVersionRepository.LockedCharacter(
+                                2, TARGET_CHARACTER_KEY, 7, 9, 0);
+                Map<Long, Long> versions = new JdbcCharacterVersionRepository()
+                        .advanceModifiedVersions(
+                                guarded,
+                                new CharacterVersionRepository.LockedScope(
+                                        7, 9, 0, executor, List.of(executor, target)),
+                                Set.of(2L));
+                assertEquals(Map.of(2L, 1L), versions);
 
-            CharacterVersionRepository.LockedCharacter executor =
-                    new CharacterVersionRepository.LockedCharacter(
-                            1, EXECUTOR_CHARACTER_KEY, 7, 9, 0);
-            CharacterVersionRepository.LockedCharacter target =
-                    new CharacterVersionRepository.LockedCharacter(
-                            2, TARGET_CHARACTER_KEY, 7, 9, 0);
-            Map<Long, Long> versions = new JdbcCharacterVersionRepository()
-                    .advanceModifiedVersions(
-                            connection,
-                            new CharacterVersionRepository.LockedScope(
-                                    7, 9, 0, executor, List.of(executor, target)),
-                            Set.of(2L));
-            assertEquals(Map.of(2L, 1L), versions);
-
-            new JdbcCheckIdempotencyRepository().complete(
-                    connection,
-                    new CheckIdempotencyRepository.Completion(
-                            REQUEST_ID, REQUEST_DIGEST, 7, saved.gameEventId()));
-            connection.commit();
+                new JdbcCheckIdempotencyRepository().complete(
+                        guarded,
+                        new CheckIdempotencyRepository.Completion(
+                                REQUEST_ID, REQUEST_DIGEST, 7, saved.gameEventId()));
+                transaction.commit();
+            }
 
             assertEquals(1, scalarInt(connection,
                     "SELECT COUNT(*) FROM game_event WHERE event_sequence = 1"));
@@ -365,6 +376,20 @@ final class MySqlIntegrationIT {
         }
     }
 
+    private static void createBusinessGuardTables(Connection connection) throws SQLException {
+        MySqlIntegrationTestSupport.execute(connection,
+                "CREATE TEMPORARY TABLE business_write_guard (guard_id INT PRIMARY KEY, "
+                        + "protocol_version INT NOT NULL)");
+        MySqlIntegrationTestSupport.execute(connection,
+                "INSERT INTO business_write_guard VALUES (1, 1)");
+        MySqlIntegrationTestSupport.execute(connection,
+                "CREATE TEMPORARY TABLE s2_runtime_identity (run_id CHAR(36) PRIMARY KEY)");
+        MySqlIntegrationTestSupport.execute(connection,
+                "CREATE TEMPORARY TABLE runtime_run_identity (run_id CHAR(36) PRIMARY KEY)");
+        MySqlIntegrationTestSupport.execute(connection,
+                "CREATE TEMPORARY TABLE IF NOT EXISTS campaign (campaign_status VARCHAR(32))");
+    }
+
     private static void createCharacterTables(Connection connection) throws SQLException {
         MySqlIntegrationTestSupport.execute(connection,
                 "CREATE TEMPORARY TABLE character_record ("
@@ -373,6 +398,7 @@ final class MySqlIntegrationIT {
                         + "row_version BIGINT NOT NULL)");
         MySqlIntegrationTestSupport.execute(connection,
                 "CREATE TEMPORARY TABLE test_character_child (character_id BIGINT NOT NULL, value_text VARCHAR(64))");
+        createBusinessGuardTables(connection);
     }
 
     private static void createAtomicCheckTables(Connection connection) throws SQLException {
@@ -429,6 +455,7 @@ final class MySqlIntegrationIT {
                 "CREATE TEMPORARY TABLE host_operation (request_id CHAR(36) PRIMARY KEY, "
                         + "request_digest_sha256 CHAR(64) NOT NULL, operation_type VARCHAR(64) NOT NULL, "
                         + "campaign_id BIGINT, game_event_id BIGINT, result_status VARCHAR(32) NOT NULL, completed_at TIMESTAMP NULL)");
+        createBusinessGuardTables(connection);
     }
 
     private static void insertAtomicCheckFixture(Connection connection) throws SQLException {
@@ -539,6 +566,7 @@ final class MySqlIntegrationIT {
         MySqlIntegrationTestSupport.execute(connection,
                 "CREATE TEMPORARY TABLE dice_roll (check_execution_id BIGINT NOT NULL, candidate_order INT NOT NULL, "
                         + "rolled_value INT NOT NULL, is_selected TINYINT NOT NULL, PRIMARY KEY(check_execution_id,candidate_order))");
+        createBusinessGuardTables(connection);
     }
 
     private static void insertCheckSnapshot(Connection connection) throws SQLException {
@@ -564,6 +592,7 @@ final class MySqlIntegrationIT {
                         + "frozen_module_key VARCHAR(128), frozen_release_version VARCHAR(64), frozen_content_sha256 CHAR(64))");
         MySqlIntegrationTestSupport.execute(connection,
                 "CREATE TEMPORARY TABLE character_record (id BIGINT PRIMARY KEY AUTO_INCREMENT, campaign_id BIGINT, character_key CHAR(36))");
+        createBusinessGuardTables(connection);
     }
 
     private static void insertRelease(Connection connection) throws SQLException {

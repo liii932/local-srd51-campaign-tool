@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.CheckEffectPlanRepository;
 import com.dndtool.persistence.CheckExecutionRepository;
 import com.dndtool.persistence.CharacterVersionRepository;
@@ -49,61 +50,50 @@ public final class CheckTransactionService {
         validate(request);
         Set<String> requiredTargetKeys = effectService.requiredTargetKeys(
                 request.success(), request.failure());
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-
-                // Lock the global request identity before versions or randomness so a replay
-                // cannot fail on a later row version or consume another die candidate.
-                CheckIdempotencyRepository.Lookup existing = idempotencyRepository.find(
-                        connection, new CheckIdempotencyRepository.Command(
-                                request.requestId(),
-                                request.versionRequest().requestDigestSha256(),
-                                request.versionRequest().campaignId()));
-                if (existing.status() == CheckIdempotencyRepository.Status.CONFLICT) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.idempotencyConflict();
-                }
-                if (existing.status() == CheckIdempotencyRepository.Status.REPLAY) {
-                    connection.commit();
-                    restore(connection, original);
-                    return Result.replayed(existing.replay());
-                }
-
-                CharacterVersionService.Result<WorkResult> versioned =
-                        versionService.executeLocked(
-                                connection,
-                                request.versionRequest(),
-                                requiredTargetKeys,
-                                (transaction, scope) -> executeLocked(
-                                        transaction, scope, request));
-                if (versioned.status() != CharacterVersionRepository.Status.LOCKED) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.rejected(
-                            versioned.status(), versioned.rejectedCharacterKey(),
-                            versioned.currentRowVersion());
-                }
-                WorkResult work = versioned.value();
-                idempotencyRepository.complete(
-                        connection, new CheckIdempotencyRepository.Completion(
-                                request.requestId(),
-                                request.versionRequest().requestDigestSha256(),
-                                request.versionRequest().campaignId(),
-                                work.savedCheck().gameEventId()));
-                connection.commit();
-                restore(connection, original);
-                return Result.completed(
-                        work.savedCheck(), work.calculation(), work.appliedEffects(),
-                        versioned.advancedRowVersions());
-            } catch (SQLException | RuntimeException exception) {
-                rollbackAndRestore(connection, original, exception);
-                throw exception;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            // Lock the global request identity before versions or randomness so a replay
+            // cannot fail on a later row version or consume another die candidate.
+            CheckIdempotencyRepository.Lookup existing = idempotencyRepository.find(
+                    connection, new CheckIdempotencyRepository.Command(
+                            request.requestId(),
+                            request.versionRequest().requestDigestSha256(),
+                            request.versionRequest().campaignId()));
+            if (existing.status() == CheckIdempotencyRepository.Status.CONFLICT) {
+                writeTransaction.rollback();
+                return Result.idempotencyConflict();
             }
+            if (existing.status() == CheckIdempotencyRepository.Status.REPLAY) {
+                writeTransaction.commit();
+                return Result.replayed(existing.replay());
+            }
+
+            CharacterVersionService.Result<WorkResult> versioned =
+                    versionService.executeLocked(
+                            connection,
+                            request.versionRequest(),
+                            requiredTargetKeys,
+                            (transaction, scope) -> executeLocked(
+                                    transaction, scope, request));
+            if (versioned.status() != CharacterVersionRepository.Status.LOCKED) {
+                writeTransaction.rollback();
+                return Result.rejected(
+                        versioned.status(), versioned.rejectedCharacterKey(),
+                        versioned.currentRowVersion());
+            }
+            WorkResult work = versioned.value();
+            idempotencyRepository.complete(
+                    connection, new CheckIdempotencyRepository.Completion(
+                            request.requestId(),
+                            request.versionRequest().requestDigestSha256(),
+                            request.versionRequest().campaignId(),
+                            work.savedCheck().gameEventId()));
+            writeTransaction.commit();
+            return Result.completed(
+                    work.savedCheck(), work.calculation(), work.appliedEffects(),
+                    versioned.advancedRowVersions());
         }
     }
 
@@ -244,27 +234,6 @@ public final class CheckTransactionService {
         eventKey(check);
     }
 
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.isolation());
-    }
-
     public record Request(
             String requestId,
             CharacterVersionService.Request versionRequest,
@@ -332,13 +301,5 @@ public final class CheckTransactionService {
             CheckExecutionRepository.SavedCheck savedCheck,
             D20CheckCalculator.Result calculation,
             CheckEffectExecutionRepository.AppliedEffects appliedEffects) {
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
-        }
     }
 }

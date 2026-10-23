@@ -40,6 +40,15 @@ final class JdbcCheckEffectPlanRepositoryTest {
                     parameter("enabled", 5, "BOOLEAN", new CheckRequestPolicy.BooleanValue(true))));
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCheckEffectPlanRepository().append(raw,
+                        new CheckEffectPlanRepository.Command(303L, 9L,
+                                branch(CheckEffectPlanRepository.EffectBranch.SUCCESS, SUCCESS_EFFECT),
+                                emptyFailure())));
+    }
+
+    @Test
     void persistsSuccessAndFailurePlansInOrderedTypedRows() throws Exception {
         Fixture fixture = new Fixture();
         CheckEffectPlanRepository.Command command = new CheckEffectPlanRepository.Command(
@@ -53,7 +62,8 @@ final class JdbcCheckEffectPlanRepositoryTest {
                                 new CheckEffectPlanRepository.EffectPlan(2, ALL_TYPES_EFFECT))));
 
         CheckEffectPlanRepository.SavedPlan saved =
-                new JdbcCheckEffectPlanRepository().append(fixture.connection(), command);
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckEffectPlanRepository().append(guarded, command));
 
         assertEquals(303L, saved.checkExecutionId());
         assertEquals(List.of(501L, 502L, 503L), saved.effects().stream()
@@ -111,7 +121,8 @@ final class JdbcCheckEffectPlanRepositoryTest {
                         CheckEffectPlanRepository.EffectBranch.FAILURE, List.of()),
                 emptyFailure());
         assertThrows(IllegalArgumentException.class,
-                () -> new JdbcCheckEffectPlanRepository().append(fixture.connection(), mismatchedBranches));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckEffectPlanRepository().append(guarded, mismatchedBranches)));
         assertTrue(fixture.preparedSql.isEmpty());
     }
 
@@ -191,8 +202,9 @@ final class JdbcCheckEffectPlanRepositoryTest {
             Fixture fixture,
             CheckEffectPlanRepository.BranchPlan success,
             CheckEffectPlanRepository.BranchPlan failure) throws SQLException {
-        return new JdbcCheckEffectPlanRepository().append(
-                fixture.connection(), new CheckEffectPlanRepository.Command(303L, 9L, success, failure));
+        return BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckEffectPlanRepository().append(
+                guarded, new CheckEffectPlanRepository.Command(303L, 9L, success, failure)));
     }
 
     private static CheckEffectPlanRepository.BranchPlan branch(

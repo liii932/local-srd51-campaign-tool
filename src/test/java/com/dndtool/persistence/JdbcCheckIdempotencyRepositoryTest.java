@@ -26,11 +26,18 @@ final class JdbcCheckIdempotencyRepositoryTest {
             new JdbcCheckIdempotencyRepository();
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCheckIdempotencyRepository().find(raw, command()));
+    }
+
+    @Test
     void missingRequestLocksIdentityAndReturnsNewWithoutWriting() throws Exception {
         Fixture fixture = new Fixture();
 
-        CheckIdempotencyRepository.Lookup lookup = repository.find(
-                fixture.connection(), command());
+        CheckIdempotencyRepository.Lookup lookup = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(
+                guarded, command()));
 
         assertEquals(CheckIdempotencyRepository.Status.NEW, lookup.status());
         assertEquals(1, fixture.preparedSql.size());
@@ -43,8 +50,9 @@ final class JdbcCheckIdempotencyRepositoryTest {
     void sameDigestRestoresOriginalIdsCandidatesAndOutcome() throws Exception {
         Fixture fixture = replayFixture();
 
-        CheckIdempotencyRepository.Lookup lookup = repository.find(
-                fixture.connection(), command());
+        CheckIdempotencyRepository.Lookup lookup = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(
+                guarded, command()));
 
         assertEquals(CheckIdempotencyRepository.Status.REPLAY, lookup.status());
         assertEquals(101L, lookup.replay().savedCheck().gameEventId());
@@ -63,8 +71,9 @@ final class JdbcCheckIdempotencyRepositoryTest {
         Fixture fixture = replayFixture();
         fixture.operationRows.getFirst().put("request_digest_sha256", "b".repeat(64));
 
-        CheckIdempotencyRepository.Lookup lookup = repository.find(
-                fixture.connection(), command());
+        CheckIdempotencyRepository.Lookup lookup = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(
+                guarded, command()));
 
         assertEquals(CheckIdempotencyRepository.Status.CONFLICT, lookup.status());
         assertEquals(1, fixture.preparedSql.size());
@@ -77,7 +86,8 @@ final class JdbcCheckIdempotencyRepositoryTest {
         fixture.diceRows.get(1).put("is_selected", 1);
 
         SQLException exception = assertThrows(SQLException.class,
-                () -> repository.find(fixture.connection(), command()));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(guarded, command())));
 
         assertTrue(exception.getMessage().contains("inconsistent"));
         assertFalse(fixture.committed);
@@ -88,8 +98,9 @@ final class JdbcCheckIdempotencyRepositoryTest {
     void completionInsertsSuccessfulRootWithoutCommitOrRollback() throws Exception {
         Fixture fixture = new Fixture();
 
-        repository.complete(fixture.connection(), new CheckIdempotencyRepository.Completion(
-                REQUEST, DIGEST, 7L, 101L));
+        BusinessWriteTestSupport.write(fixture.connection(),
+                guarded -> repository.complete(guarded, new CheckIdempotencyRepository.Completion(
+                REQUEST, DIGEST, 7L, 101L)));
 
         assertTrue(fixture.preparedSql.getFirst().startsWith("INSERT INTO host_operation"));
         assertEquals(Map.of(
@@ -108,10 +119,12 @@ final class JdbcCheckIdempotencyRepositoryTest {
         fixture.autoCommit = true;
 
         assertThrows(SQLException.class,
-                () -> repository.find(fixture.connection(), command()));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(guarded, command())));
         assertThrows(IllegalArgumentException.class,
-                () -> repository.find(fixture.connection(),
-                        new CheckIdempotencyRepository.Command("not-a-uuid", DIGEST, 7L)));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.find(guarded,
+                        new CheckIdempotencyRepository.Command("not-a-uuid", DIGEST, 7L))));
     }
 
     private static CheckIdempotencyRepository.Command command() {

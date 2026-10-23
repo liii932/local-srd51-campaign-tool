@@ -34,6 +34,17 @@ class JdbcCampaignCreationRepositoryTest {
                     MODULE_SHA);
 
     @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        JdbcFixture fixture = new JdbcFixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> new JdbcCampaignCreationRepository(fixture.dataSource()).create(COMMAND));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.insertTargets.isEmpty());
+    }
+
+    @Test
     void atomicallyCreatesCampaignSingleFrozenBindingAndSucceededOperation()
             throws Exception {
         JdbcFixture fixture = new JdbcFixture();
@@ -205,9 +216,9 @@ class JdbcCampaignCreationRepositoryTest {
 
         private DataSource dataSource() {
             Connection connection = proxy(Connection.class, this::connection);
-            return proxy(DataSource.class, (ignored, method, arguments) ->
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) ->
                     "getConnection".equals(method.getName())
-                            ? connection : defaultValue(method.getReturnType()));
+                            ? connection : defaultValue(method.getReturnType())));
         }
 
         private Object connection(Object ignored, Method method, Object[] arguments) {

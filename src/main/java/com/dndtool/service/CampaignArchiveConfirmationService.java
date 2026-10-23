@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.CampaignArchiveImportIdempotencyRepository;
 import com.dndtool.persistence.CampaignArchiveImportRepository;
 import com.dndtool.persistence.ModuleCatalogRepository;
@@ -70,73 +71,61 @@ public final class CampaignArchiveConfirmationService {
             return Result.rejected(Status.DIGEST_MISMATCH);
         }
 
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-
-                // Confirmation is deliberately not allowed to trust the earlier preview snapshot.
-                ValidatedArchive validated = validator.validate(connection, content);
-                if (validated.status() != Status.READY) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.rejected(validated.status());
-                }
-
-                CampaignArchiveImportIdempotencyRepository.Lookup existing =
-                        idempotencyRepository.find(
-                                connection,
-                                new CampaignArchiveImportIdempotencyRepository.Command(
-                                        request.requestId(), request.requestDigestSha256()));
-                if (existing.status()
-                        == CampaignArchiveImportIdempotencyRepository.Status.CONFLICT) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.rejected(Status.IDEMPOTENCY_CONFLICT);
-                }
-                if (existing.status()
-                        == CampaignArchiveImportIdempotencyRepository.Status.REPLAY) {
-                    connection.commit();
-                    restore(connection, original);
-                    return Result.completed(existing.campaignId(), true);
-                }
-
-                long hostStateEpoch = nextHostStateEpoch();
-                long campaignId;
-                try {
-                    campaignId = importWork.execute(
-                            connection,
-                            validated.document(),
-                            request.confirmedArchiveCampaignKey(),
-                            hostStateEpoch);
-                } catch (CampaignArchiveImportRepository.RejectionException rejection) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.rejected(switch (rejection.rejection()) {
-                        case ACTIVE_CAMPAIGN_CONFIRMATION_REQUIRED ->
-                                Status.ACTIVE_CAMPAIGN_CONFIRMATION_REQUIRED;
-                        case PREVIEW_STATE_CHANGED -> Status.PREVIEW_STATE_CHANGED;
-                        case UNEXPECTED_ARCHIVE_CONFIRMATION ->
-                                Status.UNEXPECTED_ARCHIVE_CONFIRMATION;
-                        case STABLE_IDENTITY_CONFLICT -> Status.STABLE_IDENTITY_CONFLICT;
-                    });
-                }
-                if (campaignId <= 0) {
-                    throw new SQLException("Confirmed import returned an invalid campaign id");
-                }
-                idempotencyRepository.complete(
-                        connection,
-                        new CampaignArchiveImportIdempotencyRepository.Completion(
-                                request.requestId(), request.requestDigestSha256(), campaignId));
-                connection.commit();
-                restore(connection, original);
-                return Result.completed(campaignId, false);
-            } catch (SQLException | RuntimeException failure) {
-                rollbackAndRestore(connection, original, failure);
-                throw failure;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            // Confirmation is deliberately not allowed to trust the earlier preview snapshot.
+            ValidatedArchive validated = validator.validate(connection, content);
+            if (validated.status() != Status.READY) {
+                writeTransaction.rollback();
+                return Result.rejected(validated.status());
             }
+
+            CampaignArchiveImportIdempotencyRepository.Lookup existing =
+                    idempotencyRepository.find(
+                            connection,
+                            new CampaignArchiveImportIdempotencyRepository.Command(
+                                    request.requestId(), request.requestDigestSha256()));
+            if (existing.status()
+                    == CampaignArchiveImportIdempotencyRepository.Status.CONFLICT) {
+                writeTransaction.rollback();
+                return Result.rejected(Status.IDEMPOTENCY_CONFLICT);
+            }
+            if (existing.status()
+                    == CampaignArchiveImportIdempotencyRepository.Status.REPLAY) {
+                writeTransaction.commit();
+                return Result.completed(existing.campaignId(), true);
+            }
+
+            long hostStateEpoch = nextHostStateEpoch();
+            long campaignId;
+            try {
+                campaignId = importWork.execute(
+                        connection,
+                        validated.document(),
+                        request.confirmedArchiveCampaignKey(),
+                        hostStateEpoch);
+            } catch (CampaignArchiveImportRepository.RejectionException rejection) {
+                writeTransaction.rollback();
+                return Result.rejected(switch (rejection.rejection()) {
+                    case ACTIVE_CAMPAIGN_CONFIRMATION_REQUIRED ->
+                            Status.ACTIVE_CAMPAIGN_CONFIRMATION_REQUIRED;
+                    case PREVIEW_STATE_CHANGED -> Status.PREVIEW_STATE_CHANGED;
+                    case UNEXPECTED_ARCHIVE_CONFIRMATION ->
+                            Status.UNEXPECTED_ARCHIVE_CONFIRMATION;
+                    case STABLE_IDENTITY_CONFLICT -> Status.STABLE_IDENTITY_CONFLICT;
+                });
+            }
+            if (campaignId <= 0) {
+                throw new SQLException("Confirmed import returned an invalid campaign id");
+            }
+            idempotencyRepository.complete(
+                    connection,
+                    new CampaignArchiveImportIdempotencyRepository.Completion(
+                            request.requestId(), request.requestDigestSha256(), campaignId));
+            writeTransaction.commit();
+            return Result.completed(campaignId, false);
         }
     }
 
@@ -220,27 +209,6 @@ public final class CampaignArchiveConfirmationService {
     private static boolean secureEquals(String left, String right) {
         return MessageDigest.isEqual(
                 HexFormat.of().parseHex(left), HexFormat.of().parseHex(right));
-    }
-
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.isolation());
     }
 
     public record Request(
@@ -327,14 +295,6 @@ public final class CampaignArchiveConfirmationService {
                 throw new IllegalArgumentException("Invalid confirmation rejection status");
             }
             return new ValidatedArchive(status, null);
-        }
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
         }
     }
 }

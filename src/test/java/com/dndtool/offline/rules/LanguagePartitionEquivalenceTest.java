@@ -1,5 +1,6 @@
 package com.dndtool.offline.rules;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import com.dndtool.module.CharacterCatalogAuthorPackageReader;
 import com.dndtool.module.LanguagePartition;
 import com.dndtool.module.ModuleCanonicalEncoderV2;
@@ -35,12 +36,13 @@ class LanguagePartitionEquivalenceTest {
         var source = new JdbcSourceLanguageRepository(fixture.source()).load();
         assertBoundary(baseline(), source, vector());
         var id = Identity.random();
-        try (var transaction = fixture.runtime()) {
+        try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+            var transaction = writeSession.connection();
             var appended = RUNTIME.append(transaction, id, source);
             assertEquals(id, appended.identity()); assertBoundary(baseline(), appended.partition(), vector());
             assertStored(baseline(), fixture.languages, "snapshot_id"); assertHead(fixture);
             assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
-            transaction.commit();
+            writeSession.commit();
         }
         try (var transaction = fixture.runtime()) {
             assertBoundary(baseline(), RUNTIME.read(transaction, id).partition(), vector());
@@ -56,9 +58,10 @@ class LanguagePartitionEquivalenceTest {
         var source = new JdbcSourceLanguageRepository(fixture.source()).load();
         assertBoundary(baseline(), source, vector());
         var id = Identity.random();
-        try (var tx = fixture.runtime()) {
+        try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+            var tx = writeSession.connection();
             assertBoundary(baseline(), RUNTIME.append(tx, id, source).partition(), vector());
-            assertStored(baseline(), fixture.languages, "snapshot_id"); tx.commit();
+            assertStored(baseline(), fixture.languages, "snapshot_id"); writeSession.commit();
         }
         try (var tx = fixture.runtime()) { assertBoundary(baseline(), RUNTIME.read(tx, id).partition(), vector()); tx.rollback(); }
     }
@@ -72,9 +75,10 @@ class LanguagePartitionEquivalenceTest {
             assertBoundary(expected, artifact.author().languages(), bytes); assertInstalled(expected, db);
             var source = new JdbcSourceLanguageRepository(fixture.source()).load(); assertBoundary(expected, source, bytes);
             var id = Identity.random();
-            try (var tx = fixture.runtime()) {
+            try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+                var tx = writeSession.connection();
                 assertBoundary(expected, RUNTIME.append(tx, id, source).partition(), bytes);
-                assertStored(expected, fixture.languages, "snapshot_id"); assertHead(fixture); tx.commit();
+                assertStored(expected, fixture.languages, "snapshot_id"); assertHead(fixture); writeSession.commit();
             }
             try (var tx = fixture.runtime()) { assertBoundary(expected, RUNTIME.read(tx, id).partition(), bytes); tx.rollback(); }
         }));
@@ -94,10 +98,12 @@ class LanguagePartitionEquivalenceTest {
         var second = new JdbcSourceLanguageRepository(fixture.source()).load();
         assertBoundary(baseline(), first, vector()); assertBoundary(baseline(), second, vector());
         var idA = Identity.random(); var idB = Identity.random(); var idC = Identity.random();
-        try (var tx = fixture.runtime()) { RUNTIME.append(tx, idA, first); RUNTIME.append(tx, idB, second); tx.commit(); }
+        try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+            var tx = writeSession.connection(); RUNTIME.append(tx, idA, first); RUNTIME.append(tx, idB, second); writeSession.commit(); }
         var changedArtifact = artifact("source_page"); installInto(db, changedArtifact, 2);
         var third = new JdbcSourceLanguageRepository(fixture.source()).load(); assertPartition(changed("source_page"), third);
-        try (var tx = fixture.runtime()) { RUNTIME.append(tx, idC, third); tx.commit(); }
+        try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+            var tx = writeSession.connection(); RUNTIME.append(tx, idC, third); writeSession.commit(); }
         assertEquals(3, fixture.registrations.size()); assertEquals(3, fixture.heads.size()); assertEquals(54, fixture.languages.size());
         fixture.sourceOffline = true;
         assertThrows(SQLException.class, () -> new JdbcSourceLanguageRepository(fixture.source()).load());
@@ -131,7 +137,8 @@ class LanguagePartitionEquivalenceTest {
                         assertTrue(fixture.registrations.isEmpty()); assertEquals(0, fixture.runtimeQueries);
                     } else {
                         var partition = new JdbcSourceLanguageRepository(fixture.source()).load(); var id = Identity.random();
-                        try (var tx = fixture.runtime()) { RUNTIME.append(tx, id, partition); tx.commit(); }
+                        try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+                            var tx = writeSession.connection(); RUNTIME.append(tx, id, partition); writeSession.commit(); }
                         fixture.runtimeFault = fault.getValue();
                         try (var tx = fixture.runtime()) { assertThrows(SQLException.class, () -> RUNTIME.read(tx, id)); tx.rollback(); }
                         assertEquals(18, fixture.languages.size(), "A bad read must not repair stored data");
@@ -145,7 +152,8 @@ class LanguagePartitionEquivalenceTest {
         fixture.sourceFault = rows -> rows.get(8).put("release_id", 999L);
         assertThrows(SQLException.class, () -> new JdbcSourceLanguageRepository(fixture.source()).load());
         var id = Identity.random();
-        try (var tx = fixture.runtime()) { RUNTIME.append(tx, id, source); tx.commit(); }
+        try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+            var tx = writeSession.connection(); RUNTIME.append(tx, id, source); writeSession.commit(); }
         fixture.runtimeFault = rows -> rows.get(8).put("snapshot_id", Identity.random().snapshotBytes());
         try (var tx = fixture.runtime()) { assertThrows(SQLException.class, () -> RUNTIME.read(tx, id)); tx.rollback(); }
     }
@@ -154,11 +162,13 @@ class LanguagePartitionEquivalenceTest {
         return Stream.of("ninth-write", "readback", "later-caller").map(fault -> DynamicTest.dynamicTest(fault, () -> {
             var db = install(artifact("")); String sourceBefore = db.snapshot(); var fixture = new LanguagePartitionJdbcFixture(db);
             var source = new JdbcSourceLanguageRepository(fixture.source()).load(); var oldId = Identity.random();
-            try (var tx = fixture.runtime()) { RUNTIME.append(tx, oldId, source); tx.commit(); }
+            try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+                var tx = writeSession.connection(); RUNTIME.append(tx, oldId, source); writeSession.commit(); }
             int committed = fixture.commits; fixture.languageWrites = 0; var failedId = Identity.random();
             if (fault.equals("ninth-write")) fixture.failLanguageWrite = 9;
             if (fault.equals("readback")) fixture.runtimeFault = rows -> rows.get(8).put("description", "Changed valid readback.");
-            try (var tx = fixture.runtime()) {
+            try (var writeSession = BusinessWriteTestSupport.partition(fixture.runtime())) {
+                var tx = writeSession.connection();
                 SQLException failure;
                 if (fault.equals("later-caller")) {
                     failure = assertThrows(SQLException.class, () -> {
@@ -175,7 +185,7 @@ class LanguagePartitionEquivalenceTest {
                 assertEquals(committed, fixture.commits); assertEquals(0, fixture.rollbacks);
                 assertEquals(2, fixture.registrations.size()); assertEquals(2, fixture.heads.size());
                 assertEquals(fault.equals("ninth-write") ? 26 : 36, fixture.languages.size());
-                tx.rollback();
+                writeSession.rollback();
             }
             assertEquals(1, fixture.rollbacks); assertEquals(1, fixture.registrations.size());
             assertEquals(1, fixture.heads.size()); assertStored(baseline(), fixture.languages, "snapshot_id");

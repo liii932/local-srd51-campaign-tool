@@ -24,13 +24,20 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
     private static final String CHARACTER = "11111111-1111-4111-8111-111111111111";
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCampaignArchiveV2CharacterStateImportRepository().append(raw, command()));
+    }
+
+    @Test
     void appendsEveryCurrentPartitionWithArchiveOriginsInsideCallerTransaction()
             throws Exception {
         Fixture fixture = new Fixture();
         CampaignArchiveV2CharacterStateImportRepository.Command command = command();
 
-        new JdbcCampaignArchiveV2CharacterStateImportRepository()
-                .append(fixture.connection(), command);
+        BusinessWriteTestSupport.write(fixture.connection(),
+                guarded -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
+                .append(guarded, command));
 
         assertEquals(19, fixture.executedSql.size());
         assertTrue(fixture.executedSql.stream().anyMatch(sql ->
@@ -67,15 +74,17 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
         Fixture autoCommit = new Fixture();
         autoCommit.autoCommit = true;
         assertThrows(SQLException.class, () ->
-                new JdbcCampaignArchiveV2CharacterStateImportRepository()
-                        .append(autoCommit.connection(), command()));
+                BusinessWriteTestSupport.write(autoCommit.connection(),
+                guarded -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
+                        .append(guarded, command())));
         assertTrue(autoCommit.executedSql.isEmpty());
 
         Fixture failed = new Fixture();
         failed.failAt = 7;
         SQLException exception = assertThrows(SQLException.class, () ->
-                new JdbcCampaignArchiveV2CharacterStateImportRepository()
-                        .append(failed.connection(), command()));
+                BusinessWriteTestSupport.write(failed.connection(),
+                guarded -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
+                        .append(guarded, command())));
         assertEquals("injected format-2 JDBC failure", exception.getMessage());
         assertEquals(0, failed.commitCount);
         assertEquals(0, failed.rollbackCount);
@@ -86,8 +95,9 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
     void rejectsWrongPhysicalCharacterBeforeAnyInsert() throws Exception {
         Fixture fixture = new Fixture();
         fixture.wrongCharacter = true;
-        assertThrows(SQLException.class, () -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
-                .append(fixture.connection(), command()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.write(fixture.connection(),
+                guarded -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
+                .append(guarded, command())));
         assertTrue(fixture.executedSql.isEmpty());
         assertEquals(0, fixture.commitCount);
         assertEquals(0, fixture.rollbackCount);
@@ -97,8 +107,9 @@ final class JdbcCampaignArchiveV2CharacterStateImportRepositoryTest {
     void requiresCampaignOwnerToRestoreExactTailBeforeFirstInsert() throws Exception {
         Fixture fixture = new Fixture();
         fixture.wrongTail = true;
-        assertThrows(SQLException.class, () -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
-                .append(fixture.connection(), command()));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.write(fixture.connection(),
+                guarded -> new JdbcCampaignArchiveV2CharacterStateImportRepository()
+                .append(guarded, command())));
         assertTrue(fixture.executedSql.isEmpty());
         assertEquals(0, fixture.commitCount);
         assertEquals(0, fixture.rollbackCount);

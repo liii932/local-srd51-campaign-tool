@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.EncounterStateRepository;
 import java.lang.reflect.InvocationHandler;
@@ -17,6 +18,20 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
 final class EncounterStateTransactionServiceTest {
+
+    @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        EncounterStateRepository repository = (connection, command) -> {
+            throw new AssertionError("guard must reject before encounter writes");
+        };
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> service(fixture, repository).initialize(request("node.cellar")));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertFalse(fixture.committed);
+    }
 
     @Test
     void commitsOnceAndRestoresConnectionAfterCompleteSave() throws Exception {
@@ -111,13 +126,13 @@ final class EncounterStateTransactionServiceTest {
         private int connectionRequests;
 
         private DataSource dataSource() {
-            return proxy(DataSource.class, (ignored, method, arguments) -> {
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) -> {
                 if ("getConnection".equals(method.getName())) {
                     connectionRequests++;
                     return connection();
                 }
                 return defaultValue(method.getReturnType());
-            });
+            }));
         }
 
         private Connection connection() {

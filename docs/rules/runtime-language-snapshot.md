@@ -38,10 +38,12 @@ COMPLETE。未来完整装配必须经独立发布门，以新的身份对一次
 写入前先校验全部输入和连接边界；连接必须属于 `dnd_tool_se`，关闭 auto-commit、可写，且使用
 `READ_COMMITTED`、`REPEATABLE_READ` 或 `SERIALIZABLE` 隔离级别。Repository 不借出连接，
 不改变连接状态，不创建 savepoint，也不提交、回滚或关闭调用方连接。
+写入连接必须来自[共同业务事务](business-write-transactions.md)的受约束 Session；
+PARTITION 验收调用方使用 `openPartition`，先锁永久业务守卫并拒绝活动 legacy 或 schema 2 残留。
 
 调用方依次完成：
 
-1. 开启满足上述条件的运行事务，提供新的身份对和完整 `LanguagePartition`。
+1. 取得共同 Session，开启满足上述条件的运行事务，提供新的身份对和完整 `LanguagePartition`。
 2. 写入登记、快照头和全部语言行；每次写入都必须影响准确行数。
 3. 在同一连接上用实际 SELECT 读取登记、头和语言，校验身份、固定头字段、精确集合及完整值，
    将回读结果与待写入分区比较。

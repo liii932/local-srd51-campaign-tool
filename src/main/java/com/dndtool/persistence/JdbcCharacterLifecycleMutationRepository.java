@@ -78,50 +78,39 @@ public final class JdbcCharacterLifecycleMutationRepository
     @Override
     public Result mutate(Command command) throws SQLException {
         validate(command);
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-
-                Result replay = findExistingOperation(connection, command);
-                if (replay != null) {
-                    connection.commit();
-                    restore(connection, original);
-                    return replay;
-                }
-                LockedCharacter character = lockCharacter(connection, command.characterKey());
-                Result rejected = rejectInvalidState(command, character);
-                if (rejected != null) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return rejected;
-                }
-
-                Change change = changeFor(command, character);
-                if (change.oldValue().equals(change.newValue())) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Status.NO_CHANGE, character.rowVersion());
-                }
-
-                updateRoot(connection, command.action(), change.newValue(), character.id());
-                long nextSequence = Math.addExact(character.eventTail(), 1L);
-                advanceEventTail(connection, character, nextSequence);
-                long eventId = insertEvent(connection, command, character, nextSequence);
-                insertChange(connection, command, character, change, eventId);
-                advanceVersion(connection, command, character);
-                insertOperation(connection, command, character);
-
-                long nextVersion = Math.addExact(character.rowVersion(), 1L);
-                connection.commit();
-                restore(connection, original);
-                return new Result(Status.UPDATED, nextVersion);
-            } catch (SQLException | RuntimeException exception) {
-                rollbackAndRestore(connection, original, exception);
-                throw exception;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            Result replay = findExistingOperation(connection, command);
+            if (replay != null) {
+                writeTransaction.commit();
+                return replay;
             }
+            LockedCharacter character = lockCharacter(connection, command.characterKey());
+            Result rejected = rejectInvalidState(command, character);
+            if (rejected != null) {
+                writeTransaction.rollback();
+                return rejected;
+            }
+
+            Change change = changeFor(command, character);
+            if (change.oldValue().equals(change.newValue())) {
+                writeTransaction.rollback();
+                return new Result(Status.NO_CHANGE, character.rowVersion());
+            }
+
+            updateRoot(connection, command.action(), change.newValue(), character.id());
+            long nextSequence = Math.addExact(character.eventTail(), 1L);
+            advanceEventTail(connection, character, nextSequence);
+            long eventId = insertEvent(connection, command, character, nextSequence);
+            insertChange(connection, command, character, change, eventId);
+            advanceVersion(connection, command, character);
+            insertOperation(connection, command, character);
+
+            long nextVersion = Math.addExact(character.rowVersion(), 1L);
+            writeTransaction.commit();
+            return new Result(Status.UPDATED, nextVersion);
         }
     }
 
@@ -430,27 +419,6 @@ public final class JdbcCharacterLifecycleMutationRepository
         return new SQLException("Invalid character lifecycle persistence state");
     }
 
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException exception) {
-            failure.addSuppressed(exception);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException exception) {
-            failure.addSuppressed(exception);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.transactionIsolation());
-    }
-
     private record Change(String oldValue, String newValue) {
     }
 
@@ -487,12 +455,5 @@ public final class JdbcCharacterLifecycleMutationRepository
             String savedModuleKey,
             String savedReleaseVersion,
             String savedContentSha256) {
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int transactionIsolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
-        }
     }
 }

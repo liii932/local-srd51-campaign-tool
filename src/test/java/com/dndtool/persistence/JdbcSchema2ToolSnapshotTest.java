@@ -19,15 +19,17 @@ class JdbcSchema2ToolSnapshotTest {
     @Test void mixedLanguagesAndToolsReadBackEveryTypedFieldAndFullChain() throws Exception {
         var fixture = new Schema2RuntimeJdbcFixture();
         var identity = Identity.random();
-        repository.store(fixture.connection, identity, projection());
-        assertEquals(37, fixture.rows("s2_runtime_tool").size());
-        assertEquals(1, fixture.rows("s2_runtime_tool_set").size());
-        assertFalse(fixture.rows("s2_runtime_language").isEmpty());
-        assertFalse(fixture.rows("s2_runtime_language_entry").isEmpty());
-        assertFalse(fixture.rows("s2_runtime_tool_entry").isEmpty());
-        assertEquals(0, fixture.commits);
-        assertEquals(0, fixture.rollbacks);
-        fixture.connection.commit();
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            repository.store(transaction.connection(), identity, projection());
+            assertEquals(37, fixture.rows("s2_runtime_tool").size());
+            assertEquals(1, fixture.rows("s2_runtime_tool_set").size());
+            assertFalse(fixture.rows("s2_runtime_language").isEmpty());
+            assertFalse(fixture.rows("s2_runtime_language_entry").isEmpty());
+            assertFalse(fixture.rows("s2_runtime_tool_entry").isEmpty());
+            assertEquals(0, fixture.commits);
+            assertEquals(0, fixture.rollbacks);
+            transaction.commit();
+        }
         var actual = repository.read(fixture.connection, identity).projection();
         assertArrayEquals(resource("expected/configuration.json"), actual.configurationJson());
         assertArrayEquals(resource("expected/final-rules.json"), actual.finalRulesJson());
@@ -49,8 +51,7 @@ class JdbcSchema2ToolSnapshotTest {
                         f.rows("s2_runtime_language").getFirst().get("rule_index")))) {
             var fixture = new Schema2RuntimeJdbcFixture();
             var identity = Identity.random();
-            repository.store(fixture.connection, identity, projection());
-            fixture.connection.commit();
+            storeAndCommit(fixture, identity);
             mutation.accept(fixture);
             assertThrows(SQLException.class, () -> repository.read(fixture.connection, identity));
         }
@@ -58,18 +59,26 @@ class JdbcSchema2ToolSnapshotTest {
 
     @Test void eachNewTypedTableFailureRollsBackWithTheCaller() throws Exception {
         var good = new Schema2RuntimeJdbcFixture();
-        repository.store(good.connection, Identity.random(), projection());
+        storeAndCommit(good, Identity.random());
         var inserts = good.sql.stream().filter(sql -> sql.startsWith("INSERT INTO ")).toList();
         for (String table : List.of("s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry")) {
             var fixture = new Schema2RuntimeJdbcFixture();
             fixture.failWrite = java.util.stream.IntStream.range(0, inserts.size())
                     .filter(i -> inserts.get(i).startsWith("INSERT INTO " + table + " ("))
                     .findFirst().orElseThrow() + 1;
-            assertThrows(SQLException.class, () -> repository.store(fixture.connection, Identity.random(), projection()));
-            assertEquals(0, fixture.commits);
-            assertEquals(0, fixture.rollbacks);
-            fixture.connection.rollback();
+            try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+                assertThrows(SQLException.class, () -> repository.store(transaction.connection(), Identity.random(), projection()));
+                assertEquals(0, fixture.commits);
+                assertEquals(0, fixture.rollbacks);
+                transaction.rollback();
+            }
             assertTrue(fixture.tables.isEmpty());
+        }
+    }
+
+    private void storeAndCommit(Schema2RuntimeJdbcFixture fixture, Identity identity) throws SQLException {
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            repository.store(transaction.connection(), identity, projection()); transaction.commit();
         }
     }
 

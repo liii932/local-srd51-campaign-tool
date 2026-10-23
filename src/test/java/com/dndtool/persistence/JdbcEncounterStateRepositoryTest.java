@@ -24,6 +24,12 @@ final class JdbcEncounterStateRepositoryTest {
     private static final String CHARACTER_B = "22222222-2222-4222-8222-222222222222";
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcEncounterStateRepository().initialize(raw, command()));
+    }
+
+    @Test
     void initializesMapPartyEncounterParticipantsAndPositionsAtomically() throws Exception {
         Fixture fixture = new Fixture();
 
@@ -137,7 +143,8 @@ final class JdbcEncounterStateRepositoryTest {
     private static EncounterStateRepository.SavedEncounter initialize(
             Fixture fixture,
             EncounterStateRepository.Command command) throws SQLException {
-        return new JdbcEncounterStateRepository().initialize(fixture.connection(), command);
+        return BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcEncounterStateRepository().initialize(guarded, command));
     }
 
     private static EncounterStateRepository.Command command() {

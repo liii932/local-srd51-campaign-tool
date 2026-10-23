@@ -50,6 +50,7 @@ public final class JdbcNoteEventRepository implements NoteEventRepository {
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         if (connection.getAutoCommit()
                 || connection.isReadOnly()
                 || connection.getTransactionIsolation() != Connection.TRANSACTION_SERIALIZABLE) {

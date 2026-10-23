@@ -41,7 +41,7 @@ class JdbcSchema2GrantSnapshotTest {
             byte[] bytes = switch (file) { case "configuration" -> actual.configurationJson(); case "final-rules" -> actual.finalRulesJson(); default -> actual.chainsJson(); };
             assertArrayEquals(Schema2GrantFixtures.resource("expected/" + file + ".json"), bytes);
         }
-        assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks); assertEquals(0, fixture.closes);
+        assertEquals(1, fixture.commits); assertEquals(0, fixture.rollbacks); assertEquals(0, fixture.closes);
         fixture.readOnly = true; int writes = fixture.writes;
         REPOSITORY.read(fixture.connection, ID); assertEquals(writes, fixture.writes);
     }
@@ -78,7 +78,7 @@ class JdbcSchema2GrantSnapshotTest {
         for (var mutation : mutations) {
             var fixture = stored(); mutation.accept(fixture);
             assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, ID));
-            assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
+            assertEquals(1, fixture.commits); assertEquals(0, fixture.rollbacks);
         }
     }
 
@@ -90,19 +90,29 @@ class JdbcSchema2GrantSnapshotTest {
                     || inserts.get(index).startsWith("INSERT INTO s2_runtime_proficiency_grant (")) failurePoints.add(index + 1);
         for (int point : failurePoints) for (int affected : new int[]{-1, 0, 2}) {
             var fixture = new Schema2RuntimeJdbcFixture(); fixture.failWrite = point; fixture.affected = affected;
-            assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, ID, PROJECTION));
-            assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
-            fixture.connection.rollback(); assertTrue(fixture.tables.isEmpty());
+            try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+                assertThrows(SQLException.class, () -> REPOSITORY.store(transaction.connection(), ID, PROJECTION));
+                assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
+                transaction.rollback();
+            }
+            assertTrue(fixture.tables.isEmpty());
         }
         var fixture = new Schema2RuntimeJdbcFixture();
         fixture.beforeRead = f -> row(f, "s2_runtime_proficiency_grant", "entry_key", "extra_languages").put("grant_count", 2);
-        assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, ID, PROJECTION));
-        assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
-        fixture.connection.rollback(); assertTrue(fixture.tables.isEmpty());
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            assertThrows(SQLException.class, () -> REPOSITORY.store(transaction.connection(), ID, PROJECTION));
+            assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
+            transaction.rollback();
+        }
+        assertTrue(fixture.tables.isEmpty());
     }
 
     private static Schema2RuntimeJdbcFixture stored() throws SQLException {
-        var fixture = new Schema2RuntimeJdbcFixture(); REPOSITORY.store(fixture.connection, ID, PROJECTION); return fixture;
+        var fixture = new Schema2RuntimeJdbcFixture();
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            REPOSITORY.store(transaction.connection(), ID, PROJECTION); transaction.commit();
+        }
+        return fixture;
     }
     private static Map<String, Object> row(Schema2RuntimeJdbcFixture fixture, String table, String column, String value) {
         return fixture.rows(table).stream().filter(row -> row.get(column) instanceof byte[] bytes

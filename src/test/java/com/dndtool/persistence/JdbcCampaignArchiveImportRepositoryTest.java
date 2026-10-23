@@ -32,11 +32,19 @@ final class JdbcCampaignArchiveImportRepositoryTest {
             new JdbcCampaignArchiveImportRepository();
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCampaignArchiveImportRepository().importArchive(
+                        raw, command(document("ARCHIVED"), null)));
+    }
+
+    @Test
     void createsEveryAuthoritativeSectionWithFreshLocalIds() throws Exception {
         Fixture fixture = new Fixture();
 
-        long campaignId = repository.importArchive(
-                fixture.connection(), command(document("ACTIVE"), null));
+        long campaignId = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ACTIVE"), null)));
 
         assertEquals(7L, campaignId);
         assertFalse(fixture.committed);
@@ -79,8 +87,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
         fixture.characterRows.add(row(
                 "id", 11L, "campaign_id", 7L, "character_key", CHARACTER));
 
-        long campaignId = repository.importArchive(
-                fixture.connection(), command(document("ACTIVE"), null));
+        long campaignId = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ACTIVE"), null)));
 
         assertEquals(7L, campaignId);
         List<Executed> deletes = fixture.executed.stream()
@@ -137,8 +146,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
 
         CampaignArchiveImportRepository.RejectionException exception = assertThrows(
                 CampaignArchiveImportRepository.RejectionException.class,
-                () -> repository.importArchive(
-                        fixture.connection(), command(document("ARCHIVED"), null)));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                        guarded, command(document("ARCHIVED"), null))));
 
         assertEquals(CampaignArchiveImportRepository.Rejection.STABLE_IDENTITY_CONFLICT,
                 exception.rejection());
@@ -157,8 +167,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 "id", 8L, "campaign_key", CAMPAIGN, "campaign_status", "ARCHIVED",
                 "host_state_epoch", OLD_HOST_STATE_EPOCH + 1L));
 
-        assertThrows(SQLException.class, () -> repository.importArchive(
-                fixture.connection(), command(document("ARCHIVED"), null)));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ARCHIVED"), null))));
 
         assertTrue(fixture.executed.isEmpty());
         assertFalse(fixture.committed);
@@ -174,8 +185,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
 
         CampaignArchiveImportRepository.RejectionException exception = assertThrows(
                 CampaignArchiveImportRepository.RejectionException.class,
-                () -> repository.importArchive(
-                        fixture.connection(), command(document("ACTIVE"), null)));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                        guarded, command(document("ACTIVE"), null))));
 
         assertEquals(CampaignArchiveImportRepository.Rejection
                 .ACTIVE_CAMPAIGN_CONFIRMATION_REQUIRED, exception.rejection());
@@ -192,8 +204,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 "id", 8L, "campaign_key", OTHER, "campaign_status", "ACTIVE",
                 "host_state_epoch", OLD_HOST_STATE_EPOCH));
 
-        long campaignId = repository.importArchive(
-                fixture.connection(), command(document("ACTIVE"), OTHER));
+        long campaignId = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ACTIVE"), OTHER)));
 
         assertEquals(7L, campaignId);
         Executed archive = fixture.firstWrite("UPDATE campaign SET campaign_status = 'ARCHIVED'");
@@ -216,8 +229,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
 
         CampaignArchiveImportRepository.RejectionException changed = assertThrows(
                 CampaignArchiveImportRepository.RejectionException.class,
-                () -> repository.importArchive(
-                        stale.connection(), command(document("ACTIVE"), different)));
+                () -> BusinessWriteTestSupport.inTransaction(stale.connection(),
+                guarded -> repository.importArchive(
+                        guarded, command(document("ACTIVE"), different))));
 
         assertEquals(CampaignArchiveImportRepository.Rejection.PREVIEW_STATE_CHANGED,
                 changed.rejection());
@@ -226,8 +240,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
         Fixture archived = new Fixture();
         CampaignArchiveImportRepository.RejectionException unexpected = assertThrows(
                 CampaignArchiveImportRepository.RejectionException.class,
-                () -> repository.importArchive(
-                        archived.connection(), command(document("ARCHIVED"), OTHER)));
+                () -> BusinessWriteTestSupport.inTransaction(archived.connection(),
+                guarded -> repository.importArchive(
+                        guarded, command(document("ARCHIVED"), OTHER))));
         assertEquals(CampaignArchiveImportRepository.Rejection.UNEXPECTED_ARCHIVE_CONFIRMATION,
                 unexpected.rejection());
         assertTrue(archived.executed.isEmpty());
@@ -240,8 +255,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 "id", 8L, "campaign_key", OTHER, "campaign_status", "ACTIVE",
                 "host_state_epoch", OLD_HOST_STATE_EPOCH));
 
-        long campaignId = repository.importArchive(
-                fixture.connection(), command(document("ARCHIVED"), null));
+        long campaignId = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ARCHIVED"), null)));
 
         assertEquals(7L, campaignId);
         Executed root = fixture.firstWrite("INSERT INTO campaign (");
@@ -257,8 +273,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
         Fixture missing = new Fixture();
         missing.releaseAvailable = false;
         assertThrows(SQLException.class,
-                () -> repository.importArchive(
-                        missing.connection(), command(document("ARCHIVED"), null)));
+                () -> BusinessWriteTestSupport.inTransaction(missing.connection(),
+                guarded -> repository.importArchive(
+                        guarded, command(document("ARCHIVED"), null))));
         assertTrue(missing.executed.isEmpty());
 
         Fixture failing = new Fixture();
@@ -267,8 +284,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 "host_state_epoch", OLD_HOST_STATE_EPOCH));
         failing.failWriteContaining = "INSERT INTO item_instance";
         assertThrows(SQLException.class,
-                () -> repository.importArchive(
-                        failing.connection(), command(document("ACTIVE"), OTHER)));
+                () -> BusinessWriteTestSupport.inTransaction(failing.connection(),
+                guarded -> repository.importArchive(
+                        guarded, command(document("ACTIVE"), OTHER))));
         assertFalse(failing.committed);
         assertFalse(failing.rolledBack);
         assertTrue(failing.containsWrite("UPDATE campaign SET campaign_status = 'ARCHIVED'"));
@@ -279,8 +297,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
     void rejectsInvalidDocumentAndConnectionBeforePreparingSql() {
         Fixture autoCommit = new Fixture();
         autoCommit.autoCommit = true;
-        assertThrows(SQLException.class, () -> repository.importArchive(
-                autoCommit.connection(), command(document("ARCHIVED"), null)));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(autoCommit.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ARCHIVED"), null))));
         assertTrue(autoCommit.preparedSql.isEmpty());
 
         Fixture invalid = new Fixture();
@@ -293,12 +312,14 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 valid.skillProficiencies(), valid.saveProficiencies(), valid.items(),
                 valid.maps(), valid.recentEvents());
         assertThrows(IllegalArgumentException.class,
-                () -> repository.importArchive(invalid.connection(), command(malformed, null)));
+                () -> BusinessWriteTestSupport.inTransaction(invalid.connection(),
+                guarded -> repository.importArchive(guarded, command(malformed, null))));
         assertTrue(invalid.preparedSql.isEmpty());
 
         Fixture invalidConfirmation = new Fixture();
-        assertThrows(IllegalArgumentException.class, () -> repository.importArchive(
-                invalidConfirmation.connection(), command(document("ACTIVE"), "not-a-key")));
+        assertThrows(IllegalArgumentException.class, () -> BusinessWriteTestSupport.inTransaction(invalidConfirmation.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ACTIVE"), "not-a-key"))));
         assertTrue(invalidConfirmation.preparedSql.isEmpty());
     }
 
@@ -335,8 +356,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
 
         for (CampaignArchiveDocument conflict : conflicts) {
             Fixture fixture = new Fixture();
-            assertThrows(IllegalArgumentException.class, () -> repository.importArchive(
-                    fixture.connection(), command(conflict, null)));
+            assertThrows(IllegalArgumentException.class, () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(
+                    guarded, command(conflict, null))));
             assertTrue(fixture.preparedSql.isEmpty());
             assertTrue(fixture.executed.isEmpty());
         }
@@ -354,7 +376,8 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 valid.maps());
         Fixture fixture = new Fixture();
 
-        repository.importArchive(fixture.connection(), command(repeated, null));
+        BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.importArchive(guarded, command(repeated, null)));
 
         assertEquals(3, fixture.writeCount("INSERT INTO item_instance"));
     }
@@ -366,8 +389,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 "id", 7L, "campaign_key", CAMPAIGN, "campaign_status", "ARCHIVED",
                 "host_state_epoch", HOST_STATE_EPOCH));
 
-        assertThrows(SQLException.class, () -> repository.importArchive(
-                targetCollision.connection(), command(document("ARCHIVED"), null)));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(targetCollision.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ARCHIVED"), null))));
         assertTrue(targetCollision.executed.isEmpty());
 
         Fixture activeCollision = new Fixture();
@@ -375,8 +399,9 @@ final class JdbcCampaignArchiveImportRepositoryTest {
                 "id", 8L, "campaign_key", OTHER, "campaign_status", "ACTIVE",
                 "host_state_epoch", HOST_STATE_EPOCH));
 
-        assertThrows(SQLException.class, () -> repository.importArchive(
-                activeCollision.connection(), command(document("ACTIVE"), OTHER)));
+        assertThrows(SQLException.class, () -> BusinessWriteTestSupport.inTransaction(activeCollision.connection(),
+                guarded -> repository.importArchive(
+                guarded, command(document("ACTIVE"), OTHER))));
         assertTrue(activeCollision.executed.isEmpty());
     }
 

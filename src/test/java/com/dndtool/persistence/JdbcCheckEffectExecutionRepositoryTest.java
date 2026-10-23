@@ -23,6 +23,14 @@ final class JdbcCheckEffectExecutionRepositoryTest {
     private static final String CHARACTER_KEY = "11111111-1111-1111-1111-111111111111";
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCheckEffectExecutionRepository().execute(raw,
+                        new CheckEffectExecutionRepository.Command(
+                                301L, 7L, 11L, 401L, emptySuccess(), emptyFailure())));
+    }
+
+    @Test
     void appliesStoredSuccessBranchAcrossFiveAlgorithms() throws Exception {
         Fixture fixture = new Fixture();
         CheckEffectExecutionRepository.AppliedEffects applied = execute(fixture,
@@ -276,10 +284,11 @@ final class JdbcCheckEffectExecutionRepositoryTest {
             Fixture fixture,
             CheckEffectExecutionRepository.BranchActions success,
             CheckEffectExecutionRepository.BranchActions failure) throws SQLException {
-        return new JdbcCheckEffectExecutionRepository().execute(
-                fixture.connection(),
+        return BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckEffectExecutionRepository().execute(
+                guarded,
                 new CheckEffectExecutionRepository.Command(
-                        301L, 7L, 11L, 401L, success, failure));
+                        301L, 7L, 11L, 401L, success, failure)));
     }
 
     private static CheckEffectExecutionRepository.BranchActions branch(

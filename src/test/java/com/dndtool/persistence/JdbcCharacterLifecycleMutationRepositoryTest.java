@@ -36,6 +36,17 @@ final class JdbcCharacterLifecycleMutationRepositoryTest {
                     HASH);
 
     @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        JdbcFixture fixture = new JdbcFixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> new JdbcCharacterLifecycleMutationRepository(fixture.dataSource()).mutate(COMMAND));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.executedUpdates.isEmpty());
+    }
+
+    @Test
     void updateVersionEventChangeAndIdempotencyCommitTogether() throws SQLException {
         JdbcFixture fixture = new JdbcFixture();
         JdbcCharacterLifecycleMutationRepository repository =
@@ -110,9 +121,9 @@ final class JdbcCharacterLifecycleMutationRepositoryTest {
 
         private DataSource dataSource() {
             Connection connection = proxy(Connection.class, this::connectionCall);
-            return proxy(DataSource.class, (ignored, method, arguments) ->
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) ->
                     "getConnection".equals(method.getName())
-                            ? connection : defaultValue(method.getReturnType()));
+                            ? connection : defaultValue(method.getReturnType())));
         }
 
         private Object connectionCall(Object ignored, Method method, Object[] arguments) {

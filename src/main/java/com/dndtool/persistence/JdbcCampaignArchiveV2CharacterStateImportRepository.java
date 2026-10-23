@@ -382,6 +382,7 @@ public final class JdbcCampaignArchiveV2CharacterStateImportRepository
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         if (connection == null || connection.getAutoCommit()) {
             throw new SQLException("Format-2 character import requires a caller-owned transaction");
         }

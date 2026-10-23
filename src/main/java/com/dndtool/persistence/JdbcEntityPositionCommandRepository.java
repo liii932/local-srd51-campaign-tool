@@ -301,6 +301,7 @@ public final class JdbcEntityPositionCommandRepository implements EntityPosition
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         Objects.requireNonNull(connection, "connection");
         if (connection.getAutoCommit() || connection.isReadOnly()
                 || connection.getTransactionIsolation() != Connection.TRANSACTION_SERIALIZABLE) {

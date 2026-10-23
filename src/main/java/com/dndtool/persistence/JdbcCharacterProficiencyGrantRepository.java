@@ -30,6 +30,7 @@ public final class JdbcCharacterProficiencyGrantRepository {
 
     public void append(Connection connection, long characterId, long moduleReleaseId,
             CharacterProficiencyGrant grant) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         requireTransaction(connection, characterId, moduleReleaseId);
         Objects.requireNonNull(grant, "proficiency grant");
         try (PreparedStatement statement = connection.prepareStatement(INSERT_SQL)) {

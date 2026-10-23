@@ -16,6 +16,8 @@ public final class Schema2RuntimeJdbcFixture {
     public int acquisitions, closes, aborts;
     public int writes, commits, rollbacks, failWrite = -1, failQuery = -1, queries, affected = -1;
     public boolean autoCommit, readOnly, unavailable, rollbackFails, abortFails, closeFails;
+    public boolean legacyActive, partitionRemainder;
+    public Error rollbackError, closeError;
     public LostCommit lostCommit = LostCommit.NONE;
     public Runnable beforeAcquire = () -> { };
     public Consumer<String> observer = ignored -> { };
@@ -40,7 +42,8 @@ public final class Schema2RuntimeJdbcFixture {
             yield null;
         }
         case "rollback" -> {
-            rollbacks++; event("rollback"); if (rollbackFails) throw new SQLException("Injected rollback failure");
+            rollbacks++; event("rollback"); if (rollbackError != null) throw rollbackError;
+            if (rollbackFails) throw new SQLException("Injected rollback failure");
             restoreCommitted(); yield null;
         }
         case "abort" -> {
@@ -48,7 +51,8 @@ public final class Schema2RuntimeJdbcFixture {
             restoreCommitted(); yield null;
         }
         case "close" -> {
-            closes++; event("close"); if (closeFails) throw new SQLException("Injected close failure"); yield null;
+            closes++; event("close"); if (closeError != null) throw closeError;
+            if (closeFails) throw new SQLException("Injected close failure"); yield null;
         }
         default -> throw new AssertionError("Unexpected connection call " + method);
     });
@@ -100,6 +104,9 @@ public final class Schema2RuntimeJdbcFixture {
     }
     private List<Map<String, Object>> select(String query, Map<Integer, Object> parameters) throws SQLException {
         queries++; beforeQuery.accept(query); if (queries == failQuery) throw new SQLException("Injected query");
+        if (query.equals(BusinessWriteTransactions.LOCK_SQL)) return List.of(row("guard_id", 1, "protocol_version", 1));
+        if (query.equals(BusinessWriteTransactions.STATE_SQL)) return List.of(row("legacy_active", legacyActive,
+                "schema2_remainder", !rows("s2_runtime_identity").isEmpty(), "partition_remainder", partitionRemainder));
         if (query.contains("DATABASE()")) return List.of(Map.of("schema_name", schema));
         if (query.contains(" FROM schema_meta ")) {
             List<Map<String, Object>> result = new ArrayList<>();
@@ -150,6 +157,8 @@ public final class Schema2RuntimeJdbcFixture {
                 if (!row.containsKey(column)) throw new AssertionError("Missing fixture column " + column);
                 yield cloneValue(row.get(column));
             }
+            case "getInt" -> ((Number) rows.get(index[0]).get(args[0])).intValue();
+            case "getBoolean" -> (boolean) rows.get(index[0]).get(args[0]);
             case "close" -> null;
             default -> throw new AssertionError("Unexpected result call " + method);
         });

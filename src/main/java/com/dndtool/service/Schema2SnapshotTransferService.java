@@ -9,6 +9,7 @@ import com.dndtool.persistence.JdbcSchema2SnapshotControlRepository;
 import com.dndtool.persistence.JdbcSchema2SnapshotControlRepository.Operation;
 import com.dndtool.persistence.JdbcSourceSchema2Repository;
 import com.dndtool.persistence.Schema2SourceLedger;
+import com.dndtool.persistence.BusinessWriteTransactions;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -22,7 +23,6 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.locks.ReentrantLock;
 import javax.sql.DataSource;
 
 /**
@@ -57,8 +57,6 @@ public final class Schema2SnapshotTransferService {
     private final DataSource runtime;
     private final JdbcSchema2RuntimeSnapshotRepository snapshots = new JdbcSchema2RuntimeSnapshotRepository();
     private final JdbcSchema2SnapshotControlRepository controls = new JdbcSchema2SnapshotControlRepository();
-    private final ReentrantLock gate = new ReentrantLock();
-    private boolean blocked;
     private Intent pending;
     private boolean pendingIsolated;
 
@@ -69,9 +67,7 @@ public final class Schema2SnapshotTransferService {
 
     public Result transfer(Request request) {
         Objects.requireNonNull(request);
-        if (!gate.tryLock()) return result(Status.NOT_EXECUTED, "S2_TRANSFER_BUSY", null, null);
-        try {
-            if (blocked) return result(Status.NOT_EXECUTED, "S2_TRANSFER_BLOCKED", pending, null);
+        try (var admission = BusinessWriteTransactions.enter()) {
             ProductionSchema2Projection projection;
             Intent intent;
             try {
@@ -85,8 +81,10 @@ public final class Schema2SnapshotTransferService {
             } catch (SQLException | RuntimeException failure) {
                 return result(Status.NOT_EXECUTED, code(failure, "S2_SOURCE_UNAVAILABLE"), null, null);
             }
-            return transact(intent, projection, false);
-        } finally { gate.unlock(); }
+            return transact(admission, intent, projection, false);
+        } catch (SQLException unavailable) {
+            return result(Status.NOT_EXECUTED, admissionCode(unavailable), pending, null);
+        }
     }
 
     /**
@@ -95,40 +93,33 @@ public final class Schema2SnapshotTransferService {
      */
     public Result resolve(Intent intent) {
         Objects.requireNonNull(intent);
-        if (!gate.tryLock()) return result(Status.NOT_EXECUTED, "S2_TRANSFER_BUSY", intent, null);
-        try {
-            if (!blocked || pending == null || !pending.equals(intent) || !pendingIsolated)
+        try (var admission = BusinessWriteTransactions.enterResolution()) {
+            if (pending == null || !pending.equals(intent) || !pendingIsolated)
                 return result(Status.UNKNOWN, "S2_RESOLUTION_REQUIRES_ISOLATION", intent, null);
-            return transact(intent, null, true);
-        } finally { gate.unlock(); }
+            return transact(admission, intent, null, true);
+        } catch (SQLException unavailable) {
+            return result(Status.UNKNOWN, "BWB02".equals(unavailable.getSQLState())
+                    ? "S2_RESOLUTION_REQUIRES_ISOLATION" : admissionCode(unavailable), intent, null);
+        }
     }
 
     /** A source-free lookup of an immutable accepted result; it does not grant game execution. */
     public Result inspect(Intent intent) {
         Objects.requireNonNull(intent);
-        if (!gate.tryLock()) return result(Status.NOT_EXECUTED, "S2_TRANSFER_BUSY", intent, null);
-        try {
-            if (blocked) return result(Status.UNKNOWN, "S2_TRANSFER_BLOCKED", intent, null);
-            return transact(intent, null, true);
-        } finally { gate.unlock(); }
+        try (var admission = BusinessWriteTransactions.enterResolution()) {
+            return transact(admission, intent, null, true);
+        } catch (SQLException unavailable) { return result(Status.UNKNOWN, admissionCode(unavailable), intent, null); }
     }
 
-    private Result transact(Intent intent, ProductionSchema2Projection projection, boolean resolution) {
+    private Result transact(BusinessWriteTransactions.Admission admission, Intent intent,
+            ProductionSchema2Projection projection, boolean resolution) {
         Connection connection = null;
-        ConnectionState original = null;
-        boolean transactionStarted = false, settled = false, commitAttempted = false, committed = false;
+        BusinessWriteTransactions.Session session = null;
         Snapshot candidate = null;
         Result result;
         try {
-            connection = runtime.getConnection();
-            original = new ConnectionState(connection.getAutoCommit(), connection.isReadOnly(), connection.getTransactionIsolation());
-            if (!original.autoCommit()) throw new SQLException("S2_CONNECTION_ACTIVE");
-            settled = true;
-            connection.setReadOnly(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-            transactionStarted = true;
-            settled = false;
-            connection.setAutoCommit(false);
+            session = resolution ? admission.openResolution(runtime) : admission.openInternal(runtime);
+            connection = session.connection();
             var control = controls.lock(connection);
             var records = controls.read(connection, control);
             // Read and revalidate all retained immutable material, not only receipt counters/digests.
@@ -150,13 +141,11 @@ public final class Schema2SnapshotTransferService {
                 }
             }
             if (found != null) {
-                connection.rollback();
-                settled = true;
+                session.rollback();
                 result = result(resolution ? Status.RESOLVED_COMMITTED : Status.COMMITTED,
                         "S2_SNAPSHOT_REPLAY", intent, candidate);
             } else if (resolution) {
-                connection.rollback();
-                settled = true;
+                session.rollback();
                 // A healthy new reader has no knowledge of the original writer's isolation.
                 boolean proven = pendingIsolated && intent.equals(pending);
                 result = result(proven ? Status.NOT_COMMITTED : Status.UNKNOWN,
@@ -186,74 +175,70 @@ public final class Schema2SnapshotTransferService {
                         || !receipt.kind().equals(intent.kind().name())) throw new SQLException("S2_OPERATION_CORRUPT");
                 candidate = snapshots.read(connection, intent.identity());
                 intent.rules().verify(candidate.projection());
-                commitAttempted = true;
-                connection.commit();
-                committed = true;
-                settled = true;
+                session.commit();
                 result = result(Status.COMMITTED, "S2_SNAPSHOT_COMMITTED", intent, candidate);
             }
         } catch (SQLException | RuntimeException failure) {
-            if (!commitAttempted && transactionStarted && connection != null) {
-                try { connection.rollback(); settled = true; }
-                catch (SQLException | RuntimeException rollback) { failure.addSuppressed(rollback); }
+            if (session != null && session.outcome() == BusinessWriteTransactions.Outcome.ACTIVE) {
+                try { session.rollback(); }
+                catch (SQLException | RuntimeException rollback) { suppress(failure, rollback); }
+                catch (Error fatal) {
+                    suppress(fatal, failure); settleFatal(session, intent, resolution, fatal); throw fatal;
+                }
             }
-            if (commitAttempted || transactionStarted && !settled) {
-                blocked = true;
-                if (!resolution) { pending = intent; pendingIsolated = false; }
+            if (session != null && session.outcome() == BusinessWriteTransactions.Outcome.UNKNOWN) {
+                if (!resolution) { pending = intent; pendingIsolated = BusinessWriteTransactions.isResolutionAvailable(); }
                 result = result(Status.UNKNOWN, "S2_SNAPSHOT_COMMIT_UNKNOWN", intent, null);
             } else {
-                if (!(failure instanceof Rejected)) blocked = true;
-                result = result(transactionStarted ? Status.ROLLED_BACK : Status.NOT_EXECUTED,
-                        code(failure, "S2_RUNTIME_FAILURE"), intent, null);
+                if (!(failure instanceof Rejected) && session != null) BusinessWriteTransactions.invalidate();
+                result = result(session != null ? Status.ROLLED_BACK : Status.NOT_EXECUTED,
+                        failure instanceof SQLException sql && sql.getSQLState() != null && sql.getSQLState().startsWith("BWB")
+                                ? admissionCode(sql) : code(failure, "S2_RUNTIME_FAILURE"), intent, null);
             }
         } catch (Error failure) {
-            // Preserve fatal failures while still releasing the caller-owned transaction safely.
-            blocked = true;
-            if (!commitAttempted && transactionStarted && connection != null) {
-                try { connection.rollback(); settled = true; }
-                catch (SQLException | RuntimeException rollback) { failure.addSuppressed(rollback); }
-            }
-            if (!settled && !resolution) { pending = intent; pendingIsolated = false; }
-            Release released = release(connection, original, settled);
-            if (!settled && !resolution && pending != null && pending.equals(intent))
-                pendingIsolated = released.isolated();
+            settleFatal(session, intent, resolution, failure);
             throw failure;
         }
-        Release released = release(connection, original, settled);
-        if (!settled && connection != null && !resolution && pending != null && pending.equals(intent))
-            pendingIsolated = released.isolated();
-        if (!released.clean()) {
-            blocked = true;
-            if (committed) return result(Status.COMMITTED, "S2_COMMITTED_CONNECTION_FAILURE", intent, candidate);
-            if (result.snapshot() != null)
-                return result(result.status(), "S2_ACCEPTED_CONNECTION_FAILURE", intent, null);
-            if (released.isolated() && result.status() == Status.UNKNOWN) return result;
-            return result(result.status(), released.isolated() ? "S2_CONNECTION_FAILURE" : "S2_CONNECTION_ISOLATION_FAILED", intent, null);
+        if (session != null) {
+            try { session.close(); }
+            catch (SQLException | RuntimeException cleanup) {
+                if (session.outcome() == BusinessWriteTransactions.Outcome.UNKNOWN) {
+                    if (!resolution) { pending = intent; pendingIsolated = BusinessWriteTransactions.isResolutionAvailable(); }
+                    return result(Status.UNKNOWN, pendingIsolated ? "S2_SNAPSHOT_COMMIT_UNKNOWN" : "S2_CONNECTION_ISOLATION_FAILED", intent, null);
+                }
+                return result(result.status(), "S2_CONNECTION_FAILURE", intent, null);
+            }
         }
+        if (result.status() == Status.UNKNOWN && !BusinessWriteTransactions.isResolutionAvailable())
+            return result(Status.UNKNOWN, "S2_CONNECTION_ISOLATION_FAILED", intent, null);
+        if (session != null && session.outcome() == BusinessWriteTransactions.Outcome.COMMITTED && BusinessWriteTransactions.isBlocked())
+            return result(Status.COMMITTED, "S2_COMMITTED_CONNECTION_FAILURE", intent, candidate);
         return result;
     }
 
-    private static Release release(Connection connection, ConnectionState original, boolean settled) {
-        if (connection == null) return new Release(true, false);
-        boolean safe = false, isolated = false;
-        if (settled && original != null && original.autoCommit()) {
-            try {
-                connection.setTransactionIsolation(original.isolation());
-                connection.setReadOnly(original.readOnly());
-                connection.setAutoCommit(true);
-                safe = true;
-            } catch (SQLException | RuntimeException ignored) { /* Quarantine before returning to pool. */ }
+    /** One bounded cleanup attempt preserves the original fatal failure and the core outcome. */
+    private void settleFatal(BusinessWriteTransactions.Session session, Intent intent, boolean resolution, Error failure) {
+        BusinessWriteTransactions.invalidate();
+        if (session == null) return;
+        if (session.outcome() == BusinessWriteTransactions.Outcome.ACTIVE) {
+            try { session.rollback(); }
+            catch (SQLException | RuntimeException | Error rollback) { suppress(failure, rollback); }
         }
-        if (!safe) {
-            try { connection.abort(Runnable::run); isolated = true; }
-            catch (SQLException | RuntimeException ignored) { return new Release(false, false); }
+        if (session.outcome() == BusinessWriteTransactions.Outcome.UNKNOWN && !resolution) {
+            pending = intent; pendingIsolated = BusinessWriteTransactions.isResolutionAvailable();
         }
-        try { connection.close(); return new Release(safe, isolated); }
-        catch (SQLException | RuntimeException ignored) {
-            try { connection.abort(Runnable::run); isolated = true; }
-            catch (SQLException | RuntimeException ignoredAbort) { /* Remain blocked. */ }
-            return new Release(false, isolated);
-        }
+        try { session.close(); }
+        catch (SQLException | RuntimeException | Error cleanup) { suppress(failure, cleanup); }
+    }
+
+    private static void suppress(Throwable original, Throwable cleanup) {
+        if (original != cleanup) original.addSuppressed(cleanup);
+    }
+
+    private static String admissionCode(SQLException failure) {
+        if ("BWB01".equals(failure.getSQLState())) return "S2_TRANSFER_BUSY";
+        if ("BWB04".equals(failure.getSQLState())) return "S2_RUNTIME_REMAINDER";
+        return "S2_TRANSFER_BLOCKED";
     }
 
     private static void validateIdentity(UUID operation, Identity identity) {
@@ -301,9 +286,6 @@ public final class Schema2SnapshotTransferService {
         byte[] data = value.getBytes(StandardCharsets.UTF_8);
         output.writeInt(data.length); output.write(data);
     }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) { }
-    private record Release(boolean clean, boolean isolated) { }
     private static final class Rejected extends IllegalArgumentException {
         private Rejected(String code) { super(code); }
     }

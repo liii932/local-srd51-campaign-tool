@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.EncounterCommandRepository;
 import com.dndtool.persistence.EncounterStateRepository;
 import java.nio.charset.StandardCharsets;
@@ -40,42 +41,33 @@ public final class EncounterCommandTransactionService {
                 request.campaignId(), request.moduleReleaseId(), request.partyNodeKey(),
                 request.participants());
 
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-                EncounterCommandRepository.Lookup existing = commandRepository.find(
-                        connection, new EncounterCommandRepository.Command(
-                                request.requestId(), request.requestDigestSha256(),
-                                request.campaignId()));
-                if (existing.status() == EncounterCommandRepository.Status.CONFLICT) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Result.failure(Status.IDEMPOTENCY_CONFLICT);
-                }
-                if (existing.status() == EncounterCommandRepository.Status.REPLAY) {
-                    connection.commit();
-                    restore(connection, original);
-                    return Result.replayed(existing.replay());
-                }
-
-                EncounterStateRepository.SavedEncounter saved =
-                        stateRepository.initialize(connection, prepared);
-                EncounterCommandRepository.SavedEvent event =
-                        commandRepository.appendEvent(connection, request.campaignId());
-                commandRepository.complete(
-                        connection, new EncounterCommandRepository.Completion(
-                                request.requestId(), request.requestDigestSha256(),
-                                request.campaignId(), event.gameEventId()));
-                connection.commit();
-                restore(connection, original);
-                return Result.completed(saved, event);
-            } catch (SQLException | RuntimeException failure) {
-                rollbackAndRestore(connection, original, failure);
-                throw failure;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            EncounterCommandRepository.Lookup existing = commandRepository.find(
+                    connection, new EncounterCommandRepository.Command(
+                            request.requestId(), request.requestDigestSha256(),
+                            request.campaignId()));
+            if (existing.status() == EncounterCommandRepository.Status.CONFLICT) {
+                writeTransaction.rollback();
+                return Result.failure(Status.IDEMPOTENCY_CONFLICT);
             }
+            if (existing.status() == EncounterCommandRepository.Status.REPLAY) {
+                writeTransaction.commit();
+                return Result.replayed(existing.replay());
+            }
+
+            EncounterStateRepository.SavedEncounter saved =
+                    stateRepository.initialize(connection, prepared);
+            EncounterCommandRepository.SavedEvent event =
+                    commandRepository.appendEvent(connection, request.campaignId());
+            commandRepository.complete(
+                    connection, new EncounterCommandRepository.Completion(
+                            request.requestId(), request.requestDigestSha256(),
+                            request.campaignId(), event.gameEventId()));
+            writeTransaction.commit();
+            return Result.completed(saved, event);
         }
     }
 
@@ -108,27 +100,6 @@ public final class EncounterCommandTransactionService {
                 && MessageDigest.isEqual(
                         expected.getBytes(StandardCharsets.US_ASCII),
                         supplied.getBytes(StandardCharsets.US_ASCII));
-    }
-
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.isolation());
     }
 
     public record Request(
@@ -168,12 +139,4 @@ public final class EncounterCommandTransactionService {
     }
 
     public enum Status { COMPLETED, INVALID_REQUEST, IDEMPOTENCY_CONFLICT }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
-        }
-    }
 }

@@ -248,6 +248,7 @@ public final class JdbcCheckEffectPlanRepository implements CheckEffectPlanRepos
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         if (connection.getAutoCommit()
                 || connection.isReadOnly()
                 || connection.getTransactionIsolation() != Connection.TRANSACTION_SERIALIZABLE) {
