@@ -6,6 +6,10 @@
 生产摘要的域和 canonical profile 沿用[制品合同](schema-2-rule-artifacts.md)，
 来源读取、转存和恢复沿用[快照合同](schema-2-runtime-snapshot.md)。
 
+[初始化准备](business-write-transactions.md)可把绑定准确战役、角色和规则快照的计划与
+INTERNAL 材料及结果事实同事务保存、独立读回并重建核验。计划的持久化不等于业务角色
+已创建，不产生完整历史或执行视图；完整业务初始化仍检查全部领域与生命周期前提。
+
 ## 本地 SRD 依据与采用范围
 
 [语言条款（第 59 页）](../references/srd-5.1/pages/page-059.md)区分种族默认语言和背景追加语言；

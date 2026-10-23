@@ -75,8 +75,8 @@ class AcceptanceBoundaryTest(unittest.TestCase):
 
     def test_approved_manifest_is_read_only_and_complete(self):
         migrations = module.manifests()
-        self.assertEqual(29, len(migrations))
-        self.assertEqual(list(range(1, 26)), [item[1] for item in migrations if item[0] == module.RUNTIME])
+        self.assertEqual(30, len(migrations))
+        self.assertEqual(list(range(1, 27)), [item[1] for item in migrations if item[0] == module.RUNTIME])
         self.assertEqual([1, 2, 3, 4], [item[1] for item in migrations if item[0] == module.SOURCE])
         for _, _, _, digest, path, raw in migrations:
             self.assertEqual(raw, path.read_bytes())
@@ -91,7 +91,7 @@ class AcceptanceBoundaryTest(unittest.TestCase):
                 patch.object(module.socket, "socket", side_effect=AssertionError("No network")), \
                 patch("builtins.print") as output:
             module.main()
-        self.assertEqual("Approved payloads verified: runtime V001-V025 and RULES V001-V004. SQL files remain unchanged.",
+        self.assertEqual("Approved payloads verified: runtime V001-V026 and RULES V001-V004. SQL files remain unchanged.",
                          output.call_args.args[0])
 
     def test_disposable_replay_covers_current_chains_and_retains_narrow_language_tool_grants(self):
@@ -102,7 +102,7 @@ class AcceptanceBoundaryTest(unittest.TestCase):
         with patch("builtins.print"):
             acceptance.migrate()
         replays = [call.kwargs for call in acceptance.mysql.call_args_list if "approved" in call.kwargs]
-        self.assertEqual(29, len(replays))
+        self.assertEqual(30, len(replays))
         self.assertEqual({"V021__schema2-runtime-snapshot.sql", "V003__schema2-source-ledger.sql"},
                          {call["path"].name for call in replays if call["path"].name.startswith(("V021__", "V003__schema2"))})
         grants = [call.kwargs["path"].name for call in acceptance.mysql.call_args_list
@@ -114,7 +114,8 @@ class AcceptanceBoundaryTest(unittest.TestCase):
                          {table for table in module.SOURCE_TABLES if table.startswith("rule_schema2_")})
         expected_runtime = {"s2_runtime_identity", "s2_runtime_snapshot", "s2_runtime_member", "s2_runtime_language",
                             "s2_runtime_language_set", "s2_runtime_language_entry", "s2_runtime_field_chain",
-                            "s2_runtime_chain_step", "s2_runtime_operation", "s2_runtime_control", "s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry", "s2_runtime_character_source", "s2_runtime_proficiency_grant"}
+                            "s2_runtime_chain_step", "s2_runtime_operation", "s2_runtime_control", "s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry", "s2_runtime_character_source", "s2_runtime_proficiency_grant",
+                            "s2_initial_plan", "s2_initial_plan_slot", "s2_initial_plan_choice", "s2_initial_plan_grant"}
         self.assertEqual(expected_runtime, set(module.SCHEMA2_RUNTIME_TABLES))
         self.assertTrue(expected_runtime.issubset(module.RUNTIME_TABLES))
         self.assertIn("business_write_guard", module.RUNTIME_TABLES)

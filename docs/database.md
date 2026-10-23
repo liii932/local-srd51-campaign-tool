@@ -24,16 +24,17 @@
 V019 建立永久运行身份登记、不可变快照头和类型化语言镜像；V020 追加空工具镜像表。它们不复制旧
 规则目录或创建战役，当前 Repository 只接受 DRAFT PARTITION。身份、调用方事务、授权
 与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。应用迁移清单预期
-V001—V025；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
+V001—V026；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
 V021 追加 schema 2 INTERNAL 类型化组合、最终规则、完整覆盖链、永久守卫与操作收据；
 来源读取和原子转存合同见[来源到运行快照](rules/schema-2-runtime-snapshot.md)，增量授权见
 [schema 2 运行权限](../database/grants/schema2-runtime-snapshot.sql)。迁移和授权文件不表示已执行。
 V022 增加[角色语言／工具授予事实](rules/character-proficiency-grants.md)，V023 增加 schema 2 工具、工具集合和成员镜像。
 V024 追加 schema 2 角色授予来源、稳定槽和类型化授予覆盖值；[初始授予计划](rules/schema-2-proficiency-grants.md)
 从实际运行快照读取这些字段，仍不创建战役、角色工作集或业务历史。
-V025 建立所有业务写入共用的不可替换单行守卫，统一现有业务、INTERNAL 和 PARTITION
-写入的接纳及事务故障边界。见[共同业务事务](rules/business-write-transactions.md)、
-[守卫权限](../database/grants/business-write-guard.sql)和[守卫核验](../database/verify/business-write-guard.sql)。
+V025 建立所有业务写入共用的不可替换单行守卫；V026 追加绑定 operation、run、snapshot、
+campaign 和 character 的初始准备头、槽、选择及授予事实。准备事实与规则快照、控制和收据
+同事务保存，但不授予游戏执行资格。见[共同业务事务](rules/business-write-transactions.md)、
+[守卫权限](../database/grants/business-write-guard.sql)和[初始计划权限](../database/grants/schema2-initial-plans.sql)。
 V022 不推测旧 DRAFT 的授予来源；若已经有一级创建快照，预检拒绝迁移，须另行决定真实数据的处理方式。
 新增结构可用[只读核验 SQL](../database/verify/character-proficiency-grants.sql)盘点；
 [授予权限](../database/grants/character-proficiency-grants.sql)与规则快照权限分别审核和应用。
@@ -59,7 +60,7 @@ V003 增加 schema 2 的不可变原始制品、独立接受与控制账本；sc
 | 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
 | 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
 | 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
-| 独立 disposable 实例 | V001—V025 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
+| 独立 disposable 实例 | V001—V026 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
 | 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
 
 运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源

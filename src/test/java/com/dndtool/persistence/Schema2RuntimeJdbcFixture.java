@@ -116,6 +116,21 @@ public final class Schema2RuntimeJdbcFixture {
             return result;
         }
         if (query.contains(" FROM s2_runtime_control ")) return rows("s2_runtime_control");
+        if (query.equals("SELECT operation_id FROM s2_initial_plan ORDER BY operation_id")) return rows("s2_initial_plan");
+        if (query.startsWith("SELECT DISTINCT operation_id FROM s2_initial_plan_")) {
+            String table = query.substring("SELECT DISTINCT operation_id FROM ".length(), query.indexOf(" ORDER BY"));
+            Map<String, Map<String, Object>> distinct = new LinkedHashMap<>();
+            for (var row : rows(table)) distinct.put(HexFormat.of().formatHex((byte[]) row.get("operation_id")), row);
+            return new ArrayList<>(distinct.values());
+        }
+        if (query.startsWith("SELECT * FROM s2_initial_plan")) {
+            var planQuery = Pattern.compile("SELECT \\* FROM ([a-z0-9_]+) WHERE operation_id = \\? ORDER BY ([a-z_]+) LIMIT ([0-9]+)").matcher(query);
+            if (!planQuery.matches()) throw new AssertionError(query);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (var row : rows(planQuery.group(1))) if (equal(row.get("operation_id"), parameters.get(1))) result.add(row);
+            if (!planQuery.group(2).equals("operation_id")) result.sort(Comparator.comparingInt(row -> ((Number) row.get(planQuery.group(2))).intValue()));
+            return result.subList(0, Math.min(result.size(), Integer.parseInt(planQuery.group(3))));
+        }
         if (query.contains(" FROM s2_runtime_operation ")) {
             List<Map<String, Object>> result = new ArrayList<>(rows("s2_runtime_operation"));
             result.sort(Comparator.comparingLong(value -> ((Number) value.get("operation_sequence")).longValue())); return result;

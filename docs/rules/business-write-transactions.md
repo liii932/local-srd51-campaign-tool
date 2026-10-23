@@ -1,4 +1,4 @@
-# 共同业务写入
+# 共同业务写入与初始化准备
 
 本合同连接既有业务事务与 [v2 运行设计](../design/v2/runtime-and-transactions.md)。
 共同接纳不改变 RELEASED v1 的规则、事件、幂等摘要和存档编码，也不赋予不完整 schema 2
@@ -10,7 +10,7 @@
 业务事务先取得进程门，再借连接、开始事务并以第一条 SQL 锁定 `business_write_guard`。
 规则、目标、版本和幂等校验及随机性消费均在此边界内进行；不能只在 Servlet 设置门。
 旧事务保留原隔离级别：角色聚合修改使用 `READ_COMMITTED`，其余入口使用 `SERIALIZABLE`；
-新 schema 2 材料采用 `READ_COMMITTED`。
+新 schema 2 材料和初始化准备采用 `READ_COMMITTED`。
 
 事务 owner 通过 `Session.connection()` 把受约束连接交给叶仓储，只有 Session 可以决定
 提交、回滚及连接归还。叶仓储不能自行提交、回滚、关闭或另开写连接；写入方法拒绝未经
@@ -33,7 +33,7 @@
 | `EntityPositionTransactionService.position` | 实体位置修改 |
 | `CampaignArchiveConfirmationService.confirm` | 完整 legacy 战役导入 |
 | `CampaignArchiveV2DraftImportService.importState` | 内部 DRAFT 角色状态导入 |
-| `Schema2SnapshotTransferService` | INTERNAL 快照的原子转存 |
+| `Schema2SnapshotTransferService` | INTERNAL 快照及绑定初始计划的原子转存 |
 
 旧 PARTITION 快照仓储也要求受共同守卫约束的连接；离线验收调用方使用 `openPartition`，
 只能在没有活动旧战役和 schema 2 残留时写 PARTITION 材料，不获得业务执行资格。
@@ -55,26 +55,36 @@
 均不能单独证明未提交。查证必须绑定原操作，在原执行者已隔离后用新连接锁同一个永久
 守卫，核验完整结果及相关材料；查证不补写、不重试命令、不自动发布或恢复执行视图。
 
-## 后续初始化采用边界
+## 初始化准备与执行资格
 
-初始语言/工具计划遵循 [schema 2 初始授予合同](schema-2-proficiency-grants.md)。
-当前 `Schema2InitialCharacterPlanService` 从已存储的 INTERNAL 快照生成和核验只读初始计划，
-不保存计划。将准确计划与快照、控制及操作收据同事务持久化和独立读回，仍须后续采用。
+初始语言/工具计划遵循 [schema 2 初始授予合同](schema-2-proficiency-grants.md)。准备阶段
+从真实来源重新读取、核对接受事实和准确组合，正常结束来源事务并关闭连接后，才进入
+运行事务。计划绑定准确 operation、campaign、character、run、snapshot 和规则摘要；
+来源、选择、槽及授予事实不可用显示名或旧单模组键替代。
 
-完整业务初始化当前不可用，即使运行库为空也不授予游戏执行资格。它还需要真实角色及全部
-必需领域、完整业务/历史写入与恢复、容量及生命周期闭包；不能以空战役、空历史或只读计划
-替代。新战役入口、完整文件和 archive format 2 的正式激活继续受采用与发布门约束。
+初始计划与 INTERNAL 快照、完整字段链、控制及结果事实在同一个运行事务保存，实际读回
+后重新构建并比较完整计划。任何计划、规则绑定或读回不一致都回滚整个候选；相同操作
+标识的不同计划必须冲突。已提交的准备事实不等于角色、战役或完整业务历史已经初始化。
+
+完整初始化还需要真实角色及全部必需领域、完整业务/历史写入与恢复、容量及生命周期
+闭包。缺失时稳定拒绝，不建立空战役、空历史或执行视图，也不把准备结果转换为长期执行
+令牌。新战役入口、完整文件和 archive format 2 的正式激活继续受采用与发布门约束。
 
 ## 验证与安装
 
 数据库无关测试应覆盖所有真实事务入口和调用方叶仓储、第一条 SQL 的锁序、并发互斥、
 旧活动战役及残留阻断、事务失败、明确提交后的连接故障、UNKNOWN 隔离和原操作查证。
+初始化准备还覆盖跨来源身份、同键不同计划、来源关闭失败、读回被修改和中途失败无
+部分快照/计划/收据。固定期望不得由被测计划器生成。
 
 前向迁移、最小授权和只读核验脚本必须分别审核。新增迁移进入候选 WAR 及完整 schema
 诊断清单；文件存在、静态 SQL 测试和 JDBC 代理测试都不表示真实 MySQL 已迁移或已通过
 锁、触发器、权限及连接池失效验收。数据库安装、授权、真实数据库验收和部署仍为独立
 检查点，普通应用启动不执行这些操作。
 
-`V025__business-write-guard.sql` 建立不可替换的单行守卫。
+`V025__business-write-guard.sql` 建立不可替换的单行守卫；
+`V026__schema2-initial-plans.sql` 建立初始准备头、槽、选择和授予事实。
 [守卫权限](../../database/grants/business-write-guard.sql)仅增加守卫及接纳状态读取；
-只读核验见[守卫核验](../../database/verify/business-write-guard.sql)。
+[计划权限](../../database/grants/schema2-initial-plans.sql)仅允许读取和追加计划。
+核验分别见[守卫核验](../../database/verify/business-write-guard.sql)与
+[计划核验](../../database/verify/schema2-initial-plans.sql)。

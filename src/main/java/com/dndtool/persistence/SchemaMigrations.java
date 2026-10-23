@@ -112,6 +112,10 @@ public final class SchemaMigrations {
     static final String V025_SCRIPT_NAME = "V025__business-write-guard.sql";
     static final String V025_APPROVED_SHA256 = "cc92de95ac0385208160f58f22d824c654dfef80edbb6151e0220dc882deed33";
 
+    static final int V026_VERSION = 26;
+    static final String V026_SCRIPT_NAME = "V026__schema2-initial-plans.sql";
+    static final String V026_APPROVED_SHA256 = "06c84d420a59cd39ed35e0c380d8e1378c5c4c1d724f7598471123f6e11bb2fa";
+
     private static final String RESOURCE_DIRECTORY = "/db/migration/";
     private static final String SCOPE_BEGIN = "-- CHECKSUM-SCOPE-BEGIN";
     private static final String SCOPE_END = "-- CHECKSUM-SCOPE-END";
@@ -145,7 +149,8 @@ public final class SchemaMigrations {
             new Definition(V022_VERSION, V022_SCRIPT_NAME, V022_APPROVED_SHA256),
             new Definition(V023_VERSION, V023_SCRIPT_NAME, V023_APPROVED_SHA256),
             new Definition(V024_VERSION, V024_SCRIPT_NAME, V024_APPROVED_SHA256),
-            new Definition(V025_VERSION, V025_SCRIPT_NAME, V025_APPROVED_SHA256));
+            new Definition(V025_VERSION, V025_SCRIPT_NAME, V025_APPROVED_SHA256),
+            new Definition(V026_VERSION, V026_SCRIPT_NAME, V026_APPROVED_SHA256));
 
     private SchemaMigrations() {
     }
