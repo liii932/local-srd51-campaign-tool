@@ -9,6 +9,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
@@ -25,6 +26,18 @@ final class JdbcCharacterCardMutationRepositoryTest {
     private static final String REQUEST_ID =
             "123e4567-e89b-42d3-a456-426614174000";
     private static final String SHA = "a".repeat(64);
+
+    @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        DatabaseFixture fixture = new DatabaseFixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> new JdbcCharacterCardMutationRepository(fixture.dataSource())
+                            .mutate(command("ability.strength", 15)));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.executed.isEmpty());
+    }
 
     @Test
     void fieldUpdateCommitsValueAuditVersionAndIdempotencyTogether() throws Exception {
@@ -129,10 +142,10 @@ final class JdbcCharacterCardMutationRepositoryTest {
         private boolean rolledBack;
 
         DataSource dataSource() {
-            return proxy(DataSource.class, (ignored, method, arguments) ->
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) ->
                     "getConnection".equals(method.getName())
                             ? proxy(Connection.class, this)
-                            : defaultValue(method.getReturnType()));
+                            : defaultValue(method.getReturnType())));
         }
 
         @Override

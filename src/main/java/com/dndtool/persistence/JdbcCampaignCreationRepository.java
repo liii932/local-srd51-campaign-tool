@@ -60,43 +60,31 @@ public final class JdbcCampaignCreationRepository implements CampaignCreationRep
     @Override
     public Result create(Command command) throws SQLException {
         validateCommand(command);
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                // SERIALIZABLE makes the empty active-campaign range lock meaningful too.
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-
-                Result existing = findExistingOperation(connection, command);
-                if (existing != null) {
-                    connection.commit();
-                    restore(connection, original);
-                    return existing;
-                }
-
-                Release release = lockRelease(connection, command);
-                if (release == null) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Result.Status.RELEASE_UNAVAILABLE, null);
-                }
-                if (activeCampaignExists(connection)) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Result.Status.ACTIVE_CAMPAIGN_EXISTS, null);
-                }
-
-                long campaignId = insertCampaign(connection, command);
-                insertCampaignModule(connection, campaignId, release);
-                insertOperation(connection, command, campaignId);
-                connection.commit();
-                restore(connection, original);
-                return new Result(Result.Status.CREATED, command.campaignKey());
-            } catch (SQLException | RuntimeException exception) {
-                rollbackAndRestore(connection, original, exception);
-                throw exception;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            Result existing = findExistingOperation(connection, command);
+            if (existing != null) {
+                writeTransaction.commit();
+                return existing;
             }
+
+            Release release = lockRelease(connection, command);
+            if (release == null) {
+                writeTransaction.rollback();
+                return new Result(Result.Status.RELEASE_UNAVAILABLE, null);
+            }
+            if (activeCampaignExists(connection)) {
+                writeTransaction.rollback();
+                return new Result(Result.Status.ACTIVE_CAMPAIGN_EXISTS, null);
+            }
+
+            long campaignId = insertCampaign(connection, command);
+            insertCampaignModule(connection, campaignId, release);
+            insertOperation(connection, command, campaignId);
+            writeTransaction.commit();
+            return new Result(Result.Status.CREATED, command.campaignKey());
         }
     }
 
@@ -279,36 +267,6 @@ public final class JdbcCampaignCreationRepository implements CampaignCreationRep
         return new SQLException("Invalid campaign creation persistence state");
     }
 
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.transactionIsolation());
-    }
-
     private record Release(long id, String moduleKey, String releaseVersion, String contentSha256) {
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int transactionIsolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(),
-                    connection.isReadOnly(),
-                    connection.getTransactionIsolation());
-        }
     }
 }

@@ -50,6 +50,8 @@ PARTITION 头分离，不把旧固定单模组字段改成通用组合，也不�
 | `s2_runtime_field_chain` / `s2_runtime_chain_step` | 完整目标/字段、初始与显式覆盖步骤、前后类型化值、提供者、加载位置和作者位置 |
 | `s2_runtime_operation` | 不可改写的操作 UUID、CAPTURE/RESTORE、意图指纹、身份对、连续序号及数据库时间 |
 | `s2_runtime_control` | 永久单例守卫、协议、材料计数与版本 |
+| `business_write_guard` | V025 的永久共同业务守卫，先于材料守卫锁定 |
+| `s2_initial_plan` / `s2_initial_plan_slot` / `s2_initial_plan_choice` / `s2_initial_plan_grant` | V026 的初始准备身份、来源、完整槽、选择和授予事实；绑定同一操作收据及快照 |
 
 Repository 接受调用方连接；完整模型验证在首次 INSERT 前完成。父子行写入后，必须从
 真实查询结果独立重建成员、领域字段和每条覆盖步骤，再核对规范字节及三种结果摘要。
@@ -66,8 +68,8 @@ Repository 接受调用方连接；完整模型验证在首次 INSERT 前完成�
 
 ## 原子转存、重放与查证
 
-协调层先取得本实例非阻塞进程门，再完成来源读取与组合，最后借运行连接开启
-`READ_COMMITTED` 事务。第一条运行 SQL 锁永久材料守卫；之后核对完整运行迁移账本、控制行、
+协调层先取得全部业务写入口共用的非阻塞进程门，再完成来源读取与组合，最后借运行连接开启
+`READ_COMMITTED` 事务。第一条运行 SQL 锁永久业务守卫，随后锁材料守卫；之后核对完整运行迁移账本、控制行、
 全部收据、身份对与实际快照。残缺、孤立或错误绑定的行拒绝新写入。
 
 新身份、组合、最终规则、覆盖链、收据和守卫计数同事务提交或回滚。计数与版本均等于不可变
@@ -81,7 +83,7 @@ CAPTURE/RESTORE、run UUID、snapshot UUID、规范 profile、组合算法、有
 此指纹不替代五类规则摘要，也不进入其既有域。
 
 只有 commit 明确成功，才返回新材料快照。commit 响应不明或 rollback 失败时不发布候选，
-当前协调器阻断后续写入并隔离原连接；不能恢复 autoCommit 或把未决连接正常归还池。
+共同事务边界阻断后续写入并隔离原连接；不能恢复 autoCommit 或把未决连接正常归还池。
 明确提交后连接恢复/关闭失败仍报告已提交事实，协调器同时保持阻断，不能重做写入。
 运行事务中的严重异常仍原样抛出，同时尝试回滚；回滚失败则隔离连接，协调器保持阻断。
 
@@ -89,6 +91,21 @@ CAPTURE/RESTORE、run UUID、snapshot UUID、规范 profile、组合算法、有
 重验完整收据和快照，不补写、重试或清理。完整永久历史中原事实缺席且原执行者隔离已确认时，
 才能判定未提交。新实例的 `inspect` 可读取已提交事实；单纯查不到行不能证明原操作回滚。
 查证不恢复已失效的协调器或任何游戏执行资格。跨进程重启后的未决恢复仍属于完整生命周期采用。
+
+`transferPrepared` 消费绑定准确 campaign/character/run/snapshot 的初始授予准备材料。
+它重新读取来源及重建计划，再在同一运行事务保存快照、操作收据与类型化初始计划；实际
+读回全部来源、槽、选择和授予事实，并调用 `Schema2InitialCharacterPlanService` 重建比较。准备材料不创建真实
+战役、角色或业务历史；完整初始化缺少必需材料时仍拒绝。共同事务、计划身份和失败边界
+见[业务写入与初始化准备](business-write-transactions.md)。
+
+含初始计划的操作使用独立指纹域 `local-dnd/schema2-initial-plan-transfer/1` 后接零字节；
+先按上述转存字段顺序编码，再追加 campaign UUID、character UUID、有序来源、槽、选择及授予。
+每组先写四字节大端数量；规则身份依次为 moduleKey、ruleType、ruleKey，槽身份在规则身份后
+追加 collectionKey、声明 moduleKey 和 entryKey。槽记录追加 category、enabled、kind、
+目标或集合身份，CHOICE 再追加四字节 count。选择按规范槽顺序写目标数量与有序目标身份；
+授予按计划顺序写槽、category、kind、目标和 suppressed。布尔使用单字节 0/1，其余字符串
+使用上述 UTF-8 长度前缀。无计划操作的原域及编码保持不变。每份计划最多 512 个槽、
+256 个已选目标及 768 条授予事实，写入前校验，读回按独立查询重新验证。
 
 ## 准确恢复绑定
 

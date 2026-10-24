@@ -99,7 +99,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V024 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V026 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -258,7 +258,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V024 完整运行清单及来源 V001—V004。
+并核对 V001—V026 完整运行清单及来源 V001—V004。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -348,6 +348,32 @@ Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业
 生成。时间、回合和触发测试必须固定明确时钟或顺序，不能依赖测试执行速度。任何规则领域
 只有在目录、服务、仓储、事务、Web 边界和存档测试共同完成后，才可标为已实现。
 
+## 共同业务事务与初始化准备验证
+
+[共同事务合同](rules/business-write-transactions.md)改变共享接纳边界时，应覆盖清单中的全部
+事务 owner 及调用方叶仓储测试，并保留现有版本、幂等、随机性和失败回滚断言。对永久守卫、
+连接所有权、材料准备和未决查证的数据库无关定向命令为：
+
+```bash
+mvn '-Dtest=BusinessWriteTransactionsTest,BusinessWriteGuardSchemaTest,Schema2SnapshotTransferServiceTest,Schema2InitializationPreparationServiceTest,Schema2InitialPlanSchemaTest,Schema2InitialCharacterPlanServiceTest,Schema2InitialCharacterPlanIntegrationTest' test
+python3 -B src/test/resources/schema2-grants/expected/initial-plan-fingerprint.py
+```
+
+故障测试通过独立子 JVM 验证永久失效门，不提供重置生产阻断状态的测试后门。覆盖第一条 SQL
+锁序、并发互斥、裸连接拒绝、活动 legacy 和材料残留阻断、commit/rollback/连接归还故障、
+明确提交与 UNKNOWN 的区别，以及隔离后绑定原操作的只读查证。准备测试从真实来源重读并
+对照固定计划期望，覆盖同键不同计划、孤立/损坏事实和每个写点失败后无部分快照、计划及收据。
+完整初始化缺少领域、业务历史、容量及生命周期时必须继续拒绝。
+计划指纹 oracle 仅使用标准库、既有独立规则摘要及手写的来源、槽、选择和授予事实；
+不调用生产计划器或指纹实现，其固定摘要由准备测试直接断言。
+
+迁移清单变化同时选择 `SchemaMigrationsTest`、`RuleSchemaMigrationsTest`、
+`ToolCatalogSchemaTest`、`V011CompleteCharacterCatalogDraftTest` 与 schema 诊断测试；
+PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像及链路测试。
+`python3 -B tools/rule-packages/tests/verify-language-jdbc-test.py` 只测试隔离验收脚本的
+拓扑、清单和授权编排，不启动 MySQL，也不替代另行授权的真实数据库验收。
+候选 WAR 必须包含共同 Session、初始准备服务/仓储及 V025/V026，排除测试工具和来源 SQL。
+
 ## 5. Web 与安全测试
 
 覆盖精确 loopback/Host/scheme/port、伪造 `X-Forwarded-*`、方法限制、Session Cookie、CSRF、Origin/Referer、Fetch Metadata、安全响应头、epoch、对象版本、幂等键和摘要。错误入口应返回一致的普通错误且不能到达业务写入。
@@ -361,7 +387,7 @@ Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V024 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V026 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 

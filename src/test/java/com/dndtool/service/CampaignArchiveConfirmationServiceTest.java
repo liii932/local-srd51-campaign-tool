@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import com.dndtool.persistence.CampaignArchiveImportIdempotencyRepository;
 import com.dndtool.persistence.CampaignArchiveImportRepository;
 import java.lang.reflect.InvocationHandler;
@@ -29,6 +30,17 @@ final class CampaignArchiveConfirmationServiceTest {
             CampaignArchiveConfirmationRequestDigest.sha256(FILE_DIGEST, null);
     private static final long HOST_STATE_EPOCH = 424_242L;
     private static final CampaignArchiveDocument DOCUMENT = document();
+
+    @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> fixture.service().confirm(request()));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.calls.isEmpty());
+    }
 
     @Test
     void revalidatesThenCompletesImportAndIdempotencyInOneSerializableTransaction()
@@ -411,13 +423,13 @@ final class CampaignArchiveConfirmationServiceTest {
                         case "close" -> { closed = true; yield null; }
                         default -> defaultValue(method.getReturnType());
                     });
-            return proxy(DataSource.class, (ignored, method, arguments) -> {
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) -> {
                 if ("getConnection".equals(method.getName())) {
                     connectionRequested = true;
                     return connection;
                 }
                 return defaultValue(method.getReturnType());
-            });
+            }));
         }
     }
 

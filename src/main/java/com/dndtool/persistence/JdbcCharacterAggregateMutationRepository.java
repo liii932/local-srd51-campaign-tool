@@ -31,38 +31,28 @@ public final class JdbcCharacterAggregateMutationRepository
     @Override
     public Result mutate(Command command, Mutation mutation) throws SQLException {
         validate(command, mutation);
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-                connection.setAutoCommit(false);
-
-                LockedRoot root = lockCharacter(connection, command.characterKey());
-                if (root == null) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Result.Status.NOT_FOUND, null);
-                }
-                if (root.rowVersion() != command.expectedRowVersion()) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Result.Status.VERSION_CONFLICT, root.rowVersion());
-                }
-
-                mutation.apply(connection, new LockedCharacter(
-                        root.id(), root.campaignId(), root.moduleReleaseId()));
-                if (advanceVersion(connection, command) != 1) {
-                    throw invalidState();
-                }
-                long nextVersion = Math.addExact(command.expectedRowVersion(), 1L);
-                connection.commit();
-                restore(connection, original);
-                return new Result(Result.Status.UPDATED, nextVersion);
-            } catch (SQLException | RuntimeException exception) {
-                rollbackAndRestore(connection, original, exception);
-                throw exception;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_READ_COMMITTED)) {
+            Connection connection = writeTransaction.connection();
+            LockedRoot root = lockCharacter(connection, command.characterKey());
+            if (root == null) {
+                writeTransaction.rollback();
+                return new Result(Result.Status.NOT_FOUND, null);
             }
+            if (root.rowVersion() != command.expectedRowVersion()) {
+                writeTransaction.rollback();
+                return new Result(Result.Status.VERSION_CONFLICT, root.rowVersion());
+            }
+
+            mutation.apply(connection, new LockedCharacter(
+                    root.id(), root.campaignId(), root.moduleReleaseId()));
+            if (advanceVersion(connection, command) != 1) {
+                throw invalidState();
+            }
+            long nextVersion = Math.addExact(command.expectedRowVersion(), 1L);
+            writeTransaction.commit();
+            return new Result(Result.Status.UPDATED, nextVersion);
         }
     }
 
@@ -129,36 +119,7 @@ public final class JdbcCharacterAggregateMutationRepository
         return new SQLException("Invalid character aggregate persistence state");
     }
 
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.transactionIsolation());
-    }
-
     private record LockedRoot(
             long id, long campaignId, long moduleReleaseId, long rowVersion) {
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int transactionIsolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
-        }
     }
 }

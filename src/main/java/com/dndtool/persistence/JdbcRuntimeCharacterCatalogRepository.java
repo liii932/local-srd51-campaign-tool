@@ -29,6 +29,7 @@ public final class JdbcRuntimeCharacterCatalogRepository {
         Objects.requireNonNull(partition);
         // Complete validation precedes the first INSERT, including both domain constructors.
         var expected = new CharacterCatalogPartition(partition.languages(), new ToolPartition(partition.tools().tools()));
+        BusinessWriteTransactions.requireGuarded(connection);
         languages.append(connection, identity, expected.languages());
         for (var tool : expected.tools().tools()) {
             try (PreparedStatement statement = connection.prepareStatement(INSERT)) {

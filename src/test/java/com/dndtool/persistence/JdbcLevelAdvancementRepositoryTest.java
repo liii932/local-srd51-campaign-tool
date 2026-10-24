@@ -58,6 +58,20 @@ class JdbcLevelAdvancementRepositoryTest {
                                     state("resource.hit_dice.d10", 2, 2))));
 
     @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> new JdbcLevelAdvancementRepository(fixture.dataSource()).confirm(
+                            COMMAND, (sides, modifier) -> {
+                                throw new AssertionError("guard must reject before hit-point randomness");
+                            }));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.targets.isEmpty());
+    }
+
+    @Test
     void validatesLocksThenRollsAndCommitsAllAuthoritativeRowsTogether() throws Exception {
         Fixture fixture = new Fixture();
         AtomicInteger rolls = new AtomicInteger();
@@ -250,9 +264,9 @@ class JdbcLevelAdvancementRepositoryTest {
 
         DataSource dataSource() {
             Connection connection = proxy(Connection.class, this::connection);
-            return proxy(DataSource.class, (ignored, method, arguments) ->
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) ->
                     "getConnection".equals(method.getName()) ? connection
-                            : defaultValue(method.getReturnType()));
+                            : defaultValue(method.getReturnType())));
         }
 
         private Object connection(Object ignored, Method method, Object[] arguments) {

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import com.dndtool.persistence.CheckEffectPlanRepository;
 import com.dndtool.persistence.CheckExecutionRepository;
 import com.dndtool.module.ModuleCatalog;
@@ -27,6 +28,18 @@ final class CheckTransactionServiceTest {
     private static final String TARGET = "22222222-2222-2222-2222-222222222222";
     private static final String REQUEST = "33333333-3333-3333-3333-333333333333";
     private static final String PAYLOAD = "a".repeat(64);
+
+    @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> fixture.service().execute(fixture.request(validSuccessPlan())));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.calls.isEmpty());
+        assertEquals(0, fixture.randomCount);
+    }
 
     @Test
     void commitsAllAuthoritativeWritesAndVersionsExactlyOnce() throws Exception {
@@ -366,12 +379,12 @@ final class CheckTransactionServiceTest {
         }
 
         private DataSource dataSource() {
-            return (DataSource) Proxy.newProxyInstance(
+            return BusinessWriteTestSupport.withGuard((DataSource) Proxy.newProxyInstance(
                     DataSource.class.getClassLoader(), new Class<?>[] {DataSource.class},
                     (proxy, method, arguments) -> switch (method.getName()) {
                         case "getConnection" -> connection;
                         default -> defaultValue(method.getReturnType());
-                    });
+                    }));
         }
 
         private Connection connectionProxy() {
@@ -396,7 +409,7 @@ final class CheckTransactionServiceTest {
 
         @Override
         public LockResult lockBeforeRoll(Connection connection, LockCommand command) {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("lock");
             return lockResult;
         }
@@ -404,7 +417,7 @@ final class CheckTransactionServiceTest {
         @Override
         public Lookup find(Connection connection, CheckIdempotencyRepository.Command command)
                 throws SQLException {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("idempotency-find");
             fail("idempotency-find");
             assertEquals(REQUEST, command.requestId());
@@ -416,7 +429,7 @@ final class CheckTransactionServiceTest {
         public void complete(
                 Connection connection, CheckIdempotencyRepository.Completion completion)
                 throws SQLException {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("idempotency-complete");
             fail("idempotency-complete");
             assertEquals(REQUEST, completion.requestId());
@@ -427,7 +440,7 @@ final class CheckTransactionServiceTest {
         public Map<Long, Long> advanceModifiedVersions(
                 Connection connection, LockedScope scope, Set<Long> modifiedCharacterIds)
                 throws SQLException {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("version");
             fail("version");
             assertEquals(Set.of(11L), modifiedCharacterIds);
@@ -437,7 +450,7 @@ final class CheckTransactionServiceTest {
         @Override
         public SavedCheck append(Connection connection, CheckExecutionRepository.Command command)
                 throws SQLException {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("check");
             fail("check");
             assertEquals(30L, command.expectedEventTail());
@@ -448,7 +461,7 @@ final class CheckTransactionServiceTest {
         @Override
         public SavedPlan append(Connection connection, CheckEffectPlanRepository.Command command)
                 throws SQLException {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("plan");
             fail("plan");
             assertEquals(201L, command.checkExecutionId());
@@ -460,7 +473,7 @@ final class CheckTransactionServiceTest {
                 Connection connection,
                 CheckEffectExecutionRepository.PositionPreflight preflight)
                 throws SQLException {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("position-preflight");
             fail("position-preflight");
             assertEquals(7L, preflight.campaignId());
@@ -471,7 +484,7 @@ final class CheckTransactionServiceTest {
         public AppliedEffects execute(
                 Connection connection, CheckEffectExecutionRepository.Command command)
                 throws SQLException {
-            assertSame(this.connection, connection);
+            BusinessWriteTestSupport.assertGuarded(connection);
             calls.add("effect");
             fail("effect");
             assertEquals(201L, command.checkExecutionId());

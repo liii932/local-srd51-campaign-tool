@@ -38,9 +38,10 @@ SCHEMA2_RUNTIME_TABLES = sorted(("s2_runtime_identity", "s2_runtime_snapshot", "
                                 "s2_runtime_language", "s2_runtime_language_set", "s2_runtime_language_entry",
                                 "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation",
                                 "s2_runtime_control", "s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry",
-                                "s2_runtime_character_source", "s2_runtime_proficiency_grant"))
+                                "s2_runtime_character_source", "s2_runtime_proficiency_grant",
+                                "s2_initial_plan", "s2_initial_plan_slot", "s2_initial_plan_choice", "s2_initial_plan_grant"))
 RUNTIME_TABLES = sorted(("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language", "runtime_rule_tool",
-                         *SCHEMA2_RUNTIME_TABLES))
+                         "business_write_guard", *SCHEMA2_RUNTIME_TABLES))
 ACCOUNTS = {
     "root": "localhost",
     "dnd_tool_se_migration_replay": "localhost",
@@ -85,7 +86,7 @@ def manifests():
         digest = re.search(rf'{prefix}_APPROVED_SHA256 =\s*"([0-9a-f]{{64}})";', java)
         require(name and digest and name[1].startswith(prefix + "__"), "Invalid migration constant")
         result.append((RUNTIME, number, name[1], digest[1], ROOT / "src/main/resources/db/migration" / name[1]))
-    require(len(result) == 24, "This acceptance profile requires review when the runtime chain changes")
+    require(len(result) == 26, "This acceptance profile requires review when the runtime chain changes")
     java = (ROOT / "src/main/java/com/dndtool/persistence/RuleSchemaMigrations.java").read_text("utf-8")
     block = re.search(r"APPROVED = List[.]of\((.*?)\);", java, re.S)
     require(block is not None, "Rules manifest not recognized")
@@ -348,7 +349,7 @@ class Acceptance:
             user = "dnd_tool_rules_migrator" if schema == SOURCE else "dnd_tool_se_migration_replay"
             self.mysql(user=user, schema=schema, path=path, approved=approved)
             print("Replayed " + schema + "/" + name, flush=True)
-        for name in ("rule-source-installer.sql", "rule-source-app.sql", "runtime-language-snapshot.sql", "runtime-tool-snapshot.sql"):
+        for name in ("rule-source-installer.sql", "rule-source-app.sql", "runtime-language-snapshot.sql", "runtime-tool-snapshot.sql", "business-write-guard.sql"):
             self.mysql(path=ROOT / "database/grants" / name)
         self.mysql("GRANT SELECT ON `dnd\\_tool\\_se`.* TO 'dnd_tool_se_validation_ro'@'127.0.0.1';")
 
@@ -434,7 +435,10 @@ class Acceptance:
                 "Schema 2 source is not freshly migrated")
         require(self.mysql("SELECT (SELECT COUNT(*) FROM runtime_run_identity),(SELECT COUNT(*) FROM runtime_rule_snapshot),"
                            "(SELECT COUNT(*) FROM runtime_rule_language),(SELECT COUNT(*) FROM runtime_rule_tool);", user="dnd_tool_se_validation_ro", schema=RUNTIME) == "0\t0\t0\t0\n", "Runtime not empty")
-        # V021/V023/V024 are installed and audited, but this language/tool profile never writes schema 2 material.
+        # Schema 2 tables are installed and audited; this profile only writes language/tool PARTITION material.
+        captures["business-write-guard"] = self.mysql(
+            "SELECT guard_id,protocol_version FROM business_write_guard;", user="dnd_tool_se_app", schema=RUNTIME)
+        require(captures["business-write-guard"] == "1\t1\n", "Business write guard is not valid")
         schema2_content_tables = [table for table in SCHEMA2_RUNTIME_TABLES if table != "s2_runtime_control"]
         captures["schema2-runtime-history"] = self.mysql(
             "SELECT " + ",".join(f"(SELECT COUNT(*) FROM {table})" for table in schema2_content_tables) + ";"

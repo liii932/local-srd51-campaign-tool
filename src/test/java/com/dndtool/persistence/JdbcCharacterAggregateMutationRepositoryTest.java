@@ -25,6 +25,21 @@ final class JdbcCharacterAggregateMutationRepositoryTest {
             new CharacterAggregateMutationRepository.Command(CHARACTER_KEY, 7);
 
     @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        JdbcFixture fixture = new JdbcFixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> new JdbcCharacterAggregateMutationRepository(fixture.dataSource()).mutate(
+                            COMMAND, (connection, character) -> {
+                                throw new AssertionError("guard must reject before aggregate writes");
+                            }));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertEquals(0, fixture.mutationCalls);
+        assertEquals(0, fixture.versionUpdateCalls);
+    }
+
+    @Test
     void appliesChildWritesAndAdvancesRootVersionOnceInOneTransaction() throws SQLException {
         JdbcFixture fixture = new JdbcFixture();
         fixture.characterRows = List.of(characterRow(7));
@@ -33,7 +48,7 @@ final class JdbcCharacterAggregateMutationRepositoryTest {
 
         CharacterAggregateMutationRepository.Result result = repository.mutate(
                 COMMAND, (connection, character) -> {
-                    assertSame(fixture.connection, connection);
+                    BusinessWriteTestSupport.assertGuarded(connection);
                     assertEquals(11, character.id());
                     assertEquals(22, character.campaignId());
                     assertEquals(33, character.moduleReleaseId());
@@ -152,9 +167,9 @@ final class JdbcCharacterAggregateMutationRepositoryTest {
 
         private DataSource dataSource() {
             connection = proxy(Connection.class, this::connectionCall);
-            return proxy(DataSource.class, (ignored, method, arguments) ->
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) ->
                     "getConnection".equals(method.getName())
-                            ? connection : defaultValue(method.getReturnType()));
+                            ? connection : defaultValue(method.getReturnType())));
         }
 
         private Object connectionCall(Object ignored, Method method, Object[] arguments) {

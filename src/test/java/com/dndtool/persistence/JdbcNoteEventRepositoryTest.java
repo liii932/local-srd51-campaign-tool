@@ -25,11 +25,18 @@ final class JdbcNoteEventRepositoryTest {
             new NoteEventRepository.Command(7L, 4L, "门后传来脚步声");
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcNoteEventRepository().append(raw, COMMAND));
+    }
+
+    @Test
     void appendsOnlyOneRootMessageEvent() throws Exception {
         Fixture fixture = new Fixture();
 
         NoteEventRepository.SavedNote saved =
-                new JdbcNoteEventRepository().append(fixture.connection(), COMMAND);
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcNoteEventRepository().append(guarded, COMMAND));
 
         assertEquals(new NoteEventRepository.SavedNote(202L, 5L), saved);
         assertEquals(List.of("campaign", "game_event"), fixture.targets);
@@ -51,8 +58,9 @@ final class JdbcNoteEventRepositoryTest {
                 new NoteEventRepository.Command(7L, 0L, "cafe\u0301");
 
         assertThrows(IllegalArgumentException.class,
-                () -> new JdbcNoteEventRepository().append(
-                        fixture.connection(), unnormalized));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcNoteEventRepository().append(
+                        guarded, unnormalized)));
         assertTrue(fixture.preparedSql.isEmpty());
     }
 
@@ -62,7 +70,8 @@ final class JdbcNoteEventRepositoryTest {
         fixture.autoCommit = true;
 
         assertThrows(SQLException.class,
-                () -> new JdbcNoteEventRepository().append(fixture.connection(), COMMAND));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcNoteEventRepository().append(guarded, COMMAND)));
         assertTrue(fixture.preparedSql.isEmpty());
     }
 
@@ -72,7 +81,8 @@ final class JdbcNoteEventRepositoryTest {
         fixture.staleTail = true;
 
         assertThrows(SQLException.class,
-                () -> new JdbcNoteEventRepository().append(fixture.connection(), COMMAND));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcNoteEventRepository().append(guarded, COMMAND)));
         assertEquals(List.of("campaign"), fixture.targets);
         assertFalse(fixture.committed);
         assertFalse(fixture.rolledBack);
@@ -84,7 +94,8 @@ final class JdbcNoteEventRepositoryTest {
         fixture.failEvent = true;
 
         assertThrows(SQLException.class,
-                () -> new JdbcNoteEventRepository().append(fixture.connection(), COMMAND));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcNoteEventRepository().append(guarded, COMMAND)));
         assertEquals(List.of("campaign", "game_event"), fixture.targets);
         assertFalse(fixture.committed);
         assertFalse(fixture.rolledBack);

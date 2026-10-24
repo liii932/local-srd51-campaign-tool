@@ -324,27 +324,24 @@ public final class JdbcLevelAdvancementRepository implements LevelAdvancementRep
     public Result confirm(Command command, HitPointResolver resolver) throws SQLException {
         java.util.Objects.requireNonNull(command);
         java.util.Objects.requireNonNull(resolver);
-        Connection connection = dataSource.getConnection();
-        ConnectionState original = ConnectionState.capture(connection);
-        try {
-            connection.setReadOnly(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-            connection.setAutoCommit(false);
-
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
             Result replay = lockOperation(connection, command);
-            if (replay != null) return commit(connection, original, replay);
+            if (replay != null) return commit(writeTransaction, replay);
             LockedCharacter character = lockCharacter(connection, command.expected().characterKey());
-            if (character == null) return rollback(connection, original,
+            if (character == null) return rollback(writeTransaction,
                     rejected(Result.Status.CHARACTER_UNAVAILABLE));
             if (!bindingMatches(connection, character, command.expected())) {
-                return rollback(connection, original,
+                return rollback(writeTransaction,
                         rejected(Result.Status.MODULE_BINDING_MISMATCH));
             }
             if (character.eventTail() != command.expected().expectedEventTail()) {
-                return rollback(connection, original, rejected(Result.Status.STALE_PREVIEW));
+                return rollback(writeTransaction, rejected(Result.Status.STALE_PREVIEW));
             }
             if (character.rowVersion() != command.expected().expectedRowVersion()) {
-                return rollback(connection, original, rejected(Result.Status.STALE_ROW_VERSION));
+                return rollback(writeTransaction, rejected(Result.Status.STALE_ROW_VERSION));
             }
             AbilityScores scores = scores(connection, character.characterId());
             List<ClassState> lockedClasses = classes(connection, character.characterId(), true);
@@ -359,12 +356,12 @@ public final class JdbcLevelAdvancementRepository implements LevelAdvancementRep
                     connection, character.characterId());
             if (!authoritativeStateMatches(command, lockedClasses, scores, lockedResources,
                     lockedFeats, lockedProficiencies, lockedSubclasses, lockedFeatures)) {
-                return rollback(connection, original,
+                return rollback(writeTransaction,
                         rejected(Result.Status.AUTHORITATIVE_STATE_MISMATCH));
             }
             List<ResourceChange> declaredChanges = validatedChanges(command, lockedResources);
             if (declaredChanges == null) {
-                return rollback(connection, original,
+                return rollback(writeTransaction,
                         rejected(Result.Status.AUTHORITATIVE_STATE_MISMATCH));
             }
 
@@ -395,17 +392,10 @@ public final class JdbcLevelAdvancementRepository implements LevelAdvancementRep
             insertResourceChanges(connection, eventId, character, allChanges);
             insertAudit(connection, eventId, character, command, hitPoints, allChanges);
             insertOperation(connection, eventId, character, command);
-            connection.commit();
-            restoreAndClose(connection, original);
+            writeTransaction.commit();
             return new Result(Result.Status.ADVANCED, command.expected().characterKey(),
                     character.rowVersion() + 1, hitPoints.hitDieRoll(),
                     hitPoints.hitPointIncrease());
-        } catch (SQLException | RuntimeException exception) {
-            rollbackAndRestore(connection, original, exception);
-            try { connection.close(); } catch (SQLException failure) {
-                exception.addSuppressed(failure);
-            }
-            throw exception;
         }
     }
 
@@ -1149,17 +1139,15 @@ public final class JdbcLevelAdvancementRepository implements LevelAdvancementRep
         return new SQLException("Invalid authoritative database row");
     }
 
-    private static Result commit(Connection connection, ConnectionState original, Result result)
+    private static Result commit(BusinessWriteTransactions.Session writeTransaction, Result result)
             throws SQLException {
-        connection.commit();
-        restoreAndClose(connection, original);
+        writeTransaction.commit();
         return result;
     }
 
-    private static Result rollback(Connection connection, ConnectionState original, Result result)
+    private static Result rollback(BusinessWriteTransactions.Session writeTransaction, Result result)
             throws SQLException {
-        connection.rollback();
-        restoreAndClose(connection, original);
+        writeTransaction.rollback();
         return result;
     }
 

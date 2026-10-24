@@ -1,5 +1,6 @@
 package com.dndtool.offline.rules;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import static org.junit.jupiter.api.Assertions.*;
 import com.dndtool.module.*;
 import com.dndtool.persistence.JdbcRuntimeCharacterCatalogRepository;
@@ -46,13 +47,15 @@ class CharacterCatalogChainTest {
         var f=installed();var source=new JdbcSourceLanguageRepository(f.source()).loadCatalog();assertIndependent(source);
         assertEquals(37,f.installed.tools.size());
         var first=Identity.random();var second=Identity.random();
-        try(var tx=f.runtime()) {
+        try (var writeSession = BusinessWriteTestSupport.partition(f.runtime())) {
+            var tx = writeSession.connection();
             assertIndependent(runtime.append(tx,first,source).partition());
-            assertEquals(0,f.commits);assertEquals(0,f.rollbacks);tx.commit();
+            assertEquals(0,f.commits);assertEquals(0,f.rollbacks);writeSession.commit();
         }
         f.sourceOffline=true;
-        try(var tx=f.runtime()) {
-            assertIndependent(runtime.append(tx,second,source).partition());tx.commit();
+        try (var writeSession = BusinessWriteTestSupport.partition(f.runtime())) {
+            var tx = writeSession.connection();
+            assertIndependent(runtime.append(tx,second,source).partition());writeSession.commit();
         }
         int sourceQueries=f.sourceQueries;
         try(var tx=f.runtime()) {
@@ -67,21 +70,24 @@ class CharacterCatalogChainTest {
         var f=installed();var source=new JdbcSourceLanguageRepository(f.source()).loadCatalog();
         for(int point=1;point<=37;point++) {
             f.failToolWrite=point;f.toolWrites=0;
-            try(var tx=f.runtime()) {
-                assertThrows(Exception.class,()->runtime.append(tx,Identity.random(),source));tx.rollback();
+            try (var writeSession = BusinessWriteTestSupport.partition(f.runtime())) {
+                var tx = writeSession.connection();
+                assertThrows(Exception.class,()->runtime.append(tx,Identity.random(),source));writeSession.rollback();
             }
             assertTrue(f.tools.isEmpty());assertTrue(f.languages.isEmpty());assertTrue(f.heads.isEmpty());assertTrue(f.registrations.isEmpty());
         }
         f.failToolWrite=0;
-        try(var tx=f.runtime()) {
-            runtime.append(tx,Identity.random(),source);tx.rollback(); // Later caller work fails.
+        try (var writeSession = BusinessWriteTestSupport.partition(f.runtime())) {
+            var tx = writeSession.connection();
+            runtime.append(tx,Identity.random(),source);writeSession.rollback(); // Later caller work fails.
         }
         assertTrue(f.tools.isEmpty());assertTrue(f.languages.isEmpty());assertTrue(f.registrations.isEmpty());
     }
 
     @Test void corruptStoredToolFieldsAndCrossSnapshotRowsRejectWithoutReturningAView() throws Exception {
         var f=installed();var source=new JdbcSourceLanguageRepository(f.source()).loadCatalog();var id=Identity.random();
-        try(var tx=f.runtime()){runtime.append(tx,id,source);tx.commit();}
+        try (var writeSession = BusinessWriteTestSupport.partition(f.runtime())) {
+            var tx = writeSession.connection();runtime.append(tx,id,source);writeSession.commit();}
         for(String field:List.of("tool_key","display_name","description","category","source_page","sort_order","snapshot_id")) {
             f.toolFault=rows->rows.get(0).put(field,switch(field) {
                 case "source_page"->75;case "sort_order"->2;case "snapshot_id"->Identity.random().snapshotBytes();
@@ -101,8 +107,9 @@ class CharacterCatalogChainTest {
         assertThrows(Exception.class,()->new JdbcSourceLanguageRepository(f.source()).loadCatalog());
         f.installed.tools.get(0)[5]=page;
         f.toolFault=rows->rows.get(0).put("display_name","Changed but valid");
-        try(var tx=f.runtime()) {
-            assertThrows(Exception.class,()->runtime.append(tx,Identity.random(),source));tx.rollback();
+        try (var writeSession = BusinessWriteTestSupport.partition(f.runtime())) {
+            var tx = writeSession.connection();
+            assertThrows(Exception.class,()->runtime.append(tx,Identity.random(),source));writeSession.rollback();
         }
         assertTrue(f.registrations.isEmpty());assertTrue(f.heads.isEmpty());assertTrue(f.languages.isEmpty());assertTrue(f.tools.isEmpty());
     }

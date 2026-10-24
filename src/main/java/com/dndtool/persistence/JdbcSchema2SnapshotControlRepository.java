@@ -18,7 +18,7 @@ public final class JdbcSchema2SnapshotControlRepository {
     public static final int MAX_SNAPSHOTS = 16;
     private static final String CONTROL = "control_id, protocol_version, row_version, snapshot_count";
 
-    /** Must be the coordinator's first SQL statement; never waits for a process lock from here. */
+    /** Locks material accounting after the shared business guard; never waits for a process gate here. */
     public Control lock(Connection connection) throws SQLException {
         transaction(connection);
         try (PreparedStatement statement = statement(connection,
@@ -71,6 +71,7 @@ public final class JdbcSchema2SnapshotControlRepository {
     /** Snapshot rows must already have been appended in this same transaction. */
     public void append(Connection connection, Control old, UUID operationId, String kind, String digest,
             UUID runId, UUID snapshotId) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         transaction(connection);
         require(old.snapshotCount() < MAX_SNAPSHOTS && operationId != null && runId != null && snapshotId != null
                 && Set.of("CAPTURE", "RESTORE").contains(kind) && digest != null && digest.matches("[0-9a-f]{64}"));

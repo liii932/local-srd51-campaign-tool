@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -20,6 +21,21 @@ import org.junit.jupiter.api.Test;
 final class CampaignArchiveV2CharacterStateTest {
     private static final String CHARACTER = "11111111-1111-4111-8111-111111111111";
     private static final Set<String> CHARACTERS = Set.of(CHARACTER);
+
+    @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        var importer = new CampaignArchiveV2DraftImportService(fixture.dataSource(),
+                (connection, state) -> {
+                    throw new AssertionError("guard must reject before draft import");
+                });
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> importer.importState(CampaignArchiveV2CharacterStateCodec.write(state(), CHARACTERS), CHARACTERS));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertFalse(fixture.calls.contains("commit"));
+    }
 
     @Test
     void writesAndStrictlyReadsCanonicalDatabaseIdFreeEventClosure() {
@@ -336,7 +352,7 @@ final class CampaignArchiveV2CharacterStateTest {
         private boolean closed;
 
         private DataSource dataSource() {
-            return (DataSource) Proxy.newProxyInstance(
+            return BusinessWriteTestSupport.withGuard((DataSource) Proxy.newProxyInstance(
                     getClass().getClassLoader(), new Class<?>[] {DataSource.class},
                     (proxy, method, args) -> {
                         if (method.getName().equals("getConnection")) {
@@ -344,7 +360,7 @@ final class CampaignArchiveV2CharacterStateTest {
                             return connection();
                         }
                         return defaultValue(method.getReturnType());
-                    });
+                    }));
         }
 
         private Connection connection() {

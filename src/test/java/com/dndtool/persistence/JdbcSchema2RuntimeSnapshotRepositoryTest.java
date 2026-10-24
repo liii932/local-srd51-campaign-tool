@@ -18,16 +18,17 @@ class JdbcSchema2RuntimeSnapshotRepositoryTest {
 
     @Test void fullActualTypedReadbackMatchesIndependentGoldenBytesAndHasNoSourceDependency() throws Exception {
         var fixture = new Schema2RuntimeJdbcFixture(); var projection = projection();
-        var stored = REPOSITORY.store(fixture.connection, ID, projection);
-        assertEquals(ID, stored.identity()); assertGolden(stored.projection());
-        assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
-        assertEquals(projection.members().size(), fixture.rows("s2_runtime_member").size());
-        assertEquals(projection.projection().rules().size(), fixture.rows("s2_runtime_language").size() + fixture.rows("s2_runtime_language_set").size());
-        assertEquals(projection.projection().entries().size(), fixture.rows("s2_runtime_language_entry").size());
-        assertEquals(projection.projection().chains().size(), fixture.rows("s2_runtime_field_chain").size());
-        assertEquals(projection.projection().chains().stream().mapToInt(chain -> chain.steps().size()).sum(), fixture.rows("s2_runtime_chain_step").size());
-        fixture.connection.commit();
-        // The read API receives no expected projection, source artifact or original ZIP.
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            var stored = REPOSITORY.store(transaction.connection(), ID, projection);
+            assertEquals(ID, stored.identity()); assertGolden(stored.projection());
+            assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
+            assertEquals(projection.members().size(), fixture.rows("s2_runtime_member").size());
+            assertEquals(projection.projection().rules().size(), fixture.rows("s2_runtime_language").size() + fixture.rows("s2_runtime_language_set").size());
+            assertEquals(projection.projection().entries().size(), fixture.rows("s2_runtime_language_entry").size());
+            assertEquals(projection.projection().chains().size(), fixture.rows("s2_runtime_field_chain").size());
+            assertEquals(projection.projection().chains().stream().mapToInt(chain -> chain.steps().size()).sum(), fixture.rows("s2_runtime_chain_step").size());
+            transaction.commit();
+        }
         var restored = REPOSITORY.read(fixture.connection, ID); assertGolden(restored.projection());
         for (String sql : fixture.sql) {
             assertFalse(sql.contains("dnd_tool_rules")); assertFalse(sql.contains("runtime_rule_snapshot"));
@@ -37,35 +38,48 @@ class JdbcSchema2RuntimeSnapshotRepositoryTest {
     }
 
     @Test void everyWritePointAndWrongAffectedCountNeedCallerRollbackAndNoPartialCommittedRows() throws Exception {
-        var good = new Schema2RuntimeJdbcFixture(); var projection = projection(); REPOSITORY.store(good.connection, ID, projection);
+        var good = new Schema2RuntimeJdbcFixture(); var projection = projection(); storeAndCommit(good, ID, projection);
         for (int write = 1; write <= good.writes; write++) for (int count : new int[]{-1, 0, 2}) {
             var fixture = new Schema2RuntimeJdbcFixture(); fixture.failWrite = write; fixture.affected = count;
-            assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, ID, projection));
-            assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
-            fixture.connection.rollback(); assertTrue(fixture.tables.isEmpty());
+            try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+                assertThrows(SQLException.class, () -> REPOSITORY.store(transaction.connection(), ID, projection));
+                assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks);
+                transaction.rollback();
+            }
+            assertTrue(fixture.tables.isEmpty());
         }
     }
 
     @Test void everyReadFailureAndLaterCallerFailureRemainOneCallerOwnedTransaction() throws Exception {
-        var good = new Schema2RuntimeJdbcFixture(); var projection = projection(); REPOSITORY.store(good.connection, ID, projection);
+        var good = new Schema2RuntimeJdbcFixture(); var projection = projection(); storeAndCommit(good, ID, projection);
         for (int query = 1; query <= good.queries; query++) {
             var fixture = new Schema2RuntimeJdbcFixture(); fixture.failQuery = query;
-            assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, ID, projection));
-            assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks); fixture.connection.rollback(); assertTrue(fixture.tables.isEmpty());
+            try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+                assertThrows(SQLException.class, () -> REPOSITORY.store(transaction.connection(), ID, projection));
+                assertEquals(0, fixture.commits); assertEquals(0, fixture.rollbacks); transaction.rollback();
+            }
+            assertTrue(fixture.tables.isEmpty());
         }
-        var fixture = new Schema2RuntimeJdbcFixture(); REPOSITORY.store(fixture.connection, ID, projection);
-        try { throw new SQLException("later business failure"); } catch (SQLException expected) { fixture.connection.rollback(); }
-        assertTrue(fixture.tables.isEmpty());
+        var fixture = new Schema2RuntimeJdbcFixture();
+        assertThrows(SQLException.class, () -> {
+            try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+                REPOSITORY.store(transaction.connection(), ID, projection);
+                throw new SQLException("later business failure");
+            }
+        });
+        assertTrue(fixture.tables.isEmpty()); assertEquals(1, fixture.rollbacks);
     }
 
     @Test void completeIdentityBindingPreventsCrossRunReadAndReuseIsNeverIdempotentSuccess() throws Exception {
-        var fixture = new Schema2RuntimeJdbcFixture(); var projection = projection(); REPOSITORY.store(fixture.connection, ID, projection); fixture.connection.commit();
+        var fixture = new Schema2RuntimeJdbcFixture(); var projection = projection(); storeAndCommit(fixture, ID, projection);
         var other = Identity.random();
         assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, new Identity(other.runId(), ID.snapshotId())));
         assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, new Identity(ID.runId(), other.snapshotId())));
-        assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, ID, projection)); fixture.connection.rollback();
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            assertThrows(SQLException.class, () -> REPOSITORY.store(transaction.connection(), ID, projection)); transaction.rollback();
+        }
         assertGolden(REPOSITORY.read(fixture.connection, ID).projection());
-        REPOSITORY.store(fixture.connection, other, projection); fixture.connection.commit();
+        storeAndCommit(fixture, other, projection);
         assertEquals(2, fixture.rows("s2_runtime_identity").size()); assertGolden(REPOSITORY.read(fixture.connection, other).projection());
     }
 
@@ -87,36 +101,42 @@ class JdbcSchema2RuntimeSnapshotRepositoryTest {
                 f -> f.rows("s2_runtime_language_entry").removeLast(),
                 f -> f.rows("s2_runtime_chain_step").removeLast(),
                 f -> f.rows("s2_runtime_chain_step").add(new LinkedHashMap<>(f.rows("s2_runtime_chain_step").getLast())))) {
-            var fixture = new Schema2RuntimeJdbcFixture(); REPOSITORY.store(fixture.connection, ID, projection()); fixture.connection.commit(); mutation.accept(fixture);
+            var fixture = new Schema2RuntimeJdbcFixture(); storeAndCommit(fixture, ID, projection()); mutation.accept(fixture);
             assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, ID));
         }
     }
 
     @Test void jdbcCoercionUnicodeAndStateDiscriminatorsFailClosed() throws Exception {
         for (Object value : Arrays.asList(null, "3", 3.0, true, Long.MAX_VALUE)) {
-            var fixture = new Schema2RuntimeJdbcFixture(); REPOSITORY.store(fixture.connection, ID, projection()); fixture.rows("s2_runtime_language").getFirst().put("source_page", value);
+            var fixture = new Schema2RuntimeJdbcFixture(); storeAndCommit(fixture, ID, projection()); fixture.rows("s2_runtime_language").getFirst().put("source_page", value);
             assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, ID));
         }
         for (String value : List.of("e\u0301", "x\u0085", "\ud800", "😀".repeat(121))) {
-            var fixture = new Schema2RuntimeJdbcFixture(); REPOSITORY.store(fixture.connection, ID, projection()); fixture.rows("s2_runtime_language").getFirst().put("display_name", value);
+            var fixture = new Schema2RuntimeJdbcFixture(); storeAndCommit(fixture, ID, projection()); fixture.rows("s2_runtime_language").getFirst().put("display_name", value);
             assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, ID));
         }
-        var fixture = new Schema2RuntimeJdbcFixture(); REPOSITORY.store(fixture.connection, ID, projection());
+        var fixture = new Schema2RuntimeJdbcFixture(); storeAndCommit(fixture, ID, projection());
         fixture.rows("s2_runtime_chain_step").getFirst().put("after_integer_value", 1);
         assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, ID));
     }
 
     @Test void exactSchemaWritableTransactionAndSupportedIsolationAreRequiredBeforeWrites() throws Exception {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw -> REPOSITORY.store(raw, ID, projection()));
         for (Consumer<Schema2RuntimeJdbcFixture> mutation : List.<Consumer<Schema2RuntimeJdbcFixture>>of(
                 f -> f.autoCommit = true, f -> f.readOnly = true, f -> f.isolation = Connection.TRANSACTION_NONE,
-                f -> f.isolation = Connection.TRANSACTION_READ_UNCOMMITTED, f -> f.schema = ascii("dnd_tool_rules"))) {
+                f -> f.isolation = Connection.TRANSACTION_READ_UNCOMMITTED)) {
             var fixture = new Schema2RuntimeJdbcFixture(); mutation.accept(fixture);
             assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, ID, projection())); assertEquals(0, fixture.writes);
+        }
+        var fixture = new Schema2RuntimeJdbcFixture(); fixture.schema = ascii("dnd_tool_rules");
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            assertThrows(SQLException.class, () -> REPOSITORY.store(transaction.connection(), ID, projection()));
+            assertEquals(0, fixture.writes); transaction.rollback();
         }
     }
 
     @Test void readOnlyTransactionCanIndependentlyReadWithoutWriteCapability() throws Exception {
-        var fixture = new Schema2RuntimeJdbcFixture(); REPOSITORY.store(fixture.connection, ID, projection()); fixture.connection.commit();
+        var fixture = new Schema2RuntimeJdbcFixture(); storeAndCommit(fixture, ID, projection());
         int writes = fixture.writes; fixture.readOnly = true;
         assertGolden(REPOSITORY.read(fixture.connection, ID).projection()); assertEquals(writes, fixture.writes);
         assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, Identity.random(), projection()));
@@ -129,6 +149,14 @@ class JdbcSchema2RuntimeSnapshotRepositoryTest {
         assertThrows(IllegalArgumentException.class, () -> new Identity(ID.runId(), ID.runId()));
         assertThrows(IllegalArgumentException.class, () -> Identity.fromBytes(new byte[16], ID.snapshotBytes()));
         assertThrows(IllegalArgumentException.class, () -> Identity.fromBytes(new byte[15], ID.snapshotBytes()));
+    }
+
+    private static void storeAndCommit(Schema2RuntimeJdbcFixture fixture, Identity identity,
+            ProductionSchema2Projection projection) throws SQLException {
+        try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
+            REPOSITORY.store(transaction.connection(), identity, projection);
+            transaction.commit();
+        }
     }
 
     private static ProductionSchema2Projection projection() {

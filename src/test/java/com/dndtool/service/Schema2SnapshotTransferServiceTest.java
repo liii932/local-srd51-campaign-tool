@@ -5,6 +5,8 @@ import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
+import com.dndtool.persistence.BusinessWriteTransactions;
+import com.dndtool.testing.IsolatedJvmTest;
 import com.dndtool.persistence.Schema2SourceReadFixture;
 import com.dndtool.service.Schema2SnapshotTransferService.*;
 import java.sql.Connection;
@@ -22,7 +24,9 @@ class Schema2SnapshotTransferServiceTest {
             UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
     private static final String GUARD_SQL = "SELECT control_id, protocol_version, row_version, snapshot_count FROM s2_runtime_control WHERE control_id = 1 FOR UPDATE";
 
-    @Test void acceptedSourceCommitsAndClosesBeforeRuntimeGuardThenFullTypedReadbackMatchesGolden() throws Exception {
+    @Test void acceptedSourceCommitsAndClosesBeforeRuntimeGuardThenFullTypedReadbackMatchesGolden() throws Exception { IsolatedJvmTest.run(Probe.class, "acceptedSourceCommitsAndClosesBeforeRuntimeGuardThenFullTypedReadbackMatchesGolden"); }
+
+    private void scenario_acceptedSourceCommitsAndClosesBeforeRuntimeGuardThenFullTypedReadbackMatchesGolden() throws Exception {
         var fixture = new Fixture(); List<String> ordering = new ArrayList<>();
         fixture.source.observer = event -> ordering.add("source:" + event);
         fixture.runtime.observer = event -> ordering.add("runtime:" + event);
@@ -34,7 +38,7 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(IDENTITY, result.snapshot().identity()); assertGolden(result.snapshot().projection());
         assertTrue(ordering.indexOf("source:commit") < ordering.indexOf("source:close"));
         assertTrue(ordering.indexOf("source:close") < ordering.indexOf("runtime:acquire"));
-        assertEquals(GUARD_SQL, fixture.runtime.sql.getFirst());
+        assertEquals(BusinessWriteTransactions.LOCK_SQL, fixture.runtime.sql.getFirst());
         assertEquals(1, fixture.runtime.commits); assertEquals(0, fixture.runtime.rollbacks);
         assertEquals(1, fixture.runtime.rows("s2_runtime_operation").size()); assertGuard(fixture.runtime, 1);
         assertTrue(fixture.runtime.autoCommit); assertFalse(fixture.runtime.readOnly);
@@ -52,7 +56,9 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(sourceReads, fixture.source.acquisitionCount());
     }
 
-    @Test void sourceReadCommitAndCloseFailuresNeverAcquireRuntime() {
+    @Test void sourceReadCommitAndCloseFailuresNeverAcquireRuntime() throws Exception { IsolatedJvmTest.run(Probe.class, "sourceReadCommitAndCloseFailuresNeverAcquireRuntime"); }
+
+    private void scenario_sourceReadCommitAndCloseFailuresNeverAcquireRuntime() throws Exception {
         for (String failure : List.of("execute:acceptance", "execute:zip", "commit", "close", "restoreIsolation")) {
             var fixture = new Fixture(); fixture.source.fail(failure);
             var result = fixture.service.transfer(fixture.request());
@@ -61,7 +67,9 @@ class Schema2SnapshotTransferServiceTest {
         }
     }
 
-    @Test void sameOperationReplaysImmutableSnapshotAndConflictingIntentOrIdentityHasNoDml() {
+    @Test void sameOperationReplaysImmutableSnapshotAndConflictingIntentOrIdentityHasNoDml() throws Exception { IsolatedJvmTest.run(Probe.class, "sameOperationReplaysImmutableSnapshotAndConflictingIntentOrIdentityHasNoDml"); }
+
+    private void scenario_sameOperationReplaysImmutableSnapshotAndConflictingIntentOrIdentityHasNoDml() throws Exception {
         var fixture = new Fixture(); var accepted = fixture.service.transfer(fixture.request());
         assertEquals(Status.COMMITTED, accepted.status()); int writes = fixture.runtime.writes;
         byte[] operationDigest = ((byte[]) fixture.runtime.rows("s2_runtime_operation").getFirst().get("operation_digest_sha256")).clone();
@@ -76,7 +84,9 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(writes, fixture.runtime.writes); assertEquals(1, fixture.runtime.commits); assertGuard(fixture.runtime, 1);
     }
 
-    @Test void restoreRequiresExactMemberOrderVersionBothDigestsProfileAndProjectionDigestsBeforeRuntime() {
+    @Test void restoreRequiresExactMemberOrderVersionBothDigestsProfileAndProjectionDigestsBeforeRuntime() throws Exception { IsolatedJvmTest.run(Probe.class, "restoreRequiresExactMemberOrderVersionBothDigestsProfileAndProjectionDigestsBeforeRuntime"); }
+
+    private void scenario_restoreRequiresExactMemberOrderVersionBothDigestsProfileAndProjectionDigestsBeforeRuntime() throws Exception {
         var fixture = new Fixture(); var binding = binding(fixture);
         var restored = fixture.service.transfer(new Request(OPERATION, IDENTITY, fixture.source.selections(), binding));
         assertEquals(Status.COMMITTED, restored.status()); assertEquals(Kind.RESTORE, restored.intent().kind());
@@ -99,15 +109,21 @@ class Schema2SnapshotTransferServiceTest {
         assertThrows(IllegalArgumentException.class, () -> new Schema2RulesBinding(binding.canonicalProfile(), "other-algorithm", binding.members(), binding.compositionSha256(), binding.finalRulesSha256(), binding.chainSha256()));
     }
 
-    @Test void eachTypedTableReceiptAndGuardWriteFailureRollsBackAllRowsAndCounters() {
+    @Test void eachTypedTableReceiptAndGuardWriteFailureRollsBackAllRowsAndCounters() throws Exception {
+        for (String table : List.of("s2_runtime_identity", "s2_runtime_snapshot", "s2_runtime_member", "s2_runtime_language", "s2_runtime_language_set", "s2_runtime_language_entry", "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation", "s2_runtime_control"))
+            for (int count : new int[]{-1, 0, 2}) IsolatedJvmTest.run(Probe.class, "writeBoundary", table, Integer.toString(count));
+    }
+
+    private void scenario_writeBoundary(String target, int count) throws Exception {
         var good = new Fixture(); assertEquals(Status.COMMITTED, good.service.transfer(good.request()).status());
         // One boundary from every typed table, plus immutable receipt and guard writes.
-        Set<Integer> boundaries = new LinkedHashSet<>(); Set<String> tables = new HashSet<>(); int write = 0;
+        Map<String, Integer> boundaries = new LinkedHashMap<>(); Set<String> tables = new HashSet<>(); int write = 0;
         for (String sql : good.runtime.sql) if (sql.startsWith("INSERT INTO ") || sql.startsWith("UPDATE ")) {
-            write++; String table = sql.split(" ")[sql.startsWith("INSERT") ? 2 : 1]; if (tables.add(table)) boundaries.add(write);
+            write++; String table = sql.split(" ")[sql.startsWith("INSERT") ? 2 : 1]; if (tables.add(table)) boundaries.put(table, write);
         }
         assertTrue(tables.containsAll(List.of("s2_runtime_identity", "s2_runtime_language", "s2_runtime_language_set", "s2_runtime_language_entry", "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation", "s2_runtime_control")));
-        for (int boundary : boundaries) for (int count : new int[]{-1, 0, 2}) {
+        int boundary = Objects.requireNonNull(boundaries.get(target));
+        {
             var fixture = new Fixture(); fixture.runtime.failWrite = boundary; fixture.runtime.affected = count;
             var result = fixture.service.transfer(fixture.request());
             assertEquals(Status.ROLLED_BACK, result.status(), "write=" + boundary + ", affected=" + count);
@@ -116,10 +132,17 @@ class Schema2SnapshotTransferServiceTest {
         }
     }
 
-    @Test void actualReadbackCorruptionAndFailureAfterReceiptRollBackMaterialReceiptAndGuard() {
+    @Test void actualReadbackCorruptionAndFailureAfterReceiptRollBackMaterialReceiptAndGuard() throws Exception {
+        for (String point : List.of("readback", "afterReceipt")) IsolatedJvmTest.run(Probe.class, "readbackFailure", point);
+    }
+
+    private void scenario_readbackFailure(String point) throws Exception {
+        if (point.equals("readback")) {
         var corrupt = new Fixture();
         corrupt.runtime.beforeRead = runtime -> runtime.rows("s2_runtime_language").getFirst().put("display_name", "Changed but valid");
         assertEquals(Status.ROLLED_BACK, corrupt.service.transfer(corrupt.request()).status()); assertEmptyRuntime(corrupt.runtime);
+        return;
+        }
 
         var afterReceipt = new Fixture();
         afterReceipt.runtime.beforeQuery = query -> {
@@ -130,8 +153,12 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(1, afterReceipt.runtime.rollbacks); assertEmptyRuntime(afterReceipt.runtime);
     }
 
-    @Test void lostCommitResponseStaysUnknownThenOnlySameIsolatedIntentResolvesWithoutSource() {
-        for (var outcome : List.of(Schema2RuntimeJdbcFixture.LostCommit.COMMITTED, Schema2RuntimeJdbcFixture.LostCommit.ROLLED_BACK)) {
+    @Test void lostCommitResponseStaysUnknownThenOnlySameIsolatedIntentResolvesWithoutSource() throws Exception {
+        for (String outcome : List.of("COMMITTED", "ROLLED_BACK")) IsolatedJvmTest.run(Probe.class, "lostCommit", outcome);
+    }
+
+    private void scenario_lostCommit(Schema2RuntimeJdbcFixture.LostCommit outcome) throws Exception {
+        {
             var fixture = new Fixture(); fixture.runtime.lostCommit = outcome;
             var unknown = fixture.service.transfer(fixture.request());
             assertEquals(Status.UNKNOWN, unknown.status()); assertNotNull(unknown.intent()); assertNull(unknown.snapshot());
@@ -147,7 +174,9 @@ class Schema2SnapshotTransferServiceTest {
         }
     }
 
-    @Test void failedRollbackIsUnknownUntilConnectionAbortIsolatesWriterAndSourceFreeResolutionFindsNoReceipt() {
+    @Test void failedRollbackIsUnknownUntilConnectionAbortIsolatesWriterAndSourceFreeResolutionFindsNoReceipt() throws Exception { IsolatedJvmTest.run(Probe.class, "failedRollbackIsUnknownUntilConnectionAbortIsolatesWriterAndSourceFreeResolutionFindsNoReceipt"); }
+
+    private void scenario_failedRollbackIsUnknownUntilConnectionAbortIsolatesWriterAndSourceFreeResolutionFindsNoReceipt() throws Exception {
         var fixture = new Fixture(); fixture.runtime.failWrite = 2; fixture.runtime.rollbackFails = true;
         var unknown = fixture.service.transfer(fixture.request());
         assertEquals(Status.UNKNOWN, unknown.status()); assertNotNull(unknown.intent()); assertNull(unknown.snapshot());
@@ -159,8 +188,12 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(Status.NOT_COMMITTED, resolved.status()); assertEquals(sourceReads, fixture.source.acquisitionCount());
     }
 
-    @Test void fatalErrorAfterActualDmlRollsBackOrAbortsThenRethrowsSameErrorAndQuarantinesService() {
-        for (boolean rollbackFails : List.of(false, true)) {
+    @Test void fatalErrorAfterActualDmlRollsBackOrAbortsThenRethrowsSameErrorAndQuarantinesService() throws Exception {
+        for (boolean fails : List.of(false, true)) IsolatedJvmTest.run(Probe.class, "fatal", Boolean.toString(fails));
+    }
+
+    private void scenario_fatal(boolean rollbackFails) throws Exception {
+        {
             var fixture = new Fixture(); var fatal = new AssertionError("Injected failure after actual identity insert");
             fixture.runtime.rollbackFails = rollbackFails;
             fixture.runtime.afterWrite = runtime -> {
@@ -169,7 +202,7 @@ class Schema2SnapshotTransferServiceTest {
             };
             assertSame(fatal, assertThrows(AssertionError.class, () -> fixture.service.transfer(fixture.request())));
             assertEquals(1, fixture.runtime.writes); assertEquals(1, fixture.runtime.rollbacks); assertEquals(0, fixture.runtime.commits);
-            assertEquals(rollbackFails ? 1 : 0, fixture.runtime.aborts); assertEquals(1, fixture.runtime.closes);
+            assertEquals(rollbackFails ? 1 : 0, fixture.runtime.aborts); assertEquals(rollbackFails ? 0 : 1, fixture.runtime.closes);
             assertEmptyRuntime(fixture.runtime);
             int sourceReads = fixture.source.acquisitionCount(), runtimeAcquisitions = fixture.runtime.acquisitions;
             var blocked = fixture.service.transfer(fixture.request());
@@ -178,7 +211,9 @@ class Schema2SnapshotTransferServiceTest {
         }
     }
 
-    @Test void abortFailureRetainsQuarantineAndCannotClaimAbsentRowMeansRollback() {
+    @Test void abortFailureRetainsQuarantineAndCannotClaimAbsentRowMeansRollback() throws Exception { IsolatedJvmTest.run(Probe.class, "abortFailureRetainsQuarantineAndCannotClaimAbsentRowMeansRollback"); }
+
+    private void scenario_abortFailureRetainsQuarantineAndCannotClaimAbsentRowMeansRollback() throws Exception {
         var fixture = new Fixture(); fixture.runtime.lostCommit = Schema2RuntimeJdbcFixture.LostCommit.ROLLED_BACK; fixture.runtime.abortFails = true;
         var unknown = fixture.service.transfer(fixture.request());
         assertEquals(Status.UNKNOWN, unknown.status()); assertEquals("S2_CONNECTION_ISOLATION_FAILED", unknown.code());
@@ -188,7 +223,9 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(runtimeReads, fixture.runtime.acquisitions);
     }
 
-    @Test void confirmedCommitWithCloseFailureRetainsCommitAndBlocksAutomaticRetry() {
+    @Test void confirmedCommitWithCloseFailureRetainsCommitAndBlocksAutomaticRetry() throws Exception { IsolatedJvmTest.run(Probe.class, "confirmedCommitWithCloseFailureRetainsCommitAndBlocksAutomaticRetry"); }
+
+    private void scenario_confirmedCommitWithCloseFailureRetainsCommitAndBlocksAutomaticRetry() throws Exception {
         var fixture = new Fixture(); fixture.runtime.closeFails = true;
         var committed = fixture.service.transfer(fixture.request());
         assertEquals(Status.COMMITTED, committed.status()); assertEquals("S2_COMMITTED_CONNECTION_FAILURE", committed.code());
@@ -202,7 +239,9 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(sourceReads, fixture.source.acquisitionCount());
     }
 
-    @Test void freshReaderMissingReceiptIsUnprovenAndNeverInitiatesSourceOrWrites() {
+    @Test void freshReaderMissingReceiptIsUnprovenAndNeverInitiatesSourceOrWrites() throws Exception { IsolatedJvmTest.run(Probe.class, "freshReaderMissingReceiptIsUnprovenAndNeverInitiatesSourceOrWrites"); }
+
+    private void scenario_freshReaderMissingReceiptIsUnprovenAndNeverInitiatesSourceOrWrites() throws Exception {
         var fixture = new Fixture(); var intent = new Intent(OPERATION, IDENTITY, Kind.CAPTURE, binding(fixture));
         fixture.source.unavailable(true);
         var result = fixture.service.inspect(intent);
@@ -211,7 +250,9 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals("S2_RESOLUTION_REQUIRES_ISOLATION", fixture.service.resolve(intent).code());
     }
 
-    @Test void corruptRetainedTypedRowsBlockReplayBeforeDmlInsteadOfTrustingReceiptDigests() {
+    @Test void corruptRetainedTypedRowsBlockReplayBeforeDmlInsteadOfTrustingReceiptDigests() throws Exception { IsolatedJvmTest.run(Probe.class, "corruptRetainedTypedRowsBlockReplayBeforeDmlInsteadOfTrustingReceiptDigests"); }
+
+    private void scenario_corruptRetainedTypedRowsBlockReplayBeforeDmlInsteadOfTrustingReceiptDigests() throws Exception {
         var fixture = new Fixture(); var accepted = fixture.service.transfer(fixture.request());
         assertEquals(Status.COMMITTED, accepted.status()); int writes = fixture.runtime.writes;
         fixture.runtime.rows("s2_runtime_chain_step").getFirst().put("author_pointer", "/incorrect"); fixture.runtime.saveCommitted();
@@ -220,7 +261,9 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(Status.ROLLED_BACK, result.status()); assertNull(result.snapshot()); assertEquals(writes, fixture.runtime.writes);
     }
 
-    @Test void concurrentTransferReturnsBusyWithinBoundBeforeSecondSourceOrRuntimeAcquisition() throws Exception {
+    @Test void concurrentTransferReturnsBusyWithinBoundBeforeSecondSourceOrRuntimeAcquisition() throws Exception { IsolatedJvmTest.run(Probe.class, "concurrentTransferReturnsBusyWithinBoundBeforeSecondSourceOrRuntimeAcquisition"); }
+
+    private void scenario_concurrentTransferReturnsBusyWithinBoundBeforeSecondSourceOrRuntimeAcquisition() throws Exception {
         var fixture = new Fixture(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         fixture.runtime.beforeQuery = query -> {
             if (!query.equals(GUARD_SQL)) return;
@@ -236,7 +279,31 @@ class Schema2SnapshotTransferServiceTest {
             });
             assertEquals(1, fixture.source.acquisitionCount()); assertEquals(1, fixture.runtime.acquisitions);
         } finally { release.countDown(); executor.shutdown(); }
-        assertEquals(Status.COMMITTED, running.get(5, TimeUnit.SECONDS).status()); assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        // Cold child-JVM composition/readback completion is test infrastructure, not a product latency contract.
+        assertEquals(Status.COMMITTED, running.get(20, TimeUnit.SECONDS).status()); assertTrue(executor.awaitTermination(20, TimeUnit.SECONDS));
+    }
+
+    public static final class Probe {
+        public static void main(String[] args) throws Exception {
+            var suite = new Schema2SnapshotTransferServiceTest();
+            switch (args[0]) {
+                case "acceptedSourceCommitsAndClosesBeforeRuntimeGuardThenFullTypedReadbackMatchesGolden" -> suite.scenario_acceptedSourceCommitsAndClosesBeforeRuntimeGuardThenFullTypedReadbackMatchesGolden();
+                case "sourceReadCommitAndCloseFailuresNeverAcquireRuntime" -> suite.scenario_sourceReadCommitAndCloseFailuresNeverAcquireRuntime();
+                case "sameOperationReplaysImmutableSnapshotAndConflictingIntentOrIdentityHasNoDml" -> suite.scenario_sameOperationReplaysImmutableSnapshotAndConflictingIntentOrIdentityHasNoDml();
+                case "restoreRequiresExactMemberOrderVersionBothDigestsProfileAndProjectionDigestsBeforeRuntime" -> suite.scenario_restoreRequiresExactMemberOrderVersionBothDigestsProfileAndProjectionDigestsBeforeRuntime();
+                case "writeBoundary" -> suite.scenario_writeBoundary(args[1], Integer.parseInt(args[2]));
+                case "readbackFailure" -> suite.scenario_readbackFailure(args[1]);
+                case "lostCommit" -> suite.scenario_lostCommit(Schema2RuntimeJdbcFixture.LostCommit.valueOf(args[1]));
+                case "failedRollbackIsUnknownUntilConnectionAbortIsolatesWriterAndSourceFreeResolutionFindsNoReceipt" -> suite.scenario_failedRollbackIsUnknownUntilConnectionAbortIsolatesWriterAndSourceFreeResolutionFindsNoReceipt();
+                case "fatal" -> suite.scenario_fatal(Boolean.parseBoolean(args[1]));
+                case "abortFailureRetainsQuarantineAndCannotClaimAbsentRowMeansRollback" -> suite.scenario_abortFailureRetainsQuarantineAndCannotClaimAbsentRowMeansRollback();
+                case "confirmedCommitWithCloseFailureRetainsCommitAndBlocksAutomaticRetry" -> suite.scenario_confirmedCommitWithCloseFailureRetainsCommitAndBlocksAutomaticRetry();
+                case "freshReaderMissingReceiptIsUnprovenAndNeverInitiatesSourceOrWrites" -> suite.scenario_freshReaderMissingReceiptIsUnprovenAndNeverInitiatesSourceOrWrites();
+                case "corruptRetainedTypedRowsBlockReplayBeforeDmlInsteadOfTrustingReceiptDigests" -> suite.scenario_corruptRetainedTypedRowsBlockReplayBeforeDmlInsteadOfTrustingReceiptDigests();
+                case "concurrentTransferReturnsBusyWithinBoundBeforeSecondSourceOrRuntimeAcquisition" -> suite.scenario_concurrentTransferReturnsBusyWithinBoundBeforeSecondSourceOrRuntimeAcquisition();
+                default -> throw new IllegalArgumentException(args[0]);
+            }
+        }
     }
 
     private static Schema2RulesBinding binding(Fixture fixture) { return Schema2RulesBinding.from(ProductionSchema2Projection.compose(fixture.source.artifacts())); }

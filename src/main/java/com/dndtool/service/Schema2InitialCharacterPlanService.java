@@ -1,6 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.Schema2RulesBinding;
+import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Snapshot;
@@ -29,9 +30,20 @@ public final class Schema2InitialCharacterPlanService {
         Snapshot actual = snapshots.read(connection, identity);
         if (actual == null || !identity.equals(actual.identity()) || actual.projection() == null)
             throw new IllegalArgumentException("S2_INITIAL_SNAPSHOT_MISMATCH");
-        binding.verify(actual.projection());
-        Prepared prepared = rules.prepare(actual.projection(), request);
-        return new Plan(identity, Schema2RulesBinding.from(actual.projection()), prepared.sources(),
+        return prepareMaterial(identity, binding, actual.projection(), request);
+    }
+
+    /**
+     * Builds the same bounded plan from completely reread source material before a runtime
+     * connection is borrowed. The result is a preparation, never an execution capability.
+     */
+    public Plan prepareMaterial(Identity identity, Schema2RulesBinding binding,
+            ProductionSchema2Projection material, Request request) {
+        if (identity == null || binding == null || material == null || request == null)
+            throw new IllegalArgumentException("S2_INITIAL_REQUEST");
+        binding.verify(material);
+        Prepared prepared = rules.prepare(material, request);
+        return new Plan(identity, Schema2RulesBinding.from(material), prepared.sources(),
                 prepared.choices(), prepared.slots(), prepared.grants());
     }
 
@@ -61,5 +73,16 @@ public final class Schema2InitialCharacterPlanService {
             slots = immutable.slots();
             grants = immutable.grants();
         }
+    }
+
+    /** Planned identities are preparation facts; no campaign or character row exists because of them. */
+    public record InitialPlan(UUID campaignId, UUID characterId, Plan character) {
+        public InitialPlan {
+            if (!uuid4(campaignId) || !uuid4(characterId) || campaignId.equals(characterId) || character == null
+                    || campaignId.equals(character.identity().runId()) || campaignId.equals(character.identity().snapshotId())
+                    || characterId.equals(character.identity().runId()) || characterId.equals(character.identity().snapshotId()))
+                throw new IllegalArgumentException("S2_INITIAL_IDENTITY");
+        }
+        private static boolean uuid4(UUID value) { return value != null && value.version() == 4 && value.variant() == 2; }
     }
 }

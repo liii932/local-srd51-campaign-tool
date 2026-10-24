@@ -3,6 +3,7 @@ package com.dndtool.offline.rules;
 import com.dndtool.module.LanguagePartition;
 import com.dndtool.module.CharacterCatalogPartition;
 import com.dndtool.module.ToolCatalogOracle;
+import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.JdbcRuntimeCharacterCatalogRepository;
 import com.dndtool.persistence.JdbcRuntimeLanguageSnapshotRepository;
 import com.dndtool.persistence.JdbcRuntimeLanguageSnapshotRepository.Identity;
@@ -99,8 +100,9 @@ class LanguagePartitionJdbcIT {
 
     private void runtimeFailure(String kind, LanguagePartition partition, Identity old) throws Exception {
         Identity failed = Identity.random(); Fault fault = new Fault("runtime_rule_language", kind);
-        try (Connection real = runtimeTransaction()) {
-            Connection wrapped = fault.wrap(real);
+        try (var writeSession = runtimeWrites(fault)) {
+            Connection real = writeSession.connection();
+            Connection wrapped = real;
             SQLException failure;
             if (kind.equals("later-caller")) {
                 assertBoundary(baseline(), runtime.append(wrapped, failed, partition).partition(), vector());
@@ -119,7 +121,7 @@ class LanguagePartitionJdbcIT {
                     }
                 }
             }
-            wrapped.rollback(); assertEquals(1, fault.rollbacks);
+            writeSession.rollback(); assertEquals(1, fault.rollbacks);
         }
         assertAbsent(failed); assertRuntime(old, baseline(), vector());
     }
@@ -127,7 +129,8 @@ class LanguagePartitionJdbcIT {
     private void databaseConstraintsRejectRows(LanguagePartition partition, Identity old) throws Exception {
         for (String bad : List.of("null", "unknown-key", "nineteenth", "wrong-category", "page-range")) {
             Identity id = Identity.random();
-            try (Connection c = runtimeTransaction()) {
+            try (var writeSession = runtimeWrites(null)) {
+                Connection c = writeSession.connection();
                 runtime.append(c, id, partition);
                 // Release a legal order for the unknown-key case, so only the closed key/category
                 // CHECK can reject it. The separate nineteenth case keeps all eighteen original rows.
@@ -150,7 +153,7 @@ class LanguagePartitionJdbcIT {
                         assertTrue(Set.of(3819, 1062).contains(rejected.getErrorCode()));
                     } else assertEquals(bad.equals("null") ? 1048 : 3819, rejected.getErrorCode());
                 }
-                c.rollback();
+                writeSession.rollback();
             }
             assertAbsent(id);
         }
@@ -200,10 +203,11 @@ class LanguagePartitionJdbcIT {
 
     private Identity append(List<Row> expected, LanguagePartition partition, byte[] bytes) throws Exception {
         Identity id = Identity.random();
-        try (Connection c = runtimeTransaction()) {
+        try (var writeSession = runtimeWrites(null)) {
+            Connection c = writeSession.connection();
             assertBoundary(expected, runtime.append(c, id, partition).partition(), bytes);
             assertStored(expected, rows(c, "SELECT snapshot_id, " + CONTENT + " FROM runtime_rule_language WHERE snapshot_id = ? ORDER BY language_key", id.snapshotBytes()), "snapshot_id");
-            c.commit();
+            writeSession.commit();
         }
         assertRuntime(id, expected, bytes); return id;
     }
@@ -236,6 +240,14 @@ class LanguagePartitionJdbcIT {
         assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM runtime_rule_snapshot WHERE snapshot_id = ?", id.snapshotBytes()));
         assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM runtime_rule_language WHERE snapshot_id = ?", id.snapshotBytes()));
         assertEquals(0, count(VERIFIER, "SELECT COUNT(*) FROM runtime_rule_tool WHERE snapshot_id = ?", id.snapshotBytes()));
+    }
+    private BusinessWriteTransactions.Session runtimeWrites(Fault fault) throws SQLException {
+        DataSource source = proxy(DataSource.class, (p, method, args) -> {
+            if (!method.getName().equals("getConnection")) throw new AssertionError(method.getName());
+            Connection raw = acceptance.open(RUNTIME);
+            return fault == null ? raw : fault.wrap(raw);
+        });
+        return BusinessWriteTransactions.openPartition(source);
     }
     private Connection runtimeTransaction() throws SQLException {
         Connection c = acceptance.open(RUNTIME); c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED); c.setAutoCommit(false); return c;
@@ -337,9 +349,10 @@ class LanguagePartitionJdbcIT {
             }
         }
         Identity saved=Identity.random();
-        try(Connection c=runtimeTransaction()) {
+        try (var writeSession = runtimeWrites(null)) {
+            Connection c = writeSession.connection();
             var actual=repository.append(c,saved,partition).partition();
-            assertEquals(partition,actual);assertArrayEquals(independent,encoder.encode(actual.projection()));c.commit();
+            assertEquals(partition,actual);assertArrayEquals(independent,encoder.encode(actual.projection()));writeSession.commit();
         }
         rejectSourceConnections=true;int connections=sourceConnections.get();
         try(Connection c=runtimeTransaction()) {
@@ -349,18 +362,20 @@ class LanguagePartitionJdbcIT {
         assertEquals(connections,sourceConnections.get());
         for(String kind:List.of("range","readback","non-nfc","later-caller")) {
             Identity failed=Identity.random();Fault fault=new Fault("runtime_rule_tool",kind);
-            try(Connection c=runtimeTransaction()) {
-                Connection wrapped=fault.wrap(c);
+            try (var writeSession = runtimeWrites(fault)) {
+                Connection c = writeSession.connection();
+                Connection wrapped = c;
                 if(kind.equals("later-caller"))repository.append(wrapped,failed,partition);
                 else assertThrows(SQLException.class,()->repository.append(wrapped,failed,partition));
                 if(kind.equals("range"))assertEquals(3819,fault.databaseFailure.getErrorCode());
-                c.rollback();
+                writeSession.rollback();
             }
             assertAbsent(failed);
         }
         for(String bad:List.of("null","unknown-key","wrong-category","duplicate-order","foreign-snapshot")) {
             Identity candidate=Identity.random();var first=partition.tools().tools().getFirst();
-            try(Connection c=runtimeTransaction()) {
+            try (var writeSession = runtimeWrites(null)) {
+                Connection c = writeSession.connection();
                 repository.append(c,candidate,partition);
                 try(var delete=c.prepareStatement("DELETE FROM runtime_rule_tool WHERE snapshot_id = ? AND tool_key = ?")) {
                     delete.setBytes(1,candidate.snapshotBytes());delete.setBytes(2,ascii(first.toolKey()));
@@ -377,7 +392,7 @@ class LanguagePartitionJdbcIT {
                     int code=switch(bad){case "null"->1048;case "duplicate-order"->1062;case "foreign-snapshot"->1452;default->3819;};
                     assertEquals(code,rejected.getErrorCode(),bad);
                 }
-                c.rollback();
+                writeSession.rollback();
             }
             assertAbsent(candidate);
         }

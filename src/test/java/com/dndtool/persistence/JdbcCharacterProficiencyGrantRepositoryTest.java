@@ -17,10 +17,18 @@ import org.junit.jupiter.api.Test;
 
 final class JdbcCharacterProficiencyGrantRepositoryTest {
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCharacterProficiencyGrantRepository().append(
+                        raw, 11L, 9L, CharacterProficiencyArchiveTestData.grants().getFirst()));
+    }
+
+    @Test
     void writesAndReadsEveryProvenanceColumnInsideCallerTransaction() throws Exception {
         Fixture fixture = new Fixture();
         var grant = CharacterProficiencyArchiveTestData.grants().getFirst();
-        new JdbcCharacterProficiencyGrantRepository().append(fixture.connection(), 11, 9, grant);
+        BusinessWriteTestSupport.write(fixture.connection(), guarded ->
+                new JdbcCharacterProficiencyGrantRepository().append(guarded, 11, 9, grant));
         assertEquals(Map.ofEntries(Map.entry(1, 11L), Map.entry(2, 9L), Map.entry(3, "LANGUAGE"),
                 Map.entry(4, "dnd5e2014_srd51_se"), Map.entry(5, "character.race"),
                 Map.entry(6, "race.human"), Map.entry(7, "creation.language.fixed"),

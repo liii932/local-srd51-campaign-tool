@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.EncounterCommandRepository;
 import com.dndtool.persistence.EncounterStateRepository;
@@ -20,6 +21,17 @@ import org.junit.jupiter.api.Test;
 final class EncounterCommandTransactionServiceTest {
     private static final String REQUEST = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     private static final String CAMPAIGN = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+    @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> fixture.service().initialize(fixture.request()));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.calls.isEmpty());
+    }
 
     @Test
     void commitsStateRootEventAndIdempotencyTogether() throws Exception {
@@ -145,13 +157,13 @@ final class EncounterCommandTransactionServiceTest {
         }
 
         private DataSource dataSource() {
-            return proxy(DataSource.class, (ignored, method, arguments) -> {
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) -> {
                 if ("getConnection".equals(method.getName())) {
                     connectionRequests++;
                     return connection();
                 }
                 return defaultValue(method.getReturnType());
-            });
+            }));
         }
 
         private Connection connection() {

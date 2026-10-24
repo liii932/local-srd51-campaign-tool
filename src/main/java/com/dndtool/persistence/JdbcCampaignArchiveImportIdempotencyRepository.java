@@ -81,6 +81,7 @@ public final class JdbcCampaignArchiveImportIdempotencyRepository
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         if (connection == null || connection.getAutoCommit() || connection.isReadOnly()
                 || connection.getTransactionIsolation() != Connection.TRANSACTION_SERIALIZABLE) {
             throw invalidState("Import idempotency requires a caller-owned serializable transaction");

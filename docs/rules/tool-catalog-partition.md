@@ -53,6 +53,8 @@ JDBC 类型或非法字段拒绝整次读取。来源 ID、安装代次及连接
 run/snapshot UUIDv4 身份对。append 一次写入登记、头、语言和工具，并实际 SELECT 比较完整
 内容；read 只读本地快照，来源断开后仍有效。任何写入、读回或后续业务失败均由调用方回滚
 整笔事务。Repository 不提交、回滚、关闭连接或创建 savepoint。已提交身份不可复用。
+append 拒绝未经[共同业务守卫](business-write-transactions.md)接纳的连接；
+PARTITION 验收通过 `BusinessWriteTransactions.openPartition` 获取调用方 Session。
 头仍是 DRAFT/PARTITION、NULL 内容摘要，不能直接用于游戏运行或存档格式 2。
 
 ## 核验与采用门

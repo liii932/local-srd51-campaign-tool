@@ -45,11 +45,18 @@ final class JdbcCheckExecutionRepositoryTest {
                     CALCULATION);
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCheckExecutionRepository().append(raw, COMMAND));
+    }
+
+    @Test
     void appendsEventCheckAndEveryCandidateInsideCallerTransaction() throws Exception {
         Fixture fixture = new Fixture();
 
         CheckExecutionRepository.SavedCheck saved =
-                new JdbcCheckExecutionRepository().append(fixture.connection(), COMMAND);
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckExecutionRepository().append(guarded, COMMAND));
 
         assertEquals(new CheckExecutionRepository.SavedCheck(202L, 303L, 12L), saved);
         assertEquals(List.of("campaign", "game_event", "check_execution", "dice_roll", "dice_roll"),
@@ -81,7 +88,8 @@ final class JdbcCheckExecutionRepositoryTest {
         CheckExecutionRepository.Command manual = new CheckExecutionRepository.Command(
                 7L, 0L, 9L, 101L, null, "check.manual", null, "撬锁", normal);
 
-        new JdbcCheckExecutionRepository().append(fixture.connection(), manual);
+        BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckExecutionRepository().append(guarded, manual));
 
         Map<Integer, Object> check = fixture.values.get(2);
         assertTrue(check.containsKey(5));
@@ -107,10 +115,12 @@ final class JdbcCheckExecutionRepositoryTest {
                 1, 0, 1, 10, D20CheckCalculator.Outcome.FAILURE);
 
         assertThrows(IllegalArgumentException.class,
-                () -> new JdbcCheckExecutionRepository().append(fixture.connection(), command));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckExecutionRepository().append(guarded, command)));
         assertThrows(IllegalArgumentException.class,
-                () -> new JdbcCheckExecutionRepository().append(
-                        fixture.connection(), commandWithCalculation(forgedSelection)));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckExecutionRepository().append(
+                        guarded, commandWithCalculation(forgedSelection))));
         assertTrue(fixture.preparedSql.isEmpty());
     }
 
@@ -120,7 +130,8 @@ final class JdbcCheckExecutionRepositoryTest {
         fixture.autoCommit = true;
 
         assertThrows(SQLException.class,
-                () -> new JdbcCheckExecutionRepository().append(fixture.connection(), COMMAND));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckExecutionRepository().append(guarded, COMMAND)));
         assertTrue(fixture.preparedSql.isEmpty());
     }
 
@@ -130,7 +141,8 @@ final class JdbcCheckExecutionRepositoryTest {
         fixture.staleTail = true;
 
         assertThrows(SQLException.class,
-                () -> new JdbcCheckExecutionRepository().append(fixture.connection(), COMMAND));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckExecutionRepository().append(guarded, COMMAND)));
         assertEquals(List.of("campaign"), fixture.targets);
         assertFalse(fixture.committed);
         assertFalse(fixture.rolledBack);
@@ -142,7 +154,8 @@ final class JdbcCheckExecutionRepositoryTest {
         fixture.failSecondDie = true;
 
         assertThrows(SQLException.class,
-                () -> new JdbcCheckExecutionRepository().append(fixture.connection(), COMMAND));
+                () -> BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCheckExecutionRepository().append(guarded, COMMAND)));
         assertEquals(List.of("campaign", "game_event", "check_execution", "dice_roll", "dice_roll"),
                 fixture.targets);
         assertFalse(fixture.committed);

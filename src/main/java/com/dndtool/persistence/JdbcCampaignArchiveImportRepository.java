@@ -671,6 +671,7 @@ public final class JdbcCampaignArchiveImportRepository
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         if (connection == null || connection.getAutoCommit() || connection.isReadOnly()
                 || connection.getTransactionIsolation() != Connection.TRANSACTION_SERIALIZABLE) {
             throw invalidState("Archive import requires a caller-owned serializable transaction");

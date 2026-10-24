@@ -30,12 +30,19 @@ final class JdbcCharacterVersionRepositoryTest {
     private static final String SHA = "a".repeat(64);
 
     @Test
+    void rejectsRawCallerConnectionBeforeBusinessSql() {
+        BusinessWriteTestSupport.assertRawConnectionRejected(raw ->
+                new JdbcCharacterVersionRepository().lockBeforeRoll(raw, command()));
+    }
+
+    @Test
     void locksCampaignThenAllCharactersInAscendingDatabaseIdOrder() throws Exception {
         Fixture fixture = new Fixture();
 
         CharacterVersionRepository.LockResult result =
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        fixture.connection(), command());
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command()));
 
         assertEquals(CharacterVersionRepository.Status.LOCKED, result.status());
         assertEquals(30L, result.scope().executor().id());
@@ -56,10 +63,12 @@ final class JdbcCharacterVersionRepositoryTest {
         JdbcCharacterVersionRepository repository =
                 new JdbcCharacterVersionRepository();
         CharacterVersionRepository.LockedScope scope =
-                repository.lockBeforeRoll(fixture.connection(), command()).scope();
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.lockBeforeRoll(guarded, command())).scope();
 
-        Map<Long, Long> advanced = repository.advanceModifiedVersions(
-                fixture.connection(), scope, Set.of(30L, 10L));
+        Map<Long, Long> advanced = BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.advanceModifiedVersions(
+                guarded, scope, Set.of(30L, 10L)));
 
         assertEquals(Map.of(10L, 5L, 30L, 3L), advanced);
         assertEquals(List.of(10L, 30L), fixture.versionUpdateOrder);
@@ -74,8 +83,9 @@ final class JdbcCharacterVersionRepositoryTest {
         fixture.characters.get(10L).put("row_version", 5L);
 
         CharacterVersionRepository.LockResult result =
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        fixture.connection(), command());
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command()));
 
         assertEquals(CharacterVersionRepository.Status.VERSION_CONFLICT, result.status());
         assertEquals(TARGET_A, result.rejectedCharacterKey());
@@ -89,8 +99,9 @@ final class JdbcCharacterVersionRepositoryTest {
         Fixture missing = new Fixture();
         missing.resolved.remove(TARGET_B);
         CharacterVersionRepository.LockResult missingResult =
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        missing.connection(), command());
+                BusinessWriteTestSupport.inTransaction(missing.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command()));
         assertEquals(CharacterVersionRepository.Status.CHARACTER_NOT_FOUND,
                 missingResult.status());
         assertEquals(TARGET_B, missingResult.rejectedCharacterKey());
@@ -99,8 +110,9 @@ final class JdbcCharacterVersionRepositoryTest {
         Fixture wrongCampaign = new Fixture();
         wrongCampaign.characters.get(10L).put("campaign_id", 8L);
         CharacterVersionRepository.LockResult invalidResult =
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        wrongCampaign.connection(), command());
+                BusinessWriteTestSupport.inTransaction(wrongCampaign.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command()));
         assertEquals(CharacterVersionRepository.Status.CHARACTER_INVALID,
                 invalidResult.status());
         assertTrue(wrongCampaign.versionUpdateOrder.isEmpty());
@@ -113,8 +125,9 @@ final class JdbcCharacterVersionRepositoryTest {
         fixture.characters.get(20L).put("saved_content_sha256", "0".repeat(64));
 
         CharacterVersionRepository.LockResult result =
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        fixture.connection(), command());
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command()));
 
         assertEquals(CharacterVersionRepository.Status.MODULE_HASH_MISMATCH,
                 result.status());
@@ -129,27 +142,32 @@ final class JdbcCharacterVersionRepositoryTest {
         Fixture fixture = new Fixture();
         fixture.autoCommit = true;
         assertThrows(SQLException.class, () ->
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        fixture.connection(), command()));
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command())));
         fixture.autoCommit = false;
         fixture.readOnly = true;
         assertThrows(SQLException.class, () ->
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        fixture.connection(), command()));
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command())));
         fixture.readOnly = false;
         fixture.isolation = Connection.TRANSACTION_READ_COMMITTED;
         assertThrows(SQLException.class, () ->
-                new JdbcCharacterVersionRepository().lockBeforeRoll(
-                        fixture.connection(), command()));
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> new JdbcCharacterVersionRepository().lockBeforeRoll(
+                        guarded, command())));
         assertTrue(fixture.preparedSql.isEmpty());
 
         fixture.isolation = Connection.TRANSACTION_SERIALIZABLE;
         JdbcCharacterVersionRepository repository =
                 new JdbcCharacterVersionRepository();
         CharacterVersionRepository.LockedScope scope =
-                repository.lockBeforeRoll(fixture.connection(), command()).scope();
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.lockBeforeRoll(guarded, command())).scope();
         assertThrows(IllegalArgumentException.class, () ->
-                repository.advanceModifiedVersions(fixture.connection(), scope, Set.of(999L)));
+                BusinessWriteTestSupport.inTransaction(fixture.connection(),
+                guarded -> repository.advanceModifiedVersions(guarded, scope, Set.of(999L))));
         assertTrue(fixture.versionUpdateOrder.isEmpty());
     }
 

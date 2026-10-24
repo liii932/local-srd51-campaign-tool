@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.persistence.BusinessWriteTransactions;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
@@ -28,50 +29,21 @@ final class CampaignArchiveV2DraftImportService {
             return Status.INVALID_ARCHIVE;
         }
 
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-                CampaignArchiveV2CharacterStateCodec.Result repeated =
-                        CampaignArchiveV2CharacterStateCodec.read(
-                                stableContent, stableCharacterKeys);
-                if (repeated.status() != CampaignArchiveV2CharacterStateCodec.Status.READY) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return Status.INVALID_ARCHIVE;
-                }
-                importWork.replace(connection, repeated.state());
-                connection.commit();
-                restore(connection, original);
-                return Status.COMPLETED;
-            } catch (SQLException | RuntimeException failure) {
-                rollbackAndRestore(connection, original, failure);
-                throw failure;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            CampaignArchiveV2CharacterStateCodec.Result repeated =
+                    CampaignArchiveV2CharacterStateCodec.read(
+                            stableContent, stableCharacterKeys);
+            if (repeated.status() != CampaignArchiveV2CharacterStateCodec.Status.READY) {
+                writeTransaction.rollback();
+                return Status.INVALID_ARCHIVE;
             }
+            importWork.replace(connection, repeated.state());
+            writeTransaction.commit();
+            return Status.COMPLETED;
         }
-    }
-
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.isolation());
     }
 
     enum Status {
@@ -84,13 +56,5 @@ final class CampaignArchiveV2DraftImportService {
         /** Replaces the format-2 character state without committing or rolling back. */
         void replace(Connection connection, CampaignArchiveV2CharacterState state)
                 throws SQLException;
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
-        }
     }
 }

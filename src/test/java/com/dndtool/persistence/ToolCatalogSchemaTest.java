@@ -21,7 +21,7 @@ class ToolCatalogSchemaTest {
         assertTrue(source.contains("SELECT release_status INTO root_status"));
         assertTrue(runtime.contains("PRIMARY KEY (snapshot_id, tool_key)"));
         assertTrue(runtime.contains("Immutable runtime tool"));
-        assertEquals(24,SchemaMigrations.loadExpectations().size());
+        assertEquals(26,SchemaMigrations.loadExpectations().size());
         assertEquals(RuleSchemaMigrations.expectations().get(1).scriptSha256(),
                 RuleSchemaMigrations.canonicalPayloadSha256(source.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }

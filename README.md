@@ -34,6 +34,8 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - schema 2 的[初始授予计划](./docs/rules/schema-2-proficiency-grants.md)将真实角色来源、稳定授予槽和
   跨模组目标纳入严格作者输入、类型化来源及运行快照，由实际快照读回生成固定／选择授予与抑制事实；
   仍属内部计划，不写角色工作集、不开放新运行或工具检定；
+- [共同业务事务](./docs/rules/business-write-transactions.md)覆盖现有业务写入口、调用方叶仓储及
+  schema 2 转存；初始计划可与快照及结果同事务保存和读回复核，完整初始化材料缺失时仍拒绝；
 - DRAFT 的[成长区间](./docs/rules/level-advancement-v2.md)与[资源恢复区间](./docs/rules/class-features-v2.md)
   使用共用不可变规则模型，逐级核验 1—20 级熟练加值，资源恢复按权威魅力值求值；
   角色领域的作者源、两侧存储链路及完整休息事务仍待接入；
@@ -149,7 +151,7 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
 
 当前自动化使用 `dnd_tool_se` 作为本地部署运行库，使用 `dnd_tool_se_it` 执行临时表集成测试；
-完整 V001—V024 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
+完整 V001—V026 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
 运行实例内创建改名 schema，也不改写迁移 SQL。运行、只读核验、正式迁移、集成测试和隔离重放
 使用不同账号。现有少量测试数据的运行库可继续作为开发部署目标，但不能作为集成测试或迁移重放
 目标，使用前仍需盘点和备份。精确账号权限与 Agent 检查点见[数据库说明](./docs/database.md)。
@@ -182,7 +184,7 @@ src/main/java/com/dndtool/
   service/         业务验证、诊断编排、事务、幂等和存档服务
   web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V024 只增不改运行数据库迁移
+                    V001—V026 只增不改运行数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
@@ -204,6 +206,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [schema 2 制品与安装接受](./docs/rules/schema-2-installation-and-acceptance.md) | 原始 ZIP、生产摘要、审阅绑定、独立接受和提交查证 |
 | [schema 2 来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md) | 来源只读复核、类型化快照和完整链、原子转存、查证与准确恢复绑定 |
 | [schema 2 初始语言／工具授予](./docs/rules/schema-2-proficiency-grants.md) | 真实来源与稳定槽、原子授予字段、跨模组选择和固定快照计划 |
+| [共同业务写入与初始化准备](./docs/rules/business-write-transactions.md) | 全部写入口、永久守卫、事务故障隔离及绑定初始计划的原子准备 |
 | [SRD 5.1 本地原文索引](./docs/references/srd-5.1/README.md) | 按主题定位 403 页检索文本，核对本地 PDF 与官方出处 |
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |
 | [冻结 v1 规则规范](./docs/rules/srd-5.1.md) | 现有稳定键、算法、范围、规范化和模组关系 |

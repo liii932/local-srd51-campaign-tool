@@ -92,55 +92,44 @@ public final class JdbcCharacterCreationRepository implements CharacterCreationR
     @Override
     public Result create(Command command) throws SQLException {
         Objects.requireNonNull(command);
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-
-                Result replay = findExistingOperation(connection, command);
-                if (replay != null) {
-                    connection.commit();
-                    restore(connection, original);
-                    return replay;
-                }
-                CampaignBinding binding = lockCampaign(connection, command.campaignKey());
-                if (binding == null) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Result.Status.CAMPAIGN_UNAVAILABLE, null, null);
-                }
-                if (!binding.matches(command)) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Result.Status.MODULE_BINDING_MISMATCH, null, null);
-                }
-
-                long characterId = insertCharacter(connection, command, binding);
-                insertFields(connection, command, binding, characterId);
-                insertClasses(connection, command, binding, characterId);
-                insertProficiencies(
-                        connection, INSERT_SKILL_SQL,
-                        command.skillProficiencies(), binding, characterId);
-                insertProficiencies(
-                        connection, INSERT_SAVE_SQL,
-                        command.saveProficiencies(), binding, characterId);
-
-                long eventSequence = Math.addExact(binding.eventTail(), 1L);
-                advanceEventTail(connection, binding, eventSequence);
-                long eventId = insertEvent(
-                        connection, command, binding, characterId, eventSequence);
-                insertAuditChanges(connection, command, binding, characterId, eventId);
-                insertOperation(connection, command, binding.campaignId(), characterId);
-
-                connection.commit();
-                restore(connection, original);
-                return new Result(Result.Status.CREATED, command.characterKey(), 0L);
-            } catch (SQLException | RuntimeException exception) {
-                rollbackAndRestore(connection, original, exception);
-                throw exception;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            Result replay = findExistingOperation(connection, command);
+            if (replay != null) {
+                writeTransaction.commit();
+                return replay;
             }
+            CampaignBinding binding = lockCampaign(connection, command.campaignKey());
+            if (binding == null) {
+                writeTransaction.rollback();
+                return new Result(Result.Status.CAMPAIGN_UNAVAILABLE, null, null);
+            }
+            if (!binding.matches(command)) {
+                writeTransaction.rollback();
+                return new Result(Result.Status.MODULE_BINDING_MISMATCH, null, null);
+            }
+
+            long characterId = insertCharacter(connection, command, binding);
+            insertFields(connection, command, binding, characterId);
+            insertClasses(connection, command, binding, characterId);
+            insertProficiencies(
+                    connection, INSERT_SKILL_SQL,
+                    command.skillProficiencies(), binding, characterId);
+            insertProficiencies(
+                    connection, INSERT_SAVE_SQL,
+                    command.saveProficiencies(), binding, characterId);
+
+            long eventSequence = Math.addExact(binding.eventTail(), 1L);
+            advanceEventTail(connection, binding, eventSequence);
+            long eventId = insertEvent(
+                    connection, command, binding, characterId, eventSequence);
+            insertAuditChanges(connection, command, binding, characterId, eventId);
+            insertOperation(connection, command, binding.campaignId(), characterId);
+
+            writeTransaction.commit();
+            return new Result(Result.Status.CREATED, command.characterKey(), 0L);
         }
     }
 
@@ -527,27 +516,6 @@ public final class JdbcCharacterCreationRepository implements CharacterCreationR
         return new SQLException("Invalid character creation persistence state");
     }
 
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException restoreFailure) {
-            failure.addSuppressed(restoreFailure);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.transactionIsolation());
-    }
-
     private record CampaignBinding(
             long campaignId,
             long eventTail,
@@ -559,14 +527,6 @@ public final class JdbcCharacterCreationRepository implements CharacterCreationR
             return moduleKey.equals(command.moduleKey())
                     && releaseVersion.equals(command.releaseVersion())
                     && contentSha256.equals(command.contentSha256());
-        }
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int transactionIsolation) {
-        private static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
         }
     }
 }

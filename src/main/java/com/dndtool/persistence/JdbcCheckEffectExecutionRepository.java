@@ -567,6 +567,7 @@ public final class JdbcCheckEffectExecutionRepository
     }
 
     private static void requireCallerTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         if (connection.getAutoCommit() || connection.isReadOnly()
                 || connection.getTransactionIsolation() != Connection.TRANSACTION_SERIALIZABLE) {
             throw invalidState("Effect execution requires a writable caller-owned serializable transaction");

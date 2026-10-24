@@ -137,58 +137,46 @@ public final class JdbcCharacterCardMutationRepository
     @Override
     public Result mutate(Command command) throws SQLException {
         validate(command);
-        try (Connection connection = dataSource.getConnection()) {
-            ConnectionState original = ConnectionState.capture(connection);
-            try {
-                connection.setReadOnly(false);
-                connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-                connection.setAutoCommit(false);
-
-                Result replay = findExistingOperation(connection, command);
-                if (replay != null) {
-                    connection.commit();
-                    restore(connection, original);
-                    return replay;
-                }
-                LockedCharacter character = lockCharacter(connection, command.characterKey());
-                Result rejected = rejectInvalidState(command, character);
-                if (rejected != null) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return rejected;
-                }
-                final Change change;
-                try {
-                    change = applyChange(connection, command, character);
-                } catch (MissingItemException exception) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Status.TARGET_NOT_FOUND, character.rowVersion());
-                }
-                if (change == null) {
-                    connection.rollback();
-                    restore(connection, original);
-                    return new Result(Status.NO_CHANGE, character.rowVersion());
-                }
-
-                long nextSequence = Math.addExact(character.eventTail(), 1L);
-                requireOne(update(connection, ADVANCE_EVENT_TAIL_SQL,
-                        nextSequence, character.campaignId(), character.eventTail()));
-                long eventId = insertEvent(
-                        connection, command, character, nextSequence, change.eventText());
-                insertChange(connection, character, eventId, change);
-                requireOne(update(connection, ADVANCE_VERSION_SQL,
-                        character.id(), command.expectedRowVersion()));
-                insertOperation(connection, command, character);
-
-                long nextVersion = Math.addExact(character.rowVersion(), 1L);
-                connection.commit();
-                restore(connection, original);
-                return new Result(Status.UPDATED, nextVersion);
-            } catch (SQLException | RuntimeException exception) {
-                rollbackAndRestore(connection, original, exception);
-                throw exception;
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
+            Result replay = findExistingOperation(connection, command);
+            if (replay != null) {
+                writeTransaction.commit();
+                return replay;
             }
+            LockedCharacter character = lockCharacter(connection, command.characterKey());
+            Result rejected = rejectInvalidState(command, character);
+            if (rejected != null) {
+                writeTransaction.rollback();
+                return rejected;
+            }
+            final Change change;
+            try {
+                change = applyChange(connection, command, character);
+            } catch (MissingItemException exception) {
+                writeTransaction.rollback();
+                return new Result(Status.TARGET_NOT_FOUND, character.rowVersion());
+            }
+            if (change == null) {
+                writeTransaction.rollback();
+                return new Result(Status.NO_CHANGE, character.rowVersion());
+            }
+
+            long nextSequence = Math.addExact(character.eventTail(), 1L);
+            requireOne(update(connection, ADVANCE_EVENT_TAIL_SQL,
+                    nextSequence, character.campaignId(), character.eventTail()));
+            long eventId = insertEvent(
+                    connection, command, character, nextSequence, change.eventText());
+            insertChange(connection, character, eventId, change);
+            requireOne(update(connection, ADVANCE_VERSION_SQL,
+                    character.id(), command.expectedRowVersion()));
+            insertOperation(connection, command, character);
+
+            long nextVersion = Math.addExact(character.rowVersion(), 1L);
+            writeTransaction.commit();
+            return new Result(Status.UPDATED, nextVersion);
         }
     }
 
@@ -676,27 +664,6 @@ public final class JdbcCharacterCardMutationRepository
         return new SQLException("Invalid character card mutation persistence state");
     }
 
-    private static void rollbackAndRestore(
-            Connection connection, ConnectionState original, Exception failure) {
-        try {
-            connection.rollback();
-        } catch (SQLException exception) {
-            failure.addSuppressed(exception);
-        }
-        try {
-            restore(connection, original);
-        } catch (SQLException exception) {
-            failure.addSuppressed(exception);
-        }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setReadOnly(original.readOnly());
-        connection.setTransactionIsolation(original.isolation());
-    }
-
     private record LockedCharacter(
             long id,
             long campaignId,
@@ -771,14 +738,6 @@ public final class JdbcCharacterCardMutationRepository
 
         MissingItemException() {
             super("Item does not belong to character");
-        }
-    }
-
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(
-                    connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
         }
     }
 }

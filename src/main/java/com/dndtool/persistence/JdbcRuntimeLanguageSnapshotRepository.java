@@ -53,6 +53,7 @@ public final class JdbcRuntimeLanguageSnapshotRepository {
         require(identity != null && partition != null);
         // Recheck the complete immutable value before touching JDBC or consuming write capacity.
         LanguagePartition expected = new LanguagePartition(partition.languages());
+        BusinessWriteTransactions.requireGuarded(connection);
         checkConnection(connection);
         insert(connection, REGISTER, statement -> bindIdentity(statement, identity));
         insert(connection, INSERT_HEAD, statement -> {

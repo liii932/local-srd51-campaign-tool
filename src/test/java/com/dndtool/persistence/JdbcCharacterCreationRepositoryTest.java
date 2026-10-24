@@ -47,6 +47,17 @@ class JdbcCharacterCreationRepositoryTest {
                             "save.strength", "proficiency.none")));
 
     @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> new JdbcCharacterCreationRepository(fixture.dataSource()).create(COMMAND));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.targets.isEmpty());
+    }
+
+    @Test
     void commitsRootValuesProficienciesEventAuditAndIdempotencyTogether() throws Exception {
         Fixture fixture = new Fixture();
 
@@ -228,9 +239,9 @@ class JdbcCharacterCreationRepositoryTest {
 
         private DataSource dataSource() {
             Connection connection = proxy(Connection.class, this::connection);
-            return proxy(DataSource.class, (ignored, method, arguments) ->
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) ->
                     "getConnection".equals(method.getName())
-                            ? connection : defaultValue(method.getReturnType()));
+                            ? connection : defaultValue(method.getReturnType())));
         }
 
         private Object connection(Object ignored, Method method, Object[] arguments) {

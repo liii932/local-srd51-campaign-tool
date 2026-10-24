@@ -156,6 +156,7 @@ public final class JdbcEncounterCommandRepository
     }
 
     private static void requireTransaction(Connection connection) throws SQLException {
+        BusinessWriteTransactions.requireGuarded(connection);
         if (connection == null || connection.getAutoCommit() || connection.isReadOnly()
                 || connection.getTransactionIsolation() != Connection.TRANSACTION_SERIALIZABLE) {
             throw new SQLException("Encounter command requires a writable SERIALIZABLE transaction");

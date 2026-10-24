@@ -149,28 +149,23 @@ public final class JdbcLevelOneCharacterCreationRepository
     @Override
     public Result confirm(Command command) throws SQLException {
         validateProficiencyGrants(command);
-        Connection connection = dataSource.getConnection();
-        ConnectionState original = ConnectionState.capture(connection);
-        try {
-            connection.setReadOnly(false);
-            connection.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
-            connection.setAutoCommit(false);
-
+        try (BusinessWriteTransactions.Session writeTransaction =
+                BusinessWriteTransactions.openLegacy(
+                        dataSource, Connection.TRANSACTION_SERIALIZABLE)) {
+            Connection connection = writeTransaction.connection();
             Result replay = lockOperation(connection, command);
             if (replay != null) {
-                connection.commit();
-                restore(connection, original);
-                connection.close();
+                writeTransaction.commit();
                 return replay;
             }
             Campaign campaign = lockCampaign(connection, command.campaignKey());
-            if (campaign == null) return rollback(connection, original,
+            if (campaign == null) return rollback(writeTransaction,
                     new Result(Result.Status.CAMPAIGN_UNAVAILABLE, null, null));
             Binding binding = binding(connection, campaign.id());
-            if (binding == null || !binding.matches(command)) return rollback(connection, original,
+            if (binding == null || !binding.matches(command)) return rollback(writeTransaction,
                     new Result(Result.Status.MODULE_BINDING_MISMATCH, null, null));
             if (campaign.eventTail() != command.expectedEventTail()) return rollback(
-                    connection, original,
+                    writeTransaction,
                     new Result(Result.Status.STALE_PREVIEW, null, null));
 
             long characterId = insertCharacter(connection, campaign.id(), binding.releaseId(), command);
@@ -185,16 +180,8 @@ public final class JdbcLevelOneCharacterCreationRepository
             insertInitialFeatures(connection, eventId, characterId, binding.releaseId(), command);
             insertAudit(connection, eventId, campaign.id(), characterId, command);
             insertOperation(connection, command, campaign.id(), characterId, eventId);
-            connection.commit();
-            restore(connection, original);
-            connection.close();
+            writeTransaction.commit();
             return new Result(Result.Status.CREATED, command.characterKey(), 0L);
-        } catch (SQLException | RuntimeException exception) {
-            rollbackAndRestore(connection, original, exception);
-            try { connection.close(); } catch (SQLException closeFailure) {
-                exception.addSuppressed(closeFailure);
-            }
-            throw exception;
         }
     }
 
@@ -569,27 +556,10 @@ public final class JdbcLevelOneCharacterCreationRepository
         }
     }
 
-    private static Result rollback(Connection connection, ConnectionState original, Result result)
+    private static Result rollback(BusinessWriteTransactions.Session writeTransaction, Result result)
             throws SQLException {
-        connection.rollback();
-        restore(connection, original);
-        connection.close();
+        writeTransaction.rollback();
         return result;
-    }
-
-    private static void rollbackAndRestore(Connection connection, ConnectionState original,
-            Exception primary) {
-        try { if (!connection.getAutoCommit()) connection.rollback(); }
-        catch (SQLException failure) { primary.addSuppressed(failure); }
-        try { restore(connection, original); }
-        catch (SQLException failure) { primary.addSuppressed(failure); }
-    }
-
-    private static void restore(Connection connection, ConnectionState original)
-            throws SQLException {
-        connection.setAutoCommit(original.autoCommit());
-        connection.setTransactionIsolation(original.isolation());
-        connection.setReadOnly(original.readOnly());
     }
 
     private record Campaign(long id, long eventTail) { }
@@ -598,12 +568,6 @@ public final class JdbcLevelOneCharacterCreationRepository
             return moduleKey.equals(command.moduleKey())
                     && releaseVersion.equals(command.releaseVersion())
                     && hash.equals(command.contentSha256());
-        }
-    }
-    private record ConnectionState(boolean autoCommit, boolean readOnly, int isolation) {
-        static ConnectionState capture(Connection connection) throws SQLException {
-            return new ConnectionState(connection.getAutoCommit(), connection.isReadOnly(),
-                    connection.getTransactionIsolation());
         }
     }
 }

@@ -16,6 +16,8 @@ public final class Schema2RuntimeJdbcFixture {
     public int acquisitions, closes, aborts;
     public int writes, commits, rollbacks, failWrite = -1, failQuery = -1, queries, affected = -1;
     public boolean autoCommit, readOnly, unavailable, rollbackFails, abortFails, closeFails;
+    public boolean legacyActive, partitionRemainder;
+    public Error rollbackError, closeError;
     public LostCommit lostCommit = LostCommit.NONE;
     public Runnable beforeAcquire = () -> { };
     public Consumer<String> observer = ignored -> { };
@@ -40,7 +42,8 @@ public final class Schema2RuntimeJdbcFixture {
             yield null;
         }
         case "rollback" -> {
-            rollbacks++; event("rollback"); if (rollbackFails) throw new SQLException("Injected rollback failure");
+            rollbacks++; event("rollback"); if (rollbackError != null) throw rollbackError;
+            if (rollbackFails) throw new SQLException("Injected rollback failure");
             restoreCommitted(); yield null;
         }
         case "abort" -> {
@@ -48,7 +51,8 @@ public final class Schema2RuntimeJdbcFixture {
             restoreCommitted(); yield null;
         }
         case "close" -> {
-            closes++; event("close"); if (closeFails) throw new SQLException("Injected close failure"); yield null;
+            closes++; event("close"); if (closeError != null) throw closeError;
+            if (closeFails) throw new SQLException("Injected close failure"); yield null;
         }
         default -> throw new AssertionError("Unexpected connection call " + method);
     });
@@ -100,6 +104,9 @@ public final class Schema2RuntimeJdbcFixture {
     }
     private List<Map<String, Object>> select(String query, Map<Integer, Object> parameters) throws SQLException {
         queries++; beforeQuery.accept(query); if (queries == failQuery) throw new SQLException("Injected query");
+        if (query.equals(BusinessWriteTransactions.LOCK_SQL)) return List.of(row("guard_id", 1, "protocol_version", 1));
+        if (query.equals(BusinessWriteTransactions.STATE_SQL)) return List.of(row("legacy_active", legacyActive,
+                "schema2_remainder", !rows("s2_runtime_identity").isEmpty(), "partition_remainder", partitionRemainder));
         if (query.contains("DATABASE()")) return List.of(Map.of("schema_name", schema));
         if (query.contains(" FROM schema_meta ")) {
             List<Map<String, Object>> result = new ArrayList<>();
@@ -109,6 +116,21 @@ public final class Schema2RuntimeJdbcFixture {
             return result;
         }
         if (query.contains(" FROM s2_runtime_control ")) return rows("s2_runtime_control");
+        if (query.equals("SELECT operation_id FROM s2_initial_plan ORDER BY operation_id")) return rows("s2_initial_plan");
+        if (query.startsWith("SELECT DISTINCT operation_id FROM s2_initial_plan_")) {
+            String table = query.substring("SELECT DISTINCT operation_id FROM ".length(), query.indexOf(" ORDER BY"));
+            Map<String, Map<String, Object>> distinct = new LinkedHashMap<>();
+            for (var row : rows(table)) distinct.put(HexFormat.of().formatHex((byte[]) row.get("operation_id")), row);
+            return new ArrayList<>(distinct.values());
+        }
+        if (query.startsWith("SELECT * FROM s2_initial_plan")) {
+            var planQuery = Pattern.compile("SELECT \\* FROM ([a-z0-9_]+) WHERE operation_id = \\? ORDER BY ([a-z_]+) LIMIT ([0-9]+)").matcher(query);
+            if (!planQuery.matches()) throw new AssertionError(query);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (var row : rows(planQuery.group(1))) if (equal(row.get("operation_id"), parameters.get(1))) result.add(row);
+            if (!planQuery.group(2).equals("operation_id")) result.sort(Comparator.comparingInt(row -> ((Number) row.get(planQuery.group(2))).intValue()));
+            return result.subList(0, Math.min(result.size(), Integer.parseInt(planQuery.group(3))));
+        }
         if (query.contains(" FROM s2_runtime_operation ")) {
             List<Map<String, Object>> result = new ArrayList<>(rows("s2_runtime_operation"));
             result.sort(Comparator.comparingLong(value -> ((Number) value.get("operation_sequence")).longValue())); return result;
@@ -150,6 +172,8 @@ public final class Schema2RuntimeJdbcFixture {
                 if (!row.containsKey(column)) throw new AssertionError("Missing fixture column " + column);
                 yield cloneValue(row.get(column));
             }
+            case "getInt" -> ((Number) rows.get(index[0]).get(args[0])).intValue();
+            case "getBoolean" -> (boolean) rows.get(index[0]).get(args[0]);
             case "close" -> null;
             default -> throw new AssertionError("Unexpected result call " + method);
         });

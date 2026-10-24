@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dndtool.persistence.BusinessWriteTestSupport;
 import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.CharacterVersionRepository;
 import com.dndtool.persistence.EntityPositionCommandRepository;
@@ -22,6 +23,17 @@ import org.junit.jupiter.api.Test;
 final class EntityPositionTransactionServiceTest {
     private static final String REQUEST = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
     private static final String CHARACTER = "11111111-1111-4111-8111-111111111111";
+
+    @Test
+    void sharedGuardRejectsRuntimeRemainderBeforeBusinessWork() throws Exception {
+        Fixture fixture = new Fixture();
+        try (var ignored = BusinessWriteTestSupport.runtimeRemainder()) {
+            SQLException failure = org.junit.jupiter.api.Assertions.assertThrows(SQLException.class,
+                    () -> fixture.service().position(request(3L)));
+            assertEquals("BWB04", failure.getSQLState());
+        }
+        assertTrue(fixture.calls.isEmpty());
+    }
 
     @Test
     void commitsMoveEventOperationAndOneVersionAdvance() throws Exception {
@@ -236,13 +248,13 @@ final class EntityPositionTransactionServiceTest {
         }
 
         private DataSource dataSource() {
-            return proxy(DataSource.class, (ignored, method, arguments) -> {
+            return BusinessWriteTestSupport.withGuard(proxy(DataSource.class, (ignored, method, arguments) -> {
                 if ("getConnection".equals(method.getName())) {
                     connectionRequests++;
                     return connection();
                 }
                 return defaultValue(method.getReturnType());
-            });
+            }));
         }
 
         private Connection connection() {
