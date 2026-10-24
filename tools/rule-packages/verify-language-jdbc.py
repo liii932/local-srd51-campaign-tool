@@ -41,7 +41,10 @@ SCHEMA2_RUNTIME_TABLES = sorted(("s2_runtime_identity", "s2_runtime_snapshot", "
                                 "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation",
                                 "s2_runtime_control", "s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry",
                                 "s2_runtime_character_source", "s2_runtime_proficiency_grant",
-                                "s2_initial_plan", "s2_initial_plan_slot", "s2_initial_plan_choice", "s2_initial_plan_grant"))
+                                "s2_initial_plan", "s2_initial_plan_slot", "s2_initial_plan_choice", "s2_initial_plan_grant",
+                                "s2_runtime_class_progression", "s2_runtime_resource", "s2_character_runtime",
+                                "s2_character_event", "s2_character_event_state", "s2_character_event_resource",
+                                "s2_runtime_subclass", "s2_runtime_feature", "s2_runtime_feat", "s2_runtime_proficiency", "s2_runtime_proficiency_set", "s2_runtime_rest", "s2_runtime_class_level_entry", "s2_runtime_proficiency_entry", "s2_runtime_growth_grant", "s2_runtime_rule_prerequisite", "s2_runtime_chain_prerequisite", "s2_character_event_class", "s2_character_event_hit_die", "s2_character_event_subclass", "s2_character_event_feature", "s2_character_event_feat", "s2_character_event_proficiency", "s2_character_command_ability", "s2_character_command_proficiency", "s2_character_command_hit_die"))
 RUNTIME_TABLES = sorted(("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language", "runtime_rule_tool",
                          "business_write_guard", *SCHEMA2_RUNTIME_TABLES))
 ACCOUNTS = {
@@ -88,7 +91,7 @@ def manifests():
         digest = re.search(rf'{prefix}_APPROVED_SHA256 =\s*"([0-9a-f]{{64}})";', java)
         require(name and digest and name[1].startswith(prefix + "__"), "Invalid migration constant")
         result.append((RUNTIME, number, name[1], digest[1], ROOT / "src/main/resources/db/migration" / name[1]))
-    require(len(result) == 26, "This acceptance profile requires review when the runtime chain changes")
+    require(len(result) == 27, "This acceptance profile requires review when the runtime chain changes")
     java = (ROOT / "src/main/java/com/dndtool/persistence/RuleSchemaMigrations.java").read_text("utf-8")
     block = re.search(r"APPROVED = List[.]of\((.*?)\);", java, re.S)
     require(block is not None, "Rules manifest not recognized")

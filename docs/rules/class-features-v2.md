@@ -76,7 +76,7 @@ Draconic Bloodline、The Fiend 为 1；Circle of the Land、School of Evocation 
 以后的区间；属性必须唯一、序号为 1 且声明 `TEXT`。失败使用 `MALFORMED_FROZEN_CATALOG`，
 不返回部分恢复效果。该模型接入内部 DRAFT 规则组件；schema 2 的[成长/资源作者材料](schema-2-character-statistics.md)
 和[休息声明](schema-2-character-rest.md)已有严格作者输入、纯组合及类型化来源读回，新类型的
-运行镜像和业务消费者尚未接合。旧组件或作者声明均不授予休息执行资格。
+运行镜像及状态/历史仓储已接合，成长和休息业务服务尚未接入。旧组件、声明或持久化事实均不授予休息执行资格。
 
 DM 裁决只接受 `SUCCESS`、`FAILURE`、`NO_EFFECT`，并按冻结算法绑定到一个稳定裁决键。
 自动能力不能改走 DM 裁决，阻断能力不能被裁决伪装成可执行。权威写入必须先证明角色已经获得

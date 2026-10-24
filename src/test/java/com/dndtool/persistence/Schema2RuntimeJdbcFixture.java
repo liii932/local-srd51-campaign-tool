@@ -10,6 +10,12 @@ import javax.sql.DataSource;
 
 /** Actual row storage/readback JDBC simulation; never claims MySQL engine evidence. */
 public final class Schema2RuntimeJdbcFixture {
+    // Fixture schema metadata is immutable packaged approval data. Domain rows remain live JDBC data.
+    private static final List<SchemaMigrations.Expectation> APPROVED_LEDGER = approvedLedger();
+    private static List<SchemaMigrations.Expectation> approvedLedger() {
+        try { return List.copyOf(SchemaMigrations.loadExpectations()); }
+        catch (SchemaMigrations.PackagedSchemaException failure) { throw new ExceptionInInitializerError(failure); }
+    }
     public enum LostCommit { NONE, COMMITTED, ROLLED_BACK }
     public final Map<String, List<Map<String, Object>>> tables = new LinkedHashMap<>();
     public final List<String> sql = new ArrayList<>(), events = new ArrayList<>();
@@ -96,6 +102,10 @@ public final class Schema2RuntimeJdbcFixture {
         if (!matcher.find()) throw new AssertionError("Unexpected update " + query);
         String table = matcher.group(1); String[] columns = matcher.group(2).split(", ");
         Map<String, Object> row = new LinkedHashMap<>(); for (int i = 0; i < columns.length; i++) row.put(columns[i], cloneValue(parameters.get(i + 1)));
+        if (table.equals("s2_character_runtime")) for (var previous : rows(table))
+            if (equal(previous.get("character_id"), row.get("character_id")) || equal(previous.get("preparation_operation_id"), row.get("preparation_operation_id")) || equal(previous.get("run_id"), row.get("run_id"))) throw new SQLException("Character identity collision");
+        if (table.equals("s2_character_event")) for (var previous : rows(table))
+            if (equal(previous.get("operation_id"), row.get("operation_id")) || equal(previous.get("character_id"), row.get("character_id")) && equalNumber(previous.get("event_sequence"), row.get("event_sequence"))) throw new SQLException("Character operation collision");
         if (table.equals("s2_runtime_identity")) for (var previous : rows(table)) {
             if (equal(previous.get("run_id"), row.get("run_id")) || equal(previous.get("snapshot_id"), row.get("snapshot_id"))) throw new SQLException("Identity collision");
         }
@@ -110,9 +120,7 @@ public final class Schema2RuntimeJdbcFixture {
         if (query.contains("DATABASE()")) return List.of(Map.of("schema_name", schema));
         if (query.contains(" FROM schema_meta ")) {
             List<Map<String, Object>> result = new ArrayList<>();
-            try {
-                for (var item : SchemaMigrations.loadExpectations()) result.add(row("schema_version", item.version(), "script_name", item.scriptName(), "script_sha256", item.scriptSha256()));
-            } catch (SchemaMigrations.PackagedSchemaException failure) { throw new AssertionError(failure); }
+            for (var item : APPROVED_LEDGER) result.add(row("schema_version", item.version(), "script_name", item.scriptName(), "script_sha256", item.scriptSha256()));
             return result;
         }
         if (query.contains(" FROM s2_runtime_control ")) return rows("s2_runtime_control");
@@ -123,14 +131,22 @@ public final class Schema2RuntimeJdbcFixture {
             for (var row : rows(table)) distinct.put(HexFormat.of().formatHex((byte[]) row.get("operation_id")), row);
             return new ArrayList<>(distinct.values());
         }
-        if (query.startsWith("SELECT * FROM s2_initial_plan")) {
-            var planQuery = Pattern.compile("SELECT \\* FROM ([a-z0-9_]+) WHERE operation_id = \\? ORDER BY ([a-z_]+) LIMIT ([0-9]+)").matcher(query);
+        if (query.startsWith("SELECT * FROM s2_character_") || query.startsWith("SELECT * FROM s2_initial_plan")) {
+            var planQuery = Pattern.compile("SELECT \\* FROM ([a-z0-9_]+) WHERE ([a-z_]+) = \\? ORDER BY ([a-z_, ]+) LIMIT ([0-9]+)").matcher(query);
             if (!planQuery.matches()) throw new AssertionError(query);
             List<Map<String, Object>> result = new ArrayList<>();
-            for (var row : rows(planQuery.group(1))) if (equal(row.get("operation_id"), parameters.get(1))) result.add(row);
-            if (!planQuery.group(2).equals("operation_id")) result.sort(Comparator.comparingInt(row -> ((Number) row.get(planQuery.group(2))).intValue()));
-            return result.subList(0, Math.min(result.size(), Integer.parseInt(planQuery.group(3))));
+            for (var row : rows(planQuery.group(1))) if (equal(row.get(planQuery.group(2)), parameters.get(1))) result.add(row);
+            String[] columns = planQuery.group(3).split(", ");
+            result.sort((left, right) -> { for (String column : columns) {
+                Object a = left.get(column), b = right.get(column); int compare;
+                if (a instanceof Number x && b instanceof Number y) compare = Long.compare(x.longValue(), y.longValue());
+                else if (a instanceof byte[] x && b instanceof byte[] y) compare = Arrays.compareUnsigned(x, y);
+                else compare = Objects.toString(a).compareTo(Objects.toString(b));
+                if (compare != 0) return compare;
+            } return 0; });
+            return result.subList(0, Math.min(result.size(), Integer.parseInt(planQuery.group(4))));
         }
+
         if (query.contains(" FROM s2_runtime_operation ")) {
             List<Map<String, Object>> result = new ArrayList<>(rows("s2_runtime_operation"));
             result.sort(Comparator.comparingLong(value -> ((Number) value.get("operation_sequence")).longValue())); return result;
@@ -159,7 +175,13 @@ public final class Schema2RuntimeJdbcFixture {
         List<Map<String, Object>> result = new ArrayList<>();
         for (var row : rows(matcher.group(1))) if (equal(row.get("snapshot_id"), parameters.get(1))) result.add(row);
         String[] columns = matcher.group(2).split(", ");
-        result.sort((left, right) -> { for (String column : columns) { int compare = Integer.compare(((Number) left.get(column)).intValue(), ((Number) right.get(column)).intValue()); if (compare != 0) return compare; } return 0; });
+        result.sort((left, right) -> { for (String column : columns) {
+            Object a = left.get(column), b = right.get(column); int compare;
+            if (a instanceof Number x && b instanceof Number y) compare = Long.compare(x.longValue(), y.longValue());
+            else if (a instanceof byte[] x && b instanceof byte[] y) compare = Arrays.compareUnsigned(x, y);
+            else compare = Objects.toString(a).compareTo(Objects.toString(b));
+            if (compare != 0) return compare;
+        } return 0; });
         return result.subList(0, Math.min(result.size(), Integer.parseInt(matcher.group(3))));
     }
     private static ResultSet result(List<Map<String, Object>> rows) {

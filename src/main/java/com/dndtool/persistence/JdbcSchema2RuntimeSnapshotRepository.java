@@ -12,7 +12,7 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 public final class JdbcSchema2RuntimeSnapshotRepository {
     private static final int MAX_RULES = 256, MAX_ENTRIES = 512, MAX_CHAINS = 3072, MAX_STEPS = 4096;
     private static final String TARGET = "target_kind, rule_module_key, rule_type, rule_key, collection_key, entry_module_key, entry_key";
-    private static final String STATE = "state, text_value, integer_value, boolean_value, reference_module_key, reference_rule_key, grant_category, grant_kind, grant_target_module_key, grant_target_rule_key, grant_count";
+    private static final String STATE = "state, text_value, integer_value, boolean_value, reference_module_key, reference_rule_key, grant_category, grant_kind, grant_target_module_key, grant_target_rule_key, grant_count, " + JdbcSchema2GrowthSnapshotRows.EXTRA_STATE;
 
     /** Caller owns the transaction and must roll it back on any failure, including later writes. */
     public Snapshot store(Connection connection, Identity identity, ProductionSchema2Projection projection) throws SQLException {
@@ -64,6 +64,8 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                         value.minimumEnabledMembers(), value.authorNote(), bit(row.enabled()));
             } else if (row instanceof FinalCharacterSource source) {
                 if (!key.ruleType().equals("character.subrace")) insertSource(connection, identity, i, source);
+            } else if (JdbcSchema2GrowthSnapshotRows.supports(row)) {
+                // Insert after all class source rows; the owner can belong to a later loaded package.
             } else {
                 throw invalid();
             }
@@ -72,8 +74,11 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
         for (int i = 0; i < typed.rules().size(); i++)
             if (typed.rules().get(i) instanceof FinalCharacterSource source
                     && source.identity().ruleType().equals("character.subrace")) insertSource(connection, identity, i, source);
+        for (int i = 0; i < typed.rules().size(); i++) if (JdbcSchema2GrowthSnapshotRows.supports(typed.rules().get(i)))
+            JdbcSchema2GrowthSnapshotRows.storeRule(connection, identity, i, typed.rules().get(i));
         for (int i = 0; i < typed.entries().size(); i++) {
             var row = typed.entries().get(i); var value = row.entry(); var key = value.identity();
+            if (JdbcSchema2GrowthSnapshotRows.storeEntry(connection, identity, i, row)) continue;
             if (value instanceof ProficiencyGrantEntry grant) {
                 List<Object> values = new ArrayList<>(List.of(identity.snapshotBytes(), i, ascii(key.rule().moduleKey()),
                         ascii(key.rule().ruleType()), ascii(key.rule().ruleKey()), ascii(key.collectionKey()), ascii(key.moduleKey()), ascii(key.entryKey())));
@@ -99,9 +104,11 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                 values = new ArrayList<>(List.of(identity.snapshotBytes(), i, j, ascii(step.op()), ascii(step.provider().moduleKey()),
                         ascii(step.provider().releaseVersion()), step.loadIndex(), ascii(location.rawZipSha256()), ascii(location.path()),
                         location.pointer(), ascii(step.origin())));
-                values.addAll(stateValues(step.before())); values.addAll(stateValues(step.after()));
+                values.addAll(stateValues(step.before(), chain.field())); values.addAll(stateValues(step.after(), chain.field()));
                 insert(connection, "s2_runtime_chain_step", "snapshot_id, chain_index, step_index, operation, provider_module_key, provider_release_version, load_index, raw_zip_sha256, author_path, author_pointer, origin, "
                         + prefixedState("before_") + ", " + prefixedState("after_"), values.toArray());
+                JdbcSchema2GrowthSnapshotRows.storeChainPredicate(connection, identity, i, j, "BEFORE", step.before());
+                JdbcSchema2GrowthSnapshotRows.storeChainPredicate(connection, identity, i, j, "AFTER", step.after());
             }
         }
         Snapshot actual = readRows(connection, identity);
@@ -165,6 +172,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                         text(result, "display_name", 120), text(result, "description", 1000), integer(result, "source_page"),
                         parent, nullableText(result, "author_note", 1000)), bool(result, "enabled")));
             })) require(rules.putIfAbsent(row.index(), row.value()) == null);
+            for (var row : JdbcSchema2GrowthSnapshotRows.readRules(connection, identity).entrySet()) require(rules.putIfAbsent(row.getKey(), row.getValue()) == null);
             require(rules.size() <= MAX_RULES);
             for (int i = 0; i < rules.size(); i++) require(rules.containsKey(i));
             TreeMap<Integer, FinalEntry> entryRows = new TreeMap<>();
@@ -184,24 +192,26 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             })) require(entryRows.putIfAbsent(row.index(), row.value()) == null);
             for (var row : rows(connection, identity, "s2_runtime_proficiency_grant", "entry_index", MAX_ENTRIES, result -> {
                 EntryIdentity key = new EntryIdentity(new RuleIdentity(binaryAscii(result, "rule_module_key", 64), binaryAscii(result, "rule_type", 20), binaryAscii(result, "rule_key", 128)),
-                        binaryAscii(result, "collection_key", 18), binaryAscii(result, "module_key", 64), binaryAscii(result, "entry_key", 64));
+                        binaryAscii(result, "collection_key", 32), binaryAscii(result, "module_key", 64), binaryAscii(result, "entry_key", 64));
                 return new Indexed<>(integer(result, "entry_index"), new FinalEntry(new ProficiencyGrantEntry(key, readGrant(result, ""),
                         nullableText(result, "author_note", 1000)), bool(result, "enabled")));
             })) require(entryRows.putIfAbsent(row.index(), row.value()) == null);
+            for (var row : JdbcSchema2GrowthSnapshotRows.readEntries(connection, identity).entrySet()) require(entryRows.putIfAbsent(row.getKey(), row.getValue()) == null);
             require(entryRows.size() <= MAX_ENTRIES);
             for (int i = 0; i < entryRows.size(); i++) require(entryRows.containsKey(i));
             List<FinalEntry> entries = List.copyOf(entryRows.values());
             var storedChains = ordered(rows(connection, identity, "s2_runtime_field_chain", "chain_index", MAX_CHAINS, result -> {
-                String fieldKey = binaryAscii(result, "field_key", 23); Field field = Arrays.stream(Field.values()).filter(f -> f.key().equals(fieldKey)).findFirst().orElseThrow();
+                String fieldKey = binaryAscii(result, "field_key", 32); Field field = Arrays.stream(Field.values()).filter(f -> f.key().equals(fieldKey)).findFirst().orElseThrow();
                 return new Indexed<>(integer(result, "chain_index"), new ChainHeader(readTarget(result), field, integer(result, "step_count")));
             }));
+            var predicates = JdbcSchema2GrowthSnapshotRows.readPredicates(connection, identity, true);
             var steps = rows(connection, identity, "s2_runtime_chain_step", "chain_index, step_index", MAX_STEPS, result -> {
                 String module = binaryAscii(result, "provider_module_key", 64), version = binaryAscii(result, "provider_release_version", 64);
                 int chainIndex = integer(result, "chain_index");
                 require(chainIndex >= 0 && chainIndex < storedChains.size());
                 Field field = storedChains.get(chainIndex).field;
                 return new StoredStep(chainIndex, integer(result, "step_index"), new ChainStep(binaryAscii(result, "operation", 11),
-                        readState(result, "before_", field), readState(result, "after_", field), new Provider(module, version), integer(result, "load_index"),
+                        readState(result, "before_", field, predicates, chainIndex, integer(result, "step_index")), readState(result, "after_", field, predicates, chainIndex, integer(result, "step_index")), new Provider(module, version), integer(result, "load_index"),
                         new Location(module, version, digest(result, "raw_zip_sha256"), binaryAscii(result, "author_path", 240),
                                 textAllowEmpty(result, "author_pointer", 4096), null), binaryAscii(result, "origin", 16)));
             });
@@ -215,7 +225,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                 }
                 chains.add(new FieldChain(chain.target, chain.field, chainSteps));
             }
-            require(cursor == steps.size());
+            require(cursor == steps.size()); predicates.complete();
             require(header.members == members.size() && header.rules == rules.size() && header.entries == entries.size()
                     && header.chains == chains.size() && header.steps == steps.size());
             ProductionSchema2Projection rebuilt = ProductionSchema2Projection.restore(members, List.copyOf(rules.values()), entries, chains);
@@ -231,42 +241,48 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                 ascii(entry.collectionKey()), ascii(entry.moduleKey()), ascii(entry.entryKey()));
     }
     private static com.dndtool.module.composition.Schema2CompositionKernel.Identity readTarget(ResultSet result) throws SQLException {
-        var rule = new RuleIdentity(binaryAscii(result, "rule_module_key", 64), binaryAscii(result, "rule_type", 20), binaryAscii(result, "rule_key", 128));
+        var rule = new RuleIdentity(binaryAscii(result, "rule_module_key", 64), binaryAscii(result, "rule_type", 32), binaryAscii(result, "rule_key", 128));
         String kind = binaryAscii(result, "target_kind", 5);
         if (kind.equals("rule")) {
             require(result.getObject("collection_key") == null && result.getObject("entry_module_key") == null && result.getObject("entry_key") == null); return rule;
         }
         require(kind.equals("entry"));
-        return new EntryIdentity(rule, binaryAscii(result, "collection_key", 18), binaryAscii(result, "entry_module_key", 64), binaryAscii(result, "entry_key", 64));
+        return new EntryIdentity(rule, binaryAscii(result, "collection_key", 32), binaryAscii(result, "entry_module_key", 64), binaryAscii(result, "entry_key", 64));
     }
-    private static List<Object> stateValues(FieldState state) {
+    private static List<Object> stateValues(FieldState state, Field field) {
         FieldValue value = state.value();
         List<Object> values = new ArrayList<>(Arrays.asList(ascii(state.state().name()), value instanceof TextValue text ? text.value() : null,
                 value instanceof IntegerValue integer ? integer.value() : null, value instanceof BooleanValue bool ? bit(bool.value()) : null,
                 value instanceof IdentityValue reference ? ascii(reference.value().moduleKey()) : null,
                 value instanceof IdentityValue reference ? ascii(reference.value().ruleKey()) : null));
         values.addAll(value instanceof GrantValue grant ? grantValues(grant.value()) : Arrays.asList(null, null, null, null, null));
+        values.addAll(JdbcSchema2GrowthSnapshotRows.extraState(state, field));
         return values;
     }
-    private static FieldState readState(ResultSet result, String prefix, Field field) throws SQLException {
+    private static FieldState readState(ResultSet result, String prefix, Field field, JdbcSchema2GrowthSnapshotRows.Predicates predicates, int chain, int step) throws SQLException {
         StateKind kind = StateKind.valueOf(binaryAscii(result, prefix + "state", 13));
         Object text = result.getObject(prefix + "text_value"), integer = result.getObject(prefix + "integer_value"), bool = result.getObject(prefix + "boolean_value"),
-                module = result.getObject(prefix + "reference_module_key"), key = result.getObject(prefix + "reference_rule_key");
-        boolean grant = false;
-        for (String column : List.of("grant_category", "grant_kind", "grant_target_module_key", "grant_target_rule_key", "grant_count"))
-            grant |= result.getObject(prefix + column) != null;
-        int count = (text == null ? 0 : 1) + (integer == null ? 0 : 1) + (bool == null ? 0 : 1) + (module == null && key == null ? 0 : 1) + (grant ? 1 : 0);
+                module = result.getObject(prefix + "reference_module_key"), key = result.getObject(prefix + "reference_rule_key"), referenceType = result.getObject(prefix + "reference_rule_type"), prerequisite = result.getObject(prefix + "prerequisite_groups");
+        boolean grant = false, growth = false;
+        for (String column : List.of("grant_category", "grant_kind", "grant_target_module_key", "grant_target_rule_key", "grant_count")) grant |= result.getObject(prefix + column) != null;
+        for (String column : JdbcSchema2GrowthSnapshotRows.GROWTH_COLUMNS.split(", ")) growth |= result.getObject(prefix + column) != null;
+        int count = (text == null ? 0 : 1) + (integer == null ? 0 : 1) + (bool == null ? 0 : 1) + (module == null && key == null && referenceType == null ? 0 : 1) + (grant ? 1 : 0) + (growth ? 1 : 0) + (prerequisite == null ? 0 : 1);
         if (kind != StateKind.PRESENT) { require(count == 0); return new FieldState(kind, null); }
-        require(count == 1);
-        FieldValue value;
+        require(count == 1); FieldValue value;
         if (text != null) value = new TextValue(text(result, prefix + "text_value", 1000));
         else if (integer != null) value = new IntegerValue(integer(result, prefix + "integer_value"));
         else if (bool != null) value = new BooleanValue(bool(result, prefix + "boolean_value"));
         else if (grant) { require(field == Field.GRANT); value = new GrantValue(readGrant(result, prefix)); }
+        else if (growth) { require(field == Field.GROWTH_GRANT); value = new GrowthGrantValue(JdbcSchema2GrowthSnapshotRows.readGrowth(result, prefix)); }
+        else if (prerequisite != null) { require(field == Field.PREREQUISITE || field == Field.MULTICLASS_PREREQUISITE); value = new PrerequisiteValue(predicates.take(chain, step, prefix.equals("before_") ? "BEFORE" : "AFTER", integer(result, prefix + "prerequisite_groups"))); }
         else {
-            require(field == Field.LANGUAGE || field == Field.TOOL || field == Field.PARENT_RACE);
-            value = new IdentityValue(new RuleIdentity(binaryAscii(result, prefix + "reference_module_key", 64),
-                    field == Field.TOOL ? "character.tool" : field == Field.PARENT_RACE ? "character.race" : "character.language", binaryAscii(result, prefix + "reference_rule_key", 128)));
+            String type;
+            if (field == Field.OWNER || field == Field.PROFICIENCY) type = binaryAscii(result, prefix + "reference_rule_type", 32);
+            else {
+                require(referenceType == null && (field == Field.LANGUAGE || field == Field.TOOL || field == Field.PARENT_RACE || field == Field.OWNER_CLASS));
+                type = field == Field.TOOL ? "character.tool" : field == Field.PARENT_RACE ? "character.race" : field == Field.OWNER_CLASS ? "character.class" : "character.language";
+            }
+            value = new IdentityValue(new RuleIdentity(binaryAscii(result, prefix + "reference_module_key", 64), type, binaryAscii(result, prefix + "reference_rule_key", 128)));
         }
         return new FieldState(kind, value);
     }
@@ -275,6 +291,10 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
         insert(connection, "s2_runtime_character_source", "snapshot_id, rule_index, module_key, rule_type, rule_key, display_name, description, source_page, parent_race_module_key, parent_race_rule_type, parent_race_rule_key, author_note, enabled",
                 identity.snapshotBytes(), index, ascii(key.moduleKey()), ascii(key.ruleType()), ascii(key.ruleKey()), value.displayName(), value.description(), value.sourcePage(),
                 parent == null ? null : ascii(parent.moduleKey()), parent == null ? null : ascii(parent.ruleType()), parent == null ? null : ascii(parent.ruleKey()), value.authorNote(), bit(source.enabled()));
+    }
+    private static RuleIdentity ownerClass(ResultSet result) throws SQLException {
+        exact(result, "owner_class_type", "character.class");
+        return new RuleIdentity(binaryAscii(result, "owner_class_module", 64), "character.class", binaryAscii(result, "owner_class_key", 128));
     }
     private static RuleIdentity nullableReference(ResultSet result, String prefix, String type) throws SQLException {
         Object module = result.getObject(prefix + "module_key"), ruleType = result.getObject(prefix + "rule_type"), key = result.getObject(prefix + "rule_key");
