@@ -141,6 +141,12 @@ public final class Schema2ProgressionFixtures {
         return Map.of("ability.strength", 15, "ability.dexterity", 12, "ability.constitution", 13,
                 "ability.intelligence", 10, "ability.wisdom", 8, "ability.charisma", 14);
     }
+    public static com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices fullInitialChoices() {
+        return new com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices(null, Map.of(), null, Map.of(INITIAL_SKILL_SLOT, List.of(ATHLETICS)));
+    }
+    public static com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices fullMulticlassChoices() {
+        return new com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices(ALT_SUBCLASS, Map.of(), null, Map.of(MULTICLASS_SKILL_SLOT, List.of(ACROBATICS)));
+    }
     public static Schema2InitialCharacterPlanService.InitialPlan initialPlan(ProductionSchema2Projection material,
             Identity identity, UUID campaign, UUID character) {
         var sources = new Schema2InitialProficiencyRules.Sources(new RuleIdentity(BASE, "character.race", "race.human"),

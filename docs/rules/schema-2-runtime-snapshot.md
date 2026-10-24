@@ -5,8 +5,10 @@
 核验，`JdbcSchema2RuntimeSnapshotRepository` 提供不访问来源库的完整读回。
 
 材料范围明确为 `INTERNAL`：当前类型为语言、工具、两类候选集合及其成员，以及种族、亚种、背景、
-职业的初始熟练来源元数据和稳定授予槽。来源读取、组合、运行存储和
-规则绑定可以独立验证；它们不创建战役、角色、业务历史或游戏执行视图。来源安装器仍拒绝所有
+职业的初始熟练来源元数据和稳定授予槽，以及类型化成长、子职业、特性、专长、熟练、资源和休息声明。来源读取、组合、运行存储和
+规则绑定可以独立验证；转存服务本身不创建战役、角色、业务历史或游戏执行视图。
+[角色状态仓储](schema-2-character-statistics.md)及[休息事实](schema-2-character-rest.md)另行保存类型化状态和历史，
+目前只提供结构校验与准确读回，业务成长/休息服务和新增事务 owner 尚未接入。来源安装器仍拒绝所有
 不完整基础包及未接入真实消费者的内容。测试中的完整账本夹具直接构造这些有限材料，不经过
 安装资格门，也不证明存在可安装、可运行的完整基础模组。
 
@@ -26,9 +28,8 @@ reader 逐列比较原 ZIP 的类型化声明与物理行，包括复合授予�
 缺行、多行、错误包/版本/作者序号或任一类型字段不一致都拒绝。语言/工具旧包和空 add-on 的
 新增投影为空，可继续读取；含新来源内容的原包不能省略新表行。跨包引用由组合器验证，
 来源表仅 FK 绑定同一原包，不要求被依赖包预先占据作者材料表。
-
-来源 V005 另外保存[成长/资源作者材料](schema-2-character-statistics.md)和[休息声明](schema-2-character-rest.md)，
-并与原 ZIP 逐列核对。这些新类型尚未纳入本运行快照的类型表或业务消费；来源可读不扩大这里的材料范围。
+来源 V005 另存成长、资源及其类型化修改，同样逐列核对全部原 ZIP；所有者职业引用、
+profile、有限支持范围和执行模式不能由组合最终值替代原始作者事实。
 
 来源事务明确结束、连接状态恢复并关闭后才返回材料，随后才允许借运行连接。来源关闭失败
 不继续写运行库。调用方事务入口 `read` 要求既有只读 RR 事务，不改变连接状态、不提交或关闭。
@@ -50,6 +51,12 @@ PARTITION 头分离，不把旧固定单模组字段改成通用组合，也不�
 | `s2_runtime_tool` / `s2_runtime_tool_set` / `s2_runtime_tool_entry` | 工具类别、来源页、集合及工具成员；与语言共用连续规则/条目序号，但引用类型分离 |
 | `s2_runtime_character_source` | 种族、亚种、背景、职业的完整最终元数据、可空备注、启用状态及亚种 parent race 类型引用 |
 | `s2_runtime_proficiency_grant` | 来源类型/身份、原声明模组和稳定 slot key；原子 LANGUAGE/TOOL × FIXED/CHOICE、准确目标或集合及有界 count |
+| `s2_runtime_class_progression` / `s2_runtime_resource` | V027 的职业所有者、生命骰面数、完整 profile、支持等级/范围、前提存在标记和资源执行模式 |
+| `s2_runtime_subclass` / `s2_runtime_feature` / `s2_runtime_feat` | 完整来源身份、选择/获得等级、特性种类、执行模式/算法及专长前提 |
+| `s2_runtime_proficiency` / `s2_runtime_proficiency_set` / `s2_runtime_proficiency_entry` | 类型化技能/护甲/武器定义，技能属性，以及包含完整目标身份的有限候选集合 |
+| `s2_runtime_class_level_entry` / `s2_runtime_growth_grant` | 每级稳定条目、ASI 可用性，以及初始/多职业熟练的稳定槽和原子 FIXED/CHOICE 声明 |
+| `s2_runtime_rule_prerequisite` / `s2_runtime_chain_prerequisite` | AND 组/OR 项的类型化能力下限；分别保存最终规则及完整链步骤的原子值，不存 JSON 规则袋 |
+| `s2_runtime_rest` | 显式标准休息算法和原文来源；该表不授予休息执行能力 |
 | `s2_runtime_field_chain` / `s2_runtime_chain_step` | 完整目标/字段、初始与显式覆盖步骤、前后类型化值、提供者、加载位置和作者位置 |
 | `s2_runtime_operation` | 不可改写的操作 UUID、CAPTURE/RESTORE、意图指纹、身份对、连续序号及数据库时间 |
 | `s2_runtime_control` | 永久单例守卫、协议、材料计数与版本 |

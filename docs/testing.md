@@ -99,7 +99,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V026 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V027 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -258,7 +258,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V026 完整运行清单及来源 V001—V005。
+并核对 V001—V027 完整运行清单及来源 V001—V005。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -361,7 +361,23 @@ mvn '-Dtest=Schema2ProgressionCompositionTest,JdbcSchema2AdvancementSourceReposi
 未选中材料损坏、逐次写入失败和调用方回滚。它们不执行成长、资源或休息业务，也不替代真实 MySQL
 的 CHECK、触发器、权限和事务验收。构建应包含作者/来源类；来源 V005、测试 oracle 和向量留在 WAR 外。
 
-离线 helper 的默认只读入口核对运行 V001—V026 与来源 V001—V005 共 31 份批准载荷；不执行 SQL。
+离线 helper 的默认只读入口核对运行 V001—V027 与来源 V001—V005 共 32 份批准载荷；不执行 SQL。
+
+## Schema 2 运行镜像与类型化状态历史验证
+
+[运行快照](rules/schema-2-runtime-snapshot.md)、[角色状态](rules/schema-2-character-statistics.md)及
+[休息事实](rules/schema-2-character-rest.md)的仓储定向检查：
+
+```bash
+mvn '-Dtest=JdbcSchema2ProgressionSnapshotTest,JdbcSchema2CharacterRuntimeRepositoryTest,JdbcSchema2CompleteGrowthStateTest,JdbcSchema2RestStateTest,Schema2CharacterRuntimeSchemaTest,SchemaMigrationsTest' test
+```
+
+这些测试覆盖完整类型化镜像/覆盖链重建、命令输入、before/after、来源、顺序、数量、版本、容量、
+错误身份、结构恢复以及写入失败后的调用方回滚。它们不调用尚未接入的成长/休息业务服务，不证明
+完整游戏语义或真实 MySQL 的约束、权限、锁和耐久性。仓储恢复不执行命令或消费随机数。
+
+运行清单为 V001—V027，RULES 清单为 V001—V005。helper 默认只读核对 32 份批准载荷，
+审计清单包含 45 张 schema 2 运行表；未显式授权时不启动隔离实例或执行 SQL。
 
 ## 共同业务事务与初始化准备验证
 
@@ -402,7 +418,7 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V026 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V027 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 

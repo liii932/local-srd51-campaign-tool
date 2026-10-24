@@ -39,7 +39,8 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - DRAFT 的[成长区间](./docs/rules/level-advancement-v2.md)与[资源恢复区间](./docs/rules/class-features-v2.md)
   使用共用不可变规则模型，逐级核验 1—20 级熟练加值，资源恢复按权威魅力值求值；
   schema 2 的[成长与资源作者模型](./docs/rules/schema-2-character-statistics.md)及[休息声明](./docs/rules/schema-2-character-rest.md)
-  已接严格读取、纯组合和类型化来源读回；新类型的运行镜像、角色状态与业务事务尚未接合；
+  已接严格读取、纯组合、来源读回和类型化运行快照；角色状态与成长/休息历史可持久化，
+  业务成长和休息服务尚未接合；
 - 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
 - 执行普通、优势和劣势 d20 检定，并保存候选骰、修正、DC、结果和内部事件；
 - 通过封闭的类型化效果调整字段、授予物品、记录消息或更新合法实体位置；
@@ -152,7 +153,7 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
 
 当前自动化使用 `dnd_tool_se` 作为本地部署运行库，使用 `dnd_tool_se_it` 执行临时表集成测试；
-完整 V001—V026 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
+完整 V001—V027 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
 运行实例内创建改名 schema，也不改写迁移 SQL。运行、只读核验、正式迁移、集成测试和隔离重放
 使用不同账号。现有少量测试数据的运行库可继续作为开发部署目标，但不能作为集成测试或迁移重放
 目标，使用前仍需盘点和备份。精确账号权限与 Agent 检查点见[数据库说明](./docs/database.md)。
@@ -185,7 +186,7 @@ src/main/java/com/dndtool/
   service/         业务验证、诊断编排、事务、幂等和存档服务
   web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V026 只增不改运行数据库迁移
+                    V001—V027 只增不改运行数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
