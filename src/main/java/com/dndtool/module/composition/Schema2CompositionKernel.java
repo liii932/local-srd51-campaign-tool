@@ -1,5 +1,7 @@
 package com.dndtool.module.composition;
 
+import com.dndtool.module.AdvancementValueProfile;
+import com.dndtool.module.ResourceRecoveryProfile;
 import java.text.Normalizer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -40,7 +42,14 @@ public final class Schema2CompositionKernel {
         DISPLAY_NAME("display_name"), DESCRIPTION("description"), CATEGORY("category"),
         SOURCE_PAGE("source_page"), MINIMUM_ENABLED_MEMBERS("minimum_enabled_members"),
         AUTHOR_NOTE("author_note"), LANGUAGE("language"), TOOL("tool"),
-        PARENT_RACE("parent_race"), GRANT("grant"), ENABLED("enabled");
+        PARENT_RACE("parent_race"), GRANT("grant"), OWNER_CLASS("owner_class"),
+        HIT_DIE_SIDES("hit_die_sides"), PROFICIENCY_BONUS_PROFILE("proficiency_bonus_profile"),
+        SUPPORTED_MAXIMUM_LEVEL("supported_maximum_level"), ADVANCEMENT_SCOPE("advancement_scope"),
+        MAXIMUM_PROFILE("maximum_profile"), RECOVERY_PROFILE("recovery_profile"),
+        EXECUTION_MODE("execution_mode"), MULTICLASS_PREREQUISITE("multiclass_prerequisite"),
+        OWNER("owner"), SELECTION_LEVEL("selection_level"), LEVEL("level"), ASI_AVAILABLE("asi_available"),
+        FEATURE_KIND("feature_kind"), EXECUTION_ALGORITHM("execution_algorithm"), PREREQUISITE("prerequisite"),
+        ABILITY_KEY("ability_key"), PROFICIENCY("proficiency"), GROWTH_GRANT("growth_grant"), ALGORITHM("algorithm"), ENABLED("enabled");
         private final String key;
         Field(String key) { this.key = key; }
         public String key() { return key; }
@@ -75,7 +84,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -91,11 +100,48 @@ public final class Schema2CompositionKernel {
     /** Initial proficiency source metadata, not a complete race, background or class domain. */
     public record CharacterSourceDefinition(RuleIdentity identity, String displayName, String description,
                                             int sourcePage, RuleIdentity parentRace, String authorNote) implements Definition { }
+    /** Explicitly bounded statistics/resource support; never an assertion of complete class advancement. */
+    public enum ProgressionScope { STATISTICS_AND_RESOURCES_ONLY, CHARACTER_ADVANCEMENT }
+    public enum ResourceExecution { AUTOMATIC, BLOCKED }
+    public record ClassProgressionDefinition(RuleIdentity identity, String displayName, String description,
+            int sourcePage, RuleIdentity ownerClass, int hitDieSides, String proficiencyBonusProfile,
+            int supportedMaximumLevel, ProgressionScope advancementScope, AbilityPrerequisite multiclassPrerequisite,
+            String authorNote) implements Definition { }
+    public record ResourceDefinition(RuleIdentity identity, String displayName, String description,
+            int sourcePage, RuleIdentity ownerClass, String maximumProfile, String recoveryProfile,
+            ResourceExecution executionMode, String authorNote) implements Definition { }
+    public record AbilityMinimum(String abilityKey, int minimum) { }
+    public record RequirementGroup(List<AbilityMinimum> anyOf) {
+        public RequirementGroup { anyOf = List.copyOf(anyOf); }
+    }
+    public record AbilityPrerequisite(List<RequirementGroup> allOf) {
+        public AbilityPrerequisite { allOf = List.copyOf(allOf); }
+    }
+    public enum FeatureKind { FEATURE, OPTION }
+    public enum FeatureExecution { AUTOMATIC, DM_ADJUDICATION, BLOCKED }
+    public enum ProficiencyCategory { SKILL, ARMOR, WEAPON, TOOL }
+    public record SubclassDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity ownerClass, int selectionLevel, String authorNote) implements Definition { }
+    public record FeatureDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity owner, int level, FeatureKind kind, FeatureExecution executionMode,
+            String executionAlgorithm, String authorNote) implements Definition { }
+    public record FeatDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            AbilityPrerequisite prerequisite, FeatureExecution executionMode, String executionAlgorithm,
+            String authorNote) implements Definition { }
+    public record ProficiencyDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            ProficiencyCategory category, String abilityKey, String authorNote) implements Definition { }
+    public record ProficiencySetDefinition(RuleIdentity identity, String displayName, ProficiencyCategory category,
+            int minimumEnabledMembers, String authorNote) implements Definition { }
+    public record RestDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            String algorithm, String authorNote) implements Definition { }
+    public sealed interface GrowthGrantSpec permits FixedGrowthGrant, ChoiceGrowthGrant { }
+    public record FixedGrowthGrant(RuleIdentity target) implements GrowthGrantSpec { }
+    public record ChoiceGrowthGrant(RuleIdentity candidates, int count) implements GrowthGrantSpec { }
     public enum GrantCategory { LANGUAGE, TOOL }
     public sealed interface GrantSpec permits FixedGrant, ChoiceGrant { GrantCategory category(); }
     public record FixedGrant(GrantCategory category, RuleIdentity target) implements GrantSpec { }
     public record ChoiceGrant(GrantCategory category, RuleIdentity candidates, int count) implements GrantSpec { }
-    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry {
+    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry, ClassLevelEntry, ProficiencyMemberEntry, GrowthProficiencyGrantEntry {
         EntryIdentity identity();
         String authorNote();
         RuleIdentity target();
@@ -109,12 +155,23 @@ public final class Schema2CompositionKernel {
     public record ProficiencyGrantEntry(EntryIdentity identity, GrantSpec grant, String authorNote) implements Entry {
         @Override public RuleIdentity target() { return grant instanceof FixedGrant fixed ? fixed.target() : ((ChoiceGrant) grant).candidates(); }
     }
-    public sealed interface FieldValue permits TextValue, IntegerValue, IdentityValue, BooleanValue, GrantValue { }
+    public record ClassLevelEntry(EntryIdentity identity, int level, boolean asiAvailable, String authorNote) implements Entry {
+        @Override public RuleIdentity target() { return identity.rule(); }
+    }
+    public record ProficiencyMemberEntry(EntryIdentity identity, RuleIdentity proficiency, String authorNote) implements Entry {
+        @Override public RuleIdentity target() { return proficiency; }
+    }
+    public record GrowthProficiencyGrantEntry(EntryIdentity identity, GrowthGrantSpec grant, String authorNote) implements Entry {
+        @Override public RuleIdentity target() { return grant instanceof FixedGrowthGrant fixed ? fixed.target() : ((ChoiceGrowthGrant) grant).candidates(); }
+    }
+    public sealed interface FieldValue permits TextValue, IntegerValue, IdentityValue, BooleanValue, GrantValue, PrerequisiteValue, GrowthGrantValue { }
     public record TextValue(String value) implements FieldValue { }
     public record IntegerValue(int value) implements FieldValue { }
     public record IdentityValue(RuleIdentity value) implements FieldValue { }
     public record BooleanValue(boolean value) implements FieldValue { }
     public record GrantValue(GrantSpec value) implements FieldValue { }
+    public record PrerequisiteValue(AbilityPrerequisite value) implements FieldValue { }
+    public record GrowthGrantValue(GrowthGrantSpec value) implements FieldValue { }
     public sealed interface Change permits SetField, ClearField, SetEnabled {
         Identity target();
         Field field();
@@ -136,7 +193,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -154,6 +211,30 @@ public final class Schema2CompositionKernel {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalCharacterSource(CharacterSourceDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalClassProgression(ClassProgressionDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalResource(ResourceDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalSubclass(SubclassDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalFeature(FeatureDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalFeat(FeatDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalProficiency(ProficiencyDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalProficiencySet(ProficiencySetDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalRest(RestDefinition definition, boolean enabled) implements FinalRule {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalEntry(Entry entry, boolean enabled) { }
@@ -308,6 +389,7 @@ public final class Schema2CompositionKernel {
         }
         finalValidation(objects);
         Map<FieldKey, Boolean> seen = new HashMap<>();
+        Map<Identity, Map<Field, FieldState>> initialFields = new HashMap<>();
         Map<Identity, Integer> declarations = new HashMap<>();
         Map<Identity, Location> sourceDeclarations = new HashMap<>();
         int[] definitionCounts = new int[members.size()], entryCounts = new int[members.size()], changeCounts = new int[members.size()];
@@ -336,7 +418,8 @@ public final class Schema2CompositionKernel {
                     throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid stored provenance location", source);
                 FieldState after = step.after();
                 if (after == null || after.state() == null || after.state() == StateKind.UNINITIALIZED
-                        || (after.state() == StateKind.ABSENT && (chain.field() != Field.AUTHOR_NOTE || after.value() != null))
+                        || (after.state() == StateKind.ABSENT && (!optionalField(chain.field()) || after.value() != null
+                            || (n > 0 && !clearableField(chain.field()))))
                         || (after.state() == StateKind.PRESENT && after.value() == null))
                     throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid stored field state", source);
                 if (after.state() == StateKind.PRESENT) {
@@ -351,8 +434,9 @@ public final class Schema2CompositionKernel {
                     if (!step.op().equals("initial") || !step.origin().equals(origin) || !chain.target().moduleKey().equals(member.moduleKey())
                             || (chain.field() == Field.ENABLED && !after.equals(present(new BooleanValue(true)))))
                         throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid stored declaration", source);
-                    boolean proficiencySource = chain.target() instanceof RuleIdentity rule && sourceType(rule.ruleType())
-                            || chain.target() instanceof EntryIdentity entry && sourceType(entry.rule().ruleType());
+                    initialFields.computeIfAbsent(chain.target(), ignored -> new LinkedHashMap<>()).put(chain.field(), after);
+                    boolean proficiencySource = chain.target() instanceof RuleIdentity rule && tracedCharacterType(rule.ruleType())
+                            || chain.target() instanceof EntryIdentity entry && tracedCharacterType(entry.rule().ruleType());
                     if (proficiencySource) {
                         String pointer = location.pointer();
                         String suffix = "/" + chain.field().key();
@@ -378,8 +462,8 @@ public final class Schema2CompositionKernel {
                     String op = chain.field() == Field.ENABLED ? "set_enabled" : after.state() == StateKind.ABSENT ? "clear_field" : "set_field";
                     if (!step.op().equals(op) || !step.origin().equals("explicit"))
                         throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid stored modification", source);
-                    if ((chain.target() instanceof RuleIdentity rule && sourceType(rule.ruleType())
-                            || chain.target() instanceof EntryIdentity entry && sourceType(entry.rule().ruleType()))
+                    if ((chain.target() instanceof RuleIdentity rule && tracedCharacterType(rule.ruleType())
+                            || chain.target() instanceof EntryIdentity entry && tracedCharacterType(entry.rule().ruleType()))
                             && (HEADER_PATH.equals(location.path()) || !storedArrayElement(location.pointer(), 256)))
                         throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid proficiency operation location", source);
                     changeCounts[step.loadIndex()]++;
@@ -399,7 +483,8 @@ public final class Schema2CompositionKernel {
             for (ChainStep step : chain.steps()) {
                 RuleIdentity reference = step.after().value() instanceof IdentityValue value ? value.value()
                         : step.after().value() instanceof GrantValue value ? (value.value() instanceof FixedGrant fixed
-                            ? fixed.target() : ((ChoiceGrant) value.value()).candidates()) : null;
+                            ? fixed.target() : ((ChoiceGrant) value.value()).candidates())
+                        : step.after().value() instanceof GrowthGrantValue value ? growthTarget(value.value()) : null;
                 if (reference != null) {
                     Integer referenceDeclaration = declarations.get(reference);
                     if (referenceDeclaration == null || referenceDeclaration > step.loadIndex())
@@ -409,6 +494,19 @@ public final class Schema2CompositionKernel {
         }
         if (seen.size() != objects.values().stream().mapToInt(o -> o.fields.size()).sum())
             throw fail("S2_STORED_INVALID", Stage.FINAL, "Stored field chains are incomplete", source);
+        for (var declaration : initialFields.entrySet()) {
+            Map<String, Object> encoded = json("identity", identityJson(declaration.getKey()));
+            for (Field field : domainFields(declaration.getKey())) {
+                FieldState state = declaration.getValue().get(field);
+                if (state.state() == StateKind.PRESENT) encoded.put(field.key(), valueJson(state.value()));
+            }
+            try {
+                if (declaration.getKey() instanceof RuleIdentity) definition(encoded, source);
+                else entry(encoded, source);
+            } catch (Schema2Exception malformed) {
+                throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid original stored declaration", source);
+            }
+        }
         for (int i = 0; i < members.size(); i++) if (definitionCounts[i] > 64 || entryCounts[i] > 128 || changeCounts[i] > 256)
             throw fail("S2_STORED_INVALID", Stage.FINAL, "Stored member budget exceeded", source);
         Map<String, Object> configuration = json("author_schema_version", 2, "canonical_profile", CANONICAL_PROFILE,
@@ -495,13 +593,24 @@ public final class Schema2CompositionKernel {
             for (Located<Definition> row : pack.definitions) {
                 if (row.value instanceof CharacterSourceDefinition source && source.parentRace() != null)
                     checkReference(pack, source.parentRace(), "character.race", objects, row.location.child("parent_race"));
+                if (row.value instanceof ClassProgressionDefinition progression)
+                    checkReference(pack, progression.ownerClass(), "character.class", objects, row.location.child("owner_class"));
+                if (row.value instanceof ResourceDefinition resource)
+                    checkReference(pack, resource.ownerClass(), "character.class", objects, row.location.child("owner_class"));
+                if (row.value instanceof SubclassDefinition subclass)
+                    checkReference(pack, subclass.ownerClass(), "character.class", objects, row.location.child("owner_class"));
+                if (row.value instanceof FeatureDefinition feature)
+                    checkReference(pack, feature.owner(), "character.class|character.subclass", objects, row.location.child("owner"));
             }
             for (Located<Entry> row : pack.entries) {
                 Entry value = row.value;
                 Field reference = referenceField(value.identity());
                 checkReference(pack, value.identity().rule(), value.identity().rule().ruleType(), objects, row.location.child("identity").child("rule"));
+                if (value instanceof ClassLevelEntry) continue;
                 if (value instanceof ProficiencyGrantEntry grant)
                     checkGrantReference(pack, grant.grant(), objects, row.location.child("grant"));
+                else if (value instanceof GrowthProficiencyGrantEntry grant)
+                    checkGrowthGrantReference(pack, grant.grant(), objects, row.location.child("growth_grant"));
                 else checkReference(pack, value.target(), referenceType(reference), objects, row.location.child(reference.key()));
             }
             for (Located<Change> row : pack.changes) {
@@ -522,6 +631,8 @@ public final class Schema2CompositionKernel {
                         checkReference(pack, identity.value(), referenceType(set.field()), objects, row.location.child("value"));
                     } else if (set.value() instanceof GrantValue grant) {
                         checkGrantReference(pack, grant.value(), objects, row.location.child("value"));
+                    } else if (set.value() instanceof GrowthGrantValue grant) {
+                        checkGrowthGrantReference(pack, grant.value(), objects, row.location.child("value"));
                     }
                     after = present(set.value());
                     op = "set_field";
@@ -846,15 +957,24 @@ public final class Schema2CompositionKernel {
     private static Definition definition(Object input, Location source) {
         Map<String, Object> initial = object(input, source);
         RuleIdentity identity = ruleIdentity(required(initial, "identity", source), source.child("identity"));
+        if (newAdvancementType(identity.ruleType()))
+            return advancementDefinition(input, identity, source);
         boolean catalogItem = identity.ruleType().equals("character.language") || identity.ruleType().equals("character.tool");
         boolean characterSource = sourceType(identity.ruleType());
-        Set<String> required = catalogItem
+        Set<String> required = identity.ruleType().equals("character.class_progression")
+                ? Set.of("identity", "display_name", "description", "source_page", "owner_class", "hit_die_sides",
+                        "proficiency_bonus_profile", "supported_maximum_level", "advancement_scope")
+                : identity.ruleType().equals("character.resource")
+                ? Set.of("identity", "display_name", "description", "source_page", "owner_class",
+                        "maximum_profile", "recovery_profile", "execution_mode")
+                : catalogItem
                 ? Set.of("identity", "display_name", "description", "category", "source_page")
                 : characterSource ? (identity.ruleType().equals("character.subrace")
                     ? Set.of("identity", "display_name", "description", "source_page", "parent_race")
                     : Set.of("identity", "display_name", "description", "source_page"))
                 : Set.of("identity", "display_name", "minimum_enabled_members");
-        Map<String, Object> row = shape(input, required, Set.of("author_note"), source);
+        Map<String, Object> row = shape(input, required, identity.ruleType().equals("character.class_progression")
+                ? Set.of("author_note", "multiclass_prerequisite") : Set.of("author_note"), source);
         String displayName = text(row.get("display_name"), 120, source.child("display_name"));
         String note = row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null;
         return switch (identity.ruleType()) {
@@ -870,12 +990,168 @@ public final class Schema2CompositionKernel {
                     integer(row.get("minimum_enabled_members"), 1, 128, source.child("minimum_enabled_members")), note);
             case "catalog.tool_set" -> new ToolSetDefinition(identity, displayName,
                     integer(row.get("minimum_enabled_members"), 1, 128, source.child("minimum_enabled_members")), note);
+            case "character.class_progression" -> {
+                ProgressionScope scope = enumValue(ProgressionScope.class, row.get("advancement_scope"), source.child("advancement_scope"));
+                if (scope == ProgressionScope.CHARACTER_ADVANCEMENT && !row.containsKey("multiclass_prerequisite"))
+                    throw fail("S2_SHAPE", Stage.AUTHOR, "Character advancement requires an explicit multiclass prerequisite", source.child("multiclass_prerequisite"));
+                yield new ClassProgressionDefinition(identity, displayName,
+                    text(row.get("description"), 1000, source.child("description")),
+                    integer(row.get("source_page"), 3, 74, source.child("source_page")),
+                    typedReference(row.get("owner_class"), "character.class", source.child("owner_class")),
+                    hitDieSides(row.get("hit_die_sides"), source.child("hit_die_sides")),
+                    profile(Field.PROFICIENCY_BONUS_PROFILE, row.get("proficiency_bonus_profile"), source.child("proficiency_bonus_profile")),
+                    integer(row.get("supported_maximum_level"), 1, 20, source.child("supported_maximum_level")),
+                    scope,
+                    row.containsKey("multiclass_prerequisite") ? prerequisite(row.get("multiclass_prerequisite"), source.child("multiclass_prerequisite")) : null, note);
+            }
+            case "character.resource" -> new ResourceDefinition(identity, displayName,
+                    text(row.get("description"), 1000, source.child("description")),
+                    integer(row.get("source_page"), 3, 74, source.child("source_page")),
+                    typedReference(row.get("owner_class"), "character.class", source.child("owner_class")),
+                    profile(Field.MAXIMUM_PROFILE, row.get("maximum_profile"), source.child("maximum_profile")),
+                    profile(Field.RECOVERY_PROFILE, row.get("recovery_profile"), source.child("recovery_profile")),
+                    enumValue(ResourceExecution.class, row.get("execution_mode"), source.child("execution_mode")), note);
             default -> new CharacterSourceDefinition(identity, displayName,
                     text(row.get("description"), 1000, source.child("description")),
                     integer(row.get("source_page"), 3, 74, source.child("source_page")),
                     identity.ruleType().equals("character.subrace")
                             ? typedReference(row.get("parent_race"), "character.race", source.child("parent_race")) : null, note);
         };
+    }
+
+    private static Definition advancementDefinition(Object input, RuleIdentity identity, Location source) {
+        Set<String> required = new HashSet<>(Set.of("identity", "display_name"));
+        if (!identity.ruleType().equals("catalog.proficiency_set")) required.addAll(Set.of("description", "source_page"));
+        required.addAll(switch (identity.ruleType()) {
+            case "character.subclass" -> Set.of("owner_class", "selection_level");
+            case "character.feature" -> Set.of("owner", "level", "feature_kind", "execution_mode", "execution_algorithm");
+            case "character.feat" -> Set.of("prerequisite", "execution_mode", "execution_algorithm");
+            case "character.proficiency" -> Set.of("category");
+            case "adventure.rest" -> Set.of("algorithm");
+            default -> Set.of("category", "minimum_enabled_members");
+        });
+        var row = shape(input, required, identity.ruleType().equals("character.proficiency")
+                ? Set.of("author_note", "ability_key") : Set.of("author_note"), source);
+        String name = text(row.get("display_name"), 120, source.child("display_name"));
+        String note = row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null;
+        ProficiencyCategory category = row.containsKey("category") ? proficiencyCategory(identity.ruleType(), row.get("category"), source.child("category")) : null;
+        if (identity.ruleType().equals("catalog.proficiency_set")) return new ProficiencySetDefinition(identity, name, category,
+                integer(row.get("minimum_enabled_members"), 1, 128, source.child("minimum_enabled_members")), note);
+        String description = text(row.get("description"), 1000, source.child("description"));
+        int page = identity.ruleType().equals("adventure.rest") ? integer(row.get("source_page"), 87, 87, source.child("source_page"))
+                : integer(row.get("source_page"), 3, 74, source.child("source_page"));
+        if (identity.ruleType().equals("adventure.rest")) {
+            String algorithm = string(row.get("algorithm"), source.child("algorithm"));
+            if (!algorithm.equals("SRD_2014_REST_V1")) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported rest algorithm", source);
+            return new RestDefinition(identity, name, description, page, algorithm, note);
+        }
+        if (identity.ruleType().equals("character.subclass")) return new SubclassDefinition(identity, name, description, page,
+                typedReference(row.get("owner_class"), "character.class", source.child("owner_class")),
+                integer(row.get("selection_level"), 1, 20, source.child("selection_level")), note);
+        if (identity.ruleType().equals("character.proficiency")) {
+            String ability = row.containsKey("ability_key") ? abilityKey(row.get("ability_key"), source.child("ability_key")) : null;
+            if ((category == ProficiencyCategory.SKILL) != (ability != null))
+                throw fail("S2_TYPE", Stage.AUTHOR, "Only skill proficiencies declare an ability", source);
+            return new ProficiencyDefinition(identity, name, description, page, category, ability, note);
+        }
+        FeatureExecution mode = featureExecution(identity.ruleType(), row.get("execution_mode"), source.child("execution_mode"));
+        String algorithm = executionAlgorithmAtom(identity.ruleType(), row.get("execution_algorithm"), source.child("execution_algorithm"));
+        if (!executionAlgorithms(mode).contains(algorithm))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Feature mode and algorithm disagree", source.child("execution_algorithm"));
+        if (identity.ruleType().equals("character.feat")) {
+            return new FeatDefinition(identity, name, description, page, prerequisite(row.get("prerequisite"), source.child("prerequisite")), mode, algorithm, note);
+        }
+        return new FeatureDefinition(identity, name, description, page,
+                typedReference(row.get("owner"), "character.class|character.subclass", source.child("owner")),
+                integer(row.get("level"), 1, 20, source.child("level")), enumValue(FeatureKind.class, row.get("feature_kind"), source.child("feature_kind")), mode, algorithm, note);
+    }
+
+    private static String abilityKey(Object value, Location source) {
+        String key = string(value, source);
+        if (!Set.of("ability.strength", "ability.dexterity", "ability.constitution", "ability.intelligence", "ability.wisdom", "ability.charisma").contains(key))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Unknown ability key", source);
+        return key;
+    }
+
+    private static ProficiencyCategory proficiencyCategory(String ruleType, Object value, Location source) {
+        ProficiencyCategory category = enumValue(ProficiencyCategory.class, value, source);
+        if (ruleType.equals("character.proficiency") && category == ProficiencyCategory.TOOL)
+            throw fail("S2_TYPE", Stage.AUTHOR, "Tool proficiency requires a character.tool identity", source);
+        return category;
+    }
+
+    private static FeatureExecution featureExecution(String ruleType, Object value, Location source) {
+        FeatureExecution mode = enumValue(FeatureExecution.class, value, source);
+        if (ruleType.equals("character.feat") && mode != FeatureExecution.BLOCKED)
+            throw fail("S2_TYPE", Stage.AUTHOR, "Feat execution is currently blocked; acquisition is separate", source);
+        return mode;
+    }
+
+    private static Set<String> executionAlgorithms(FeatureExecution mode) {
+        return switch (mode) {
+            case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1");
+            case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
+            case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1");
+        };
+    }
+
+    private static String executionAlgorithmAtom(String ruleType, Object value, Location source) {
+        String algorithm = identifier(value, "[A-Z][A-Z0-9_]{0,127}", source);
+        boolean allowed = ruleType.equals("character.feat") ? algorithm.equals("BLOCKED_DOWNSTREAM_SYSTEM_V1")
+                : Arrays.stream(FeatureExecution.values()).anyMatch(mode -> executionAlgorithms(mode).contains(algorithm));
+        if (!allowed) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported execution algorithm for this rule type", source);
+        return algorithm;
+    }
+
+    private static AbilityPrerequisite prerequisite(Object value, Location source) {
+        var root = shape(value, Set.of("all_of"), Set.of(), source);
+        var groups = array(root.get("all_of"), source.child("all_of"));
+        if (groups.size() > 6) throw fail("S2_BUDGET", Stage.AUTHOR, "Ability prerequisite group budget", source);
+        List<RequirementGroup> result = new ArrayList<>(); Set<String> abilities = new HashSet<>();
+        for (int g = 0; g < groups.size(); g++) {
+            Location groupSource = source.child("all_of").child(Integer.toString(g));
+            var alternatives = array(shape(groups.get(g), Set.of("any_of"), Set.of(), groupSource).get("any_of"), groupSource.child("any_of"));
+            if (alternatives.isEmpty() || alternatives.size() > 2) throw fail("S2_BUDGET", Stage.AUTHOR, "Ability alternative budget", groupSource);
+            List<AbilityMinimum> terms = new ArrayList<>();
+            for (int a = 0; a < alternatives.size(); a++) {
+                Location termSource = groupSource.child("any_of").child(Integer.toString(a));
+                var term = shape(alternatives.get(a), Set.of("ability", "minimum"), Set.of(), termSource);
+                String key = abilityKey(term.get("ability"), termSource.child("ability"));
+                if (!abilities.add(key)) throw fail("S2_TYPE", Stage.AUTHOR, "Duplicate prerequisite ability", termSource);
+                terms.add(new AbilityMinimum(key, integer(term.get("minimum"), 1, 20, termSource.child("minimum"))));
+            }
+            result.add(new RequirementGroup(terms));
+        }
+        return new AbilityPrerequisite(result);
+    }
+
+    private static boolean optionalField(Field field) {
+        return Set.of(Field.AUTHOR_NOTE, Field.ABILITY_KEY, Field.MULTICLASS_PREREQUISITE).contains(field);
+    }
+
+    private static boolean clearableField(Field field) { return field == Field.AUTHOR_NOTE; }
+
+    private static int hitDieSides(Object value, Location source) {
+        int sides = integer(value, 6, 12, source);
+        if (!Set.of(6, 8, 10, 12).contains(sides)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported hit die", source);
+        return sides;
+    }
+
+    private static String profile(Field field, Object value, Location source) {
+        String result = text(value, field == Field.RECOVERY_PROFILE ? 200 : 1000, source);
+        try {
+            if (field == Field.PROFICIENCY_BONUS_PROFILE) AdvancementValueProfile.parseProficiencyBonus(result);
+            else if (field == Field.MAXIMUM_PROFILE) AdvancementValueProfile.parse(result);
+            else ResourceRecoveryProfile.parse(result);
+        } catch (IllegalArgumentException invalid) {
+            throw fail("S2_TYPE", Stage.AUTHOR, "Malformed complete resource or proficiency profile", source);
+        }
+        return result;
+    }
+
+    private static <T extends Enum<T>> T enumValue(Class<T> type, Object value, Location source) {
+        try { return Enum.valueOf(type, string(value, source)); }
+        catch (IllegalArgumentException invalid) { throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported " + type.getSimpleName(), source); }
     }
 
     private static GrantSpec grant(Object input, Location source) {
@@ -899,15 +1175,38 @@ public final class Schema2CompositionKernel {
         throw fail("S2_TYPE", Stage.AUTHOR, "Unknown proficiency grant kind", source.child("kind"));
     }
 
+    private static GrowthGrantSpec growthGrant(Object input, Location source) {
+        var initial = object(input, source);
+        String kind = string(required(initial, "kind", source), source.child("kind"));
+        if (kind.equals("FIXED")) {
+            var row = shape(input, Set.of("kind", "target"), Set.of(), source);
+            return new FixedGrowthGrant(typedReference(row.get("target"), "character.proficiency|character.tool", source.child("target")));
+        }
+        if (kind.equals("CHOICE")) {
+            var row = shape(input, Set.of("kind", "candidates", "count"), Set.of(), source);
+            return new ChoiceGrowthGrant(typedReference(row.get("candidates"), "catalog.proficiency_set", source.child("candidates")),
+                    integer(row.get("count"), 1, MAX_GRANT_CHOICE_COUNT, source.child("count")));
+        }
+        throw fail("S2_TYPE", Stage.AUTHOR, "Unknown growth proficiency grant kind", source);
+    }
+
     private static Entry entry(Object input, Location source) {
         Map<String, Object> initial = object(input, source);
         Identity identity = identity(required(initial, "identity", source), source.child("identity"));
         if (!(identity instanceof EntryIdentity entry)) throw fail("S2_TYPE", Stage.AUTHOR, "Entry declaration requires an entry identity", source.child("identity"));
+        if (entry.collectionKey().equals("levels")) {
+            var row = shape(input, Set.of("identity", "level", "asi_available"), Set.of("author_note"), source);
+            if (!(row.get("asi_available") instanceof Boolean asi)) throw fail("S2_TYPE", Stage.AUTHOR, "ASI marker requires boolean", source.child("asi_available"));
+            return new ClassLevelEntry(entry, integer(row.get("level"), 1, 20, source.child("level")), asi,
+                    row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null);
+        }
         Field reference = referenceField(entry);
         Map<String, Object> row = shape(input, Set.of("identity", reference.key()), Set.of("author_note"), source);
         String note = row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null;
         if (reference == Field.GRANT) return new ProficiencyGrantEntry(entry, grant(row.get("grant"), source.child("grant")), note);
+        if (reference == Field.GROWTH_GRANT) return new GrowthProficiencyGrantEntry(entry, growthGrant(row.get("growth_grant"), source.child("growth_grant")), note);
         RuleIdentity target = typedReference(row.get(reference.key()), referenceType(reference), source.child(reference.key()));
+        if (reference == Field.PROFICIENCY) return new ProficiencyMemberEntry(entry, target, note);
         return reference == Field.LANGUAGE ? new LanguageEntry(entry, target, note) : new ToolEntry(entry, target, note);
     }
 
@@ -931,7 +1230,7 @@ public final class Schema2CompositionKernel {
         for (Field item : domainFields(target)) if (item.key().equals(key)) field = item;
         if (field == null) throw fail("S2_FIELD_UNKNOWN", Stage.AUTHOR, "Unknown atomic domain field", source.child("field"));
         if (op.equals("clear_field")) {
-            if (field != Field.AUTHOR_NOTE) throw fail("S2_FIELD_NOT_CLEARABLE", Stage.AUTHOR, "Only author_note can be cleared", source.child("field"));
+            if (!clearableField(field)) throw fail("S2_FIELD_NOT_CLEARABLE", Stage.AUTHOR, "Only author_note can be cleared", source.child("field"));
             return new ClearField(target, field);
         }
         Object value = row.get("value");
@@ -939,10 +1238,34 @@ public final class Schema2CompositionKernel {
             case DISPLAY_NAME -> new TextValue(text(value, 120, source.child("value")));
             case DESCRIPTION, AUTHOR_NOTE -> new TextValue(text(value, 1000, source.child("value")));
             case CATEGORY -> new TextValue(((RuleIdentity) target).ruleType().equals("character.tool")
-                    ? toolCategory(value, source.child("value")).name() : category(value, source.child("value")).name());
-            case SOURCE_PAGE -> new IntegerValue(integer(value, 3, 74, source.child("value")));
+                    ? toolCategory(value, source.child("value")).name()
+                    : Set.of("character.proficiency", "catalog.proficiency_set").contains(((RuleIdentity) target).ruleType())
+                        ? proficiencyCategory(((RuleIdentity) target).ruleType(), value, source.child("value")).name() : category(value, source.child("value")).name());
+            case SOURCE_PAGE -> new IntegerValue(((RuleIdentity) target).ruleType().equals("adventure.rest")
+                    ? integer(value, 87, 87, source.child("value")) : integer(value, 3, 74, source.child("value")));
             case MINIMUM_ENABLED_MEMBERS -> new IntegerValue(integer(value, 1, 128, source.child("value")));
-            case LANGUAGE, TOOL, PARENT_RACE -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
+            case LANGUAGE, TOOL, PARENT_RACE, OWNER_CLASS, OWNER, PROFICIENCY -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
+            case HIT_DIE_SIDES -> new IntegerValue(hitDieSides(value, source.child("value")));
+            case SUPPORTED_MAXIMUM_LEVEL -> new IntegerValue(integer(value, 1, 20, source.child("value")));
+            case PROFICIENCY_BONUS_PROFILE, MAXIMUM_PROFILE, RECOVERY_PROFILE -> new TextValue(profile(field, value, source.child("value")));
+            case ADVANCEMENT_SCOPE -> new TextValue(enumValue(ProgressionScope.class, value, source.child("value")).name());
+            case EXECUTION_MODE -> new TextValue(((RuleIdentity) target).ruleType().equals("character.resource")
+                    ? enumValue(ResourceExecution.class, value, source.child("value")).name()
+                    : featureExecution(((RuleIdentity) target).ruleType(), value, source.child("value")).name());
+            case SELECTION_LEVEL, LEVEL -> new IntegerValue(integer(value, 1, 20, source.child("value")));
+            case ASI_AVAILABLE -> {
+                if (!(value instanceof Boolean booleanValue)) throw fail("S2_TYPE", Stage.AUTHOR, "ASI marker requires boolean", source.child("value"));
+                yield new BooleanValue(booleanValue);
+            }
+            case FEATURE_KIND -> new TextValue(enumValue(FeatureKind.class, value, source.child("value")).name());
+            case EXECUTION_ALGORITHM -> new TextValue(executionAlgorithmAtom(((RuleIdentity) target).ruleType(), value, source.child("value")));
+            case ABILITY_KEY -> new TextValue(abilityKey(value, source.child("value")));
+            case MULTICLASS_PREREQUISITE, PREREQUISITE -> new PrerequisiteValue(prerequisite(value, source.child("value")));
+            case GROWTH_GRANT -> new GrowthGrantValue(growthGrant(value, source.child("value")));
+            case ALGORITHM -> {
+                if (!"SRD_2014_REST_V1".equals(value)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported rest algorithm", source.child("value"));
+                yield new TextValue("SRD_2014_REST_V1");
+            }
             case GRANT -> new GrantValue(grant(value, source.child("value")));
             case ENABLED -> throw new AssertionError("Enabled is not a domain field");
         };
@@ -956,11 +1279,13 @@ public final class Schema2CompositionKernel {
         if (!kind.equals("entry")) throw fail("S2_TYPE", Stage.AUTHOR, "Unknown identity kind", source.child("kind"));
         row = shape(input, Set.of("kind", "rule", "collection_key", "module_key", "entry_key"), Set.of(), source);
         RuleIdentity rule = ruleIdentity(row.get("rule"), source.child("rule"));
-        boolean catalog = rule.ruleType().equals("catalog.language_set") || rule.ruleType().equals("catalog.tool_set");
-        if (!catalog && !sourceType(rule.ruleType()))
+        boolean catalog = Set.of("catalog.language_set", "catalog.tool_set", "catalog.proficiency_set").contains(rule.ruleType());
+        boolean progression = rule.ruleType().equals("character.class_progression");
+        if (!catalog && !sourceType(rule.ruleType()) && !progression)
             throw fail("S2_TYPE", Stage.AUTHOR, "Entry owner requires a catalog set or character source", source.child("rule").child("rule_type"));
         String collection = string(row.get("collection_key"), source.child("collection_key"));
-        if (!collection.equals(catalog ? "members" : "proficiency_grants"))
+        if (!(progression ? Set.of("levels", "starting_proficiencies", "multiclass_proficiencies").contains(collection)
+                : collection.equals(catalog ? "members" : "proficiency_grants")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unknown collection key for this owner type", source.child("collection_key"));
         String owner = moduleKey(row.get("module_key"), source.child("module_key"));
         String key = identifier(row.get("entry_key"), "[a-z][a-z0-9_]{0,63}", source.child("entry_key"));
@@ -972,15 +1297,30 @@ public final class Schema2CompositionKernel {
         if (!string(row.get("kind"), source.child("kind")).equals("rule")) throw fail("S2_TYPE", Stage.AUTHOR, "Expected a rule identity", source.child("kind"));
         String module = moduleKey(row.get("module_key"), source.child("module_key"));
         String type = string(row.get("rule_type"), source.child("rule_type"));
-        if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set").contains(type) && !sourceType(type))
+        if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
+                "character.class_progression", "character.resource", "character.subclass", "character.feature",
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
+        String prefix = switch (type) {
+            case "character.resource" -> "resource";
+            case "character.class_progression" -> "progression";
+            case "character.subclass" -> "subclass";
+            case "character.feature" -> "feature";
+            case "character.feat" -> "feat";
+            case "character.proficiency" -> "proficiency";
+            case "catalog.proficiency_set" -> "proficiency_set";
+            case "adventure.rest" -> "rest";
+            default -> null;
+        };
+        if (prefix != null && !key.matches(prefix + "[.][a-z][a-z0-9_]*(?:[.][a-z0-9_]+)*"))
+            throw fail("S2_TYPE", Stage.AUTHOR, "New character rules require their domain prefix and nonempty key segments", source.child("rule_key"));
         return new RuleIdentity(module, type, key);
     }
 
     private static RuleIdentity typedReference(Object input, String type, Location source) {
         RuleIdentity identity = ruleIdentity(input, source);
-        if (!identity.ruleType().equals(type)) throw fail("S2_TYPE", Stage.AUTHOR, "Reference requires " + type, source.child("rule_type"));
+        if (!Arrays.asList(type.split("[|]")).contains(identity.ruleType())) throw fail("S2_TYPE", Stage.AUTHOR, "Reference requires " + type, source.child("rule_type"));
         return identity;
     }
 
@@ -988,6 +1328,8 @@ public final class Schema2CompositionKernel {
         return switch (identity.rule().ruleType()) {
             case "catalog.language_set" -> Field.LANGUAGE;
             case "catalog.tool_set" -> Field.TOOL;
+            case "catalog.proficiency_set" -> Field.PROFICIENCY;
+            case "character.class_progression" -> identity.collectionKey().equals("levels") ? Field.LEVEL : Field.GROWTH_GRANT;
             default -> {
                 if (sourceType(identity.rule().ruleType())) yield Field.GRANT;
                 throw new IllegalArgumentException("Unsupported entry owner type");
@@ -999,12 +1341,20 @@ public final class Schema2CompositionKernel {
             case LANGUAGE -> "character.language";
             case TOOL -> "character.tool";
             case PARENT_RACE -> "character.race";
+            case OWNER_CLASS -> "character.class";
+            case OWNER -> "character.class|character.subclass";
+            case PROFICIENCY -> "character.proficiency|character.tool";
             default -> throw new IllegalArgumentException("Field is not a catalog reference");
         };
     }
 
     private static boolean sourceType(String type) {
         return Set.of("character.race", "character.subrace", "character.background", "character.class").contains(type);
+    }
+
+    private static boolean tracedCharacterType(String type) {
+        return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -1203,7 +1553,7 @@ public final class Schema2CompositionKernel {
         directIdentity(pack, identity, source);
         MutableObject target = objects.get(identity);
         if (target == null) throw fail("S2_REFERENCE_MISSING", Stage.APPLY, "A reference must exist in this package or a preceding package", source);
-        if (!identity.ruleType().equals(type)) throw fail("S2_TYPE", Stage.APPLY, "Reference has the wrong domain type", source);
+        if (!Arrays.asList(type.split("[|]")).contains(identity.ruleType())) throw fail("S2_TYPE", Stage.APPLY, "Reference has the wrong domain type", source);
     }
 
     private static void checkGrantReference(AuthorPackage pack, GrantSpec grant,
@@ -1218,9 +1568,54 @@ public final class Schema2CompositionKernel {
         }
     }
 
+    private static RuleIdentity growthTarget(GrowthGrantSpec grant) {
+        return grant instanceof FixedGrowthGrant fixed ? fixed.target() : ((ChoiceGrowthGrant) grant).candidates();
+    }
+    private static void checkGrowthGrantReference(AuthorPackage pack, GrowthGrantSpec grant,
+            Map<Identity, MutableObject> objects, Location source) {
+        checkReference(pack, growthTarget(grant), grant instanceof FixedGrowthGrant
+                ? "character.proficiency|character.tool" : "catalog.proficiency_set", objects,
+                source.child(grant instanceof FixedGrowthGrant ? "target" : "candidates"));
+    }
+
     private static void finalValidation(Map<Identity, MutableObject> objects) {
         Map<RuleIdentity, Set<RuleIdentity>> candidates = new HashMap<>();
+        Set<RuleIdentity> progressionOwners = new HashSet<>();
+        Map<RuleIdentity, Map<Integer, Boolean>> levels = new HashMap<>();
+        Map<RuleIdentity, Integer> subclassSelectionLevels = new HashMap<>();
+        int enabledRests = 0;
         for (MutableObject object : objects.values()) {
+            if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
+                FinalRule checked = finalRule(rule, object.fields);
+                if (checked instanceof FinalRest && checked.enabled() && ++enabledRests > 1)
+                    throw fail("S2_REST_AMBIGUOUS", Stage.FINAL, "At most one rest algorithm may be enabled", object.source);
+                if (checked instanceof FinalSubclass subclass && !objects.containsKey(subclass.definition().ownerClass()))
+                    throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Subclass class owner is missing", object.source);
+                if (checked instanceof FinalSubclass subclass && checked.enabled()) {
+                    Integer prior = subclassSelectionLevels.putIfAbsent(subclass.definition().ownerClass(), subclass.definition().selectionLevel());
+                    if (prior != null && prior != subclass.definition().selectionLevel())
+                        throw fail("S2_SUBCLASS_LEVEL_MISMATCH", Stage.FINAL, "Enabled subclasses of one class require the same selection level", object.source);
+                }
+                if (checked instanceof FinalFeature feature) {
+                    MutableObject owner = objects.get(feature.definition().owner());
+                    if (owner == null) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Feature owner is missing", object.source);
+                    if (feature.definition().owner().ruleType().equals("character.subclass")
+                            && feature.definition().level() < ((IntegerValue) owner.fields.get(Field.SELECTION_LEVEL).value()).value())
+                        throw fail("S2_TYPE", Stage.FINAL, "Subclass feature predates subclass selection", object.source);
+                }
+            }
+            if (object.identity instanceof RuleIdentity rule
+                    && Set.of("character.class_progression", "character.resource").contains(rule.ruleType())) {
+                RuleIdentity owner = ((IdentityValue) object.fields.get(Field.OWNER_CLASS).value()).value();
+                if (!owner.ruleType().equals("character.class") || !objects.containsKey(owner))
+                    throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Class growth and resources require a real class source", object.source);
+                if (rule.ruleType().equals("character.class_progression") && enabled(object) && !progressionOwners.add(owner))
+                    throw fail("S2_PROGRESSION_AMBIGUOUS", Stage.FINAL, "A class has more than one enabled progression", object.source);
+                if (rule.ruleType().equals("character.class_progression")
+                        && textField(object.fields, Field.ADVANCEMENT_SCOPE).equals(ProgressionScope.CHARACTER_ADVANCEMENT.name())
+                        && object.fields.get(Field.MULTICLASS_PREREQUISITE).state() != StateKind.PRESENT)
+                    throw fail("S2_TYPE", Stage.FINAL, "Character advancement requires an explicit multiclass prerequisite", object.source);
+            }
             if (object.identity instanceof RuleIdentity rule && rule.ruleType().equals("character.subrace")) {
                 RuleIdentity parent = ((IdentityValue) object.fields.get(Field.PARENT_RACE).value()).value();
                 if (!parent.ruleType().equals("character.race") || !objects.containsKey(parent))
@@ -1229,6 +1624,24 @@ public final class Schema2CompositionKernel {
             if (!(object.identity instanceof EntryIdentity identity)) continue;
             MutableObject owner = objects.get(identity.rule());
             Field reference = referenceField(identity);
+            if (reference == Field.LEVEL) {
+                if (owner == null) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Growth level owner is missing", object.source);
+                int level = ((IntegerValue) object.fields.get(Field.LEVEL).value()).value();
+                if (level == 1 && ((BooleanValue) object.fields.get(Field.ASI_AVAILABLE).value()).value()
+                        && textField(owner.fields, Field.ADVANCEMENT_SCOPE).equals(ProgressionScope.CHARACTER_ADVANCEMENT.name()))
+                    throw fail("S2_GROWTH_INITIAL_ASI_UNSUPPORTED", Stage.FINAL, "Initial ASI is not a supported growth declaration", object.source);
+                if (levels.computeIfAbsent(identity.rule(), ignored -> new HashMap<>()).put(level, enabled(object)) != null)
+                    throw fail("S2_TYPE", Stage.FINAL, "Duplicate class growth level", object.source);
+                if (level > ((IntegerValue) owner.fields.get(Field.SUPPORTED_MAXIMUM_LEVEL).value()).value())
+                    throw fail("S2_TYPE", Stage.FINAL, "Growth level exceeds the supported range", object.source);
+                continue;
+            }
+            if (reference == Field.GROWTH_GRANT) {
+                GrowthGrantSpec grant = ((GrowthGrantValue) object.fields.get(Field.GROWTH_GRANT).value()).value();
+                if (owner == null || !objects.containsKey(growthTarget(grant)))
+                    throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Growth grant target is missing", object.source);
+                continue;
+            }
             if (reference == Field.GRANT) {
                 GrantSpec grant = ((GrantValue) object.fields.get(Field.GRANT).value()).value();
                 RuleIdentity target = grant instanceof FixedGrant fixed ? fixed.target() : ((ChoiceGrant) grant).candidates();
@@ -1239,18 +1652,38 @@ public final class Schema2CompositionKernel {
             RuleIdentity candidate = ((IdentityValue) object.fields.get(reference).value()).value();
             MutableObject target = objects.get(candidate);
             if (owner == null || !identity.collectionKey().equals("members") || target == null
-                    || !candidate.ruleType().equals(referenceType(reference))) {
+                    || !Arrays.asList(referenceType(reference).split("[|]")).contains(candidate.ruleType())) {
                 throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Final entry ownership and typed catalog references must remain valid", object.source);
+            }
+            if (reference == Field.PROFICIENCY) {
+                String expectedCategory = textField(owner.fields, Field.CATEGORY);
+                String actualCategory = candidate.ruleType().equals("character.tool") ? "TOOL" : textField(target.fields, Field.CATEGORY);
+                if (!expectedCategory.equals(actualCategory)) throw fail("S2_TYPE", Stage.FINAL, "Proficiency set member category differs", object.source);
             }
             if (enabled(object) && enabled(target)) candidates.computeIfAbsent(identity.rule(), ignored -> new HashSet<>()).add(candidate);
         }
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity identity
-                    && (identity.ruleType().equals("catalog.language_set") || identity.ruleType().equals("catalog.tool_set"))) {
+                    && Set.of("catalog.language_set", "catalog.tool_set", "catalog.proficiency_set").contains(identity.ruleType())) {
                 int minimum = ((IntegerValue) object.fields.get(Field.MINIMUM_ENABLED_MEMBERS).value()).value();
                 if (candidates.getOrDefault(identity, Set.of()).size() < minimum) {
                     throw fail("S2_CANDIDATES_INSUFFICIENT", Stage.FINAL, "Distinct enabled catalog candidates are below the declared minimum", object.source);
                 }
+            }
+            if (object.identity instanceof RuleIdentity identity && identity.ruleType().equals("character.class_progression")
+                    && textField(object.fields, Field.ADVANCEMENT_SCOPE).equals(ProgressionScope.CHARACTER_ADVANCEMENT.name())) {
+                int maximum = ((IntegerValue) object.fields.get(Field.SUPPORTED_MAXIMUM_LEVEL).value()).value();
+                Map<Integer, Boolean> declared = levels.getOrDefault(identity, Map.of());
+                if (declared.size() != maximum || java.util.stream.IntStream.rangeClosed(1, maximum)
+                        .anyMatch(level -> !Boolean.TRUE.equals(declared.get(level))))
+                    throw fail("S2_GROWTH_LEVELS_INCOMPLETE", Stage.FINAL, "Character growth requires every enabled level row", object.source);
+            }
+            if (object.identity instanceof EntryIdentity identity && referenceField(identity) == Field.GROWTH_GRANT
+                    && enabled(object) && enabled(objects.get(identity.rule()))) {
+                GrowthGrantSpec grant = ((GrowthGrantValue) object.fields.get(Field.GROWTH_GRANT).value()).value();
+                if (grant instanceof ChoiceGrowthGrant choice && (!enabled(objects.get(choice.candidates()))
+                        || candidates.getOrDefault(choice.candidates(), Set.of()).size() < choice.count()))
+                    throw fail("S2_CANDIDATES_INSUFFICIENT", Stage.FINAL, "Growth choice requires enough enabled candidates", object.source);
             }
             if (object.identity instanceof EntryIdentity identity && referenceField(identity) == Field.GRANT
                     && enabled(object) && enabled(objects.get(identity.rule()))) {
@@ -1263,17 +1696,43 @@ public final class Schema2CompositionKernel {
     }
 
     private static List<Field> domainFields(Identity identity) {
-        if (identity instanceof EntryIdentity entry) return List.of(referenceField(entry), Field.AUTHOR_NOTE);
+        if (identity instanceof EntryIdentity entry) return entry.collectionKey().equals("levels")
+                ? List.of(Field.LEVEL, Field.ASI_AVAILABLE, Field.AUTHOR_NOTE) : List.of(referenceField(entry), Field.AUTHOR_NOTE);
         String type = ((RuleIdentity) identity).ruleType();
         if (type.equals("character.language") || type.equals("character.tool")) {
             return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.CATEGORY, Field.SOURCE_PAGE, Field.AUTHOR_NOTE);
         }
+        if (type.equals("character.class_progression")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION,
+                Field.SOURCE_PAGE, Field.OWNER_CLASS, Field.HIT_DIE_SIDES, Field.PROFICIENCY_BONUS_PROFILE,
+                Field.SUPPORTED_MAXIMUM_LEVEL, Field.ADVANCEMENT_SCOPE, Field.MULTICLASS_PREREQUISITE, Field.AUTHOR_NOTE);
+        if (type.equals("character.resource")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION,
+                Field.SOURCE_PAGE, Field.OWNER_CLASS, Field.MAXIMUM_PROFILE, Field.RECOVERY_PROFILE,
+                Field.EXECUTION_MODE, Field.AUTHOR_NOTE);
+        if (type.equals("character.subclass")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.OWNER_CLASS, Field.SELECTION_LEVEL, Field.AUTHOR_NOTE);
+        if (type.equals("character.feature")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.OWNER, Field.LEVEL, Field.FEATURE_KIND, Field.EXECUTION_MODE, Field.EXECUTION_ALGORITHM, Field.AUTHOR_NOTE);
+        if (type.equals("character.feat")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.PREREQUISITE, Field.EXECUTION_MODE, Field.EXECUTION_ALGORITHM, Field.AUTHOR_NOTE);
+        if (type.equals("character.proficiency")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.CATEGORY, Field.ABILITY_KEY, Field.AUTHOR_NOTE);
+        if (type.equals("catalog.proficiency_set")) return List.of(Field.DISPLAY_NAME, Field.CATEGORY, Field.MINIMUM_ENABLED_MEMBERS, Field.AUTHOR_NOTE);
+        if (type.equals("adventure.rest")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (sourceType(type)) return type.equals("character.subrace")
                 ? List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.PARENT_RACE, Field.AUTHOR_NOTE)
                 : List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.AUTHOR_NOTE);
         return List.of(Field.DISPLAY_NAME, Field.MINIMUM_ENABLED_MEMBERS, Field.AUTHOR_NOTE);
     }
     private static Map<Field, FieldState> definitionFields(Definition value) {
+        if (newAdvancementType(value.identity().ruleType())) {
+            Map<Field, FieldState> fields = new LinkedHashMap<>();
+            Map<String, Object> encoded = definitionJson(value);
+            for (Field field : domainFields(value.identity())) fields.put(field, !encoded.containsKey(field.key()) ? absent()
+                    : present(((SetField) change(json("op", "set_field", "target", identityJson(value.identity()),
+                            "field", field.key(), "value", encoded.get(field.key())), new Location(null, null, null, "$definition", "", null))).value()));
+            fields.put(Field.ENABLED, present(new BooleanValue(true)));
+            return fields;
+        }
         Map<Field, FieldState> result = new LinkedHashMap<>();
         result.put(Field.DISPLAY_NAME, present(new TextValue(value.displayName())));
         if (value instanceof LanguageDefinition language) {
@@ -1288,6 +1747,23 @@ public final class Schema2CompositionKernel {
             result.put(Field.DESCRIPTION, present(new TextValue(source.description())));
             result.put(Field.SOURCE_PAGE, present(new IntegerValue(source.sourcePage())));
             if (source.parentRace() != null) result.put(Field.PARENT_RACE, present(new IdentityValue(source.parentRace())));
+        } else if (value instanceof ClassProgressionDefinition progression) {
+            result.put(Field.DESCRIPTION, present(new TextValue(progression.description())));
+            result.put(Field.SOURCE_PAGE, present(new IntegerValue(progression.sourcePage())));
+            result.put(Field.OWNER_CLASS, present(new IdentityValue(progression.ownerClass())));
+            result.put(Field.HIT_DIE_SIDES, present(new IntegerValue(progression.hitDieSides())));
+            result.put(Field.PROFICIENCY_BONUS_PROFILE, present(new TextValue(progression.proficiencyBonusProfile())));
+            result.put(Field.SUPPORTED_MAXIMUM_LEVEL, present(new IntegerValue(progression.supportedMaximumLevel())));
+            result.put(Field.ADVANCEMENT_SCOPE, present(new TextValue(progression.advancementScope().name())));
+            result.put(Field.MULTICLASS_PREREQUISITE, progression.multiclassPrerequisite() == null ? absent()
+                    : present(new PrerequisiteValue(progression.multiclassPrerequisite())));
+        } else if (value instanceof ResourceDefinition resource) {
+            result.put(Field.DESCRIPTION, present(new TextValue(resource.description())));
+            result.put(Field.SOURCE_PAGE, present(new IntegerValue(resource.sourcePage())));
+            result.put(Field.OWNER_CLASS, present(new IdentityValue(resource.ownerClass())));
+            result.put(Field.MAXIMUM_PROFILE, present(new TextValue(resource.maximumProfile())));
+            result.put(Field.RECOVERY_PROFILE, present(new TextValue(resource.recoveryProfile())));
+            result.put(Field.EXECUTION_MODE, present(new TextValue(resource.executionMode().name())));
         } else {
             int minimum = value instanceof LanguageSetDefinition set ? set.minimumEnabledMembers() : ((ToolSetDefinition) value).minimumEnabledMembers();
             result.put(Field.MINIMUM_ENABLED_MEMBERS, present(new IntegerValue(minimum)));
@@ -1298,8 +1774,12 @@ public final class Schema2CompositionKernel {
     }
     private static Map<Field, FieldState> entryFields(Entry value) {
         Map<Field, FieldState> result = new LinkedHashMap<>();
-        result.put(referenceField(value.identity()), present(value instanceof ProficiencyGrantEntry grant
-                ? new GrantValue(grant.grant()) : new IdentityValue(value.target())));
+        if (value instanceof ClassLevelEntry level) {
+            result.put(Field.LEVEL, present(new IntegerValue(level.level())));
+            result.put(Field.ASI_AVAILABLE, present(new BooleanValue(level.asiAvailable())));
+        } else result.put(referenceField(value.identity()), present(value instanceof ProficiencyGrantEntry grant
+                ? new GrantValue(grant.grant()) : value instanceof GrowthProficiencyGrantEntry growth
+                    ? new GrowthGrantValue(growth.grant()) : new IdentityValue(value.target())));
         result.put(Field.AUTHOR_NOTE, value.authorNote() == null ? absent() : present(new TextValue(value.authorNote())));
         result.put(Field.ENABLED, present(new BooleanValue(true)));
         return result;
@@ -1314,6 +1794,18 @@ public final class Schema2CompositionKernel {
     }
     private static FinalRule finalRule(RuleIdentity identity, Map<Field, FieldState> fields) {
         boolean enabled = ((BooleanValue) fields.get(Field.ENABLED).value()).value();
+        if (newAdvancementType(identity.ruleType())) {
+            Map<String, Object> encoded = json("identity", identityJson(identity));
+            for (Field field : domainFields(identity)) if (fields.get(field).state() == StateKind.PRESENT)
+                encoded.put(field.key(), valueJson(fields.get(field).value()));
+            Definition definition = definition(encoded, new Location(null, null, null, "$final", "", null));
+            if (definition instanceof SubclassDefinition value) return new FinalSubclass(value, enabled);
+            if (definition instanceof FeatureDefinition value) return new FinalFeature(value, enabled);
+            if (definition instanceof FeatDefinition value) return new FinalFeat(value, enabled);
+            if (definition instanceof ProficiencyDefinition value) return new FinalProficiency(value, enabled);
+            if (definition instanceof RestDefinition value) return new FinalRest(value, enabled);
+            return new FinalProficiencySet((ProficiencySetDefinition) definition, enabled);
+        }
         if (identity.ruleType().equals("character.language")) {
             return new FinalLanguage(new LanguageDefinition(identity, textField(fields, Field.DISPLAY_NAME),
                     textField(fields, Field.DESCRIPTION), Category.valueOf(textField(fields, Field.CATEGORY)),
@@ -1329,6 +1821,22 @@ public final class Schema2CompositionKernel {
                 ((IntegerValue) fields.get(Field.SOURCE_PAGE).value()).value(),
                 identity.ruleType().equals("character.subrace") ? ((IdentityValue) fields.get(Field.PARENT_RACE).value()).value() : null,
                 noteField(fields)), enabled);
+        if (identity.ruleType().equals("character.class_progression")) return new FinalClassProgression(
+                new ClassProgressionDefinition(identity, textField(fields, Field.DISPLAY_NAME), textField(fields, Field.DESCRIPTION),
+                        ((IntegerValue) fields.get(Field.SOURCE_PAGE).value()).value(),
+                        ((IdentityValue) fields.get(Field.OWNER_CLASS).value()).value(),
+                        ((IntegerValue) fields.get(Field.HIT_DIE_SIDES).value()).value(),
+                        textField(fields, Field.PROFICIENCY_BONUS_PROFILE),
+                        ((IntegerValue) fields.get(Field.SUPPORTED_MAXIMUM_LEVEL).value()).value(),
+                        ProgressionScope.valueOf(textField(fields, Field.ADVANCEMENT_SCOPE)),
+                        fields.get(Field.MULTICLASS_PREREQUISITE).state() == StateKind.ABSENT ? null
+                                : ((PrerequisiteValue) fields.get(Field.MULTICLASS_PREREQUISITE).value()).value(), noteField(fields)), enabled);
+        if (identity.ruleType().equals("character.resource")) return new FinalResource(
+                new ResourceDefinition(identity, textField(fields, Field.DISPLAY_NAME), textField(fields, Field.DESCRIPTION),
+                        ((IntegerValue) fields.get(Field.SOURCE_PAGE).value()).value(),
+                        ((IdentityValue) fields.get(Field.OWNER_CLASS).value()).value(), textField(fields, Field.MAXIMUM_PROFILE),
+                        textField(fields, Field.RECOVERY_PROFILE), ResourceExecution.valueOf(textField(fields, Field.EXECUTION_MODE)),
+                        noteField(fields)), enabled);
         int minimum = ((IntegerValue) fields.get(Field.MINIMUM_ENABLED_MEMBERS).value()).value();
         return identity.ruleType().equals("catalog.language_set")
                 ? new FinalLanguageSet(new LanguageSetDefinition(identity, textField(fields, Field.DISPLAY_NAME), minimum, noteField(fields)), enabled)
@@ -1336,8 +1844,12 @@ public final class Schema2CompositionKernel {
     }
     private static Entry finalEntry(EntryIdentity identity, Map<Field, FieldState> fields) {
         Field reference = referenceField(identity);
+        if (reference == Field.LEVEL) return new ClassLevelEntry(identity, ((IntegerValue) fields.get(Field.LEVEL).value()).value(),
+                ((BooleanValue) fields.get(Field.ASI_AVAILABLE).value()).value(), noteField(fields));
+        if (reference == Field.GROWTH_GRANT) return new GrowthProficiencyGrantEntry(identity, ((GrowthGrantValue) fields.get(Field.GROWTH_GRANT).value()).value(), noteField(fields));
         if (reference == Field.GRANT) return new ProficiencyGrantEntry(identity, ((GrantValue) fields.get(Field.GRANT).value()).value(), noteField(fields));
         RuleIdentity target = ((IdentityValue) fields.get(reference).value()).value();
+        if (reference == Field.PROFICIENCY) return new ProficiencyMemberEntry(identity, target, noteField(fields));
         return reference == Field.LANGUAGE ? new LanguageEntry(identity, target, noteField(fields)) : new ToolEntry(identity, target, noteField(fields));
     }
 
@@ -1382,6 +1894,42 @@ public final class Schema2CompositionKernel {
             result.put("description", source.description());
             result.put("source_page", source.sourcePage());
             if (source.parentRace() != null) result.put("parent_race", identityJson(source.parentRace()));
+        } else if (value instanceof ClassProgressionDefinition progression) {
+            result.put("description", progression.description());
+            result.put("source_page", progression.sourcePage());
+            result.put("owner_class", identityJson(progression.ownerClass()));
+            result.put("hit_die_sides", progression.hitDieSides());
+            result.put("proficiency_bonus_profile", progression.proficiencyBonusProfile());
+            result.put("supported_maximum_level", progression.supportedMaximumLevel());
+            result.put("advancement_scope", progression.advancementScope().name());
+            if (progression.multiclassPrerequisite() != null) result.put("multiclass_prerequisite", prerequisiteJson(progression.multiclassPrerequisite()));
+        } else if (value instanceof ResourceDefinition resource) {
+            result.put("description", resource.description());
+            result.put("source_page", resource.sourcePage());
+            result.put("owner_class", identityJson(resource.ownerClass()));
+            result.put("maximum_profile", resource.maximumProfile());
+            result.put("recovery_profile", resource.recoveryProfile());
+            result.put("execution_mode", resource.executionMode().name());
+        } else if (value instanceof SubclassDefinition subclass) {
+            result.put("description", subclass.description()); result.put("source_page", subclass.sourcePage());
+            result.put("owner_class", identityJson(subclass.ownerClass())); result.put("selection_level", subclass.selectionLevel());
+        } else if (value instanceof FeatureDefinition feature) {
+            result.put("description", feature.description()); result.put("source_page", feature.sourcePage());
+            result.put("owner", identityJson(feature.owner())); result.put("level", feature.level());
+            result.put("feature_kind", feature.kind().name()); result.put("execution_mode", feature.executionMode().name());
+            result.put("execution_algorithm", feature.executionAlgorithm());
+        } else if (value instanceof FeatDefinition feat) {
+            result.put("description", feat.description()); result.put("source_page", feat.sourcePage());
+            result.put("prerequisite", prerequisiteJson(feat.prerequisite())); result.put("execution_mode", feat.executionMode().name());
+            result.put("execution_algorithm", feat.executionAlgorithm());
+        } else if (value instanceof ProficiencyDefinition proficiency) {
+            result.put("description", proficiency.description()); result.put("source_page", proficiency.sourcePage());
+            result.put("category", proficiency.category().name());
+            if (proficiency.abilityKey() != null) result.put("ability_key", proficiency.abilityKey());
+        } else if (value instanceof ProficiencySetDefinition set) {
+            result.put("category", set.category().name()); result.put("minimum_enabled_members", set.minimumEnabledMembers());
+        } else if (value instanceof RestDefinition rest) {
+            result.put("description", rest.description()); result.put("source_page", rest.sourcePage()); result.put("algorithm", rest.algorithm());
         } else result.put("minimum_enabled_members", value instanceof LanguageSetDefinition set
                 ? set.minimumEnabledMembers() : ((ToolSetDefinition) value).minimumEnabledMembers());
         if (value.authorNote() != null) result.put("author_note", value.authorNote());
@@ -1390,6 +1938,9 @@ public final class Schema2CompositionKernel {
     private static Map<String, Object> entryJson(Entry value) {
         Map<String, Object> result = json("identity", identityJson(value.identity()));
         if (value instanceof ProficiencyGrantEntry grant) result.put("grant", grantJson(grant.grant()));
+        else if (value instanceof ClassLevelEntry level) { result.put("level", level.level()); result.put("asi_available", level.asiAvailable()); }
+        else if (value instanceof ProficiencyMemberEntry member) result.put("proficiency", identityJson(member.proficiency()));
+        else if (value instanceof GrowthProficiencyGrantEntry grant) result.put("growth_grant", growthGrantJson(grant.grant()));
         else result.put(value instanceof LanguageEntry ? "language" : "tool", identityJson(value.target()));
         if (value.authorNote() != null) result.put("author_note", value.authorNote());
         return result;
@@ -1398,6 +1949,18 @@ public final class Schema2CompositionKernel {
         if (value instanceof FixedGrant fixed) return json("category", fixed.category().name(), "kind", "FIXED", "target", identityJson(fixed.target()));
         ChoiceGrant choice = (ChoiceGrant) value;
         return json("category", choice.category().name(), "kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
+    }
+    private static Map<String, Object> prerequisiteJson(AbilityPrerequisite value) {
+        return json("all_of", value.allOf().stream().map(group -> json("any_of", group.anyOf().stream()
+                .map(term -> json("ability", term.abilityKey(), "minimum", term.minimum())).toList())).toList());
+    }
+    private static Map<String, Object> growthGrantJson(GrowthGrantSpec value) {
+        if (value instanceof FixedGrowthGrant fixed) return json("kind", "FIXED", "target", identityJson(fixed.target()));
+        ChoiceGrowthGrant choice = (ChoiceGrowthGrant) value;
+        return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
+    }
+    private static boolean newAdvancementType(String type) {
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),
@@ -1421,6 +1984,8 @@ public final class Schema2CompositionKernel {
         if (value instanceof IntegerValue integer) return integer.value();
         if (value instanceof IdentityValue identity) return identityJson(identity.value());
         if (value instanceof GrantValue grant) return grantJson(grant.value());
+        if (value instanceof PrerequisiteValue predicate) return prerequisiteJson(predicate.value());
+        if (value instanceof GrowthGrantValue grant) return growthGrantJson(grant.value());
         return ((BooleanValue) value).value();
     }
     private static Map<String, Object> stateJson(FieldState state) {

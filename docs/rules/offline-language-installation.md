@@ -82,7 +82,7 @@ provider 失败关闭，使用 Linux/WSL 受控本地介质。构建输出父目
 | state_directory | 固定、绝对、owner-only 的共享状态目录 |
 
 `schema-audit.txt` 必须记录：批准规则链完整定义比较；当前批准链中全部准确 InnoDB 表及全部列、
-索引、CHECK、触发器和其 DEFINER；V001—V004 的完整对象范围见
+索引、CHECK、触发器和其 DEFINER；V001—V005 的完整对象范围见
 [schema 2 来源账本](schema-2-source-ledger.md)，新增对象也必须纳入审计，不能继续只检查旧七表；
 源内 RESTRICT FK 与**所有 schema 的入向引用**；
 无额外表/视图/函数/例程/触发器副作用或运行库访问；所有授予和继承能力与

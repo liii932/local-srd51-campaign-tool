@@ -16,7 +16,8 @@ public final class RuleSchemaMigrations {
             "003916bc758315351e46f177fec10eb70f2b1275a524d270c6eb89a602cd130e"),
             new Expectation(SCHEMA_ROLE, 2, "V002__tool-catalog.sql", "2a5a8a67ebef60754ff9ca572d651878558ccc56ed2bfd311ce811ef42082c40"),
             new Expectation(SCHEMA_ROLE, 3, "V003__schema2-source-ledger.sql", "4166a7f4b4d8670a8300c4129ce566e177b824dda24c58ee3d208f9880048cdf"),
-            new Expectation(SCHEMA_ROLE, 4, "V004__schema2-character-grant-source.sql", "9578db2143bfb14eb077e403d5395bb3089a7ab6e54f6926f42b7dbcac4e9269"));
+            new Expectation(SCHEMA_ROLE, 4, "V004__schema2-character-grant-source.sql", "9578db2143bfb14eb077e403d5395bb3089a7ab6e54f6926f42b7dbcac4e9269"),
+            new Expectation(SCHEMA_ROLE, 5, "V005__schema2-advancement-source.sql", "2dfdecf8cb30fcc71f7e011550ce3b32334340aab5ff546f4e71e53e13147e5c"));
 
     private RuleSchemaMigrations() {
     }

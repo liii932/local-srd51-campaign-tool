@@ -1,4 +1,4 @@
--- Read-only supplement to rule-source-schema.sql for the V003 ledger and V004 typed author material.
+-- Read-only supplement to rule-source-schema.sql for the schema 2 ledger and typed author material.
 -- Execute with maintenance visibility; do not infer absent trigger/privilege rows from a narrow reader.
 SELECT control_id, protocol_version, metadata_row_count, installation_count, acceptance_count,
     raw_zip_byte_count, row_version FROM rule_schema2_control ORDER BY control_id LIMIT 2;
@@ -10,7 +10,20 @@ SELECT (SELECT COUNT(*) FROM rule_schema2_artifact) AS installed_count,
 SELECT CONVERT(a.module_key USING latin1) AS module_key, CONVERT(a.release_version USING latin1) AS release_version,
     (SELECT COUNT(*) FROM rule_schema2_character_source s WHERE s.artifact_module_key = a.module_key AND s.release_version = a.release_version) AS character_source_count,
     (SELECT COUNT(*) FROM rule_schema2_proficiency_grant g WHERE g.artifact_module_key = a.module_key AND g.release_version = a.release_version) AS proficiency_grant_count,
-    (SELECT COUNT(*) FROM rule_schema2_character_change c WHERE c.artifact_module_key = a.module_key AND c.release_version = a.release_version) AS character_change_count
+    (SELECT COUNT(*) FROM rule_schema2_character_change c WHERE c.artifact_module_key = a.module_key AND c.release_version = a.release_version) AS character_change_count,
+    (SELECT COUNT(*) FROM rule_schema2_class_progression p WHERE p.artifact_module_key = a.module_key AND p.release_version = a.release_version) AS class_progression_count,
+    (SELECT COUNT(*) FROM rule_schema2_resource r WHERE r.artifact_module_key = a.module_key AND r.release_version = a.release_version) AS resource_count,
+    (SELECT COUNT(*) FROM rule_schema2_advancement_change c WHERE c.artifact_module_key = a.module_key AND c.release_version = a.release_version) AS advancement_change_count,
+    (SELECT COUNT(*) FROM rule_schema2_subclass m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS subclass_count,
+    (SELECT COUNT(*) FROM rule_schema2_feature m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS feature_count,
+    (SELECT COUNT(*) FROM rule_schema2_feat m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS feat_count,
+    (SELECT COUNT(*) FROM rule_schema2_proficiency m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS proficiency_count,
+    (SELECT COUNT(*) FROM rule_schema2_proficiency_set m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS proficiency_set_count,
+    (SELECT COUNT(*) FROM rule_schema2_class_level m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS class_level_count,
+    (SELECT COUNT(*) FROM rule_schema2_proficiency_member m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS proficiency_member_count,
+    (SELECT COUNT(*) FROM rule_schema2_growth_grant m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS growth_grant_count,
+    (SELECT COUNT(*) FROM rule_schema2_ability_requirement m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS ability_requirement_count,
+    (SELECT COUNT(*) FROM rule_schema2_rest m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS rest_count
 FROM rule_schema2_artifact a ORDER BY a.installation_sequence LIMIT 17;
 SELECT CONVERT(module_key USING latin1) AS module_key, CONVERT(release_version USING latin1) AS release_version,
     installation_sequence, HEX(source_operation_id) AS source_operation_id,

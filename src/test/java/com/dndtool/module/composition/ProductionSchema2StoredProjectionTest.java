@@ -2,10 +2,66 @@ package com.dndtool.module.composition;
 
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProductionSchema2StoredProjectionTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"MULTICLASS_PREREQUISITE", "FEATURE_MODE", "PROFICIENCY_CATEGORY"})
+    void restoredOriginalDefinitionCannotBeMadeLegalByALaterFieldChange(String mutation) {
+        var material = Schema2ProgressionFixtures.fullProjection();
+        Field field = switch (mutation) {
+            case "FEATURE_MODE" -> Field.EXECUTION_MODE;
+            case "PROFICIENCY_CATEGORY" -> Field.CATEGORY;
+            default -> Field.MULTICLASS_PREREQUISITE;
+        };
+        RuleIdentity target = switch (mutation) {
+            case "FEATURE_MODE" -> new RuleIdentity(Schema2ProgressionFixtures.BASE, "character.feature", "feature.training");
+            case "PROFICIENCY_CATEGORY" -> Schema2ProgressionFixtures.ATHLETICS;
+            default -> Schema2ProgressionFixtures.PROGRESSION;
+        };
+        var chains = new ArrayList<>(material.projection().chains());
+        int index = 0; while (!chains.get(index).target().equals(target) || chains.get(index).field() != field) index++;
+        var chain = chains.get(index); assertEquals(1, chain.steps().size()); var initial = chain.steps().getFirst();
+        boolean omitted = field == Field.MULTICLASS_PREREQUISITE;
+        var invalidInitial = omitted ? new FieldState(StateKind.ABSENT, null)
+                : new FieldState(StateKind.PRESENT, new TextValue(field == Field.CATEGORY ? "ARMOR" : "BLOCKED"));
+        var source = initial.authorLocation();
+        var originalSource = omitted ? new Location(source.moduleKey(), source.releaseVersion(), source.rawZipSha256(),
+                source.path(), source.pointer().substring(0, source.pointer().lastIndexOf('/')), null) : source;
+        var extension = material.members().get(1);
+        chains.set(index, new FieldChain(target, field, List.of(
+                new ChainStep("initial", initial.before(), invalidInitial, initial.provider(), 0, originalSource,
+                        omitted ? "omitted_optional" : "declared"),
+                new ChainStep("set_field", invalidInitial, initial.after(), new Provider(extension.moduleKey(), extension.releaseVersion()), 1,
+                        new Location(extension.moduleKey(), extension.releaseVersion(), extension.rawZipSha256(), "changes.json", "/2", null), "explicit"))));
+        assertEquals("S2_STORED_INVALID", assertThrows(Schema2Exception.class, () -> restore(material,
+                material.projection().rules(), chains)).diagnostic().code());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MULTICLASS_PREREQUISITE", "ABILITY_KEY"})
+    void onlyAuthorNoteMayBeClearedAfterAnOmittedOptionalDeclaration(String fieldName) {
+        Field field = Field.valueOf(fieldName);
+        var material = field == Field.MULTICLASS_PREREQUISITE
+                ? Schema2ProgressionFixtures.projection() : Schema2ProgressionFixtures.fullProjection();
+        RuleIdentity target = field == Field.MULTICLASS_PREREQUISITE
+                ? Schema2ProgressionFixtures.PROGRESSION : Schema2ProgressionFixtures.LIGHT_ARMOR;
+        var chains = new ArrayList<>(material.projection().chains());
+        int index = 0; while (!chains.get(index).target().equals(target) || chains.get(index).field() != field) index++;
+        var chain = chains.get(index); var initial = chain.steps().getFirst();
+        assertEquals(StateKind.ABSENT, initial.after().state());
+        var extension = material.members().get(1); var steps = new ArrayList<>(chain.steps());
+        steps.add(new ChainStep("clear_field", initial.after(), initial.after(),
+                new Provider(extension.moduleKey(), extension.releaseVersion()), 1,
+                new Location(extension.moduleKey(), extension.releaseVersion(), extension.rawZipSha256(), "changes.json", "/2", null), "explicit"));
+        chains.set(index, new FieldChain(target, field, steps));
+        assertEquals("S2_STORED_INVALID", assertThrows(Schema2Exception.class, () -> restore(material,
+                material.projection().rules(), chains)).diagnostic().code());
+    }
+
     @Test void restoresFullTypedRowsToIndependentGoldenBytesWithoutOriginalArtifacts() {
         var expected = ProductionSchema2Projection.compose(ProductionRuleArtifactTest.fixedArtifacts());
         var restored = restore(expected, expected.projection().rules(), expected.projection().chains());
