@@ -150,7 +150,7 @@ public final class Schema2RuntimeJdbcFixture {
             }
             return result;
         }
-        if (query.contains(" FROM rule_schema2_character_source ") || query.contains(" FROM rule_schema2_proficiency_grant ") || query.contains(" FROM rule_schema2_character_change ")) {
+        if (query.contains(" FROM rule_schema2_")) {
             String table = query.substring(query.indexOf(" FROM ") + 6, query.indexOf(" ORDER BY"));
             return rows(table);
         }

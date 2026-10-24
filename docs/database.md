@@ -40,11 +40,17 @@ V022 不推测旧 DRAFT 的授予来源；若已经有一级创建快照，预�
 [授予权限](../database/grants/character-proficiency-grants.sql)与规则快照权限分别审核和应用。
 
 独立 `RULES` 链位于 `database/rules/migration/`，目标为 `dnd_tool_rules.rule_schema_meta`，
-本链包括 V001—V004，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
-V003 增加 schema 2 的不可变原始制品、独立接受与控制账本；schema 1 和 schema 2 共用原安装锁，
-各自核对所属历史与计数。V004 增加角色授予作者来源、槽和修改的类型化投影，与准确原包逐字段核对；
-它不删除既有制品或接受事实，也不放宽安装资格门。结构、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)
-和[schema 2 来源账本](rules/schema-2-source-ledger.md)。新增 SQL 与权限文件不表示已经在数据库执行。
+本链包括 V001—V005，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
+既有 V001—V004 保持不可变，V005 前向增加成长、资源、休息和类型化条目/前提/修改材料；当前来源 schema
+合计二十六表、七十八触发器。schema 1 和 schema 2 共用原安装锁，各自核对所属历史与计数。
+schema 2 原始制品、独立接受和控制账本绑定十六张类型化作者材料表。成长定义、稳定等级条目、
+起始/多职业来源槽、子职业、特性、专长、有界熟练集合与休息声明保留原始作者序号和完整引用。
+能力前提按组/备选序号保存；存在标记区分省略和空前提。有限 profile、最高支持等级、采用范围与
+执行模式均与全部原 ZIP 逐列核对，包含未选中包和全部子原子。
+installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只读；现有事实不能事后补写。
+来源存储不放宽完整基础包与非空 add-on 的安装资格门，也不授予完整职业升级或发布资格。
+结构、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)和
+[schema 2 来源账本](rules/schema-2-source-ledger.md)。新增 SQL 与权限文件不表示已经在数据库执行。
 该本地交付不改变当前单 schema 生产调用链，不建立第二个 JNDI 或执行任何外部迁移/授权。
 
 ## 自动化数据库拓扑与账号职责

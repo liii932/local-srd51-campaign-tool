@@ -87,7 +87,7 @@ public class Schema2SourceReadFixture {
         rows.put("ledger", new ArrayList<>(RuleSchemaMigrations.expectations().stream().map(expected -> row("schema_version", expected.version(), "script_name", bytes(expected.scriptName()), "script_sha256", bytes(expected.scriptSha256()))).toList()));
         rows.put("artifact", new ArrayList<>());
         rows.put("acceptance", new ArrayList<>());
-        for (String table : List.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change")) rows.put(table, new ArrayList<>());
+        for (String table : List.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest")) rows.put(table, new ArrayList<>());
         long total = 0;
         for (int index = 0; index < artifacts.size(); index++) {
             var artifact = artifacts.get(index);
@@ -129,6 +129,11 @@ public class Schema2SourceReadFixture {
                 JsonObject target = value.getAsJsonObject(kind.equals("changes") ? "target" : "identity");
                 boolean entry = target.get("kind").getAsString().equals("entry");
                 JsonObject owner = entry ? target.getAsJsonObject("rule") : target;
+                String ruleType = owner.get("rule_type").getAsString();
+                if (Set.of("character.class_progression", "character.resource", "character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest").contains(ruleType)) {
+                    seedAdvancementMaterial(artifact, kind, index, value, owner, ruleType);
+                    continue;
+                }
                 if (!Set.of("character.race", "character.subrace", "character.background", "character.class").contains(owner.get("rule_type").getAsString())) continue;
                 Map<String, Object> row = row("artifact_module_key", bytes(artifact.moduleKey()), "release_version", bytes(artifact.releaseVersion()), "author_index", index);
                 String table;
@@ -169,6 +174,93 @@ public class Schema2SourceReadFixture {
                 rows.get(table).add(row);
             }
         }
+    }
+    private void seedAdvancementMaterial(ProductionRuleArtifact artifact, String kind, int index,
+            JsonObject value, JsonObject owner, String ruleType) {
+        Map<String, Object> row = row("artifact_module_key", bytes(artifact.moduleKey()), "release_version", bytes(artifact.releaseVersion()), "author_index", index);
+        String table;
+        if (kind.equals("definitions")) {
+            table = "rule_schema2_" + (ruleType.equals("character.class_progression") ? "class_progression" : ruleType.substring(ruleType.indexOf('.') + 1));
+            identity(row, owner, "module_key", "rule_type", "rule_key");
+            for (String field : List.of("display_name", "author_note")) row.put(field, optionalText(value, field));
+            if (!ruleType.equals("catalog.proficiency_set")) {
+                row.put("description", value.get("description").getAsString()); row.put("source_page", value.get("source_page").getAsInt());
+            }
+            if (value.has("owner_class")) identity(row, value.getAsJsonObject("owner_class"), "owner_class_module_key", "owner_class_rule_type", "owner_class_rule_key");
+            if (value.has("owner")) identity(row, value.getAsJsonObject("owner"), "owner_module_key", "owner_rule_type", "owner_rule_key");
+            for (String field : List.of("hit_die_sides", "supported_maximum_level", "selection_level", "level", "minimum_enabled_members"))
+                if (value.has(field)) row.put(field, value.get(field).getAsInt());
+            for (String field : List.of("proficiency_bonus_profile", "maximum_profile", "recovery_profile"))
+                if (value.has(field)) row.put(field, value.get(field).getAsString());
+            for (String field : List.of("advancement_scope", "execution_mode", "execution_algorithm", "feature_kind", "category", "algorithm"))
+                if (value.has(field)) row.put(field, bytes(value.get(field).getAsString()));
+            if (ruleType.equals("character.proficiency")) row.put("ability_key", value.has("ability_key") ? bytes(value.get("ability_key").getAsString()) : null);
+            if (ruleType.equals("character.class_progression")) {
+                row.put("multiclass_prerequisite_present", value.has("multiclass_prerequisite") ? 1 : 0);
+                seedRequirements(artifact, index, kind, value.getAsJsonObject("multiclass_prerequisite"));
+            }
+            if (ruleType.equals("character.feat")) seedRequirements(artifact, index, kind, value.getAsJsonObject("prerequisite"));
+        } else {
+            JsonObject target = value.getAsJsonObject(kind.equals("changes") ? "target" : "identity");
+            boolean entry = target.get("kind").getAsString().equals("entry");
+            identity(row, owner, "rule_module_key", "rule_type", "rule_key");
+            row.put("collection_key", entry ? bytes(target.get("collection_key").getAsString()) : null);
+            row.put("module_key", entry ? bytes(target.get("module_key").getAsString()) : null);
+            row.put("entry_key", entry ? bytes(target.get("entry_key").getAsString()) : null);
+            if (kind.equals("entries")) {
+                String collection = target.get("collection_key").getAsString();
+                if (collection.equals("levels")) {
+                    table = "rule_schema2_class_level"; row.put("level", value.get("level").getAsInt());
+                    row.put("asi_available", value.get("asi_available").getAsBoolean() ? 1 : 0);
+                } else if (collection.equals("members")) {
+                    table = "rule_schema2_proficiency_member";
+                    identity(row, value.getAsJsonObject("proficiency"), "proficiency_module_key", "proficiency_rule_type", "proficiency_rule_key");
+                } else {
+                    table = "rule_schema2_growth_grant"; growthGrant(row, value.getAsJsonObject("growth_grant"));
+                }
+                row.put("author_note", optionalText(value, "author_note"));
+            } else {
+                table = "rule_schema2_advancement_change"; row.put("target_kind", bytes(entry ? "entry" : "rule"));
+                String operation = value.get("op").getAsString();
+                String field = operation.equals("set_enabled") ? "enabled" : value.get("field").getAsString();
+                row.put("operation", bytes(operation)); row.put("field_key", bytes(field));
+                for (String column : List.of("text_value", "integer_value", "boolean_value", "reference_module_key", "reference_rule_type", "reference_rule_key", "prerequisite_value")) row.put(column, null);
+                growthGrant(row, null);
+                if (!operation.equals("clear_field")) {
+                    var atom = value.get("value");
+                    if (Set.of("owner_class", "owner", "proficiency").contains(field)) identity(row, atom.getAsJsonObject(), "reference_module_key", "reference_rule_type", "reference_rule_key");
+                    else if (field.equals("growth_grant")) growthGrant(row, atom.getAsJsonObject());
+                    else if (Set.of("multiclass_prerequisite", "prerequisite").contains(field)) {
+                        row.put("prerequisite_value", 1); seedRequirements(artifact, index, kind, atom.getAsJsonObject());
+                    } else if (Set.of("enabled", "asi_available").contains(field)) row.put("boolean_value", atom.getAsBoolean() ? 1 : 0);
+                    else if (Set.of("source_page", "hit_die_sides", "supported_maximum_level", "selection_level", "level", "minimum_enabled_members").contains(field)) row.put("integer_value", atom.getAsInt());
+                    else row.put("text_value", atom.getAsString());
+                }
+            }
+        }
+        rows.get(table).add(row);
+    }
+    private void seedRequirements(ProductionRuleArtifact artifact, int index, String kind, JsonObject prerequisite) {
+        if (prerequisite == null) return;
+        var groups = prerequisite.getAsJsonArray("all_of");
+        for (int group = 0; group < groups.size(); group++) {
+            var alternatives = groups.get(group).getAsJsonObject().getAsJsonArray("any_of");
+            for (int alternative = 0; alternative < alternatives.size(); alternative++) {
+                var minimum = alternatives.get(alternative).getAsJsonObject();
+                rows.get("rule_schema2_ability_requirement").add(row("artifact_module_key", bytes(artifact.moduleKey()),
+                        "release_version", bytes(artifact.releaseVersion()), "author_index", index, "author_kind", bytes(kind),
+                        "group_index", group, "alternative_index", alternative, "ability_key", bytes(minimum.get("ability").getAsString()),
+                        "minimum_value", minimum.get("minimum").getAsInt()));
+            }
+        }
+    }
+    private static void growthGrant(Map<String, Object> row, JsonObject grant) {
+        for (String column : List.of("growth_grant_kind", "growth_grant_target_module_key", "growth_grant_target_rule_type", "growth_grant_target_rule_key", "growth_grant_count")) row.put(column, null);
+        if (grant == null) return;
+        String kind = grant.get("kind").getAsString();
+        row.put("growth_grant_kind", bytes(kind));
+        identity(row, grant.getAsJsonObject(kind.equals("FIXED") ? "target" : "candidates"), "growth_grant_target_module_key", "growth_grant_target_rule_type", "growth_grant_target_rule_key");
+        if (kind.equals("CHOICE")) row.put("growth_grant_count", grant.get("count").getAsInt());
     }
     private static void identity(Map<String, Object> row, JsonObject identity, String module, String type, String key) {
         row.put(module, bytes(identity.get("module_key").getAsString())); row.put(type, bytes(identity.get("rule_type").getAsString())); row.put(key, bytes(identity.get("rule_key").getAsString()));
@@ -218,8 +310,8 @@ public class Schema2SourceReadFixture {
             case "setMaxRows" -> {
                 maximum[0] = (int) args[0];
                 assertEquals(table.equals("ledger") ? RuleSchemaMigrations.expectations().size() + 1 : table.equals("artifact") || table.equals("acceptance") ? 17
-                        : table.equals("rule_schema2_character_source") ? 4097 : table.equals("rule_schema2_proficiency_grant") ? 8193
-                        : table.equals("rule_schema2_character_change") ? 65537 : 2, maximum[0]);
+                        : Set.of("rule_schema2_character_source", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_rest").contains(table) ? 4097 : Set.of("rule_schema2_proficiency_grant", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant").contains(table) ? 8193
+                        : Set.of("rule_schema2_character_change", "rule_schema2_advancement_change").contains(table) ? 65537 : table.equals("rule_schema2_ability_requirement") ? 30721 : 2, maximum[0]);
                 yield null;
             }
             case "setBytes" -> { parameters.put((int) args[0], ((byte[]) args[1]).clone()); yield null; }
@@ -274,7 +366,7 @@ public class Schema2SourceReadFixture {
     void assertResourcesClosed() { resources.forEach(resource -> assertTrue(resource.closed)); }
 
     private static String table(String sql) {
-        for (String table : List.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change"))
+        for (String table : List.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest"))
             if (sql.contains(" FROM " + table + " ORDER BY artifact_module_key, release_version, author_index")) return table;
         return switch (sql.replaceAll("\\s+", " ").trim()) {
             case "SELECT CAST(DATABASE() AS BINARY) AS schema_name" -> "schema";

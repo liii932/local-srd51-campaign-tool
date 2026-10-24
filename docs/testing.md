@@ -258,7 +258,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V026 完整运行清单及来源 V001—V004。
+并核对 V001—V026 完整运行清单及来源 V001—V005。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -347,6 +347,21 @@ Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业
 随机规则使用可注入且可审计的随机源测试边界和候选选择，但生产结果仍由服务端安全随机源
 生成。时间、回合和触发测试必须固定明确时钟或顺序，不能依赖测试执行速度。任何规则领域
 只有在目录、服务、仓储、事务、Web 边界和存档测试共同完成后，才可标为已实现。
+
+## Schema 2 成长与休息作者、组合和来源验证
+
+[成长作者合同](rules/schema-2-character-statistics.md)和[休息声明](rules/schema-2-character-rest.md)的定向检查：
+
+```bash
+mvn '-Dtest=Schema2ProgressionCompositionTest,JdbcSchema2AdvancementSourceRepositoryTest,JdbcSchema2GrowthSourceRepositoryTest,Schema2AdvancementSourceSchemaTest,JdbcSourceSchema2RepositoryTest,JdbcSchema2CharacterSourceRepositoryTest,RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,Schema2SourceLedgerContractTest,JdbcSchema2RuleSourceTest,Schema2SourceInstallationTest' test
+```
+
+固定字段与完整覆盖链位于 `src/test/resources/schema2-progression/`；共享组合器变化还覆盖原语言、
+工具和授予向量。来源测试逐列核对原 ZIP 的定义、稳定条目、修改及前提子行，覆盖空/省略区别、
+未选中材料损坏、逐次写入失败和调用方回滚。它们不执行成长、资源或休息业务，也不替代真实 MySQL
+的 CHECK、触发器、权限和事务验收。构建应包含作者/来源类；来源 V005、测试 oracle 和向量留在 WAR 外。
+
+离线 helper 的默认只读入口核对运行 V001—V026 与来源 V001—V005 共 31 份批准载荷；不执行 SQL。
 
 ## 共同业务事务与初始化准备验证
 

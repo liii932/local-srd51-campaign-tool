@@ -116,7 +116,7 @@ final class Schema2SourceJdbcFixture {
                         && equal(r.get("release_version"), parameters.get(2))).toList();
             }
         } else if (sql.contains(" FROM rule_schema2_acceptance")) source = acceptances;
-        else if (sql.contains(" FROM rule_schema2_character_source ") || sql.contains(" FROM rule_schema2_proficiency_grant ") || sql.contains(" FROM rule_schema2_character_change ")) {
+        else if (sql.contains(" FROM rule_schema2_")) {
             String table = sql.substring(sql.indexOf(" FROM ") + 6, sql.indexOf(" ORDER BY"));
             source = characterTables.computeIfAbsent(table, ignored -> new ArrayList<>());
         }
@@ -147,7 +147,7 @@ final class Schema2SourceJdbcFixture {
             assertEquals(parameters.size(), parameter - 1);
             if (table.equals("rule_schema2_artifact")) { row.put("installed_at", LocalDateTime.of(2026, 1, 1, 0, 0).plusSeconds(artifacts.size())); artifacts.add(row); }
             else if (table.equals("rule_schema2_acceptance")) { row.put("accepted_at", LocalDateTime.of(2026, 2, 1, 0, 0).plusSeconds(acceptances.size())); acceptances.add(row); }
-            else if (table.equals("rule_schema2_character_source") || table.equals("rule_schema2_proficiency_grant") || table.equals("rule_schema2_character_change"))
+            else if (Set.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest").contains(table))
                 characterTables.computeIfAbsent(table, ignored -> new ArrayList<>()).add(row);
             else throw new AssertionError("Unexpected insert " + sql);
             return;

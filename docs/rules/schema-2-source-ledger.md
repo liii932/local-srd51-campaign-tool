@@ -5,17 +5,18 @@
 入口与票据见[安装与验收流程](schema-2-installation-and-acceptance.md)，生产 ZIP 和规范编码见
 [模组接口基线](../design/v2/module-interface-baseline.md)。纯验证向量不能取得安装或验收资格。
 
-这里保存可重新解析的完整制品，以及与原 ZIP 精确一致的类型化初始熟练作者材料，
+这里保存可重新解析的完整制品，以及与原 ZIP 精确一致的类型化初始熟练、职业成长、资源和休息作者材料，
 不把通用规则袋当作业务来源模型。语言、工具等既有
 schema 1 来源表不被 schema 2 安装改写。[来源到运行快照](schema-2-runtime-snapshot.md)从准确
-原包重建有限类型材料及完整字段链；其他领域来源物理表、完整运行目录、战役创建和 archive 2
-开放仍属于后续采用边界。完整基础包未过全域完整性门时
-`S2_BASE_INCOMPLETE`；没有现行业务算法支持的机制不能靠安装或人工验收取得运行资格。
+原包重建有限类型材料及完整字段链；尚未采用的其他领域来源、完整运行目录、战役创建和 archive 2
+开放仍属于后续采用边界。来源账本只确认原始事实与接受证据；成长和休息作者材料尚未接入运行镜像或业务执行。
+完整基础包未过全域完整性门时 `S2_BASE_INCOMPLETE`；没有现行业务算法支持的机制不能靠安装或人工验收取得运行资格。
 
 ## 表与身份
 
 `database/rules/migration/V003__schema2-source-ledger.sql` 建立独立 RULES 账本，
-V004 追加初始熟练作者材料，不修改 V001—V003。六个 schema 2 表均为 InnoDB，
+既有 V001—V004 保持不可变，V005 前向增加成长、资源和休息作者材料。
+十九个 schema 2 表均为 InnoDB，
 技术身份、版本、枚举和摘要使用 VARBINARY，
 因此大小写及尾字符按字节比较。没有跨 schema FK 或运行表写入。
 
@@ -27,16 +28,39 @@ V004 追加初始熟练作者材料，不修改 V001—V003。六个 schema 2 �
 | `rule_schema2_character_source` | 原始 race/subrace/background/class 声明：原包、版本、definitions 作者序号、稳定规则身份、完整元数据、parent race 引用及可空作者备注 |
 | `rule_schema2_proficiency_grant` | 原始稳定授予槽声明：原包、版本、entries 作者序号、来源规则和槽身份、完整 LANGUAGE/TOOL × FIXED/CHOICE 原子、可空作者备注 |
 | `rule_schema2_character_change` | 原始来源/槽操作：原包、版本、changes 作者序号、准确目标、操作/字段与单个类型化值；保存清空、启停、文本、页码、parent race 和完整 grant 原子 |
+| `rule_schema2_class_progression` | 原始 `character.class_progression` 声明：原包、版本、definitions 作者序号、完整规则身份、元数据、完整 owner class 引用、生命骰面数、熟练加值 profile、最高支持等级、准确 `STATISTICS_AND_RESOURCES_ONLY`/`CHARACTER_ADVANCEMENT` 范围、多职业前提存在标记及可空作者备注 |
+| `rule_schema2_resource` | 原始 `character.resource` 声明：同一作者身份与元数据、完整 owner class 引用、资源上限及恢复 profile、准确 `AUTOMATIC`/`BLOCKED` 执行模式及可空作者备注 |
+| `rule_schema2_advancement_change` | 原始成长、资源和休息操作：原包、版本、changes 作者序号、完整规则或条目目标、操作/字段；文本、整数、布尔、完整规则引用、growth grant 原子与前提存在标记分别保存，支持 author note 清空和启停 |
+| `rule_schema2_subclass` | 原始子职业元数据、完整 owner class 引用和选择等级 |
+| `rule_schema2_feature` | 原始特性/选项元数据、完整 class/subclass owner、等级、种类、执行模式和白名单算法 |
+| `rule_schema2_feat` | 原始专长元数据、前提子原子与明确 BLOCKED 执行模式/算法；声明不授予激活能力 |
+| `rule_schema2_proficiency` | 原始 SKILL/ARMOR/WEAPON 目录；技能保存冻结能力键，其他分类该列为空 |
+| `rule_schema2_proficiency_set` | 原始有界熟练候选集合、分类和最低启用成员数 |
+| `rule_schema2_class_level` | 稳定 `levels` 条目完整身份、等级和 ASI 可用事实，不根据整数等级补造缺失条目 |
+| `rule_schema2_proficiency_member` | 稳定成员条目及完整 proficiency/tool 引用 |
+| `rule_schema2_growth_grant` | 稳定 starting/multiclass 来源槽；保存 FIXED/CHOICE、完整 target/candidates 引用和有界选择数 |
+| `rule_schema2_ability_requirement` | definitions/changes 作者身份下的组序号、备选序号、冻结能力键和最低值；保留 AND 组与 OR 备选的准确原始结构 |
+| `rule_schema2_rest` | 原始 `adventure.rest` 声明、页码 87 和准确 `SRD_2014_REST_V1` 算法 |
 
-三类作者材料以 `(artifact_module_key, release_version, author_index)` 为主键，作者序号保留
+类型化作者材料按准确原包和作者序号标识；前提子原子另加 `author_kind/group_index/alternative_index`。作者序号保留
 同类文件按 ASCII 路径排序、各文件内按原始数组位置累积的零基位置；包括其他领域，
 不能采用规范身份排序后的序号，也不能按过滤后的新领域重新编号。清单的文件声明顺序
-不改变该序号，准确文件路径和数组位置仍由原 ZIP 保留。每包最多 256 来源、512 槽、4096
-操作；外键仅绑定同一原包身份。外部来源、目标与集合引用由组合器校验直接依赖和加载位置，
+不改变该序号，准确文件路径和数组位置仍由原 ZIP 保留。作者协议每包最多 64 个定义、128 个条目和
+256 个操作；外键仅绑定同一原包身份。owner class 使用完整 module/type/key，
+同名资源不能跨模组合并。外部来源、目标与集合引用由组合器校验直接依赖和加载位置，
 不强制被依赖包先写入来源物理表。
 
-V004 只增加新表与约束，不要求既有 artifact/acceptance 为空，也不猜测回填 ZIP 内容。
-空 add-on 与语言/工具旧包的新增投影为空，仍可读；含新领域声明或操作却缺少等价物理行时，
+职业进阶必须明确支持等级和采用范围；`CHARACTER_ADVANCEMENT` 必须提供多职业前提，稳定等级、
+起始与多职业来源槽、子职业和特性均通过完整身份接合。统计/资源范围可省略多职业前提；存在标记
+区分省略和明确空 `all_of`。前提最多六组、每组一至两个备选，六个冻结能力键全局不重复，
+最低值为 1—20；子表按两级原始数组位置保存，每包最多 1920 个前提子原子。
+资源、特性与专长保留准确执行模式和白名单算法，`BLOCKED` 不能靠存储或人工验收激活。
+profile 文本保存作者的准确有限协议值，恢复 profile 上限为 200 字符；作者校验和读回重解析
+继续拒绝未知、畸形或不受支持值。所有新域以类型化列和子行保存，不保存 JSON 或最终组合值。
+SQL CHECK 提供列形状、引用类型和基础范围约束，不能替代组合器的引用闭包与 profile 语义校验。
+
+前向材料迁移只增加新表与约束，不要求既有 artifact/acceptance 为空，也不猜测回填 ZIP 内容。
+不含相应领域的旧包投影为空，仍可读；含相应声明或操作却缺少等价物理行时，
 完整 reader 拒绝该账本。此规则不改变旧表、不允许补写不可变事实或授权迁移执行。
 
 持久协议准确为 author schema 2、artifact protocol 1、operation fingerprint version 1、
@@ -53,7 +77,8 @@ reader 的有限协议约束，不能用压缩体积替代展开预算。
 
 schema 1 安装、schema 2 安装和独立验收首先按 PK 锁原永久
 `rule_installation_control` 控制行 S。schema 2 随后锁 `rule_schema2_control`；
-新的 INSERT/control UPDATE 触发器也取得同一个 S，不使用可伪造 session 标志。
+制品/验收 INSERT 和 control UPDATE 触发器也取得同一个 S，不使用可伪造 session 标志。
+类型化材料 INSERT 触发器锁 schema 2 控制行，并核对当前安装序号对应的原包。
 原 S 的 `metadata_row_count/row_version` 保留 schema 1 元数据域语义，不把新表计入旧计数。
 schema 2 维护证据中的旧历史下界与锁住的 S 版本比较；这一步不声称重新审计旧内容闭包。
 
@@ -77,9 +102,9 @@ ZIP 字节计数等于全部安装的实际原始 ZIP 长度之和。安装与�
 `JdbcSourceSchema2Repository` 在独立只读事务中复用它并要求选定项具备准确接受事实。
 账本完整性不授予机制或运行资格；运行材料由独立快照协调器建立，不由此 reader 写入。
 
-共享 reader 同时有界读取全部三类新材料，与每个准确 ZIP 的原始类型化声明和操作逐列比较。
-比较包含未选中包、可空字段、完整引用和复合 grant；缺失、多余、错误包/版本/序号和任一值
-不一致均拒绝。不能用组合后的最终值代替作者声明或历史操作，也不能只比较制品头摘要。
+共享 reader 同时有界读取全部十六张作者材料表，与每个准确 ZIP 的原始类型化声明和操作逐列比较。
+比较包含未选中包、可空字段、完整引用、稳定等级/来源槽、前提两级顺序、有限 profile、支持范围、执行模式和两类复合 grant；
+缺失、多余、错误包/版本/序号和任一值不一致均拒绝。不能用组合后的最终值代替作者声明或历史操作，也不能只比较制品头摘要。
 新增存储能力不改变 `Schema2InstallationEligibility`：不完整 BASE 仍拒绝，非空 add-on
 仍未获安装资格。类型化夹具直接构造有限材料，不能据此声称安装领域已验收。
 
@@ -102,15 +127,15 @@ ZIP 字节计数等于全部安装的实际原始 ZIP 长度之和。安装与�
 
 ## 账号与独立引擎验收
 
-`rule-source-installer.sql` 增加新制品与三类作者材料的准确列级 INSERT 和安装计数列 UPDATE；没有新验收 INSERT。
+`rule-source-installer.sql` 对新制品与十六张作者材料表只有准确列级 INSERT，并获安装计数列 UPDATE；没有新验收 INSERT。
 `rule-source-accepter.sql` 是独立账号模板，只能 INSERT 新验收及更新验收计数；
 它对旧 S 仅获 `UPDATE(control_id)` 以支持锁读，执行路径不更新旧 S。
 二者都不能改写已有制品/作者材料/验收或写 schema 账本。accepter 对作者材料只有 SELECT，
-app/agent 对十三个准确表只有 SELECT。
+app/agent 对二十六个准确表只有 SELECT。
 迁移身份仍独立，没有新增账号创建、密码或 schema 通配能力。
 
 SQL 文件只表示可审阅迁移/权限源，不证明真实数据库执行。部署前分别授权并核对准确
-V001—V004 历史、十三个表、三十九个触发器、所有列/约束/索引、DEFINER、跨库入向 FK、
+V001—V005 历史、二十六个表、七十八个触发器、所有列/约束/索引、DEFINER、跨库入向 FK、
 继承角色和既有宽权限。只读核验结合 `rule-source-schema.sql` 与
 `rule-schema2-source-ledger.sql`；后者不输出 ZIP 正文。
 

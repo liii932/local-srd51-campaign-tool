@@ -3,8 +3,9 @@
 规则源链位于 `database/rules/migration/`，角色为 `RULES`，显式默认库为 `dnd_tool_rules`。
 它与运行链 `src/main/resources/db/migration/`、`dnd_tool_se.schema_meta` 分开编号和批准。
 规则链由 `V001__rule-source-schema.sql`、`V002__tool-catalog.sql`、
-`V003__schema2-source-ledger.sql` 与 `V004__schema2-character-grant-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个
-连续编号。运行 V001—V018、RELEASED v1、旧默认发布及现有 JNDI 合同保持不变。
+`V003__schema2-source-ledger.sql`、`V004__schema2-character-grant-source.sql` 与
+`V005__schema2-advancement-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个连续编号。
+运行 V001—V018、RELEASED v1、旧默认发布及现有 JNDI 合同保持不变。
 
 本合同提供离线 schema 源、批准元数据、窄权限模板和独立只读账本核验器。
 离线安装分别使用[角色目录流程](rules/offline-language-installation.md)与
@@ -34,8 +35,12 @@
 
 ## 表与列
 
-原有七表均为 InnoDB（包含独立账本）；V003 增加三个账本表，V004 增加三个初始熟练作者材料表，定义见
-[schema 2 账本](rules/schema-2-source-ledger.md)。下表和角色目录计数属于原有 schema 1 域。
+来源二十六表均为 InnoDB（包含独立账本）；schema 2 包括三个制品/接受/控制账本表，以及十六张类型化作者材料表，定义见
+[schema 2 账本](rules/schema-2-source-ledger.md)。职业进阶与资源保存完整 class 引用、有限 profile、
+最高支持等级、准确采用范围和执行模式；稳定等级、起始/多职业来源槽、子职业、特性、专长、
+有界熟练目录及休息声明分别保存。能力前提使用带组/备选序号的子行，显式存在标记区分省略和空前提。
+定义与操作保留原包作者序号，不能替换为最终组合值。
+下表和角色目录计数属于原有 schema 1 域。
 源本地 ID、安装代次与计数使用有符号 BIGINT；只有发布根 `id` 自增。
 FK 只指向源内同一发布，全部 UPDATE/DELETE RESTRICT，不级联，不引用运行 schema。
 技术键、版本、枚举和摘要使用 VARBINARY，保留全部字节的大小写与尾字符区别。
@@ -98,15 +103,15 @@ PARTITION 事实的 observed 摘要恒 NULL，COMPLETE 恒非 NULL。当前事�
 ## 账号与验收
 
 管理员分别审核 `database/grants/rule-source-{app,agent,installer,accepter,migrator}.sql`；文件不创建
-账号或设置密码。app/agent 只对十三个准确源表 SELECT，没有 schema 通配或写权限；普通只读
+账号或设置密码。app/agent 只对二十六个准确源表 SELECT，没有 schema 通配或写权限；普通只读
 核验不能借此声明取得源提交查证屏障。installer 只获明确列级根 INSERT/UPDATE、语言/工具内容
 写权、事实/分区 INSERT、S 两计数列 UPDATE，不能写账本、状态/发布时间、根身份、永久事实
 或 S 身份。独立 migrator 仅源 schema 所需 CREATE/CREATE TEMPORARY TABLES/ALTER/INDEX/REFERENCES/TRIGGER/DML，
 没有全局权限、账号管理或 GRANT OPTION；不把其能力传给 Web/installer/accepter。
 schema 2 安装与独立验收使用不同写权限；accepter 不能插入制品，installer 不能插入验收。
-两者在 S 上的锁读能力及新增精确列级权限见 schema 2 账本合同。V004 作者来源、授予槽及
-完整操作的 INSERT 只授予 installer；accepter/app/agent 只读。来源/槽/操作与准确原包
-同事务写入并逐列读回校验，不通过独立权限补写旧事实。
+两者在 S 上的锁读能力及准确列级权限见 schema 2 账本合同。十六张作者材料表的准确列级 INSERT
+只授予 installer；accepter/app/agent 只有 SELECT。作者定义、完整引用与类型化操作和准确原包
+同事务写入，完整 reader 与全部原 ZIP 逐列核对，包含未选中包；不通过独立权限补写旧事实。
 
 库级 GRANT 中的下划线在 `partial_revokes=OFF` 时是通配符，反引号本身不能消除该语义。
 migrator 模板使用 `dnd\_tool\_rules`；管理员先读取 `@@GLOBAL.partial_revokes`，若为 ON，
@@ -122,11 +127,12 @@ migrator 模板使用 `dnd\_tool\_rules`；管理员先读取 `@@GLOBAL.partial_
 创建空 schema 并预检；原样执行本链获批 SQL；核对对象和空源后记最后账本；独立只读核验；
 另行账号授权验收。迁移前必须确认默认库精确为 `dnd_tool_rules`、无既有对象且前序历史一致，
 不能以默认库未知或可改名目标试跑。DDL 可能隐式提交，中途失败立即维护阻断，不 IF NOT EXISTS
-跳过、不盲重跑、不补造账本。V001 自检初始六表/十八触发器及空源种子；V002 验证准确前序
-账本，再增加工具表、三个触发器和分区键约束。V003 验证准确 V001/V002 历史，增加三个
-永久表与九个触发器；V004 验证准确三版前序历史后，仅新增三个类型化作者材料表及九个触发器，
-保留已有制品与接受事实，不要求旧账本为空；现行合计十三表、三十九触发器。
-新领域原包缺少对应类型化行时完整 reader 拒绝，不猜测自动回填。
+跳过、不盲重跑、不补造账本。迁移前逐版核对准确前序账本、严格 SQL mode 与新增对象不存在，
+执行后核对当前完整对象集；现行合计二十六表、七十八触发器。既有 V001—V004 历史保持原样；
+V005 仅前向增加成长、资源、休息及其条目/前提/修改十三表和三十九个触发器。
+材料迁移保留已有制品与接受事实，不要求旧账本为空；新领域原包缺少对应类型化行时完整 reader
+拒绝，不猜测自动回填。插入触发器只允许当前安装事务写入该原包材料，UPDATE/DELETE 一律拒绝。
+有限类型存储不放宽安装资格门，不表示完整职业升级、完整规则或发布资格。
 账本不能替代完整定义核验或使多条 DDL 获得整体回滚。
 
 `database/verify/rule-source-schema.sql` 只有 SELECT/SHOW，输出默认库、账本、种子、列、索引、

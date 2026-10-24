@@ -33,7 +33,9 @@ LABEL = "com.dndtool.language-jdbc-acceptance"
 SOURCE_TABLES = sorted(("rule_schema_meta", "rule_release", "rule_language", "rule_tool",
                        "rule_package_installation", "rule_package_installation_partition",
                        "rule_installation_control", "rule_schema2_artifact", "rule_schema2_acceptance",
-                       "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change"))
+                       "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change",
+                       "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change",
+                       "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest"))
 SCHEMA2_RUNTIME_TABLES = sorted(("s2_runtime_identity", "s2_runtime_snapshot", "s2_runtime_member",
                                 "s2_runtime_language", "s2_runtime_language_set", "s2_runtime_language_entry",
                                 "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation",
@@ -93,7 +95,7 @@ def manifests():
     pattern = r'new Expectation\(\s*SCHEMA_ROLE, ([0-9]+), "([a-zA-Z0-9_.-]+[.]sql)",\s*"([0-9a-f]{64})"\)'
     rules = re.findall(pattern, block[1])
     require(re.sub(pattern, "", block[1]).replace(",", "").strip() == "", "Unexpected rules manifest entry")
-    require(len(rules) == 4, "This acceptance profile requires review when the RULES chain changes")
+    require(len(rules) == 5, "This acceptance profile requires review when the RULES chain changes")
     for expected, (version, name, digest) in enumerate(rules, 1):
         require(int(version) == expected and name.startswith(f"V{expected:03d}__"), "Unordered rules manifest")
         result.append((SOURCE, expected, name, digest, ROOT / "database/rules/migration" / name))
@@ -426,12 +428,12 @@ class Acceptance:
             "SELECT (SELECT COUNT(*) FROM rule_release),(SELECT COUNT(*) FROM rule_language),(SELECT COUNT(*) FROM rule_tool),"
             "(SELECT COUNT(*) FROM rule_package_installation),(SELECT COUNT(*) FROM rule_package_installation_partition);", user="dnd_tool_rules_app", schema=SOURCE)
         require(captures["fresh-history"] == "1\t1\t1\t0\n0\t0\t0\t0\t0\n", "Source is not freshly migrated")
+        schema2_source_content_tables = [table for table in SOURCE_TABLES if table.startswith("rule_schema2_") and table != "rule_schema2_control"]
         captures["schema2-fresh-history"] = self.mysql(
             "SELECT control_id,protocol_version,metadata_row_count,installation_count,acceptance_count,raw_zip_byte_count,row_version FROM rule_schema2_control;"
-            "SELECT (SELECT COUNT(*) FROM rule_schema2_artifact),(SELECT COUNT(*) FROM rule_schema2_acceptance),"
-            "(SELECT COUNT(*) FROM rule_schema2_character_source),(SELECT COUNT(*) FROM rule_schema2_proficiency_grant),(SELECT COUNT(*) FROM rule_schema2_character_change);",
+            "SELECT " + ",".join(f"(SELECT COUNT(*) FROM {table})" for table in schema2_source_content_tables) + ";",
             user="dnd_tool_rules_app", schema=SOURCE)
-        require(captures["schema2-fresh-history"] == "1\t1\t1\t0\t0\t0\t0\n0\t0\t0\t0\t0\n",
+        require(captures["schema2-fresh-history"] == "1\t1\t1\t0\t0\t0\t0\n" + "\t".join("0" for _ in schema2_source_content_tables) + "\n",
                 "Schema 2 source is not freshly migrated")
         require(self.mysql("SELECT (SELECT COUNT(*) FROM runtime_run_identity),(SELECT COUNT(*) FROM runtime_rule_snapshot),"
                            "(SELECT COUNT(*) FROM runtime_rule_language),(SELECT COUNT(*) FROM runtime_rule_tool);", user="dnd_tool_se_validation_ro", schema=RUNTIME) == "0\t0\t0\t0\n", "Runtime not empty")

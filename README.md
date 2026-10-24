@@ -38,7 +38,8 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
   schema 2 转存；初始计划可与快照及结果同事务保存和读回复核，完整初始化材料缺失时仍拒绝；
 - DRAFT 的[成长区间](./docs/rules/level-advancement-v2.md)与[资源恢复区间](./docs/rules/class-features-v2.md)
   使用共用不可变规则模型，逐级核验 1—20 级熟练加值，资源恢复按权威魅力值求值；
-  角色领域的作者源、两侧存储链路及完整休息事务仍待接入；
+  schema 2 的[成长与资源作者模型](./docs/rules/schema-2-character-statistics.md)及[休息声明](./docs/rules/schema-2-character-rest.md)
+  已接严格读取、纯组合和类型化来源读回；新类型的运行镜像、角色状态与业务事务尚未接合；
 - 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
 - 执行普通、优势和劣势 d20 检定，并保存候选骰、修正、DC、结果和内部事件；
 - 通过封闭的类型化效果调整字段、授予物品、记录消息或更新合法实体位置；
