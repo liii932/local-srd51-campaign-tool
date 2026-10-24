@@ -348,36 +348,21 @@ Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业
 生成。时间、回合和触发测试必须固定明确时钟或顺序，不能依赖测试执行速度。任何规则领域
 只有在目录、服务、仓储、事务、Web 边界和存档测试共同完成后，才可标为已实现。
 
-## Schema 2 成长与休息作者、组合和来源验证
+## Schema 2 角色成长、资源与休息验证
 
-[成长作者合同](rules/schema-2-character-statistics.md)和[休息声明](rules/schema-2-character-rest.md)的定向检查：
-
-```bash
-mvn '-Dtest=Schema2ProgressionCompositionTest,JdbcSchema2AdvancementSourceRepositoryTest,JdbcSchema2GrowthSourceRepositoryTest,Schema2AdvancementSourceSchemaTest,JdbcSourceSchema2RepositoryTest,JdbcSchema2CharacterSourceRepositoryTest,RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,Schema2SourceLedgerContractTest,JdbcSchema2RuleSourceTest,Schema2SourceInstallationTest' test
-```
-
-固定字段与完整覆盖链位于 `src/test/resources/schema2-progression/`；共享组合器变化还覆盖原语言、
-工具和授予向量。来源测试逐列核对原 ZIP 的定义、稳定条目、修改及前提子行，覆盖空/省略区别、
-未选中材料损坏、逐次写入失败和调用方回滚。它们不执行成长、资源或休息业务，也不替代真实 MySQL
-的 CHECK、触发器、权限和事务验收。构建应包含作者/来源类；来源 V005、测试 oracle 和向量留在 WAR 外。
-
-离线 helper 的默认只读入口核对运行 V001—V027 与来源 V001—V005 共 32 份批准载荷；不执行 SQL。
-
-## Schema 2 运行镜像与类型化状态历史验证
-
-[运行快照](rules/schema-2-runtime-snapshot.md)、[角色状态](rules/schema-2-character-statistics.md)及
-[休息事实](rules/schema-2-character-rest.md)的仓储定向检查：
+[内部成长合同](rules/schema-2-character-statistics.md)和[标准休息](rules/schema-2-character-rest.md)的数据库无关定向命令：
 
 ```bash
-mvn '-Dtest=JdbcSchema2ProgressionSnapshotTest,JdbcSchema2CharacterRuntimeRepositoryTest,JdbcSchema2CompleteGrowthStateTest,JdbcSchema2RestStateTest,Schema2CharacterRuntimeSchemaTest,SchemaMigrationsTest' test
+mvn '-Dtest=Schema2ProgressionCompositionTest,Schema2CharacterProgressionRulesTest,Schema2GrowthRulesTest,Schema2CharacterRuntimeServiceTest,Schema2CharacterAdvancementAndRestServiceTest,JdbcSchema2AdvancementSourceRepositoryTest,JdbcSchema2GrowthSourceRepositoryTest,Schema2AdvancementSourceSchemaTest,JdbcSchema2ProgressionSnapshotTest,JdbcSchema2CharacterRuntimeRepositoryTest,JdbcSchema2CompleteGrowthStateTest,JdbcSchema2RestStateTest,Schema2CharacterRuntimeSchemaTest' test
 ```
 
-这些测试覆盖完整类型化镜像/覆盖链重建、命令输入、before/after、来源、顺序、数量、版本、容量、
-错误身份、结构恢复以及写入失败后的调用方回滚。它们不调用尚未接入的成长/休息业务服务，不证明
-完整游戏语义或真实 MySQL 的约束、权限、锁和耐久性。仓储恢复不执行命令或消费随机数。
-
-运行清单为 V001—V027，RULES 清单为 V001—V005。helper 默认只读核对 32 份批准载荷，
-审计清单包含 45 张 schema 2 运行表；未显式授权时不启动隔离实例或执行 SQL。
+独立固定规则字段及完整覆盖链在 `src/test/resources/schema2-progression/`。共享组合器或
+来源读取变化还覆盖原语言/工具/授予向量、stored projection 和来源账本测试。迁移清单
+变化沿用下节 schema 与诊断测试。服务测试使用实际来源、计划、快照和状态仓储的 JDBC
+代理，覆盖失效前拒绝、随机性顺序、幂等、写入失败回滚、源库断开和直接恢复，不替代真实
+MySQL 外键、触发器、权限或部署证据。成长/休息集成测试还覆盖子职业、ASI、专长、多职业、
+逐次生命骰、活动中断、长休收益间隔及完整历史恢复；不声称通用效果或多角色生命周期已完成。
+WAR 必须包含成长/休息服务、规则、类型化仓储及运行 V027；来源 V005、测试 oracle 和向量排除。
 
 ## 共同业务事务与初始化准备验证
 

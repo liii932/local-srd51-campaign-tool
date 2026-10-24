@@ -18,11 +18,11 @@ Local 5E Campaign Tool 是面向单一 DM 的本机战役工具。内置规则�
 [架构](architecture.md)、[数据库](database.md)和[完整规则覆盖目标](rules/srd-5.1-complete.md)。
 schema 2 的[初始授予计划](rules/schema-2-proficiency-grants.md)可从固定快照验证真实角色来源、
 语言／工具选择及抑制事实；它仍是内部接入，不开放角色创建或完整战役初始化。
-
-schema 2 的[成长与资源作者模型](rules/schema-2-character-statistics.md)和[休息声明](rules/schema-2-character-rest.md)
-可表达稳定等级、子职业、特性、专长、有界熟练与属性前提，进行纯组合并保存准确原包来源事实。
-类型化运行快照、角色状态和完整命令/成长/休息历史已有持久化与结构读回；业务成长、资源和休息
-服务尚未接入。这些存储能力不开放业务执行、Host 或完整战役初始化。
+[角色成长与资源切片](rules/schema-2-character-statistics.md)可在准确准备身份上保存真实状态，
+执行有界职业成长、子职业／ASI／专长和多职业选择、资源消费，以及[标准休息](rules/schema-2-character-rest.md)，
+并保留完整局部历史和直接恢复材料。内部起点使用标准数组；种族能力修正、所有特性效果、
+完整战役及 Host 创建／执行入口仍未开放。当前内部运行限定单角色，时间推进的持续效果
+集合必须由封闭历史证明为空，不构成完整持续效果或多角色战役系统。
 
 ## v2 产品目标
 

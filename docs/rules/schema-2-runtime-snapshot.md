@@ -7,8 +7,8 @@
 材料范围明确为 `INTERNAL`：当前类型为语言、工具、两类候选集合及其成员，以及种族、亚种、背景、
 职业的初始熟练来源元数据和稳定授予槽，以及类型化成长、子职业、特性、专长、熟练、资源和休息声明。来源读取、组合、运行存储和
 规则绑定可以独立验证；转存服务本身不创建战役、角色、业务历史或游戏执行视图。
-[角色状态仓储](schema-2-character-statistics.md)及[休息事实](schema-2-character-rest.md)另行保存类型化状态和历史，
-目前只提供结构校验与准确读回，业务成长/休息服务和新增事务 owner 尚未接入。来源安装器仍拒绝所有
+另行消费这些材料的[内部成长服务](schema-2-character-statistics.md)和[休息服务](schema-2-character-rest.md)保存其局部角色状态和历史，
+不扩大完整初始化资格。来源安装器仍拒绝所有
 不完整基础包及未接入真实消费者的内容。测试中的完整账本夹具直接构造这些有限材料，不经过
 安装资格门，也不证明存在可安装、可运行的完整基础模组。
 
@@ -56,7 +56,7 @@ PARTITION 头分离，不把旧固定单模组字段改成通用组合，也不�
 | `s2_runtime_proficiency` / `s2_runtime_proficiency_set` / `s2_runtime_proficiency_entry` | 类型化技能/护甲/武器定义，技能属性，以及包含完整目标身份的有限候选集合 |
 | `s2_runtime_class_level_entry` / `s2_runtime_growth_grant` | 每级稳定条目、ASI 可用性，以及初始/多职业熟练的稳定槽和原子 FIXED/CHOICE 声明 |
 | `s2_runtime_rule_prerequisite` / `s2_runtime_chain_prerequisite` | AND 组/OR 项的类型化能力下限；分别保存最终规则及完整链步骤的原子值，不存 JSON 规则袋 |
-| `s2_runtime_rest` | 显式标准休息算法和原文来源；该表不授予休息执行能力 |
+| `s2_runtime_rest` | 显式标准休息算法和原文来源；没有声明不获得休息执行能力 |
 | `s2_runtime_field_chain` / `s2_runtime_chain_step` | 完整目标/字段、初始与显式覆盖步骤、前后类型化值、提供者、加载位置和作者位置 |
 | `s2_runtime_operation` | 不可改写的操作 UUID、CAPTURE/RESTORE、意图指纹、身份对、连续序号及数据库时间 |
 | `s2_runtime_control` | 永久单例守卫、协议、材料计数与版本 |
