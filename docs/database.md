@@ -35,12 +35,11 @@ V025 建立所有业务写入共用的不可替换单行守卫；V026 追加绑�
 campaign 和 character 的初始准备头、槽、选择及授予事实。准备事实与规则快照、控制和收据
 同事务保存，但不授予游戏执行资格。见[共同业务事务](rules/business-write-transactions.md)、
 [守卫权限](../database/grants/business-write-guard.sql)和[初始计划权限](../database/grants/schema2-initial-plans.sql)。
-V027 增加成长、选择、熟练和休息规则镜像，以及仅追加的角色根、命令、前后状态和各类历史子行。
-[成长与资源持久化](rules/schema-2-character-statistics.md)及[休息事实](rules/schema-2-character-rest.md)
-可通过类型化仓储写入和完整读回；仓储只检查结构、身份、集合及版本，不执行游戏命令。
-完整成长/休息语义和事务协调服务尚未接入；当前没有新增业务入口或事务 owner。
-[运行权限](../database/grants/schema2-character-runtime.sql)仅提供明确 SELECT/INSERT，
-[只读核验](../database/verify/schema2-character-runtime.sql)是独立步骤；SQL 与权限文件不表示已执行。
+V027 增加成长、选择、熟练和休息规则镜像，以及追加式角色根、完整命令和各类状态历史；
+它们属于[内部成长消费者](rules/schema-2-character-statistics.md)及[休息消费者](rules/schema-2-character-rest.md)。
+同 run 的唯一角色约束维持当前内部时钟所有权，不开放完整战役初始化或多角色生命周期。
+[有限运行权限](../database/grants/schema2-character-runtime.sql)仅给应用 SELECT/INSERT，
+[只读核验](../database/verify/schema2-character-runtime.sql)另行执行；没有隐含迁移或授权。
 V022 不推测旧 DRAFT 的授予来源；若已经有一级创建快照，预检拒绝迁移，须另行决定真实数据的处理方式。
 新增结构可用[只读核验 SQL](../database/verify/character-proficiency-grants.sql)盘点；
 [授予权限](../database/grants/character-proficiency-grants.sql)与规则快照权限分别审核和应用。

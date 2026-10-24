@@ -74,9 +74,10 @@ Draconic Bloodline、The Fiend 为 1；Circle of the Land、School of Evocation 
 
 恢复规则在判断自动资源是否已满、尚未获得或无限之前，验证整个恢复 profile，包括当前等级
 以后的区间；属性必须唯一、序号为 1 且声明 `TEXT`。失败使用 `MALFORMED_FROZEN_CATALOG`，
-不返回部分恢复效果。该模型接入内部 DRAFT 规则组件；schema 2 的[成长/资源作者材料](schema-2-character-statistics.md)
-和[休息声明](schema-2-character-rest.md)已有严格作者输入、纯组合及类型化来源读回，新类型的
-运行镜像及状态/历史仓储已接合，成长和休息业务服务尚未接入。旧组件、声明或持久化事实均不授予休息执行资格。
+不返回部分恢复效果。旧 DRAFT 组件本身不代表完整休息命令；schema 2 的有限作者、来源、
+运行镜像和真实资源命令见[内部成长合同](schema-2-character-statistics.md)，标准休息、逐次
+生命骰、时间和治疗见[内部休息合同](schema-2-character-rest.md)。旧组件不单独证明资源
+作者源、类型化来源表、运行镜像或完整战役休息资格已采用。
 
 DM 裁决只接受 `SUCCESS`、`FAILURE`、`NO_EFFECT`，并按冻结算法绑定到一个稳定裁决键。
 自动能力不能改走 DM 裁决，阻断能力不能被裁决伪装成可执行。权威写入必须先证明角色已经获得

@@ -34,6 +34,7 @@
 | `CampaignArchiveConfirmationService.confirm` | 完整 legacy 战役导入 |
 | `CampaignArchiveV2DraftImportService.importState` | 内部 DRAFT 角色状态导入 |
 | `Schema2SnapshotTransferService` | INTERNAL 快照及绑定初始计划的原子转存 |
+| `Schema2CharacterRuntimeService` | INTERNAL 角色成长、资源、单角色时间／标准休息及完整局部状态/历史直接恢复；不开放完整战役初始化或 Host 执行 |
 
 旧 PARTITION 快照仓储也要求受共同守卫约束的连接；离线验收调用方使用 `openPartition`，
 只能在没有活动旧战役和 schema 2 残留时写 PARTITION 材料，不获得业务执行资格。
