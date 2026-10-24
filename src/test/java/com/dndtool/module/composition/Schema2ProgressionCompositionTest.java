@@ -6,8 +6,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static com.dndtool.module.composition.Schema2GrantFixtures.edit;
@@ -200,6 +204,69 @@ class Schema2ProgressionCompositionTest {
             assertThrows(Schema2Exception.class, () -> new Schema2CompositionKernel().composeFiles(files), mutation);
         }
     }
+
+    @Test void fullGrowthDeclarationRequiresItsOwnPrerequisiteBeforeLaterPackagesAreRead() {
+        var files = fullPackages();
+        edit(files, 0, "rules.json", root -> find(root, "progression.guard").remove("multiclass_prerequisite"));
+        edit(files, 1, "changes.json", root -> root.getAsJsonArray().add(atomicChange(PROGRESSION,
+                "multiclass_prerequisite", com.google.gson.JsonParser.parseString("{\"all_of\":[]}"))));
+        assertAll(
+                () -> assertThrows(Schema2Exception.class, () -> new Schema2CompositionKernel().read(files.getFirst())),
+                () -> assertThrows(Schema2Exception.class, () -> new Schema2CompositionKernel().composeFiles(files)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "character.feature, feature.training, execution_algorithm, UNKNOWN_ALGORITHM, AUTOMATIC_RESOURCE_LIFECYCLE_V1",
+            "character.feat, feat.grappler, execution_algorithm, UNKNOWN_ALGORITHM, BLOCKED_DOWNSTREAM_SYSTEM_V1",
+            "character.feat, feat.grappler, execution_algorithm, BLOCKED_SPELL_SYSTEM_V1, BLOCKED_DOWNSTREAM_SYSTEM_V1",
+            "character.feat, feat.grappler, execution_mode, AUTOMATIC, BLOCKED",
+            "character.feat, feat.grappler, execution_mode, DM_ADJUDICATION, BLOCKED",
+            "character.proficiency, proficiency.skill.athletics, category, TOOL, SKILL"
+    })
+    void unsupportedTargetLocalAtomCannotBeHiddenByALaterOverride(String type, String key, String field,
+                                                                 String invalid, String replacement) {
+        var files = fullPackages(); var target = new RuleIdentity(BASE, type, key);
+        edit(files, 1, "changes.json", root -> root.getAsJsonArray()
+                .add(atomicChange(target, field, new com.google.gson.JsonPrimitive(invalid))));
+        files.add(repairPackage(files.get(1), atomicChange(target, field, new com.google.gson.JsonPrimitive(replacement))));
+        assertAll(
+                () -> assertThrows(Schema2Exception.class, () -> new Schema2CompositionKernel().read(files.get(1))),
+                () -> assertThrows(Schema2Exception.class, () -> new Schema2CompositionKernel().composeFiles(files)));
+    }
+
+    @Test void supportedModeAndAlgorithmMayChangeTogetherInOnePackage() {
+        var files = fullPackages(); var target = new RuleIdentity(BASE, "character.feature", "feature.training");
+        edit(files, 1, "changes.json", root -> {
+            root.getAsJsonArray().add(atomicChange(target, "execution_mode", new com.google.gson.JsonPrimitive("DM_ADJUDICATION")));
+            root.getAsJsonArray().add(atomicChange(target, "execution_algorithm", new com.google.gson.JsonPrimitive("BOUNDED_DM_ADJUDICATION_V1")));
+        });
+        var material = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+        var feature = (FinalFeature) material.projection().rules().stream().filter(row -> row.identity().equals(target)).findFirst().orElseThrow();
+        assertEquals(FeatureExecution.DM_ADJUDICATION, feature.definition().executionMode());
+        assertEquals("BOUNDED_DM_ADJUDICATION_V1", feature.definition().executionAlgorithm());
+        assertDoesNotThrow(() -> ProductionSchema2Projection.restore(material.members(), material.projection().rules(),
+                material.projection().entries(), material.projection().chains()));
+    }
+
+    private static JsonObject atomicChange(RuleIdentity target, String field, com.google.gson.JsonElement value) {
+        var row = new JsonObject(); row.addProperty("op", "set_field"); row.add("target", jsonIdentity(target));
+        row.addProperty("field", field); row.add("value", value); return row;
+    }
+
+    private static Map<String, byte[]> repairPackage(Map<String, byte[]> extension, JsonObject change) {
+        var header = Schema2GrantFixtures.json(extension.get(HEADER_PATH)).getAsJsonObject();
+        header.addProperty("module_key", "growth_repair"); header.addProperty("package_display_name", "Later valid override");
+        var dependency = new JsonObject(); dependency.addProperty("module_key", EXT);
+        dependency.add("supported_versions", com.google.gson.JsonParser.parseString("[\"1\"]"));
+        header.getAsJsonArray("dependencies").add(dependency);
+        header.getAsJsonArray("compatible_combinations").get(0).getAsJsonObject().addProperty(EXT, "1");
+        header.add("files", com.google.gson.JsonParser.parseString("[{\"kind\":\"changes\",\"path\":\"changes.json\"}]"));
+        var changes = new com.google.gson.JsonArray(); changes.add(change);
+        return new LinkedHashMap<>(Map.of(HEADER_PATH, header.toString().getBytes(StandardCharsets.UTF_8),
+                "changes.json", changes.toString().getBytes(StandardCharsets.UTF_8)));
+    }
+
     private static JsonObject find(com.google.gson.JsonElement root, String key) {
         for (var row : root.getAsJsonArray()) if (row.getAsJsonObject().getAsJsonObject("identity").get("rule_key").getAsString().equals(key)) return row.getAsJsonObject();
         throw new AssertionError("Missing " + key);
