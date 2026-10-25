@@ -1,0 +1,202 @@
+[
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "display_name",
+    "value": "Reviewed heavy armor"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "source_page",
+    "value": 64
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "kind",
+    "value": "HEAVY_ARMOR"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "armor_class",
+    "value": 18
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "strength_minimum",
+    "value": 15
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "stealth_disadvantage",
+    "value": false
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "hands",
+    "value": 0
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "proficiency",
+    "value": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor"
+    }
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "algorithm",
+    "value": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "stealth_skill"
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "field": "author_note"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.converted"
+    },
+    "field": "kind",
+    "value": "HEALING"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.converted"
+    },
+    "field": "dice_count",
+    "value": 0
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.converted"
+    },
+    "field": "dice_sides",
+    "value": 0
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.converted"
+    },
+    "field": "modifier",
+    "value": 7
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.converted"
+    },
+    "field": "algorithm",
+    "value": "DIRECT_VITAL_EFFECT_V1"
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.converted"
+    },
+    "field": "damage_type"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.health",
+      "rule_key": "health.srd2014"
+    },
+    "field": "display_name",
+    "value": "Reviewed standard health"
+  }
+]

@@ -23,7 +23,12 @@ SELECT CONVERT(a.module_key USING latin1) AS module_key, CONVERT(a.release_versi
     (SELECT COUNT(*) FROM rule_schema2_proficiency_member m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS proficiency_member_count,
     (SELECT COUNT(*) FROM rule_schema2_growth_grant m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS growth_grant_count,
     (SELECT COUNT(*) FROM rule_schema2_ability_requirement m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS ability_requirement_count,
-    (SELECT COUNT(*) FROM rule_schema2_rest m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS rest_count
+    (SELECT COUNT(*) FROM rule_schema2_rest m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS rest_count,
+    (SELECT COUNT(*) FROM rule_schema2_check m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS check_count,
+    (SELECT COUNT(*) FROM rule_schema2_equipment_item m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS equipment_item_count,
+    (SELECT COUNT(*) FROM rule_schema2_health m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS health_count,
+    (SELECT COUNT(*) FROM rule_schema2_vital_effect m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS vital_effect_count,
+    (SELECT COUNT(*) FROM rule_schema2_execution_change m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS execution_change_count
 FROM rule_schema2_artifact a ORDER BY a.installation_sequence LIMIT 17;
 SELECT CONVERT(module_key USING latin1) AS module_key, CONVERT(release_version USING latin1) AS release_version,
     installation_sequence, HEX(source_operation_id) AS source_operation_id,

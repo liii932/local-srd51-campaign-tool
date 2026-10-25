@@ -6,7 +6,7 @@ import java.sql.*;
 import java.util.*;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
-/** Original character-growth and rest declarations/operations, independently checked against original ZIPs.
+/** Original character-growth, check and rest declarations/operations, independently checked against original ZIPs.
  * This material store grants no installation or game eligibility. The caller owns the transaction. */
 public final class JdbcSchema2CharacterSourceRepository {
     private static final String PACKAGE = "artifact_module_key, release_version, author_index";
@@ -40,6 +40,7 @@ public final class JdbcSchema2CharacterSourceRepository {
         require(connection != null && !connection.getAutoCommit() && !connection.isReadOnly());
         var material = expected(Objects.requireNonNull(artifact));
         for (Row row : material) insert(connection, row);
+        JdbcSchema2ExecutionSourceRows.store(connection, artifact);
     }
 
     /** Reads all rows, including unselected/orphan materials, and compares every typed value to the ZIP. */
@@ -65,6 +66,7 @@ public final class JdbcSchema2CharacterSourceRepository {
         read(connection, "rule_schema2_growth_grant", GROWTH_GRANTS, MAX_SLOTS, actual);
         read(connection, "rule_schema2_ability_requirement", REQUIREMENTS, MAX_REQUIREMENTS, actual);
         read(connection, "rule_schema2_rest", RESTS, MAX_SOURCES, actual);
+        read(connection, "rule_schema2_check", RESTS, MAX_SOURCES, actual);
         actual.sort(ORDER);
         require(actual.size() == expected.size());
         for (int i = 0; i < expected.size(); i++) {
@@ -72,6 +74,7 @@ public final class JdbcSchema2CharacterSourceRepository {
             require(wanted.table.equals(found.table) && wanted.columns.equals(found.columns) && wanted.values.size() == found.values.size());
             for (int j = 0; j < wanted.values.size(); j++) require(equal(wanted.values.get(j), found.values.get(j)));
         }
+        JdbcSchema2ExecutionSourceRows.verifyAll(connection, artifacts);
     }
 
     private static List<Row> expected(ProductionRuleArtifact artifact) throws SQLException {
@@ -97,6 +100,9 @@ public final class JdbcSchema2CharacterSourceRepository {
                 Collections.addAll(values, value.description(), value.sourcePage()); rule(values, value.ownerClass());
                 Collections.addAll(values, value.maximumProfile(), value.recoveryProfile(), ascii(value.executionMode().name()), value.authorNote());
                 rows.add(new Row("rule_schema2_resource", RESOURCES, values));
+            } else if (definition instanceof CheckDefinition value) {
+                Collections.addAll(values, value.description(), value.sourcePage(), ascii(value.algorithm()), value.authorNote());
+                rows.add(new Row("rule_schema2_check", RESTS, values));
             } else if (definition instanceof RestDefinition value) {
                 Collections.addAll(values, value.description(), value.sourcePage(), ascii(value.algorithm()), value.authorNote());
                 rows.add(new Row("rule_schema2_rest", RESTS, values));
@@ -171,7 +177,7 @@ public final class JdbcSchema2CharacterSourceRepository {
         return rows;
     }
 
-    private static boolean advancementType(String type) { return Set.of("character.class_progression", "character.resource", "character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest").contains(type); }
+    private static boolean advancementType(String type) { return Set.of("character.class_progression", "character.resource", "character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check").contains(type); }
     private static boolean sourceType(String type) { return Set.of("character.race", "character.subrace", "character.background", "character.class").contains(type); }
     private static List<Object> prefix(ProductionRuleArtifact artifact, int index) { return new ArrayList<>(List.of(ascii(artifact.moduleKey()), ascii(artifact.releaseVersion()), index)); }
     private static void rule(List<Object> values, RuleIdentity key) { Collections.addAll(values, ascii(key.moduleKey()), ascii(key.ruleType()), ascii(key.ruleKey())); }

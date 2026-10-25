@@ -1,0 +1,15 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "checks_base",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "display_name": "Ability check",
+    "description": "Server-owned ability check mechanism.",
+    "source_page": 77,
+    "algorithm": "SRD_2014_ABILITY_CHECK_V1",
+    "author_note": "Original rule"
+  }
+]

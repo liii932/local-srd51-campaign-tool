@@ -20,6 +20,7 @@ canonical/archive 目标为 `2/2`，发布状态保持 DRAFT。它不是所有�
 | 模组公共接口与组合范围 | [模组接口基线](module-interface-baseline.md) | 身份、作者输入、覆盖、支持资格、生命周期及存档绑定的统一目标 |
 | schema 2 作者包到组合结果 | [最小组合链路验证](schema-2-composition-validation.md) | 有限严格读取与纯组合内核、完整作者输入、最终字段和覆盖链的独立向量；内部可测与完整基础模组接纳分别判断 |
 | schema 2 生产制品及离线接受 | [制品编码](../../rules/schema-2-rule-artifacts.md)、[安装与接受](../../rules/schema-2-installation-and-acceptance.md) | 有界原始 ZIP、独立生产摘要、不可变来源事实和显式审阅绑定；不代替完整基础、机制、运行与真实数据库采用门 |
+| schema 2 检定、装备与健康作者来源 | [作者来源合同](../../rules/schema-2-foundation-authoring.md) | 四类封闭定义、有符号整数、条件引用与清空、完整字段链及真实来源；运行 V027 尚未采用其镜像和业务历史 |
 | schema 2 来源到运行快照 | [内部转存与恢复绑定](../../rules/schema-2-runtime-snapshot.md) | 来源一致读取、类型化快照与完整覆盖链原子转存、实际回读、提交查证；有限内部链路，不开放游戏初始化 |
 | schema 2 初始语言／工具授予 | [初始授予合同](../../rules/schema-2-proficiency-grants.md) | 真实角色来源、稳定槽、完整原子授予、来源与快照读回、绑定计划；完整业务/历史初始化仍待接合 |
 | schema 2 成长、资源与标准休息 | [成长合同](../../rules/schema-2-character-statistics.md)、[休息合同](../../rules/schema-2-character-rest.md) | 类型化成长、选择、来源/运行表和真实状态历史；单角色 INTERNAL 的逐次生命骰、标准休息及时间；完整战役/Host、多角色时间与持续效果仍按各自门限采用 |
