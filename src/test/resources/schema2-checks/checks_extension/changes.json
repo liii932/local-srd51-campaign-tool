@@ -1,0 +1,55 @@
+[
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "checks_base",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "display_name",
+    "value": "Reviewed ability check"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "checks_base",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "source_page",
+    "value": 77
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "checks_base",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "algorithm",
+    "value": "SRD_2014_ABILITY_CHECK_V1"
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "checks_base",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "author_note"
+  },
+  {
+    "op": "set_enabled",
+    "target": {
+      "kind": "rule",
+      "module_key": "checks_base",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "value": true
+  }
+]

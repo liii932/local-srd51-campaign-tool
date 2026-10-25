@@ -35,7 +35,7 @@ SOURCE_TABLES = sorted(("rule_schema_meta", "rule_release", "rule_language", "ru
                        "rule_installation_control", "rule_schema2_artifact", "rule_schema2_acceptance",
                        "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change",
                        "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change",
-                       "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest"))
+                       "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_health", "rule_schema2_vital_effect"))
 SCHEMA2_RUNTIME_TABLES = sorted(("s2_runtime_identity", "s2_runtime_snapshot", "s2_runtime_member",
                                 "s2_runtime_language", "s2_runtime_language_set", "s2_runtime_language_entry",
                                 "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation",
@@ -98,7 +98,7 @@ def manifests():
     pattern = r'new Expectation\(\s*SCHEMA_ROLE, ([0-9]+), "([a-zA-Z0-9_.-]+[.]sql)",\s*"([0-9a-f]{64})"\)'
     rules = re.findall(pattern, block[1])
     require(re.sub(pattern, "", block[1]).replace(",", "").strip() == "", "Unexpected rules manifest entry")
-    require(len(rules) == 5, "This acceptance profile requires review when the RULES chain changes")
+    require(len(rules) == 7, "This acceptance profile requires review when the RULES chain changes")
     for expected, (version, name, digest) in enumerate(rules, 1):
         require(int(version) == expected and name.startswith(f"V{expected:03d}__"), "Unordered rules manifest")
         result.append((SOURCE, expected, name, digest, ROOT / "database/rules/migration" / name))

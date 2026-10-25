@@ -74,7 +74,7 @@ class RuleSourceSchemaContractTest {
             while (matcher.find()) tables.add(matcher.group(1));
             var currentTables = new java.util.HashSet<>(TABLES);
             currentTables.add("rule_tool");
-            currentTables.addAll(Set.of("rule_schema2_artifact", "rule_schema2_acceptance", "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest"));
+            currentTables.addAll(Set.of("rule_schema2_artifact", "rule_schema2_acceptance", "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_health", "rule_schema2_vital_effect"));
             assertEquals(currentTables, tables);
             assertEquals("", matcher.replaceAll("").trim());
         }
@@ -87,7 +87,7 @@ class RuleSourceSchemaContractTest {
             if (privilege.equals("SELECT")) reads++;
             else assertNull(writes.put(matcher.group(2), privilege));
         }
-        assertEquals(25, reads);
+        assertEquals(30, reads);
         Map<String, String> expectedWrites = new LinkedHashMap<>(Map.of(
                 "rule_release", "INSERT (module_key, release_version, canonical_format_version, archive_format_version, hash_algorithm), UPDATE (canonical_format_version, archive_format_version, hash_algorithm, content_sha256, installation_revision)",
                 "rule_language", "INSERT, DELETE, UPDATE (display_name, description, category, source_page, sort_order)",
@@ -113,6 +113,11 @@ class RuleSourceSchemaContractTest {
         expectedWrites.put("rule_schema2_growth_grant", "INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, growth_grant_kind, growth_grant_target_module_key, growth_grant_target_rule_type, growth_grant_target_rule_key, growth_grant_count, author_note)");
         expectedWrites.put("rule_schema2_ability_requirement", "INSERT (artifact_module_key, release_version, author_index, author_kind, group_index, alternative_index, ability_key, minimum_value)");
         expectedWrites.put("rule_schema2_rest", "INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note)");
+        expectedWrites.put("rule_schema2_check", "INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note)");
+        expectedWrites.put("rule_schema2_equipment_item", "INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, kind, armor_class, strength_minimum, stealth_disadvantage, hands, proficiency_module_key, proficiency_rule_type, proficiency_rule_key, stealth_skill_module_key, stealth_skill_rule_type, stealth_skill_rule_key, algorithm, author_note)");
+        expectedWrites.put("rule_schema2_health", "INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note)");
+        expectedWrites.put("rule_schema2_vital_effect", "INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, kind, dice_count, dice_sides, modifier, damage_type, algorithm, author_note)");
+        expectedWrites.put("rule_schema2_execution_change", "INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, operation, field_key, text_value, integer_value, boolean_value, reference_module_key, reference_rule_type, reference_rule_key)");
         assertEquals(expectedWrites, writes);
         assertEquals("", matcher.replaceAll("").trim());
     }

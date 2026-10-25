@@ -1,0 +1,292 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor"
+    },
+    "display_name": "proficiency.armor",
+    "description": "Fixed closed mechanism.",
+    "source_page": 70,
+    "category": "ARMOR"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon"
+    },
+    "display_name": "proficiency.weapon",
+    "description": "Fixed closed mechanism.",
+    "source_page": 70,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.stealth"
+    },
+    "display_name": "proficiency.stealth",
+    "description": "Fixed closed mechanism.",
+    "source_page": 70,
+    "category": "SKILL",
+    "ability_key": "ability.dexterity"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.strength"
+    },
+    "display_name": "proficiency.strength",
+    "description": "Fixed closed mechanism.",
+    "source_page": 70,
+    "category": "SKILL",
+    "ability_key": "ability.strength"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.kit"
+    },
+    "display_name": "tool.kit",
+    "description": "Fixed closed mechanism.",
+    "source_page": 70,
+    "category": "KIT"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.light_armor"
+    },
+    "display_name": "item.light_armor",
+    "description": "Fixed closed mechanism.",
+    "source_page": 63,
+    "kind": "LIGHT_ARMOR",
+    "armor_class": 11,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 0,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "author_note": "Original mechanics"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.medium_armor"
+    },
+    "display_name": "item.medium_armor",
+    "description": "Fixed closed mechanism.",
+    "source_page": 63,
+    "kind": "MEDIUM_ARMOR",
+    "armor_class": 14,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 0,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "author_note": "Original mechanics"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.heavy_armor"
+    },
+    "display_name": "item.heavy_armor",
+    "description": "Fixed closed mechanism.",
+    "source_page": 64,
+    "kind": "HEAVY_ARMOR",
+    "armor_class": 16,
+    "strength_minimum": 13,
+    "stealth_disadvantage": true,
+    "hands": 0,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "author_note": "Original mechanics",
+    "stealth_skill": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.stealth"
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.shield"
+    },
+    "display_name": "item.shield",
+    "description": "Fixed closed mechanism.",
+    "source_page": 64,
+    "kind": "SHIELD",
+    "armor_class": 2,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "author_note": "Original mechanics"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.weapon"
+    },
+    "display_name": "item.weapon",
+    "description": "Fixed closed mechanism.",
+    "source_page": 66,
+    "kind": "WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 2,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "author_note": "Original mechanics"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.tool"
+    },
+    "display_name": "item.tool",
+    "description": "Fixed closed mechanism.",
+    "source_page": 70,
+    "kind": "TOOL",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "character.tool",
+      "rule_key": "tool.kit"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "author_note": "Original mechanics"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.health",
+      "rule_key": "health.srd2014"
+    },
+    "display_name": "health.srd2014",
+    "description": "Fixed closed mechanism.",
+    "source_page": 98,
+    "algorithm": "SRD_2014_HEALTH_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.flame"
+    },
+    "display_name": "vital_effect.flame",
+    "description": "Fixed closed mechanism.",
+    "source_page": 98,
+    "kind": "DAMAGE",
+    "dice_count": 2,
+    "dice_sides": 6,
+    "modifier": -3,
+    "algorithm": "DIRECT_VITAL_EFFECT_V1",
+    "damage_type": "FIRE"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.converted"
+    },
+    "display_name": "vital_effect.converted",
+    "description": "Fixed closed mechanism.",
+    "source_page": 98,
+    "kind": "DAMAGE",
+    "dice_count": 1,
+    "dice_sides": 4,
+    "modifier": -2,
+    "algorithm": "DIRECT_VITAL_EFFECT_V1",
+    "damage_type": "COLD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.healing"
+    },
+    "display_name": "vital_effect.healing",
+    "description": "Fixed closed mechanism.",
+    "source_page": 98,
+    "kind": "HEALING",
+    "dice_count": 0,
+    "dice_sides": 0,
+    "modifier": 5,
+    "algorithm": "DIRECT_VITAL_EFFECT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "vitals_base",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.temporary"
+    },
+    "display_name": "vital_effect.temporary",
+    "description": "Fixed closed mechanism.",
+    "source_page": 98,
+    "kind": "TEMP_HP",
+    "dice_count": 1,
+    "dice_sides": 4,
+    "modifier": 1,
+    "algorithm": "DIRECT_VITAL_EFFECT_V1"
+  }
+]

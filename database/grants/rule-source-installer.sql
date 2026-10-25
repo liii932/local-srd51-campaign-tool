@@ -61,3 +61,13 @@ GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_ability_requirement` TO 'dnd_tool
 GRANT INSERT (artifact_module_key, release_version, author_index, author_kind, group_index, alternative_index, ability_key, minimum_value) ON `dnd_tool_rules`.`rule_schema2_ability_requirement` TO 'dnd_tool_rules_installer'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_rest` TO 'dnd_tool_rules_installer'@'127.0.0.1';
 GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_rest` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_check` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_check` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_equipment_item` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, kind, armor_class, strength_minimum, stealth_disadvantage, hands, proficiency_module_key, proficiency_rule_type, proficiency_rule_key, stealth_skill_module_key, stealth_skill_rule_type, stealth_skill_rule_key, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_equipment_item` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_execution_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, operation, field_key, text_value, integer_value, boolean_value, reference_module_key, reference_rule_type, reference_rule_key) ON `dnd_tool_rules`.`rule_schema2_execution_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_health` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_health` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_vital_effect` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, kind, dice_count, dice_sides, modifier, damage_type, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_vital_effect` TO 'dnd_tool_rules_installer'@'127.0.0.1';

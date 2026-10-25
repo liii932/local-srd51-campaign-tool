@@ -143,7 +143,8 @@ final class Schema2StrictJson {
     private Object number() {
         int start = position;
         boolean integer = true;
-        if (peek() == '-') { position++; integer = false; }
+        boolean negative = peek() == '-';
+        if (negative) position++;
         if (peek() == '0') position++;
         else {
             if (peek() < '1' || peek() > '9') throw syntax("Invalid JSON number");
@@ -162,7 +163,10 @@ final class Schema2StrictJson {
             if (!digit(peek())) throw syntax("Invalid JSON exponent");
             while (digit(peek())) position++;
         }
-        if (integer && position - start <= 10) {
+        // Keep lexical integers exact; each typed field still owns its allowed signed range.
+        // Negative zero has no distinct canonical integer representation and remains unsupported.
+        if (integer && position - start <= (negative ? 11 : 10)
+                && !(negative && position - start == 2 && text.charAt(start + 1) == '0')) {
             try { return Integer.valueOf(text.substring(start, position)); }
             catch (NumberFormatException ignored) { /* A valid JSON number, but not a schema integer. */ }
         }

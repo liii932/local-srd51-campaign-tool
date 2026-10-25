@@ -27,7 +27,7 @@ class Schema2CompositionParsingTest {
 
     @Test
     void integersUseExactTokensAndRangesAndBooleansNeverCoerce() {
-        for(String token:List.of("\"59\"","59.0","5.9e1","-59","2147483648","99999999999","null","true")) {
+        for(String token:List.of("\"59\"","59.0","5.9e1","-59","-0","-2147483648","-2147483649","2147483648","99999999999","null","true")) {
             var p=packages();String text=new String(p.getFirst().get("rules.json"),StandardCharsets.UTF_8);raw(p,0,"rules.json",text.replace("\"source_page\":59","\"source_page\":"+token));
             rejected(token.equals("null")?"S2_SHAPE":"S2_TYPE","AUTHOR",p);
         }

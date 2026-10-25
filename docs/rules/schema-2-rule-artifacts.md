@@ -9,6 +9,11 @@
 `base / extension / compatibility`，定义、条目、修改、直接依赖、联合版本、顺序约束、
 字段覆盖与最终候选检查均由同一个严格读取和组合内核完成。
 
+[成长与资源](schema-2-character-statistics.md)另定义其有限类型，
+[检定、装备与健康作者来源](schema-2-foundation-authoring.md)另定义 `adventure.check`、
+`equipment.item`、`adventure.health`、`adventure.vital_effect` 的字段、条件引用及严格清空。
+这四类新增类型仅接通作者、纯组合和真实来源；当前 V027 运行镜像及业务消费者尚未采用。
+
 “生产编码”指可用于真实制品保管和准确身份绑定的字节合同，不表示完整基础、机制支持、
 安装成功、DM 接受或运行资格。有限基础始终缺少完整跨领域证据；自洽原包、逻辑、配置、
 最终规则及覆盖链不能替代资格门。`requireProductionQualification` 对有限投影仍返回
@@ -36,7 +41,9 @@
 
 两种集合都仅有 `members` 集合。工具成员只接受 `tool` 字段并引用工具，语言成员只接受
 `language` 字段并引用语言；修改时也不能跨域使用这些字段或身份。两种引用字段均为完整
-身份的原子修改单元。清空仍仅允许 `author_note`；启停仍仅通过 `set_enabled`。
+身份的原子修改单元。上述语言、工具和授予类型清空仅允许 `author_note`；
+装备与健康效果的条件字段清空按[作者来源合同](schema-2-foundation-authoring.md#覆盖清空与来源链)限定；
+启停仅通过 `set_enabled`。
 
 角色来源仅表达初始授予领域，不能替代完整种族、背景或职业规则。授予的类别、固定目标或
 候选集合与数量整体写入 `grant`，覆盖不能只更换其子字段；`parent_race` 是亚种的完整引用
@@ -150,9 +157,10 @@ present。来源包含准确 provider、load_index、真实原包摘要、包内
 完整链字节及各自摘要；它复用内核依赖/顺序/字段算法。`projection()` 可供资格门检查类型化
 结果；其中既有内核 JSON/digest 仍为验证专用。生产读写方只使用外层生产访问器。
 
-类型出口保持封闭：`Definition` 包含语言、语言集合、工具、工具集合及角色授予来源
-`CharacterSourceDefinition`；`FinalRule.definition()` 返回相应类型化定义。`Entry` 只允许
-`LanguageEntry`、`ToolEntry` 和 `ProficiencyGrantEntry`，共用
+类型出口保持封闭：`Definition` 包含语言、语言集合、工具、工具集合、角色授予来源、
+成长/资源/熟练/休息，以及本合同链接的检定、装备和健康作者定义；
+`FinalRule.definition()` 返回相应类型化定义。语言/工具/初始授予的条目为
+`LanguageEntry`、`ToolEntry` 和 `ProficiencyGrantEntry`，成长条目另按成长合同限定；共用
 `identity()/authorNote()/target()`，分别保留 `language()`、`tool()` 和 `grant()`。
 授予条目的 `grant()` 为 `FixedGrant / ChoiceGrant` 完整原子，`target()` 返回固定目标或候选集合。
 `FinalEntry` 持有该封闭条目。存储还原入口 `restore` 从这些完整类型行与来源链重建规范字节，重新检查
