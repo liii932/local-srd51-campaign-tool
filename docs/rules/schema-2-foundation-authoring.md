@@ -5,8 +5,9 @@
 它扩展[生产制品合同](schema-2-rule-artifacts.md)和[来源账本](schema-2-source-ledger.md)，
 沿用既有准确身份、原始 ZIP、直接依赖、完整字段链和生产摘要域。
 
-这些类型已能解析、组合、从类型化来源读回，并校验原始作者事实。当前运行迁移仍为
-V001—V027；这四类定义尚无运行镜像、角色业务命令或状态历史消费者。
+这些类型已能解析、组合、从类型化来源读回，并校验原始作者事实。运行 V028—V031 的
+[准确镜像与角色事实存储](schema-2-character-fact-storage.md)已接通完整字段链、封闭记录格式及叶仓储恢复；
+真实检定、装备与健康业务消费者尚未采用。
 既有[成长与资源](schema-2-character-statistics.md)及[标准休息](schema-2-character-rest.md)
 能力保持。作者类型中的算法登记不开放检定、装备或健康业务，也不扩大安装、Host、完整战役
 或 archive format 2 资格。
@@ -121,15 +122,16 @@ V007 增加 `rule_schema2_equipment_item`、`rule_schema2_health`、
 缺失、多余、跨包、序号或值不一致均拒绝。负修正及严格清空也参与来源读回校验。
 
 RULES 的 V001—V007 合计 31 张表、93 个触发器，其中 21 张为 schema 2 类型化作者材料表；
-加运行 V001—V027，共 34 份迁移源。既有历史不可改写；迁移、授权与真实引擎验收各是独立检查点。
+加运行 V001—V031，共 38 份迁移源。既有历史不可改写；迁移、授权与真实引擎验收各是独立检查点。
 installer 仅获准确材料列 INSERT，accepter/app/agent 对这些材料只读，仓储不拥有提交或回滚权限。
 
 `Schema2CompositionKernel` 与 `ProductionSchema2Projection` 支持这些类型的纯组合、完整链及
 材料还原；`Schema2SourceLedger`、`JdbcSchema2CharacterSourceRepository` 和
 `JdbcSchema2ExecutionSourceRows` 承担真实来源等价核对。纯材料还原不等于运行快照或角色恢复。
-当前 V027 运行镜像仅覆盖已有领域，含这四类新定义的组合不能转存为可执行的 INTERNAL 材料；
-不能省略新定义后保存不完整快照。新增运行镜像、实际命令、装备实例、健康状态、骰子和历史恢复
-须按[采用边界](../design/v2/adoption-boundaries.md)另行接通。完整基础包及非空 add-on 的
+运行 V028/V030 以类型化表保存这四类规则及完整链，不能丢弃定义后保存不完整快照。
+V029/V031 的[角色事实仓储](schema-2-character-fact-storage.md)保存输入、结果、状态和原骰，
+提供结构校验、追加和直接恢复；这不建立实际新业务消费者。检定、装备、健康规则执行及
+对应 RuntimeService 命令仍须按[采用边界](../design/v2/adoption-boundaries.md)接通。完整基础包及非空 add-on 的
 封闭安装资格门保持，类型化夹具不证明内容包已经可安装或可运行。
 
 组合、来源及结构验证入口见[测试指南](../testing.md#schema-2-检定装备与健康作者来源验证)。

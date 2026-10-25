@@ -179,7 +179,7 @@ public final class Schema2CharacterRestRules {
     private static State copy(State before, long hp, List<HitDicePool> dice, List<ResourceState> resources, RestState clock) {
         return new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(), before.characterClass(),
                 before.abilities(), before.level(), before.proficiencyBonus(), hp, before.maximumHitPoints(), before.classes(), dice,
-                before.subclasses(), before.features(), before.feats(), before.proficiencies(), before.version() + 1, resources, clock);
+                before.subclasses(), before.features(), before.feats(), before.proficiencies(), before.version() + 1, resources, clock, before.equipment(), before.health());
     }
     private static IllegalArgumentException invalid(String code) { return new IllegalArgumentException(code); }
 }

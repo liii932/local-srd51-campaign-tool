@@ -24,7 +24,7 @@
 V019 建立永久运行身份登记、不可变快照头和类型化语言镜像；V020 追加空工具镜像表。它们不复制旧
 规则目录或创建战役，当前 Repository 只接受 DRAFT PARTITION。身份、调用方事务、授权
 与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。应用迁移清单预期
-V001—V027；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
+V001—V031；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
 V021 追加 schema 2 INTERNAL 类型化组合、最终规则、完整覆盖链、永久守卫与操作收据；
 来源读取和原子转存合同见[来源到运行快照](rules/schema-2-runtime-snapshot.md)，增量授权见
 [schema 2 运行权限](../database/grants/schema2-runtime-snapshot.sql)。迁移和授权文件不表示已执行。
@@ -37,6 +37,9 @@ campaign 和 character 的初始准备头、槽、选择及授予事实。准备
 [守卫权限](../database/grants/business-write-guard.sql)和[初始计划权限](../database/grants/schema2-initial-plans.sql)。
 V027 增加成长、选择、熟练和休息规则镜像，以及追加式角色根、完整命令和各类状态历史；
 它们属于[内部成长消费者](rules/schema-2-character-statistics.md)及[休息消费者](rules/schema-2-character-rest.md)。
+V028/V030 追加四类检定/装备/健康规则镜像及完整字段链；V029/V031 保存检定输入与结果、装备
+前后状态/命令、健康状态/结果和有序原骰。格式、预算及叶仓储追加/恢复见
+[角色事实存储](rules/schema-2-character-fact-storage.md)；这些结构不开放新的业务命令。
 同 run 的唯一角色约束维持当前内部时钟所有权，不开放完整战役初始化或多角色生命周期。
 [有限运行权限](../database/grants/schema2-character-runtime.sql)仅给应用 SELECT/INSERT，
 [只读核验](../database/verify/schema2-character-runtime.sql)另行执行；没有隐含迁移或授权。
@@ -57,8 +60,9 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 来源存储不放宽完整基础包与非空 add-on 的安装资格门，也不授予完整职业升级或发布资格。
 结构、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)和
 [schema 2 来源账本](rules/schema-2-source-ledger.md)。新增 SQL 与权限文件不表示已经在数据库执行。
-运行链保持 V001—V027，两条链合计 34 份迁移源。新增四类作者定义尚无运行镜像、业务命令或角色历史，
-不改变已有内部成长/休息能力。来源能力不建立第二个 JNDI，也不执行外部迁移或授权。
+运行 V001—V031 与来源 V001—V007 共 38 份迁移源。准确规则镜像和类型化角色事实存储已接通，
+真实检定、装备与健康消费者尚未采用；已有内部成长/休息能力保持。
+来源与存储能力不建立第二个 JNDI，也不执行外部迁移或授权。
 
 ## 自动化数据库拓扑与账号职责
 
@@ -73,7 +77,7 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 | 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
 | 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
 | 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
-| 独立 disposable 实例 | V001—V027 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
+| 独立 disposable 实例 | V001—V031 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
 | 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
 
 运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源

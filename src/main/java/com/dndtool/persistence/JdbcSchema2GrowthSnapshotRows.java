@@ -6,10 +6,10 @@ import java.util.*;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
 
-/** Typed growth/rest material rows and atomic prerequisite children, in the caller's snapshot transaction. */
+/** Typed growth/rest/check material rows and atomic prerequisite children, in the caller's snapshot transaction. */
 final class JdbcSchema2GrowthSnapshotRows {
     private JdbcSchema2GrowthSnapshotRows() { }
-    static boolean supports(FinalRule row) { return row instanceof FinalClassProgression || row instanceof FinalResource || row instanceof FinalSubclass || row instanceof FinalFeature || row instanceof FinalFeat || row instanceof FinalProficiency || row instanceof FinalProficiencySet || row instanceof FinalRest; }
+    static boolean supports(FinalRule row) { return row instanceof FinalClassProgression || row instanceof FinalResource || row instanceof FinalSubclass || row instanceof FinalFeature || row instanceof FinalFeat || row instanceof FinalProficiency || row instanceof FinalProficiencySet || row instanceof FinalRest || row instanceof FinalCheck; }
     static void storeRule(Connection c, Identity id, int index, FinalRule row) throws SQLException {
         RuleIdentity key = row.identity(); String table, columns; List<Object> values = new ArrayList<>(List.of(id.snapshotBytes(), index, ascii(key.moduleKey()), ascii(key.ruleKey())));
         if (row instanceof FinalProficiencySet set) {
@@ -23,6 +23,7 @@ final class JdbcSchema2GrowthSnapshotRows {
             else if (row instanceof FinalFeature v) { name=v.definition().displayName(); description=v.definition().description(); page=v.definition().sourcePage(); note=v.definition().authorNote(); }
             else if (row instanceof FinalFeat v) { name=v.definition().displayName(); description=v.definition().description(); page=v.definition().sourcePage(); note=v.definition().authorNote(); }
             else if (row instanceof FinalProficiency v) { name=v.definition().displayName(); description=v.definition().description(); page=v.definition().sourcePage(); note=v.definition().authorNote(); }
+            else if (row instanceof FinalCheck v) { name=v.definition().displayName(); description=v.definition().description(); page=v.definition().sourcePage(); note=v.definition().authorNote(); }
             else if (row instanceof FinalRest v) { name=v.definition().displayName(); description=v.definition().description(); page=v.definition().sourcePage(); note=v.definition().authorNote(); }
             else throw invalid();
             Collections.addAll(values, name, description, page);
@@ -37,6 +38,7 @@ final class JdbcSchema2GrowthSnapshotRows {
             else if (row instanceof FinalFeature v) { var d=v.definition(); table="feature"; specific="owner_module, owner_type, owner_key, feature_level, feature_kind, execution_mode, execution_algorithm"; values.addAll(reference(d.owner())); Collections.addAll(values,d.level(),ascii(d.kind().name()),ascii(d.executionMode().name()),ascii(d.executionAlgorithm())); }
             else if (row instanceof FinalFeat v) { var d=v.definition(); table="feat"; specific="prerequisite_groups, execution_mode, execution_algorithm"; Collections.addAll(values,d.prerequisite().allOf().size(),ascii(d.executionMode().name()),ascii(d.executionAlgorithm())); }
             else if (row instanceof FinalProficiency v) { var d=v.definition(); table="proficiency"; specific="category, ability_key"; Collections.addAll(values,ascii(d.category().name()),d.abilityKey()==null?null:ascii(d.abilityKey())); }
+            else if (row instanceof FinalCheck v) { var d=v.definition(); table="check"; specific="algorithm"; values.add(ascii(d.algorithm())); }
             else { var d=((FinalRest)row).definition(); table="rest"; specific="algorithm"; values.add(ascii(d.algorithm())); }
             columns="display_name, description, source_page, "+specific+", author_note, enabled"; Collections.addAll(values,note,bit(row.enabled()));
         }
@@ -46,9 +48,9 @@ final class JdbcSchema2GrowthSnapshotRows {
     }
     static Map<Integer, FinalRule> readRules(Connection c, Identity id) throws SQLException {
         var predicates=readPredicates(c,id,false); Map<Integer,FinalRule> result=new TreeMap<>();
-        for(String type:List.of("class_progression","resource","subclass","feature","feat","proficiency","proficiency_set","rest")) {
+        for(String type:List.of("class_progression","resource","subclass","feature","feat","proficiency","proficiency_set","rest","check")) {
             rows(c,id,"s2_runtime_"+type,"rule_index",256,r->{
-                int index=number(r,"rule_index"); RuleIdentity key=new RuleIdentity(ascii(r,"module_key",64),type.equals("proficiency_set")?"catalog.proficiency_set":type.equals("rest")?"adventure.rest":"character."+type,ascii(r,"rule_key",128));
+                int index=number(r,"rule_index"); RuleIdentity key=new RuleIdentity(ascii(r,"module_key",64),type.equals("proficiency_set")?"catalog.proficiency_set":type.equals("rest")?"adventure.rest":type.equals("check")?"adventure.check":"character."+type,ascii(r,"rule_key",128));
                 String name=text(r,"display_name",120),note=nullableText(r,"author_note",1000); boolean enabled=bool(r,"enabled"); FinalRule rule;
                 if(type.equals("proficiency_set")) rule=new FinalProficiencySet(new ProficiencySetDefinition(key,name,ProficiencyCategory.valueOf(ascii(r,"category",16)),number(r,"minimum_enabled_members"),note),enabled);
                 else {
@@ -60,6 +62,7 @@ final class JdbcSchema2GrowthSnapshotRows {
                         case "feature" -> new FinalFeature(new FeatureDefinition(key,name,description,page,reference(r,"owner"),number(r,"feature_level"),FeatureKind.valueOf(ascii(r,"feature_kind",16)),FeatureExecution.valueOf(ascii(r,"execution_mode",20)),ascii(r,"execution_algorithm",128),note),enabled);
                         case "feat" -> new FinalFeat(new FeatDefinition(key,name,description,page,predicates.take(index,-1,null,number(r,"prerequisite_groups")),FeatureExecution.valueOf(ascii(r,"execution_mode",20)),ascii(r,"execution_algorithm",128),note),enabled);
                         case "proficiency" -> new FinalProficiency(new ProficiencyDefinition(key,name,description,page,ProficiencyCategory.valueOf(ascii(r,"category",16)),r.getObject("ability_key")==null?null:ascii(r,"ability_key",32),note),enabled);
+                        case "check" -> new FinalCheck(new CheckDefinition(key,name,description,page,ascii(r,"algorithm",64),note),enabled);
                         case "rest" -> new FinalRest(new RestDefinition(key,name,description,page,ascii(r,"algorithm",64),note),enabled);
                         default -> throw invalid();
                     };
@@ -91,7 +94,7 @@ final class JdbcSchema2GrowthSnapshotRows {
     static final String GROWTH_COLUMNS="growth_kind, growth_target_module, growth_target_type, growth_target_key, growth_count";
     static List<Object> extraState(FieldState state,Field field){
         FieldValue value=state.value(); List<Object> values=new ArrayList<>();
-        values.add(value instanceof IdentityValue ref&&(field==Field.OWNER||field==Field.PROFICIENCY)?ascii(ref.value().ruleType()):null);
+        values.add(value instanceof IdentityValue ref&&(field==Field.OWNER||field==Field.PROFICIENCY||field==Field.STEALTH_SKILL)?ascii(ref.value().ruleType()):null);
         values.add(value instanceof PrerequisiteValue predicate?predicate.value().allOf().size():null);
         values.addAll(value instanceof GrowthGrantValue grant?growth(grant.value()):Arrays.asList(null,null,null,null,null));return values;
     }

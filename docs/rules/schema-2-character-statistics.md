@@ -87,7 +87,7 @@
 
 所有新增字段分别具有完整字段链。`owner_class` 使用类型化身份值，面数／等级使用整数值，
 profile、scope 和 execution 使用已验证文本值；不把复合对象压成 JSON 文本。字段操作遵循
-现有 `set_field`、`set_enabled` 和仅允许清空备注的 `clear_field` 合同，不允许
+现有 `set_field`、`set_enabled` 和在本成长领域仅允许清空备注的 `clear_field` 合同，不允许
 `maximum_profile.range` 等嵌套修改。显式同值修改仍保留来源步骤。
 
 来源表和运行表分别保留成长／资源的类型化字段。运行读回重建最终规则及全部字段链，复核
@@ -100,6 +100,8 @@ profile、scope 和 execution 使用已验证文本值；不把复合对象压�
 内部命令是封闭的 `INITIALIZED`、`CHARACTER_ADVANCED`、`STATISTICS_ADVANCED`、`RESOURCE_SPENT` 和
 `RESOURCES_RECOVERED`。各命令只接受其对应字段，不能夹带客户端骰点、资源上限、HP 增量、
 职业特性结果或任意规则字段。它们不通过完整角色创建或普通升级 Host 路由开放。
+[角色事实存储](schema-2-character-fact-storage.md)另支持检定、装备和健康的封闭记录格式；
+当前成长/休息消费者仅中性保留新增字段，不执行那些新业务命令或生成其效果。
 
 `INITIALIZED` 必须绑定准确的运行快照、已保留的初始计划和计划中的职业来源。服务端重新
 核对初始计划的来源、槽、选择和授予，而后只接受标准数组 `8,10,12,13,14,15` 在六个冻结

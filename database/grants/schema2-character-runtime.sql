@@ -1,5 +1,5 @@
--- Apply only after explicit review of V027 and the application account.
--- Append-only character growth/rest facts; the INTERNAL clock is limited to one character per run.
+-- Apply only after explicit review of the character runtime migrations and application account.
+-- Append-only character growth, rest, check, equipment and health facts; the INTERNAL clock is limited to one character per run.
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_class_progression` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_resource` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_subclass` TO 'dnd_tool_se_app'@'127.0.0.1';
@@ -26,3 +26,12 @@ GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_event_proficiency` TO 'dnd_t
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_command_ability` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_command_proficiency` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_command_hit_die` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_check` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_check` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_equipment_item` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_health` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_vital_effect` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_event_equipment` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_equipment_command` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_health_event` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_health_die` TO 'dnd_tool_se_app'@'127.0.0.1';
