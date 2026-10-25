@@ -19,7 +19,7 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.EntryIdent
 import static com.dndtool.module.composition.Schema2CompositionKernel.ProgressionScope;
 
 /**
- * INTERNAL character advancement, resource and rest consumer, with atomic state and history.
+ * INTERNAL character advancement, resource, rest and check consumer, with atomic state and history.
  * Full campaign initialization and Host routing remain separate adoption boundaries.
  */
 public final class Schema2CharacterRuntimeService {
@@ -43,6 +43,8 @@ public final class Schema2CharacterRuntimeService {
                     || entry.getValue() < 1 || entry.getValue() > 30))
                 throw rejected("S2_CHARACTER_REQUEST");
             initialAbilities = Collections.unmodifiableMap(new TreeMap<>(initialAbilities));
+            if (command.kind().equals("ITEM_ACQUIRED") && !operationId.equals(command.equipmentInput().itemId()))
+                throw rejected("S2_EQUIPMENT_INSTANCE");
         }
         public String digest() { return fingerprint(this); }
     }
@@ -51,6 +53,9 @@ public final class Schema2CharacterRuntimeService {
     private final IntUnaryOperator dice;
     private final Schema2CharacterProgressionRules rules = new Schema2CharacterProgressionRules();
     private final Schema2CharacterRestRules rests = new Schema2CharacterRestRules();
+    private final Schema2CharacterCheckRules checks = new Schema2CharacterCheckRules();
+    private final Schema2CharacterEquipmentRules equipment = new Schema2CharacterEquipmentRules();
+    private final Schema2CharacterHealthRules health = new Schema2CharacterHealthRules();
     private final JdbcSchema2CharacterRuntimeRepository characters = new JdbcSchema2CharacterRuntimeRepository();
     private final JdbcSchema2RuntimeSnapshotRepository snapshots = new JdbcSchema2RuntimeSnapshotRepository();
     private final JdbcSchema2InitialPlanRepository initialPlans = new JdbcSchema2InitialPlanRepository();
@@ -94,9 +99,28 @@ public final class Schema2CharacterRuntimeService {
                     throw rejected("S2_CHARACTER_CAPACITY");
             }
             State before = history == null ? null : history.current();
+            health.requireCommand(before, request.command());
             Integer roll = null;
+            CheckResult checkResult = null;
+            HealthResult healthResult = null;
             State after;
-            if (isAdvancement(request.command())) {
+            if (Schema2CharacterHealthRules.handles(request.command())) {
+                var prepared = health.prepare(material.projection(), before, request.command());
+                checkCapacity(history, prepared.capacityState(), request.command());
+                List<Integer> drawn = new ArrayList<>();
+                for (int i = 0; i < prepared.diceCount(); i++) drawn.add(dice.applyAsInt(prepared.diceSides()));
+                Integer deathD20 = prepared.deathSave() ? dice.applyAsInt(20) : null;
+                Integer recoveryD4 = prepared.needsRecoveryD4(deathD20) ? dice.applyAsInt(4) : null;
+                var resolution = health.resolve(prepared, drawn, deathD20, recoveryD4);
+                healthResult = resolution.result(); after = resolution.state();
+            } else if (request.command().kind().equals("CHECK_RESOLVED")) {
+                var prepared = checks.prepare(material.projection(), before, request.command());
+                checkCapacity(history, prepared.capacityState(), request.command());
+                int firstD20 = dice.applyAsInt(20);
+                Integer secondD20 = prepared.secondDieRequired() ? dice.applyAsInt(20) : null;
+                checkResult = checks.resolve(prepared, firstD20, secondD20);
+                after = prepared.capacityState();
+            } else if (isAdvancement(request.command())) {
                 var prepared = prepareAdvance(material, before, request.command());
                 checkCapacity(history, prepared.capacityState(), request.command());
                 if (request.command().hpChoice().equals("SERVER_ROLL")) roll = dice.applyAsInt(prepared.hitDieSides());
@@ -104,15 +128,15 @@ public final class Schema2CharacterRuntimeService {
             } else if (request.command().kind().equals("HIT_DIE_SPENT")) {
                 // A deterministic minimum result proves the full transition and capacity before
                 // calling the random source. Only the actual result is retained in the event.
-                State capacity = rests.apply(material.projection(), before, request.command(), 1);
+                State capacity = health.afterRest(before, rests.apply(material.projection(), before, request.command(), 1), request.command());
                 checkCapacity(history, capacity, request.command());
                 roll = dice.applyAsInt(request.command().restInput().hitDieSides());
-                after = rests.apply(material.projection(), before, request.command(), roll);
+                after = health.afterRest(before, rests.apply(material.projection(), before, request.command(), roll), request.command());
             } else {
-                after = calculate(material, request, before, null);
+                after = calculate(material, request, before, null, null, null);
                 checkCapacity(history, after, request.command());
             }
-            Event event = new Event(request.operationId(), request.digest(), request.command(), roll, before, after);
+            Event event = new Event(request.operationId(), request.digest(), request.command(), roll, before, after, checkResult, healthResult);
             characters.append(connection, event);
             History read = characters.read(connection, request.characterId());
             List<Event> expected = new ArrayList<>(history == null ? List.of() : history.events()); expected.add(event);
@@ -229,20 +253,37 @@ public final class Schema2CharacterRuntimeService {
             JdbcSchema2CharacterRuntimeRepository.validate(history);
             for (Event event : history.events()) {
                 State after = event.after(); rules.validateState(material.projection(), after); rests.validateState(material.projection(), after);
+                equipment.validateState(material.projection(), after); health.validateState(after);
                 Request request = new Request(event.operationId(), after.identity(), after.campaignId(), after.characterId(),
                         after.preparationOperationId(), Schema2RulesBinding.from(material.projection()),
                         event.before() == null ? -1 : event.before().version(), event.command(),
                         event.before() == null ? after.abilities() : Map.of());
                 if (!request.digest().equals(event.requestDigest())
-                        || !after.equals(calculate(material, request, event.before(), event.hitDieRoll())))
+                        || !after.equals(calculate(material, request, event.before(), event.hitDieRoll(), event.checkResult(), event.healthResult())))
                     throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT");
             }
         } catch (IllegalArgumentException malformed) { throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT", malformed); }
     }
 
-    private State calculate(Material material, Request request, State before, Integer roll) {
+    private State calculate(Material material, Request request, State before, Integer roll, CheckResult checkResult, HealthResult healthResult) {
         Command command = request.command();
-        if (Schema2CharacterRestRules.handles(command)) return rests.apply(material.projection(), before, command, roll);
+        health.requireCommand(before, command);
+        if (Schema2CharacterHealthRules.handles(command)) {
+            if (roll != null || checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+            return health.verify(material.projection(), before, command, healthResult);
+        }
+        if (healthResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+        if (command.kind().equals("CHECK_RESOLVED")) {
+            if (roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+            return checks.verify(material.projection(), before, command, checkResult);
+        }
+        if (checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+        if (Schema2CharacterEquipmentRules.handles(command)) {
+            if (roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+            return equipment.apply(material.projection(), before, command, request.operationId());
+        }
+        if (Schema2CharacterRestRules.handles(command))
+            return health.afterRest(before, rests.apply(material.projection(), before, command, roll), command);
         if (!isAdvancement(command) && roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
         return switch (command.kind()) {
             case "INITIALIZED" -> rules.initial(material.projection(), material.initial(), request.preparationOperationId(),
@@ -377,6 +418,24 @@ public final class Schema2CharacterRuntimeService {
                 out.writeLong(rest.minutes()); out.writeInt(rest.hitDieSides());
                 var recovered = new TreeMap<>(rest.recoveredHitDice()); out.writeInt(recovered.size());
                 for (var entry : recovered.entrySet()) { out.writeInt(entry.getKey()); out.writeInt(entry.getValue()); }
+            }
+            // The command discriminant gives this extension an unambiguous position while
+            // preserving every earlier command's persisted request bytes and digest.
+            CheckInput check = command.checkInput();
+            if (check != null) {
+                rule(out, check.rule()); text(out, check.kind()); text(out, check.abilityKey());
+                nullableRule(out, check.proficiency()); out.writeInt(check.difficultyClass());
+                out.writeBoolean(check.advantage()); out.writeBoolean(check.disadvantage()); text(out, check.adjudication());
+            }
+            EquipmentInput item = command.equipmentInput();
+            if (item != null) {
+                text(out, item.itemId().toString()); nullableRule(out, item.item());
+                text(out, Objects.toString(item.location(), "")); text(out, item.adjudication());
+            }
+            HealthInput health = command.healthInput();
+            if (health != null) {
+                rule(out, health.rule()); nullableRule(out, health.effect());
+                text(out, Objects.toString(health.temporaryChoice(), "")); text(out, health.adjudication());
             }
             out.writeInt(request.initialAbilities().size());
             for (var entry : request.initialAbilities().entrySet()) { text(out, entry.getKey()); out.writeInt(entry.getValue()); }

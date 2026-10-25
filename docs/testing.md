@@ -361,7 +361,8 @@ mvn '-Dtest=Schema2CheckCompositionTest,Schema2EquipmentHealthCompositionTest,Jd
 来源测试从真实作者 ZIP 核对 typed 行，包含未选中包、完整引用与操作、缺失/多余/损坏数据和
 各写点失败；仓储保留调用方事务所有权。结构测试保护来源 V006/V007、最小授权和独立批准链。
 这些是作者、组合与来源证据，不包含新运行镜像、检定/装备/健康业务、骰子或角色历史验收。
-运行镜像与事实存储使用后面的[持久化验证](#schema-2-检定装备与健康镜像和事实存储验证)；
+运行镜像与事实存储使用后面的[持久化验证](#schema-2-检定装备与健康镜像和事实存储验证)，
+真实命令与恢复语义使用[角色基础验证](#schema-2-检定装备与健康验证)；
 已实现的成长/休息验证继续使用下节入口。
 
 WAR 包含严格作者/组合和真实来源读取类；来源 SQL、离线安装器、作者包及测试向量排除。
@@ -398,10 +399,30 @@ mvn '-Dtest=JdbcSchema2CheckSnapshotTest,JdbcSchema2EquipmentHealthSnapshotTest,
 孤儿与类型化行缺失、结构/邻接/预算限制及整笔回滚；这些测试保存已经准备的事实，不执行新业务。
 
 运行链为 V001—V031，来源保持 V001—V007，共 38 份迁移源。WAR 须包含镜像/事实仓储及
-全部运行迁移，排除来源 SQL、离线写入工具、测试向量和真实存档。真实新 Check/Equipment/Health
-消费者、请求幂等和 RuntimeService 命令尚未采用；仓储测试不作为这些业务的完成证据。
+全部运行迁移，排除来源 SQL、离线写入工具、测试向量和真实存档。Check/Equipment/Health
+消费者、请求幂等和 RuntimeService 命令使用下节验证；仓储测试本身只作为存储事实的证据。
 现有成长/休息测试保护新增字段的中性保留，DRAFT、Host、archive 2 和安装门保持。
 静态 SQL/JDBC 代理不代替真实 MySQL 的 CHECK、生成列、外键、触发器、权限与持久化验收。
+
+## Schema 2 检定、装备与健康验证
+
+[角色基础合同](rules/schema-2-character-foundations.md)使用真实准备、来源、快照、角色事件和直接恢复。
+新增作者类型或读写映射时，覆盖 `Schema2CheckCompositionTest`、`Schema2EquipmentHealthCompositionTest`、
+对应 `JdbcSchema2Check*` / `JdbcSchema2EquipmentHealth*` 来源、快照、历史和 schema 测试；
+共享组合器改动同时覆盖原语言/工具/授予/成长向量及 `ProductionSchema2StoredProjectionTest`。
+独立向量位于 `src/test/resources/schema2-checks/` 和 `schema2-equipment-health/`。
+
+消费者变化的定向命令：
+
+```bash
+mvn '-Dtest=Schema2CharacterCheckRulesTest,Schema2CharacterCheckServiceTest,Schema2CharacterEquipmentRulesTest,Schema2CharacterHealthRulesTest,Schema2CharacterEquipmentHealthServiceTest,Schema2CharacterRuntimeServiceTest,Schema2CharacterAdvancementAndRestServiceTest,Schema2CharacterProgressionRulesTest,Schema2GrowthRulesTest' test
+```
+
+覆盖真实授予去重、装备产生的实际骰模式、手位/AC、穿脱时间、环境效果原骰、临时 HP、零 HP/即死、
+死亡豁免、恰抵达稳定恢复期限、长休清临时 HP、跨命令状态保持，以及缺失/损坏子表、幂等、随机性前拒绝、
+故障整体回滚与直接恢复不重掷。未知运行时故障遵循共同守卫冻结，不能把回滚视作允许盲目重试。
+WAR 包含基础消费者与运行 V028—V031；来源 SQL、测试向量和离线写入工具不得入包。
+这些测试不授予真实 MySQL、部署、Host、战斗回合或完整初始化验收。
 
 ## 共同业务事务与初始化准备验证
 

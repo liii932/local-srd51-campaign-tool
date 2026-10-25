@@ -19,8 +19,9 @@
 
 作者与组合内核支持既有语言、工具、初始授予、成长/休息及
 [检定、装备与健康作者类型](schema-2-foundation-authoring.md)。当前运行 V028—V031 另提供
-[准确镜像与类型化事实存储](schema-2-character-fact-storage.md)，新业务消费者仍未接入；
-已实现的内部成长/休息及仓储能力不等于完整基础体系或战役初始化。
+[准确镜像与类型化事实存储](schema-2-character-fact-storage.md)，并由
+[角色基础消费者](schema-2-character-foundations.md)执行真实检定、装备与健康命令，保存局部历史；
+这些单角色 INTERNAL 能力及已有成长/休息不等于完整基础体系或战役初始化。
 生产安装采用封闭门：
 
 | 实际内容 | 离线结果 |

@@ -44,7 +44,8 @@
 完整字段、引用、负修正及清空约束见[作者来源合同](rules/schema-2-foundation-authoring.md)。
 来源 V001—V007 与运行 V001—V031 共 38 份迁移源。四类定义的准确镜像及类型化角色事实
 见[运行快照](rules/schema-2-runtime-snapshot.md)和[角色事实存储](rules/schema-2-character-fact-storage.md)；
-实际新业务消费者尚未采用，来源批准不授予执行资格。
+实际单角色 INTERNAL 命令与历史语义见[角色基础合同](rules/schema-2-character-foundations.md)；
+来源批准本身不授予执行或完整基础资格。
 下表和角色目录计数属于原有 schema 1 域。
 源本地 ID、安装代次与计数使用有符号 BIGINT；只有发布根 `id` 自增。
 FK 只指向源内同一发布，全部 UPDATE/DELETE RESTRICT，不级联，不引用运行 schema。
