@@ -28,8 +28,8 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
   完整基础及尚未接入运行消费者的规则内容仍拒绝，安装或接受不开放新战役；
 - schema 2 的[检定、装备与健康作者来源](./docs/rules/schema-2-foundation-authoring.md)支持四类封闭定义、
   有符号修正、严格字段清空、纯组合及来源 V006/V007 的类型化原包核对；
-  [镜像与事实存储](./docs/rules/schema-2-character-fact-storage.md)已保存准确规则、完整链及类型化角色事实；
-  新检定、装备与健康业务命令尚未接入，既有内部成长/休息能力保持；
+  [镜像与事实存储](./docs/rules/schema-2-character-fact-storage.md)保存准确规则、完整链及类型化角色事实；
+  运行行为由下述角色基础消费者承担；
 - schema 2 的[来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md)提供只读来源复核、
   类型化最终规则与完整覆盖链的原子保存、独立读回、操作查证和准确恢复绑定；范围为内部材料，
   尚不创建战役或开放游戏执行；
@@ -45,6 +45,9 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
   schema 2 的[成长与资源合同](./docs/rules/schema-2-character-statistics.md)及[休息合同](./docs/rules/schema-2-character-rest.md)
   已接作者、来源和运行镜像，提供单角色 INTERNAL 的成长、资源、标准休息与局部历史；
   该内部链路不开放完整战役、Host 入口或持续效果执行；
+- schema 2 的[检定、装备与健康基础](./docs/rules/schema-2-character-foundations.md)在同一内部角色链上
+  保存真实检定、装备实例、护甲限制、伤害／治疗、临时 HP、死亡豁免与稳定恢复；
+  全部依据准确模组声明和服务器骰子，状态、结果及恢复材料同事务保存；
 - 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
 - 执行普通、优势和劣势 d20 检定，并保存候选骰、修正、DC、结果和内部事件；
 - 通过封闭的类型化效果调整字段、授予物品、记录消息或更新合法实体位置；
@@ -214,6 +217,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [schema 2 初始语言／工具授予](./docs/rules/schema-2-proficiency-grants.md) | 真实来源与稳定槽、原子授予字段、跨模组选择和固定快照计划 |
 | [schema 2 检定、装备与健康作者来源](./docs/rules/schema-2-foundation-authoring.md) | 四类类型化定义、字段和引用、负修正、清空、纯组合与真实来源边界 |
 | [schema 2 角色事实存储](./docs/rules/schema-2-character-fact-storage.md) | 准确镜像、检定/装备/健康输入与结果、前后状态、历史预算及仓储直接恢复 |
+| [schema 2 检定、装备与健康基础](./docs/rules/schema-2-character-foundations.md) | 真实检定、装备实例、健康变化、命令幂等、完整局部历史与直接恢复 |
 | [共同业务写入与初始化准备](./docs/rules/business-write-transactions.md) | 全部写入口、永久守卫、事务故障隔离及绑定初始计划的原子准备 |
 | [SRD 5.1 本地原文索引](./docs/references/srd-5.1/README.md) | 按主题定位 403 页检索文本，核对本地 PDF 与官方出处 |
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |

@@ -13,7 +13,8 @@
 [检定、装备与健康作者来源](schema-2-foundation-authoring.md)另定义 `adventure.check`、
 `equipment.item`、`adventure.health`、`adventure.vital_effect` 的字段、条件引用及严格清空。
 这四类定义已接通作者、纯组合、真实来源和[准确镜像/事实存储](schema-2-character-fact-storage.md)；
-新业务消费者尚未采用。纯材料还原与角色仓储恢复各自验证不同事实，不能据此取得执行资格。
+运行命令与历史语义由[角色基础消费者](schema-2-character-foundations.md)验证。
+作者/来源、材料还原、仓储恢复与业务验证各有职责，不能从单独一层推断完整执行资格。
 
 “生产编码”指可用于真实制品保管和准确身份绑定的字节合同，不表示完整基础、机制支持、
 安装成功、DM 接受或运行资格。有限基础始终缺少完整跨领域证据；自洽原包、逻辑、配置、

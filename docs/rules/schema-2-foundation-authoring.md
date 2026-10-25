@@ -7,10 +7,9 @@
 
 这些类型已能解析、组合、从类型化来源读回，并校验原始作者事实。运行 V028—V031 的
 [准确镜像与角色事实存储](schema-2-character-fact-storage.md)已接通完整字段链、封闭记录格式及叶仓储恢复；
-真实检定、装备与健康业务消费者尚未采用。
-既有[成长与资源](schema-2-character-statistics.md)及[标准休息](schema-2-character-rest.md)
-能力保持。作者类型中的算法登记不开放检定、装备或健康业务，也不扩大安装、Host、完整战役
-或 archive format 2 资格。
+[角色基础消费者](schema-2-character-foundations.md)在同一内部角色链执行真实检定、装备和健康命令，
+沿用既有[成长与资源](schema-2-character-statistics.md)及[标准休息](schema-2-character-rest.md)。
+作者类型中的算法登记本身不授予执行资格，也不扩大安装、Host、完整战役或 archive format 2 资格。
 
 ## 身份、文本与出处
 
@@ -130,8 +129,9 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对这些材料只�
 `JdbcSchema2ExecutionSourceRows` 承担真实来源等价核对。纯材料还原不等于运行快照或角色恢复。
 运行 V028/V030 以类型化表保存这四类规则及完整链，不能丢弃定义后保存不完整快照。
 V029/V031 的[角色事实仓储](schema-2-character-fact-storage.md)保存输入、结果、状态和原骰，
-提供结构校验、追加和直接恢复；这不建立实际新业务消费者。检定、装备、健康规则执行及
-对应 RuntimeService 命令仍须按[采用边界](../design/v2/adoption-boundaries.md)接通。完整基础包及非空 add-on 的
+提供结构校验、追加和直接恢复；实际检定、装备、健康规则与 RuntimeService 命令由
+[角色基础合同](schema-2-character-foundations.md)限定。规则执行和保存历史的语义验证不能由来源或仓储结构校验代替。
+[采用边界](../design/v2/adoption-boundaries.md)中的完整基础包及非空 add-on 的
 封闭安装资格门保持，类型化夹具不证明内容包已经可安装或可运行。
 
 组合、来源及结构验证入口见[测试指南](../testing.md#schema-2-检定装备与健康作者来源验证)。

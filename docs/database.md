@@ -39,7 +39,8 @@ V027 增加成长、选择、熟练和休息规则镜像，以及追加式角色
 它们属于[内部成长消费者](rules/schema-2-character-statistics.md)及[休息消费者](rules/schema-2-character-rest.md)。
 V028/V030 追加四类检定/装备/健康规则镜像及完整字段链；V029/V031 保存检定输入与结果、装备
 前后状态/命令、健康状态/结果和有序原骰。格式、预算及叶仓储追加/恢复见
-[角色事实存储](rules/schema-2-character-fact-storage.md)；这些结构不开放新的业务命令。
+[角色事实存储](rules/schema-2-character-fact-storage.md)；实际命令、规则语义与恢复验证见
+[角色基础合同](rules/schema-2-character-foundations.md)。
 同 run 的唯一角色约束维持当前内部时钟所有权，不开放完整战役初始化或多角色生命周期。
 [有限运行权限](../database/grants/schema2-character-runtime.sql)仅给应用 SELECT/INSERT，
 [只读核验](../database/verify/schema2-character-runtime.sql)另行执行；没有隐含迁移或授权。
@@ -60,9 +61,9 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 来源存储不放宽完整基础包与非空 add-on 的安装资格门，也不授予完整职业升级或发布资格。
 结构、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)和
 [schema 2 来源账本](rules/schema-2-source-ledger.md)。新增 SQL 与权限文件不表示已经在数据库执行。
-运行 V001—V031 与来源 V001—V007 共 38 份迁移源。准确规则镜像和类型化角色事实存储已接通，
-真实检定、装备与健康消费者尚未采用；已有内部成长/休息能力保持。
-来源与存储能力不建立第二个 JNDI，也不执行外部迁移或授权。
+运行 V001—V031 与来源 V001—V007 共 38 份迁移源。作者来源、运行镜像与真实角色命令/历史
+分别按各自合同核验；该单角色 INTERNAL 接入不开放完整战役，不建立第二个 JNDI，
+也不执行外部迁移或授权。
 
 ## 自动化数据库拓扑与账号职责
 
