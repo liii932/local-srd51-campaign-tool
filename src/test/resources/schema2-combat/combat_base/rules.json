@@ -1,0 +1,103 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "character.race",
+      "rule_key": "race.human"
+    },
+    "display_name": "race.human",
+    "description": "Fixed independent combat vector.",
+    "source_page": 7
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon"
+    },
+    "display_name": "proficiency.weapon",
+    "description": "Fixed independent combat vector.",
+    "source_page": 65,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.blade"
+    },
+    "display_name": "item.blade",
+    "description": "Fixed independent combat vector.",
+    "source_page": 65,
+    "kind": "WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "adventure.combat",
+      "rule_key": "combat.standard"
+    },
+    "display_name": "combat.standard",
+    "description": "Fixed independent combat vector.",
+    "source_page": 90,
+    "algorithm": "SRD_2014_COMBAT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.blade"
+    },
+    "display_name": "weapon_attack.blade",
+    "description": "Fixed independent combat vector.",
+    "source_page": 65,
+    "item": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "equipment.item",
+      "rule_key": "item.blade"
+    },
+    "ability_policy": "STRENGTH",
+    "dice_count": 1,
+    "dice_sides": 6,
+    "damage_type": "SLASHING",
+    "reach_feet": 5,
+    "algorithm": "SRD_2014_MELEE_WEAPON_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "character.movement",
+      "rule_key": "movement.human"
+    },
+    "display_name": "movement.human",
+    "description": "Fixed independent combat vector.",
+    "source_page": 7,
+    "owner": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "character.race",
+      "rule_key": "race.human"
+    },
+    "walk_speed_feet": 30,
+    "author_note": "Original source note.",
+    "algorithm": "SRD_2014_WALKING_SPEED_V1"
+  }
+]

@@ -59,7 +59,7 @@ public final class Schema2CharacterEquipmentRules {
         }
         if (before.rest().minute() > Schema2CharacterRestRules.MAX_MINUTE - minutes) throw invalid("S2_EQUIPMENT_TIME_CAPACITY");
         next.sort(ORDER);
-        RestState clock = new RestState(before.rest().minute() + minutes, before.rest().lastLongRestEndMinute(), null);
+        RestState clock = new RestState(before.rest().minute() + minutes, before.rest().second(),before.rest().lastLongRestEndMinute(),before.rest().lastLongRestEndSecond(), null);
         State after = new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(), before.characterClass(),
                 before.abilities(), before.level(), before.proficiencyBonus(), before.hitPoints(), before.maximumHitPoints(), before.classes(),
                 before.hitDicePools(), before.subclasses(), before.features(), before.feats(), before.proficiencies(), before.version() + 1,
@@ -74,7 +74,7 @@ public final class Schema2CharacterEquipmentRules {
         for (EquipmentItem instance : state.equipment()) {
             if (!ids.add(instance.itemId())) throw invalid("S2_EQUIPMENT_STATE");
             ItemDefinition definition = definition(material, instance.item());
-            if (instance.location().equals("CARRIED")) continue;
+            if (Set.of("CARRIED","GROUND").contains(instance.location())) continue;
             boolean bodyArmor = armor(definition.kind());
             if (bodyArmor) {
                 if (!instance.location().equals("WORN") || ++armor > 1) throw invalid("S2_EQUIPMENT_LOCATION");
@@ -95,7 +95,7 @@ public final class Schema2CharacterEquipmentRules {
         int ac = 10 + dexterity, shield = 0, speed = 0; boolean untrained = false;
         Set<RuleIdentity> stealth = new HashSet<>();
         for (EquipmentItem instance : state.equipment()) {
-            if (instance.location().equals("CARRIED")) continue;
+            if (Set.of("CARRIED","GROUND").contains(instance.location())) continue;
             ItemDefinition item = definition(material, instance.item());
             if (armor(item.kind())) {
                 ac = item.armorClass() + switch (item.kind()) { case LIGHT_ARMOR -> dexterity; case MEDIUM_ARMOR -> Math.min(2, dexterity); default -> 0; };
@@ -110,7 +110,7 @@ public final class Schema2CharacterEquipmentRules {
 
     public boolean hasPreparedTool(ProductionSchema2Projection material, State state, RuleIdentity proficiency) {
         validateState(material, state);
-        return state.equipment().stream().filter(value -> !value.location().equals("CARRIED"))
+        return state.equipment().stream().filter(value -> Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(value.location()))
                 .map(value -> definition(material, value.item())).anyMatch(value -> value.kind() == EquipmentKind.TOOL && value.proficiency().equals(proficiency));
     }
     private static ItemDefinition definition(ProductionSchema2Projection material, RuleIdentity identity) {

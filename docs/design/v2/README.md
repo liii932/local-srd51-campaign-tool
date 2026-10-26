@@ -24,8 +24,9 @@ canonical/archive 目标为 `2/2`，发布状态保持 DRAFT。它不是所有�
 | schema 2 角色事实存储 | [镜像与历史格式](../../rules/schema-2-character-fact-storage.md) | 运行 V028—V031 的准确镜像、封闭输入/结果、装备健康前后状态、预算、追加读回和直接恢复；与实际消费者的规则语义验证分工 |
 | schema 2 来源到运行快照 | [内部转存与恢复绑定](../../rules/schema-2-runtime-snapshot.md) | 来源一致读取、类型化快照与完整覆盖链原子转存、实际回读、提交查证；有限内部链路，不开放游戏初始化 |
 | schema 2 初始语言／工具授予 | [初始授予合同](../../rules/schema-2-proficiency-grants.md) | 真实角色来源、稳定槽、完整原子授予、来源与快照读回、绑定计划；完整业务/历史初始化仍待接合 |
-| schema 2 成长、资源与标准休息 | [成长合同](../../rules/schema-2-character-statistics.md)、[休息合同](../../rules/schema-2-character-rest.md) | 类型化成长、选择、来源/运行表和真实状态历史；单角色 INTERNAL 的逐次生命骰、标准休息及时间；完整战役/Host、多角色时间与持续效果仍按各自门限采用 |
+| schema 2 成长、资源与标准休息 | [成长合同](../../rules/schema-2-character-statistics.md)、[休息合同](../../rules/schema-2-character-rest.md) | 类型化成长、选择、来源/运行表和真实状态历史；单角色 INTERNAL 的逐次生命骰、标准休息及时间；完整战役/Host、通用多角色时间与持续效果仍按各自门限采用 |
 | schema 2 检定、装备与健康基础 | [角色基础合同](../../rules/schema-2-character-foundations.md) | 真实检定、装备/护甲限制、单目标环境健康效果、死亡豁免与稳定恢复；准确来源和状态历史贯通，仍为单角色 INTERNAL |
+| schema 2 内部战斗与动作继续 | [作者来源](../../rules/schema-2-combat-authoring.md)、[战斗合同](../../rules/schema-2-combat.md) | 准确来源/镜像、真实先攻/回合/近战/移动/OA、倒地/掉落、唯一秒时钟、历史与直接恢复；内部采用不开放法术、怪物、完整基础包或 Host |
 | 共同业务守卫与初始化准备 | [共同业务事务](../../rules/business-write-transactions.md) | 全部现有写入口共享接纳与故障边界；初始计划与快照原子准备，完整业务/历史初始化仍须满足全部采用前提 |
 | 单个机制怎样完整接入 | [机制接入责任清单](mechanism-integration-checklist.md) | 规则、执行、状态、历史、恢复和验证的责任及采用门；供每个机制逐项填写 |
 | 攻击、移动、施法和反应的暂停与继续 | [动作继续协议](action-continuation-protocol.md) | 唯一动作流、类型化阶段、反应与选择、一次消费和精确恢复；具体机制另按责任清单采用 |

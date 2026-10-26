@@ -37,3 +37,9 @@ GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_equipment_item` TO 'dnd_tool_rule
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_execution_change` TO 'dnd_tool_rules_accepter'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_health` TO 'dnd_tool_rules_accepter'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_vital_effect` TO 'dnd_tool_rules_accepter'@'127.0.0.1';
+
+-- Typed combat source material; installation does not grant game eligibility.
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_combat` TO 'dnd_tool_rules_accepter'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_weapon_attack` TO 'dnd_tool_rules_accepter'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_movement` TO 'dnd_tool_rules_accepter'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_combat_change` TO 'dnd_tool_rules_accepter'@'127.0.0.1';

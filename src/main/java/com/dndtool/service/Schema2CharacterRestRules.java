@@ -42,7 +42,7 @@ public final class Schema2CharacterRestRules {
             case "REST_STARTED" -> {
                 if (active != null) throw invalid("S2_REST_ALREADY_ACTIVE");
                 if (input.restKind().equals("LONG_REST") && hp < 1) throw invalid("S2_REST_START_HEALTH");
-                next = new RestState(clock.minute(), clock.lastLongRestEndMinute(), new RestAttempt(definition.identity(),
+                next = new RestState(clock.minute(), clock.second(), clock.lastLongRestEndMinute(), clock.lastLongRestEndSecond(), new RestAttempt(definition.identity(),
                         input.restKind(), clock.minute(), Math.toIntExact(hp), 0, 0, 0, "IN_PROGRESS", null, 0, false));
             }
             case "TIME_ADVANCED" -> {
@@ -50,7 +50,7 @@ public final class Schema2CharacterRestRules {
                 if (minute > MAX_MINUTE) throw invalid("S2_REST_TIME_CAPACITY");
                 if (active == null) {
                     if (!input.activity().equals("NONE")) throw invalid("S2_REST_ACTIVITY");
-                    next = new RestState(minute, clock.lastLongRestEndMinute(), null);
+                    next = new RestState(minute, clock.second(), clock.lastLongRestEndMinute(), clock.lastLongRestEndSecond(), null);
                 } else {
                     if (!active.phase().equals("IN_PROGRESS") || input.activity().equals("NONE")) throw invalid("S2_REST_ACTIVITY");
                     long sleep = active.sleepMinutes() + (input.activity().equals("SLEEP") ? input.minutes() : 0);
@@ -59,7 +59,7 @@ public final class Schema2CharacterRestRules {
                     long consecutive = input.activity().equals("STRENUOUS")
                             ? ("STRENUOUS".equals(active.lastActivity()) ? active.consecutiveStrenuousMinutes() : 0) + input.minutes() : 0;
                     boolean interrupted = active.interrupted() || (active.kind().equals("SHORT_REST") ? strenuous > 0 : consecutive >= 60);
-                    next = new RestState(minute, clock.lastLongRestEndMinute(), new RestAttempt(active.rule(), active.kind(),
+                    next = new RestState(minute, clock.second(), clock.lastLongRestEndMinute(), clock.lastLongRestEndSecond(), new RestAttempt(active.rule(), active.kind(),
                             active.startMinute(), active.hitPointsAtStart(), sleep, light, strenuous, active.phase(), input.activity(), consecutive, interrupted));
                 }
             }
@@ -69,18 +69,18 @@ public final class Schema2CharacterRestRules {
                 if (active.kind().equals("SHORT_REST")) {
                     if (duration < 60 || active.interrupted()) throw invalid("S2_REST_REQUIREMENTS");
                     if (!input.recoveredHitDice().isEmpty()) throw invalid("S2_REST_HIT_DICE_CHOICE");
-                    next = new RestState(clock.minute(), clock.lastLongRestEndMinute(), new RestAttempt(active.rule(), active.kind(),
+                    next = new RestState(clock.minute(), clock.second(), clock.lastLongRestEndMinute(), clock.lastLongRestEndSecond(), new RestAttempt(active.rule(), active.kind(),
                             active.startMinute(), active.hitPointsAtStart(), active.sleepMinutes(), active.lightMinutes(),
                             active.strenuousMinutes(), "SPENDING_HIT_DICE", active.lastActivity(), active.consecutiveStrenuousMinutes(), active.interrupted()));
                 } else {
                     if (duration < 480 || active.sleepMinutes() < 360 || active.lightMinutes() > 120
                             || active.interrupted() || active.hitPointsAtStart() < 1)
                         throw invalid("S2_REST_REQUIREMENTS");
-                    if (clock.lastLongRestEndMinute() != null && clock.minute() - clock.lastLongRestEndMinute() < 1440)
+                    if (clock.lastLongRestEndMinute() != null && (clock.minute() - clock.lastLongRestEndMinute()) * 60L + clock.second() - clock.lastLongRestEndSecond() < 86400)
                         throw invalid("S2_REST_LONG_INTERVAL");
                     dice = recoverDice(before, input.recoveredHitDice());
                     hp = Schema2CharacterHealthRules.heal(hp, before.maximumHitPoints(), before.maximumHitPoints()).after();
-                    next = new RestState(clock.minute(), clock.minute(), null);
+                    next = new RestState(clock.minute(), clock.second(), clock.minute(), clock.second(), null);
                 }
                 resources = recoverResources(material, before, active.kind());
             }
@@ -98,7 +98,7 @@ public final class Schema2CharacterRestRules {
             }
             case "REST_ENDED" -> {
                 if (active == null) throw invalid("S2_REST_NOT_ACTIVE");
-                next = new RestState(clock.minute(), clock.lastLongRestEndMinute(), null);
+                next = new RestState(clock.minute(), clock.second(), clock.lastLongRestEndMinute(), clock.lastLongRestEndSecond(), null);
             }
             default -> throw invalid("S2_REST_COMMAND");
         }
@@ -108,8 +108,11 @@ public final class Schema2CharacterRestRules {
 
     public void validateState(ProductionSchema2Projection material, State state) {
         RestState clock = state.rest();
-        if (clock == null || clock.minute() < 0 || clock.minute() > MAX_MINUTE
-                || clock.lastLongRestEndMinute() != null && (clock.lastLongRestEndMinute() < 480 || clock.lastLongRestEndMinute() > clock.minute()))
+        if (clock == null || clock.minute() < 0 || clock.minute() > MAX_MINUTE || clock.second() < 0 || clock.second() > 59
+                || (clock.lastLongRestEndMinute() == null) != (clock.lastLongRestEndSecond() == null)
+                || clock.lastLongRestEndSecond() != null && (clock.lastLongRestEndSecond() < 0 || clock.lastLongRestEndSecond() > 59)
+                || clock.lastLongRestEndMinute() != null && (clock.lastLongRestEndMinute() < 480 || clock.lastLongRestEndMinute() > clock.minute()
+                    || clock.lastLongRestEndMinute() == clock.minute() && clock.lastLongRestEndSecond() > clock.second()))
             throw invalid("S2_REST_STATE");
         RestAttempt active = clock.active();
         if (active == null) return;

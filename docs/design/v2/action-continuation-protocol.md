@@ -1,7 +1,8 @@
 # v2 动作暂停与继续协议
 
-状态：统一控制协议、领域责任和验收条件已确定；真实执行器、存储、文件映射和 Host 入口尚待采用。
-本文完成攻击、移动、施法与反应的共同暂停/继续设计，不证明这些分支已经可以运行。
+状态：统一控制协议、领域责任和验收条件已确定；[有限 INTERNAL 战斗消费者](../../rules/schema-2-combat.md)
+已采用普通近战、移动、机会攻击的真实 owner、类型化存储及直接恢复。
+其他执行分支、完整文件映射和 Host 入口仍须各自采用，本文不证明所有分支已经可以运行。
 它遵循[模组接口基线](module-interface-baseline.md)、[机制接入责任清单](mechanism-integration-checklist.md)、
 [运行与事务](runtime-and-transactions.md)、[保存与恢复](save-and-recovery.md)及
 [玩家步骤](player-steps-and-auto-save.md)。legacy RELEASED v1、DRAFT 状态和 archive format 2

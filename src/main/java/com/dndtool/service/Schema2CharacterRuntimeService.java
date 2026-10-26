@@ -62,7 +62,7 @@ public final class Schema2CharacterRuntimeService {
     private final JdbcSchema2SnapshotControlRepository controls = new JdbcSchema2SnapshotControlRepository();
     private volatile Pending pending;
     private record Pending(UUID characterId, String digest, History restoration, boolean isolated) { }
-    private record Material(ProductionSchema2Projection projection, InitialPlan initial) { }
+    record Material(ProductionSchema2Projection projection, InitialPlan initial) { }
 
     public Schema2CharacterRuntimeService(DataSource runtime) {
         this(runtime, sides -> new SecureRandom().nextInt(sides) + 1);
@@ -74,19 +74,22 @@ public final class Schema2CharacterRuntimeService {
     /** Every source, version, capacity and rule check precedes randomness and the first insert. */
     public Result execute(Request request) {
         Objects.requireNonNull(request);
+        if (JdbcSchema2CharacterRuntimeRepository.combatKind(request.command().kind()))
+            return new Result(Status.REJECTED, "S2_CHARACTER_COMBAT_OWNER_REQUIRED", null);
         return transact(false, request.characterId(), request.digest(), null, connection -> {
             Material material = material(connection, request.identity(), request.preparationOperationId());
             request.rules().verify(material.projection());
             if (!request.characterId().equals(material.initial().characterId())
                     || !request.campaignId().equals(material.initial().campaignId())) throw rejected("S2_CHARACTER_BINDING");
             History history = characters.read(connection, request.characterId());
-            if (history != null) validateHistory(material, history);
+            if (history != null) { validateHistory(material, history); Schema2CombatRuntimeService.validateCharacterReferences(connection, history, runtime); }
             Event previous = characters.findOperation(connection, request.operationId());
             if (previous != null) {
                 if (!previous.requestDigest().equals(request.digest()) || history == null
                         || !history.events().contains(previous)) throw rejected("S2_CHARACTER_OPERATION_CONFLICT");
                 return new Result(Status.REPLAYED, "S2_CHARACTER_REPLAY", previous);
             }
+            Schema2CombatRuntimeService.requireNoActiveCombat(connection, request.campaignId());
             if (request.command().kind().equals("INITIALIZED")) {
                 if (history != null) throw rejected("S2_CHARACTER_EXISTS");
                 if (characters.findByRun(connection, request.identity().runId()) != null)
@@ -181,8 +184,11 @@ public final class Schema2CharacterRuntimeService {
             }
             if (characters.findByRun(connection, state.identity().runId()) != null)
                 throw rejected("S2_CHARACTER_RUN_OCCUPIED");
+            if (history.events().stream().anyMatch(event -> event.command().combatInput() != null))
+                throw rejected("S2_CHARACTER_COMBAT_RESTORE_BUNDLE_REQUIRED");
             for (Event event : history.events()) if (characters.findOperation(connection, event.operationId()) != null)
                 throw rejected("S2_CHARACTER_OPERATION_CONFLICT");
+            Schema2CombatRuntimeService.requireNoActiveCombat(connection, state.campaignId());
             characters.restore(connection, history);
             if (!history.equals(characters.read(connection, state.characterId()))) throw new SQLException("S2_CHARACTER_READBACK");
             return new Result(Status.COMMITTED, "S2_CHARACTER_RESTORED", history.events().getLast());
@@ -217,7 +223,7 @@ public final class Schema2CharacterRuntimeService {
         }
     }
 
-    private Material material(Connection connection, Identity identity, UUID preparationOperation) throws SQLException {
+    Material material(Connection connection, Identity identity, UUID preparationOperation) throws SQLException {
         var snapshot = snapshots.read(connection, identity);
         if (snapshot == null) throw rejected("S2_CHARACTER_BINDING");
         var initial = initialPlans.read(connection, preparationOperation, snapshot);
@@ -232,12 +238,13 @@ public final class Schema2CharacterRuntimeService {
         return new Material(snapshot.projection(), initial);
     }
 
-    private void validateHistory(Connection connection, History history) throws SQLException {
+    void validateHistory(Connection connection, History history) throws SQLException {
         State current = history.current();
         validateHistory(material(connection, current.identity(), current.preparationOperationId()), history);
+        Schema2CombatRuntimeService.validateCharacterReferences(connection, history, runtime);
     }
 
-    private void validateRestoration(Connection connection, History history) throws SQLException {
+    void validateRestoration(Connection connection, History history) throws SQLException {
         State current = history.current();
         Material material = material(connection, current.identity(), current.preparationOperationId());
         try { validateHistory(material, history); }
@@ -248,7 +255,7 @@ public final class Schema2CharacterRuntimeService {
         }
     }
 
-    private void validateHistory(Material material, History history) throws SQLException {
+    void validateHistory(Material material, History history) throws SQLException {
         try {
             JdbcSchema2CharacterRuntimeRepository.validate(history);
             for (Event event : history.events()) {
@@ -259,7 +266,9 @@ public final class Schema2CharacterRuntimeService {
                         event.before() == null ? -1 : event.before().version(), event.command(),
                         event.before() == null ? after.abilities() : Map.of());
                 if (!request.digest().equals(event.requestDigest())
-                        || !after.equals(calculate(material, request, event.before(), event.hitDieRoll(), event.checkResult(), event.healthResult())))
+                        || !after.equals(JdbcSchema2CharacterRuntimeRepository.combatKind(event.kind())
+                            ? Schema2CombatCharacterFacts.verify(material.projection(),event.before(),event.command(),event.healthResult(),event.after())
+                            : calculate(material, request, event.before(), event.hitDieRoll(), event.checkResult(), event.healthResult())))
                     throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT");
             }
         } catch (IllegalArgumentException malformed) { throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT", malformed); }
@@ -268,6 +277,10 @@ public final class Schema2CharacterRuntimeService {
     private State calculate(Material material, Request request, State before, Integer roll, CheckResult checkResult, HealthResult healthResult) {
         Command command = request.command();
         health.requireCommand(before, command);
+        if (JdbcSchema2CharacterRuntimeRepository.combatKind(command.kind())) {
+            if (roll != null || checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+            throw rejected("S2_CHARACTER_COMBAT_OWNER_REQUIRED");
+        }
         if (Schema2CharacterHealthRules.handles(command)) {
             if (roll != null || checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
             return health.verify(material.projection(), before, command, healthResult);
@@ -436,6 +449,12 @@ public final class Schema2CharacterRuntimeService {
             if (health != null) {
                 rule(out, health.rule()); nullableRule(out, health.effect());
                 text(out, Objects.toString(health.temporaryChoice(), "")); text(out, health.adjudication());
+            }
+            CombatInput combat = command.combatInput();
+            if (combat != null) {
+                text(out, combat.combatId().toString()); text(out, combat.combatOperationId().toString());
+                text(out, combat.frameKey().toString()); text(out, combat.actorId().toString());
+                out.writeInt(combat.damageAmount()); out.writeBoolean(combat.critical()); out.writeInt(combat.secondsAdvanced());
             }
             out.writeInt(request.initialAbilities().size());
             for (var entry : request.initialAbilities().entrySet()) { text(out, entry.getKey()); out.writeInt(entry.getValue()); }

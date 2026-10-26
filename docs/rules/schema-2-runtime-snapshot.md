@@ -158,3 +158,10 @@ V022—V024 新结构另见[授予与工具核验 SQL](../../database/verify/cha
 候选 WAR 包含生产读取、组合、快照和协调类；不包含离线安装类、原包、来源 SQL、测试向量、
 秘密或真实存档。运行迁移、账号授权、隔离 MySQL 验收和部署仍分别执行；本合同不改变默认
 RELEASED v1，不激活 archive 2，也不自动装配第二 JNDI 或游戏运行入口。
+
+## 有界战斗规则镜像
+
+运行 V032 的 `s2_runtime_combat`、`s2_runtime_weapon_attack`、`s2_runtime_movement` 保存
+[战斗作者合同](schema-2-combat-authoring.md)的完整类型化字段和来源链。引用保留完整
+模块／规则类型／规则键；启停、覆盖、原子字段和真实读回都参与既有生产字节验证。
+这与 V033/V034 的[战斗业务事实](schema-2-combat.md)分工，镜像本身不授予执行资格。

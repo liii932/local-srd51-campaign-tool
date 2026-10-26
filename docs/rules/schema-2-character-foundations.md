@@ -1,9 +1,14 @@
 # Schema 2 检定、装备与健康基础
 
-本文约束单角色 INTERNAL 运行中的真实消费者，沿用[初始授予](schema-2-proficiency-grants.md)、
+本文约束单角色 INTERNAL 基础入口中的真实消费者，沿用[初始授予](schema-2-proficiency-grants.md)、
 [成长与资源](schema-2-character-statistics.md)、[休息](schema-2-character-rest.md)及
 [共同事务](business-write-transactions.md)。准确来源、运行快照、角色状态、命令与实际结果共同构成
 执行依据；纯计算方法或测试向量不授予完整战役、Host、archive format 2 或发布资格。
+
+[内部战斗](schema-2-combat.md)复用这些角色事实，但由独立战斗 owner 接纳攻击、回合和机会攻击。
+活动战斗期间本基础入口在幂等查证后阻断普通写入；战斗健康和计时子命令不能由调用方直接提交。
+零 HP 掉物由战斗 owner 保存为带准确战斗／格坐标的 GROUND 实例，基础装备操作不得把它自动收回。
+稳定恢复期限及长休完成时刻保留秒，整分钟推进保留现有秒余数。
 
 ## 规则来源与责任
 

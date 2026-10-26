@@ -136,6 +136,18 @@ public final class SchemaMigrations {
     static final String V031_SCRIPT_NAME = "V031__schema2-equipment-health-history.sql";
     static final String V031_APPROVED_SHA256 = "1b9f8959ad5c3d6e4b417d2672a7a06cf8df572e9059e4addfde01856e57b79e";
 
+    static final int V032_VERSION = 32;
+    static final String V032_SCRIPT_NAME = "V032__schema2-combat-rules.sql";
+    static final String V032_APPROVED_SHA256 = "e1bc7521e953b640b42c869f734961d8e9153e2036788468c9ea13db39be5cae";
+
+    static final int V033_VERSION = 33;
+    static final String V033_SCRIPT_NAME = "V033__schema2-combat-runtime.sql";
+    static final String V033_APPROVED_SHA256 = "df5ddd066e6694d836daf2891ead4271e5ae6e2ed1cb2bf13a009d75d72c83e7";
+
+    static final int V034_VERSION = 34;
+    static final String V034_SCRIPT_NAME = "V034__schema2-combat-time-ground.sql";
+    static final String V034_APPROVED_SHA256 = "b9872fe91f87cf0d0c8cb2c16e955c6d0e4e566aed52d56071afa89217affe1f";
+
     private static final String RESOURCE_DIRECTORY = "/db/migration/";
     private static final String SCOPE_BEGIN = "-- CHECKSUM-SCOPE-BEGIN";
     private static final String SCOPE_END = "-- CHECKSUM-SCOPE-END";
@@ -175,7 +187,10 @@ public final class SchemaMigrations {
             new Definition(V028_VERSION, V028_SCRIPT_NAME, V028_APPROVED_SHA256),
             new Definition(V029_VERSION, V029_SCRIPT_NAME, V029_APPROVED_SHA256),
             new Definition(V030_VERSION, V030_SCRIPT_NAME, V030_APPROVED_SHA256),
-            new Definition(V031_VERSION, V031_SCRIPT_NAME, V031_APPROVED_SHA256));
+            new Definition(V031_VERSION, V031_SCRIPT_NAME, V031_APPROVED_SHA256),
+            new Definition(V032_VERSION, V032_SCRIPT_NAME, V032_APPROVED_SHA256),
+            new Definition(V033_VERSION, V033_SCRIPT_NAME, V033_APPROVED_SHA256),
+            new Definition(V034_VERSION, V034_SCRIPT_NAME, V034_APPROVED_SHA256));
 
     private SchemaMigrations() {
     }

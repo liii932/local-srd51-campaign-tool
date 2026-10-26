@@ -28,7 +28,11 @@ SELECT CONVERT(a.module_key USING latin1) AS module_key, CONVERT(a.release_versi
     (SELECT COUNT(*) FROM rule_schema2_equipment_item m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS equipment_item_count,
     (SELECT COUNT(*) FROM rule_schema2_health m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS health_count,
     (SELECT COUNT(*) FROM rule_schema2_vital_effect m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS vital_effect_count,
-    (SELECT COUNT(*) FROM rule_schema2_execution_change m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS execution_change_count
+    (SELECT COUNT(*) FROM rule_schema2_execution_change m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS execution_change_count,
+    (SELECT COUNT(*) FROM rule_schema2_combat m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS combat_count,
+    (SELECT COUNT(*) FROM rule_schema2_weapon_attack m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS weapon_attack_count,
+    (SELECT COUNT(*) FROM rule_schema2_movement m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS movement_count,
+    (SELECT COUNT(*) FROM rule_schema2_combat_change m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS combat_change_count
 FROM rule_schema2_artifact a ORDER BY a.installation_sequence LIMIT 17;
 SELECT CONVERT(module_key USING latin1) AS module_key, CONVERT(release_version USING latin1) AS release_version,
     installation_sequence, HEX(source_operation_id) AS source_operation_id,

@@ -41,6 +41,7 @@ public final class JdbcSchema2CharacterSourceRepository {
         var material = expected(Objects.requireNonNull(artifact));
         for (Row row : material) insert(connection, row);
         JdbcSchema2ExecutionSourceRows.store(connection, artifact);
+        JdbcSchema2CombatSourceRows.store(connection, artifact);
     }
 
     /** Reads all rows, including unselected/orphan materials, and compares every typed value to the ZIP. */
@@ -75,6 +76,7 @@ public final class JdbcSchema2CharacterSourceRepository {
             for (int j = 0; j < wanted.values.size(); j++) require(equal(wanted.values.get(j), found.values.get(j)));
         }
         JdbcSchema2ExecutionSourceRows.verifyAll(connection, artifacts);
+        JdbcSchema2CombatSourceRows.verifyAll(connection, artifacts);
     }
 
     private static List<Row> expected(ProductionRuleArtifact artifact) throws SQLException {

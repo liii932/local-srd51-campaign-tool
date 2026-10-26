@@ -1,0 +1,18 @@
+{
+  "author_schema_version": 2,
+  "module_key": "combat_base",
+  "release_version": "1",
+  "package_display_name": "Fixed combat author vectors",
+  "role": "base",
+  "dependencies": [],
+  "compatible_combinations": [
+    {}
+  ],
+  "load_order_constraints": [],
+  "files": [
+    {
+      "kind": "definitions",
+      "path": "rules.json"
+    }
+  ]
+}

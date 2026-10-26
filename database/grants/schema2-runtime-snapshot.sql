@@ -15,3 +15,8 @@ GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_operation` TO 'dnd_tool_se_app
 GRANT SELECT, UPDATE ON `dnd_tool_se`.`s2_runtime_control` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_character_source` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_proficiency_grant` TO 'dnd_tool_se_app'@'127.0.0.1';
+
+-- V032 combat, melee weapon and walking-speed rule mirrors.
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_combat` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_weapon_attack` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_movement` TO 'dnd_tool_se_app'@'127.0.0.1';

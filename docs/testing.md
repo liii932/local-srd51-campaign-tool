@@ -99,7 +99,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V031 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V034 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -258,7 +258,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V031 完整运行清单及来源 V001—V007（两链共 38 份迁移源）。
+并核对 V001—V034 完整运行清单及来源 V001—V008（两链共 42 份迁移源）。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -366,7 +366,7 @@ mvn '-Dtest=Schema2CheckCompositionTest,Schema2EquipmentHealthCompositionTest,Jd
 已实现的成长/休息验证继续使用下节入口。
 
 WAR 包含严格作者/组合和真实来源读取类；来源 SQL、离线安装器、作者包及测试向量排除。
-来源 V001—V007 的 31 张表、93 个触发器及 21 张类型化材料表须在另行授权的隔离 MySQL
+来源 V001—V008 的 35 张表、105 个触发器及 25 张类型化材料表须在另行授权的隔离 MySQL
 实例验收；代理和静态结构测试不能替代真实 CHECK、FK、权限、锁或持久化事实。
 
 ## Schema 2 角色成长、资源与休息验证
@@ -398,7 +398,7 @@ mvn '-Dtest=JdbcSchema2CheckSnapshotTest,JdbcSchema2EquipmentHealthSnapshotTest,
 核对封闭输入/结果、有效骰模式、完整装备健康前后状态、有序原骰、追加读回、直接恢复、
 孤儿与类型化行缺失、结构/邻接/预算限制及整笔回滚；这些测试保存已经准备的事实，不执行新业务。
 
-运行链为 V001—V031，来源保持 V001—V007，共 38 份迁移源。WAR 须包含镜像/事实仓储及
+运行链为 V001—V034，来源保持 V001—V008，共 42 份迁移源。WAR 须包含镜像/事实仓储及
 全部运行迁移，排除来源 SQL、离线写入工具、测试向量和真实存档。Check/Equipment/Health
 消费者、请求幂等和 RuntimeService 命令使用下节验证；仓储测试本身只作为存储事实的证据。
 现有成长/休息测试保护新增字段的中性保留，DRAFT、Host、archive 2 和安装门保持。
@@ -463,7 +463,7 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V031 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V034 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 
@@ -479,3 +479,20 @@ WAR 审计通过不代表已经部署。
 检定确认和其他业务提交仍须按上述授权边界验收。核对 CSP 下同源样式和脚本正常加载，
 窄屏不截断操作区或角色卡内容；自动化页面合同由 `HostOverviewPageTest`、
 `HostConsolePageTest` 和对应表单测试覆盖。
+
+## Schema 2 战斗与动作继续验证
+
+[内部战斗合同](rules/schema-2-combat.md)通过实际来源、准备、冻结镜像、角色和战斗仓储验证：
+
+```bash
+mvn '-Dtest=Schema2CombatCompositionTest,JdbcSchema2CombatSourceTest,JdbcSchema2CombatSnapshotTest,Schema2CombatSchemaTest,Schema2CombatRulesTest,Schema2CombatTimeRulesTest,Schema2CombatRuntimeServiceTest,JdbcSchema2CombatRuntimeRepositoryTest,Schema2CombatRuntimeSchemaTest' test
+```
+
+共享修改还须覆盖原组合 golden、stored projection、来源账本、
+角色装备／健康／休息／成长和迁移 schema 诊断。服务用例验证真实近战、机会攻击在离开前
+提交暂停、准确父继续、过期版本、一次消费、掉物与倒地、秒余数、死亡豁免、因果子历史、
+故障整笔回滚、UNKNOWN 原操作查证，以及 OPEN/CLOSED 窗口和健康／计时完整直接恢复。
+原始骰、预算和未实现来源拒绝在纯规则与存储测试中分别验证；不以过往测试计数代替本次结果。
+
+WAR 包含战斗消费者／仓储和运行 V032—V034，排除来源 V008、离线写入工具与测试向量。
+JDBC 代理及静态 SQL 检查不代替真实 MySQL、迁移执行、授权、部署、Host 或 archive format 2 验收。
