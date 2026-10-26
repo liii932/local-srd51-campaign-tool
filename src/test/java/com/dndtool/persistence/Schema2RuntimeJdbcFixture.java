@@ -106,6 +106,12 @@ public final class Schema2RuntimeJdbcFixture {
             if (equal(previous.get("character_id"), row.get("character_id")) || equal(previous.get("preparation_operation_id"), row.get("preparation_operation_id")) || equal(previous.get("run_id"), row.get("run_id"))) throw new SQLException("Character identity collision");
         if (table.equals("s2_character_event")) for (var previous : rows(table))
             if (equal(previous.get("operation_id"), row.get("operation_id")) || equal(previous.get("character_id"), row.get("character_id")) && equalNumber(previous.get("event_sequence"), row.get("event_sequence"))) throw new SQLException("Character operation collision");
+        if (table.equals("s2_character_combat_input")) for (var previous : rows(table))
+            if (equal(previous.get("operation_id"), row.get("operation_id"))) throw new SQLException("Character combat input collision");
+        if (table.equals("s2_combat_runtime")) for (var previous : rows(table))
+            if (equal(previous.get("combat_id"), row.get("combat_id"))) throw new SQLException("Combat identity collision");
+        if (table.equals("s2_combat_event")) for (var previous : rows(table))
+            if (equal(previous.get("operation_id"), row.get("operation_id")) || equal(previous.get("combat_id"), row.get("combat_id")) && equalNumber(previous.get("event_sequence"), row.get("event_sequence"))) throw new SQLException("Combat operation collision");
         if (table.equals("s2_runtime_identity")) for (var previous : rows(table)) {
             if (equal(previous.get("run_id"), row.get("run_id")) || equal(previous.get("snapshot_id"), row.get("snapshot_id"))) throw new SQLException("Identity collision");
         }
@@ -131,7 +137,7 @@ public final class Schema2RuntimeJdbcFixture {
             for (var row : rows(table)) distinct.put(HexFormat.of().formatHex((byte[]) row.get("operation_id")), row);
             return new ArrayList<>(distinct.values());
         }
-        if (query.startsWith("SELECT * FROM s2_character_") || query.startsWith("SELECT * FROM s2_initial_plan")) {
+        if (query.startsWith("SELECT * FROM s2_character_") || query.startsWith("SELECT * FROM s2_combat_") || query.startsWith("SELECT * FROM s2_initial_plan")) {
             var planQuery = Pattern.compile("SELECT \\* FROM ([a-z0-9_]+) WHERE ([a-z_]+) = \\? ORDER BY ([a-z_, ]+) LIMIT ([0-9]+)").matcher(query);
             if (!planQuery.matches()) throw new AssertionError(query);
             List<Map<String, Object>> result = new ArrayList<>();
@@ -188,6 +194,11 @@ public final class Schema2RuntimeJdbcFixture {
         int[] index = {-1};
         return proxy(ResultSet.class, (method, args) -> switch (method) {
             case "next" -> ++index[0] < rows.size();
+            case "getMetaData" -> proxy(ResultSetMetaData.class, (metadataMethod, metadataArgs) -> switch (metadataMethod) {
+                case "getColumnCount" -> rows.isEmpty() ? 0 : rows.getFirst().size();
+                case "getColumnLabel" -> new ArrayList<>(rows.getFirst().keySet()).get((int) metadataArgs[0] - 1);
+                default -> throw new AssertionError("Unexpected metadata call " + metadataMethod);
+            });
             case "getObject" -> {
                 var row = rows.get(index[0]);
                 Object column = args[0] instanceof Integer position ? new ArrayList<>(row.keySet()).get(position - 1) : args[0];

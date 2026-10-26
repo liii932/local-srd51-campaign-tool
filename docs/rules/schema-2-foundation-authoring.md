@@ -120,8 +120,8 @@ V007 增加 `rule_schema2_equipment_item`、`rule_schema2_health`、
 不把对象压成 JSON 文本。共享 reader 对全部包逐列比较原 ZIP，包含未选中包；
 缺失、多余、跨包、序号或值不一致均拒绝。负修正及严格清空也参与来源读回校验。
 
-RULES 的 V001—V007 合计 31 张表、93 个触发器，其中 21 张为 schema 2 类型化作者材料表；
-加运行 V001—V031，共 38 份迁移源。既有历史不可改写；迁移、授权与真实引擎验收各是独立检查点。
+RULES 的 V001—V008 合计 35 张表、105 个触发器，其中 25 张为 schema 2 类型化作者材料表；
+加运行 V001—V034，共 42 份迁移源。既有历史不可改写；迁移、授权与真实引擎验收各是独立检查点。
 installer 仅获准确材料列 INSERT，accepter/app/agent 对这些材料只读，仓储不拥有提交或回滚权限。
 
 `Schema2CompositionKernel` 与 `ProductionSchema2Projection` 支持这些类型的纯组合、完整链及

@@ -1,0 +1,45 @@
+[
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.blade"
+    },
+    "field": "ability_policy",
+    "value": "FINESSE"
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.blade"
+    },
+    "field": "dice_count",
+    "value": 2
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "character.movement",
+      "rule_key": "movement.human"
+    },
+    "field": "walk_speed_feet",
+    "value": 35
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "character.movement",
+      "rule_key": "movement.human"
+    },
+    "field": "author_note"
+  }
+]

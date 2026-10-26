@@ -23,6 +23,39 @@ public final class Schema2CharacterHealthRules {
 
     public static boolean handles(Command command) { return Set.of("HEALTH_EFFECT_RESOLVED", "DEATH_SAVE_RESOLVED").contains(command.kind()); }
     public record Resolution(State state, HealthResult result) { }
+    public record DamageResolution(State state, int requestedAmount, int appliedAmount, boolean critical) { }
+
+    /** Shared health owner for a server-proved damage packet; this method never rolls or creates an effect. */
+    public DamageResolution applyDamage(State before, int amount, boolean critical) {
+        prepareDamage(before);
+        if (amount < 0 || amount > 65535) throw invalid("S2_HEALTH_DAMAGE_AMOUNT");
+        HealthState old = before.health(), next = old;
+        int absorbed = Math.min(old.temporaryHitPoints(), amount), remaining = amount - absorbed;
+        int applied = absorbed + (int)Math.min(before.hitPoints(), remaining);
+        int temporary = old.temporaryHitPoints() - absorbed;
+        long hp = Math.max(0, before.hitPoints() - remaining);
+        if (before.hitPoints() == 0) {
+            if (amount > 0) next = remaining >= before.maximumHitPoints() ? dead(temporary) : failure(old, temporary, critical ? 2 : 1);
+        } else next = hp == 0 ? (remaining - before.hitPoints() >= before.maximumHitPoints() ? dead(temporary) : living(temporary)) : living(temporary);
+        State after = copy(before, hp, next, before.rest(), before.version() + 1);
+        validateState(after);
+        return new DamageResolution(after, amount, applied, critical);
+    }
+
+    /** Preflight usable by attack owners before their first random draw. */
+    public void prepareDamage(State before) {
+        validateState(before);
+        if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
+        if (before.rest().active() != null) throw invalid("S2_HEALTH_REST_ACTIVE");
+        if (before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
+        if (!before.features().isEmpty() || !before.feats().isEmpty()) throw invalid("S2_HEALTH_EFFECT_UNSUPPORTED");
+    }
+
+    public State verifyDamage(State before, int amount, boolean critical, DamageResolution saved) {
+        var expected = applyDamage(before, amount, critical);
+        if (!expected.equals(saved)) throw invalid("S2_HEALTH_RESULT_CORRUPT");
+        return expected.state();
+    }
     public static final class PreparedHealth {
         private final State before, capacityState;
         private final HealthInput input;
@@ -78,7 +111,7 @@ public final class Schema2CharacterHealthRules {
             if (deathD20 == 20) { hp = 1; applied = 1; next = living(old.temporaryHitPoints()); }
             else if (deathD20 >= 10) {
                 int successes = old.deathSuccesses() + 1;
-                next = successes == 3 ? new HealthState(old.temporaryHitPoints(), 0, 0, true, false, before.rest().minute() + recoveryD4 * 60L)
+                next = successes == 3 ? new HealthState(old.temporaryHitPoints(), 0, 0, true, false, before.rest().minute() + recoveryD4 * 60L,before.rest().second())
                         : new HealthState(old.temporaryHitPoints(), successes, old.deathFailures(), false, false, null);
             } else next = failure(old, old.temporaryHitPoints(), deathD20 == 1 ? 2 : 1);
         } else {
@@ -86,15 +119,8 @@ public final class Schema2CharacterHealthRules {
             amount = Math.max(0, dice.stream().mapToInt(Integer::intValue).sum() + prepared.effect.modifier());
             switch (prepared.effect.kind()) {
                 case DAMAGE -> {
-                    int absorbed = Math.min(old.temporaryHitPoints(), amount), remaining = amount - absorbed;
-                    applied = absorbed + (int) Math.min(hp, remaining);
-                    int temporary = old.temporaryHitPoints() - absorbed;
-                    if (hp == 0) {
-                        if (amount > 0) next = remaining >= before.maximumHitPoints() ? dead(temporary) : failure(old, temporary, 1);
-                    } else {
-                        long prior = hp; hp = Math.max(0, hp - remaining);
-                        next = hp == 0 ? (remaining - prior >= before.maximumHitPoints() ? dead(temporary) : living(temporary)) : living(temporary);
-                    }
+                    var damage=applyDamage(before,amount,false);
+                    hp=damage.state().hitPoints();next=damage.state().health();applied=damage.appliedAmount();
                 }
                 case HEALING -> {
                     var healing = heal(hp, before.maximumHitPoints(), amount); hp = healing.after(); applied = (int) healing.applied();
@@ -102,7 +128,7 @@ public final class Schema2CharacterHealthRules {
                 }
                 case TEMP_HP -> {
                     if (prepared.input.temporaryChoice().equals("REPLACE")) {
-                        applied = amount; next = new HealthState(amount, old.deathSuccesses(), old.deathFailures(), old.stable(), old.dead(), old.stableRecoveryMinute());
+                        applied = amount; next = new HealthState(amount, old.deathSuccesses(), old.deathFailures(), old.stable(), old.dead(), old.stableRecoveryMinute(),old.stableRecoverySecond());
                     }
                 }
             }
@@ -129,7 +155,8 @@ public final class Schema2CharacterHealthRules {
             if (value.stable() || value.deathSuccesses() != 0 || value.deathFailures() != 0 || value.stableRecoveryMinute() != null) throw invalid("S2_HEALTH_STATE");
         } else if (value.stable()) {
             if (value.deathSuccesses() != 0 || value.deathFailures() != 0 || value.stableRecoveryMinute() == null
-                    || value.stableRecoveryMinute() <= state.rest().minute()) throw invalid("S2_HEALTH_STATE");
+                    || value.stableRecoveryMinute() < state.rest().minute()
+                    || value.stableRecoveryMinute() == state.rest().minute() && value.stableRecoverySecond() <= state.rest().second()) throw invalid("S2_HEALTH_STATE");
         } else if (value.stableRecoveryMinute() != null) throw invalid("S2_HEALTH_STATE");
     }
 
@@ -148,7 +175,8 @@ public final class Schema2CharacterHealthRules {
     /** Reconciles stable recovery before validating the final time state. It never draws another die. */
     public State afterRest(State before, State after, Command command) {
         HealthState value = before.health(); long hp = after.hitPoints();
-        if (command.kind().equals("TIME_ADVANCED") && value.stable() && after.rest().minute() >= value.stableRecoveryMinute()) {
+        if (command.kind().equals("TIME_ADVANCED") && value.stable() && (after.rest().minute() > value.stableRecoveryMinute()
+                || after.rest().minute() == value.stableRecoveryMinute() && after.rest().second() >= value.stableRecoverySecond())) {
             hp = 1; value = living(value.temporaryHitPoints());
         } else if (command.kind().equals("REST_COMPLETED") && before.rest().active().kind().equals("LONG_REST")) value = living(0);
         else if (hp > before.hitPoints()) value = living(value.temporaryHitPoints());

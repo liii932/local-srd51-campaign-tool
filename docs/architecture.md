@@ -93,6 +93,13 @@ V029/V031 的[角色事实仓储](rules/schema-2-character-fact-storage.md)保�
 保存实际骰模式、骰点和结果。伤害、治疗、临时 HP、死亡豁免及稳定恢复沿唯一健康 owner 执行，
 稳定期限接入该运行的唯一时间；没有平行 HP、装备目录即库存、独立检定事务或恢复时重掷。
 
+[内部战斗](rules/schema-2-combat.md)由 `Schema2CombatRuntimeService` 接纳同战役的独立 prepared 角色，
+要求冻结规则一致、准确 run/snapshot/准备绑定和同秒起点。`Schema2CombatRules` 消费
+[战斗作者定义](rules/schema-2-combat-authoring.md)，以唯一聚合记录回合、动作、位置和活动继续链。
+`JdbcSchema2CombatRuntimeRepository` 保存完整战斗历史；真实伤害、死亡豁免、掉落及六秒回合时间
+仍写入原角色事件，与战斗根在共同事务中原子提交。保存/恢复保留已完成前缀与唯一未决叶子，
+不复制 HP 或时钟、不重放已付成本。此 INTERNAL 接合不开放完整初始化、Host 或完整战役文件。
+
 ## 3. 产品范围
 
 ### 3.1 当前冻结 v1 已实现

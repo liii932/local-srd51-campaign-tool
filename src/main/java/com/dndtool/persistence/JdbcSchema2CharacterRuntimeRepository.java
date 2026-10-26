@@ -12,7 +12,7 @@ import java.util.*;
 public final class JdbcSchema2CharacterRuntimeRepository {
     public static final int MAX_EVENTS = 128, MAX_RESOURCES = 32;
     public static final List<String> ABILITIES = List.of("ability.strength", "ability.dexterity", "ability.constitution", "ability.intelligence", "ability.wisdom", "ability.charisma");
-    private static final Set<String> KINDS = Set.of("INITIALIZED", "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED", "CHECK_RESOLVED", "ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED", "HEALTH_EFFECT_RESOLVED", "DEATH_SAVE_RESOLVED");
+    private static final Set<String> KINDS = Set.of("INITIALIZED", "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED", "CHECK_RESOLVED", "ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED", "HEALTH_EFFECT_RESOLVED", "DEATH_SAVE_RESOLVED", "COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED");
     private static final Comparator<RuleIdentity> RULE_ORDER = Comparator.comparing(RuleIdentity::moduleKey).thenComparing(RuleIdentity::ruleType).thenComparing(RuleIdentity::ruleKey);
     private static final Comparator<com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity> SLOT_ORDER = Comparator.comparing(com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity::rule, RULE_ORDER).thenComparing(com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity::collectionKey).thenComparing(com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity::moduleKey).thenComparing(com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity::entryKey);
     private static final Comparator<ResourceState> RESOURCE_ORDER = Comparator.comparing((ResourceState r) -> r.identity().moduleKey()).thenComparing(r -> r.identity().ruleType()).thenComparing(r -> r.identity().ruleKey());
@@ -21,16 +21,24 @@ public final class JdbcSchema2CharacterRuntimeRepository {
     public static final int MAX_HISTORY_CHILD_ROWS = 32768;
     public static final int MAX_EQUIPMENT = 32, MAX_HEALTH_DICE = 20;
     private static final Set<String> EQUIPMENT_LOCATIONS = Set.of("CARRIED", "WORN", "MAIN_HAND", "OFF_HAND", "BOTH_HANDS");
-    public record EquipmentItem(UUID itemId, RuleIdentity item, String location) {
+    public record EquipmentItem(UUID itemId, RuleIdentity item, String location, UUID groundCombatId, Integer groundX, Integer groundY) {
+        public EquipmentItem(UUID itemId,RuleIdentity item,String location) { this(itemId,item,location,null,null,null); }
         public EquipmentItem {
-            if (!validUuid(itemId) || !validRule(item, "equipment.item") || location == null || !EQUIPMENT_LOCATIONS.contains(location))
+            if (!validUuid(itemId) || !validRule(item, "equipment.item") || location == null || !(EQUIPMENT_LOCATIONS.contains(location)||location.equals("GROUND")))
                 throw new IllegalArgumentException("S2_CHARACTER_EQUIPMENT_ITEM");
+            if (location.equals("GROUND") ? !validUuid(groundCombatId) || groundX==null || groundY==null
+                    || Math.abs((long)groundX)>10000 || Math.abs((long)groundY)>10000
+                    : groundCombatId!=null || groundX!=null || groundY!=null) throw new IllegalArgumentException("S2_CHARACTER_EQUIPMENT_ITEM");
         }
     }
-    public record HealthState(int temporaryHitPoints, int deathSuccesses, int deathFailures, boolean stable, boolean dead, Long stableRecoveryMinute) {
+    public record HealthState(int temporaryHitPoints, int deathSuccesses, int deathFailures, boolean stable, boolean dead, Long stableRecoveryMinute, Integer stableRecoverySecond) {
+        public HealthState(int temporaryHitPoints,int deathSuccesses,int deathFailures,boolean stable,boolean dead,Long stableRecoveryMinute) {
+            this(temporaryHitPoints,deathSuccesses,deathFailures,stable,dead,stableRecoveryMinute,stableRecoveryMinute==null?null:0);
+        }
         public static final HealthState INITIAL = new HealthState(0, 0, 0, false, false, null);
         public HealthState {
-            if (temporaryHitPoints < 0 || temporaryHitPoints > 65535 || deathSuccesses < 0 || deathSuccesses > 2 || deathFailures < 0 || deathFailures > 2
+            if ((stableRecoveryMinute==null)!=(stableRecoverySecond==null) || stableRecoverySecond!=null&&(stableRecoverySecond<0||stableRecoverySecond>59)
+                    || temporaryHitPoints < 0 || temporaryHitPoints > 65535 || deathSuccesses < 0 || deathSuccesses > 2 || deathFailures < 0 || deathFailures > 2
                     || stableRecoveryMinute != null && (stableRecoveryMinute < 1 || stableRecoveryMinute > 1000000000L))
                 throw new IllegalArgumentException("S2_CHARACTER_HEALTH_STATE");
         }
@@ -44,7 +52,12 @@ public final class JdbcSchema2CharacterRuntimeRepository {
     public record ProficiencyState(com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity sourceSlot, RuleIdentity target, int acquiredAtTotalLevel) { }
     public record RestAttempt(RuleIdentity rule, String kind, long startMinute, int hitPointsAtStart,
             long sleepMinutes, long lightMinutes, long strenuousMinutes, String phase, String lastActivity, long consecutiveStrenuousMinutes, boolean interrupted) { }
-    public record RestState(long minute, Long lastLongRestEndMinute, RestAttempt active) {
+    public record RestState(long minute, int second, Long lastLongRestEndMinute, Integer lastLongRestEndSecond, RestAttempt active) {
+        public RestState(long minute,Long lastLongRestEndMinute,RestAttempt active) { this(minute,0,lastLongRestEndMinute,lastLongRestEndMinute==null?null:0,active); }
+        public RestState {
+            if(second<0||second>59||(lastLongRestEndMinute==null)!=(lastLongRestEndSecond==null)
+                    ||lastLongRestEndSecond!=null&&(lastLongRestEndSecond<0||lastLongRestEndSecond>59)) throw new IllegalArgumentException("S2_CHARACTER_TIME");
+        }
         public static final RestState INITIAL = new RestState(0, null, null);
     }
     public record RestInput(String restKind, String activity, long minutes, int hitDieSides, Map<Integer, Integer> recoveredHitDice) {
@@ -155,9 +168,26 @@ public final class JdbcSchema2CharacterRuntimeRepository {
             dice = List.copyOf(dice);
         }
     }
+    /** Causal reference to the sole combat owner; never accepted as a public character command. */
+    public record CombatInput(UUID combatId, UUID combatOperationId, UUID frameKey, UUID actorId,
+            int damageAmount, boolean critical, int secondsAdvanced) {
+        public CombatInput(UUID combatId,UUID combatOperationId,UUID frameKey,UUID actorId,int damageAmount,boolean critical) {
+            this(combatId,combatOperationId,frameKey,actorId,damageAmount,critical,0);
+        }
+        public CombatInput {
+            if (!validUuid(combatId) || !validUuid(combatOperationId) || !validUuid(frameKey) || !validUuid(actorId)
+                    || damageAmount < 0 || damageAmount > 65535 || secondsAdvanced<0 || secondsAdvanced>6) throw new IllegalArgumentException("S2_CHARACTER_COMBAT_INPUT");
+        }
+    }
     public record Command(String kind, RuleIdentity resource, long amount, String recoveryTrigger, String hpChoice,
             RuleIdentity targetClass, GrowthChoices growthChoices, RestInput restInput, CheckInput checkInput,
-            EquipmentInput equipmentInput, HealthInput healthInput) {
+            EquipmentInput equipmentInput, HealthInput healthInput, CombatInput combatInput) {
+        public Command(String kind, RuleIdentity resource, long amount, String recoveryTrigger, String hpChoice,
+                RuleIdentity targetClass, GrowthChoices growthChoices, RestInput restInput, CheckInput checkInput,
+                EquipmentInput equipmentInput, HealthInput healthInput) {
+            this(kind, resource, amount, recoveryTrigger, hpChoice, targetClass, growthChoices, restInput, checkInput,
+                    equipmentInput, healthInput, null);
+        }
         public Command(String kind, RuleIdentity resource, long amount, String recoveryTrigger, String hpChoice, RuleIdentity targetClass, GrowthChoices growthChoices, RestInput restInput, CheckInput checkInput) {
             this(kind, resource, amount, recoveryTrigger, hpChoice, targetClass, growthChoices, restInput, checkInput, null, null);
         }
@@ -208,6 +238,12 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                     && GrowthChoices.EMPTY.equals(growthChoices) && restInput == null && checkInput == null && equipmentInput == null && healthInput != null
                     && (kind.equals("HEALTH_EFFECT_RESOLVED") ? healthInput.effect() != null : healthInput.effect() == null && healthInput.temporaryChoice() == null);
             else valid &= healthInput == null;
+            if (combatKind(kind)) valid &= combatInput != null && healthInput.effect() == null && healthInput.temporaryChoice() == null
+                    && (!kind.equals("COMBAT_DEATH_SAVE_RESOLVED") || combatInput.damageAmount() == 0 && !combatInput.critical());
+            else valid &= combatInput == null;
+            if (combatInput != null) valid &= kind.equals("COMBAT_TIME_ADVANCED")
+                    ? combatInput.secondsAdvanced()==6 && combatInput.damageAmount()==0 && !combatInput.critical()
+                    : combatInput.secondsAdvanced()==0;
             if (!valid) throw new IllegalArgumentException("S2_CHARACTER_COMMAND");
         }
     }
@@ -280,6 +316,15 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                     row.getObject("recovery_d4") == null ? null : integer(row, "recovery_d4"), integer(row, "rolled_amount"), integer(row, "applied_amount"));
             require(healthEvents.putIfAbsent(sequence, new HealthFacts(input, result)) == null); return true;
         });
+        Map<Long, CombatInput> combatInputs = new HashMap<>();
+        query(connection, "s2_character_combat_input", "character_id", bytes(characterId), "event_sequence", MAX_EVENTS, row -> {
+            long sequence = eventSequence(row, headers.size());
+            require(id(row, "operation_id").equals(headers.get((int) sequence - 1).operation));
+            int critical = integer(row, "critical"); require(critical <= 1);
+            CombatInput input = new CombatInput(id(row, "combat_id"), id(row, "combat_operation_id"), id(row, "frame_key"),
+                    id(row, "actor_id"), integer(row, "damage_amount"), critical == 1, integer(row,"seconds_advanced"));
+            require(combatInputs.putIfAbsent(sequence, input) == null); return true;
+        });
         require(healthDice.isEmpty());
         Map<Long, Map<String, Integer>> abilityChoices = new HashMap<>();
         query(connection, "s2_character_command_ability", "character_id", bytes(characterId), "event_sequence, choice_index", MAX_EVENTS * 2, row -> {
@@ -303,7 +348,9 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         var features = readChildren(connection, characterId, "feature", "feature_index", MAX_FEATURES, headers.size(), row -> new FeatureState(rule(row, "feature"), rule(row, "owner"), integer(row, "acquired_class_level")));
         var feats = readChildren(connection, characterId, "feat", "feat_index", MAX_FEATS, headers.size(), row -> new FeatState(rule(row, "feat"), rule(row, "class"), integer(row, "acquired_class_level")));
         var proficiencies = readChildren(connection, characterId, "proficiency", "proficiency_index", MAX_GRANTS, headers.size(), row -> new ProficiencyState(slot(row), rule(row, "target"), integer(row, "acquired_total_level")));
-        var equipment = readChildren(connection, characterId, "equipment", "equipment_index", MAX_EQUIPMENT, headers.size(), row -> new EquipmentItem(id(row, "item_id"), rule(row, "item"), ascii(row, "location", 16)));
+        var equipment = readChildren(connection, characterId, "equipment", "equipment_index", MAX_EQUIPMENT, headers.size(), row -> new EquipmentItem(id(row, "item_id"), rule(row, "item"), ascii(row, "location", 16),
+                row.getObject("ground_combat_id")==null?null:id(row,"ground_combat_id"),
+                row.getObject("ground_x")==null?null:signedInteger(row,"ground_x"),row.getObject("ground_y")==null?null:signedInteger(row,"ground_y")));
 
         Map<StateKey, List<ResourceState>> resourceRows = new HashMap<>();
         query(connection, "s2_character_event_resource", "character_id", bytes(characterId), "event_sequence, phase, resource_index", MAX_EVENTS * MAX_RESOURCES * 2, row -> {
@@ -356,11 +403,12 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                 require("CHECK_RESOLVED".equals(header.kind) == (check != null));
                 EquipmentInput equipmentInput = equipmentCommands.remove(index + 1L); HealthFacts health = healthEvents.remove(index + 1L);
                 require(equipmentKind(header.kind) == (equipmentInput != null) && healthKind(header.kind) == (health != null));
-                Command command = new Command(header.kind, header.resource, header.amount, header.trigger, header.hp, header.targetClass, growth, input, check == null ? null : check.input(), equipmentInput, health == null ? null : health.input());
+                CombatInput combat = combatInputs.remove(index + 1L); require(combatKind(header.kind) == (combat != null));
+                Command command = new Command(header.kind, header.resource, header.amount, header.trigger, header.hp, header.targetClass, growth, input, check == null ? null : check.input(), equipmentInput, health == null ? null : health.input(), combat);
                 events.add(new Event(header.operation, header.digest, command, header.roll, before, after, check == null ? null : check.result(), health == null ? null : health.result()));
             } catch (IllegalArgumentException malformed) { throw new SQLException("S2_CHARACTER_RUNTIME_CORRUPT", malformed); }
         }
-        require(states.isEmpty() && abilityChoices.isEmpty() && proficiencyChoices.isEmpty() && recoveredDice.isEmpty() && checks.isEmpty() && equipmentCommands.isEmpty() && healthEvents.isEmpty());
+        require(states.isEmpty() && abilityChoices.isEmpty() && proficiencyChoices.isEmpty() && recoveredDice.isEmpty() && checks.isEmpty() && equipmentCommands.isEmpty() && healthEvents.isEmpty() && combatInputs.isEmpty());
         History history = new History(events.getLast().after(), events); validate(history); return history;
     }
 
@@ -431,8 +479,17 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         }
         require(rows <= MAX_HISTORY_CHILD_ROWS);
     }
+    /** Combat changes only health, clock and equipment location, so their structural bound is fixed. */
+    public static void checkCombatCapacity(History history, int additionalEvents) throws SQLException {
+        require(additionalEvents >= 0 && history.events().size() + additionalEvents <= MAX_EVENTS);
+        long used = 0;
+        for (Event event : history.events()) used += stateRows(event.after())
+                + (event.before() == null ? 0 : stateRows(event.before())) + eventRows(event);
+        long perEvent = stateRows(history.current()) * 2 + 2 + MAX_HEALTH_DICE;
+        require(used + perEvent * additionalEvents <= MAX_HISTORY_CHILD_ROWS);
+    }
     private static long stateRows(State state) { return 1L + state.classes().size() + state.hitDicePools().size() + state.subclasses().size() + state.features().size() + state.feats().size() + state.proficiencies().size() + state.resources().size() + state.equipment().size(); }
-    private static long commandRows(Command command) { return command.growthChoices().abilityIncreases().size() + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum() + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size()) + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1) + (command.healthInput() == null ? 0 : 1 + MAX_HEALTH_DICE); }
+    private static long commandRows(Command command) { return command.growthChoices().abilityIncreases().size() + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum() + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size()) + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1) + (command.healthInput() == null ? 0 : 1 + MAX_HEALTH_DICE) + (command.combatInput() == null ? 0 : 1); }
     private static long eventRows(Event event) { return commandRows(event.command()) - (event.healthResult() == null ? 0 : MAX_HEALTH_DICE - event.healthResult().dice().size()); }
     public static void validate(History history) throws SQLException {
         require(history != null && !history.events().isEmpty() && history.events().size() <= MAX_EVENTS);
@@ -446,7 +503,8 @@ public final class JdbcSchema2CharacterRuntimeRepository {
     }
     private static boolean restKind(String kind) { return kind != null && Set.of("REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED").contains(kind); }
     private static boolean equipmentKind(String kind) { return kind != null && Set.of("ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED").contains(kind); }
-    private static boolean healthKind(String kind) { return "HEALTH_EFFECT_RESOLVED".equals(kind) || "DEATH_SAVE_RESOLVED".equals(kind); }
+    public static boolean combatKind(String kind) { return "COMBAT_DAMAGE_APPLIED".equals(kind) || "COMBAT_DEATH_SAVE_RESOLVED".equals(kind) || "COMBAT_TIME_ADVANCED".equals(kind); }
+    private static boolean healthKind(String kind) { return "HEALTH_EFFECT_RESOLVED".equals(kind) || "DEATH_SAVE_RESOLVED".equals(kind) || combatKind(kind); }
     private static boolean advancement(String kind) { return kind.equals("CHARACTER_ADVANCED") || kind.equals("STATISTICS_ADVANCED"); }
     private static void validateEvent(Event event) throws SQLException {
         require(event != null && event.command() != null); uuid(event.operationId());
@@ -458,7 +516,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         if (before == null) require(event.kind().equals("INITIALIZED") && after.version() == 0 && after.level() == 1 && event.hitDieRoll() == null && after.equipment().isEmpty() && after.health().equals(HealthState.INITIAL));
         else {
             validateState(before); require(!event.kind().equals("INITIALIZED") && root(before).equals(root(after)) && before.characterClass().equals(after.characterClass()) && after.version() == before.version() + 1);
-            if (!equipmentKind(event.kind())) require(before.equipment().equals(after.equipment()));
+            if (!equipmentKind(event.kind()) && !event.kind().equals("COMBAT_DAMAGE_APPLIED")) require(before.equipment().equals(after.equipment()));
             if (!healthKind(event.kind()) && !Set.of("TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT").contains(event.kind())) require(before.health().equals(after.health()));
             if (advancement(event.kind())) {
                 require(before.rest().equals(after.rest()));
@@ -475,8 +533,8 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                 if (equipmentKind(event.kind())) require(before.hitPoints() == after.hitPoints() && before.health().equals(after.health())
                         && after.rest().minute() >= before.rest().minute() && sameRestExceptMinute(before.rest(), after.rest()));
                 else {
-                    require(before.rest().equals(after.rest())); HealthResult result = event.healthResult();
-                    require(event.kind().equals("DEATH_SAVE_RESOLVED") ? result.deathD20() != null && result.dice().isEmpty()
+                    require(event.kind().equals("COMBAT_TIME_ADVANCED") || before.rest().equals(after.rest())); HealthResult result = event.healthResult();
+                    require((event.kind().equals("DEATH_SAVE_RESOLVED") || event.kind().equals("COMBAT_DEATH_SAVE_RESOLVED")) ? result.deathD20() != null && result.dice().isEmpty()
                             : result.deathD20() == null && result.recoveryD4() == null);
                 }
             } else if (event.kind().equals("CHECK_RESOLVED")) {
@@ -502,7 +560,8 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                 after.subclasses(), after.features(), after.feats(), after.proficiencies(), before.version(), after.resources(), before.rest(), before.equipment(), before.health()));
     }
     private static boolean sameRestExceptMinute(RestState before, RestState after) {
-        return Objects.equals(before.lastLongRestEndMinute(), after.lastLongRestEndMinute()) && Objects.equals(before.active(), after.active());
+        return before.second()==after.second() && Objects.equals(before.lastLongRestEndMinute(), after.lastLongRestEndMinute())
+                && Objects.equals(before.lastLongRestEndSecond(),after.lastLongRestEndSecond()) && Objects.equals(before.active(), after.active());
     }
     private static State withVersion(State state, long version) {
         return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(), state.characterClass(), state.abilities(),
@@ -526,7 +585,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         HealthState health = state.health();
         if (health.dead()) require(state.hitPoints() == 0 && health.deathSuccesses() == 0 && health.deathFailures() == 0 && !health.stable() && health.stableRecoveryMinute() == null);
         else if (state.hitPoints() > 0) require(health.deathSuccesses() == 0 && health.deathFailures() == 0 && !health.stable() && health.stableRecoveryMinute() == null);
-        else if (health.stable()) require(health.deathSuccesses() == 0 && health.deathFailures() == 0 && health.stableRecoveryMinute() != null && health.stableRecoveryMinute() > rest.minute());
+        else if (health.stable()) require(health.deathSuccesses() == 0 && health.deathFailures() == 0 && health.stableRecoveryMinute() != null && (health.stableRecoveryMinute() > rest.minute() || health.stableRecoveryMinute()==rest.minute() && health.stableRecoverySecond()>rest.second()));
         else require(health.stableRecoveryMinute() == null);
         String previousItem = null; int worn = 0, mainHand = 0, offHand = 0;
         for (EquipmentItem item : state.equipment()) {
@@ -596,6 +655,12 @@ public final class JdbcSchema2CharacterRuntimeRepository {
             insert(connection, "s2_character_health_event", "character_id, event_sequence, health_module, health_type, health_key, effect_module, effect_type, effect_key, temporary_choice, adjudication, die_count, death_d20, recovery_d4, rolled_amount, applied_amount", values.toArray());
             for (int i = 0; i < result.dice().size(); i++) insert(connection, "s2_character_health_die", "character_id, event_sequence, die_index, die_value", bytes(state.characterId()), state.version() + 1, i, result.dice().get(i));
         }
+        if (command.combatInput() != null) {
+            CombatInput combat = command.combatInput();
+            insert(connection, "s2_character_combat_input", "operation_id, character_id, event_sequence, combat_id, combat_operation_id, frame_key, actor_id, damage_amount, critical, seconds_advanced",
+                    bytes(event.operationId()), bytes(state.characterId()), state.version() + 1, bytes(combat.combatId()),
+                    bytes(combat.combatOperationId()), bytes(combat.frameKey()), bytes(combat.actorId()), combat.damageAmount(), combat.critical() ? 1 : 0, combat.secondsAdvanced());
+        }
         int index = 0;
         for (var choice : growth.abilityIncreases().entrySet()) insert(connection, "s2_character_command_ability", "character_id, event_sequence, choice_index, ability_key, increase_value", bytes(state.characterId()), state.version() + 1, index++, ascii(choice.getKey()), choice.getValue());
         index = 0;
@@ -621,8 +686,8 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         Collections.addAll(values, attempt == null ? null : ascii(attempt.kind()), attempt == null ? null : attempt.startMinute(), attempt == null ? null : attempt.hitPointsAtStart(),
                 attempt == null ? null : attempt.sleepMinutes(), attempt == null ? null : attempt.lightMinutes(), attempt == null ? null : attempt.strenuousMinutes(), attempt == null ? null : ascii(attempt.phase()),
                 attempt == null || attempt.lastActivity() == null ? null : ascii(attempt.lastActivity()), attempt == null ? null : attempt.consecutiveStrenuousMinutes(), attempt == null ? null : attempt.interrupted() ? 1 : 0);
-        HealthState health = state.health(); Collections.addAll(values, state.equipment().size(), health.temporaryHitPoints(), health.deathSuccesses(), health.deathFailures(), health.stable() ? 1 : 0, health.dead() ? 1 : 0, health.stableRecoveryMinute());
-        insert(connection, "s2_character_event_state", "character_id, event_sequence, phase, class_module, class_type, class_key, strength, dexterity, constitution, intelligence, wisdom, charisma, total_level, proficiency_bonus, hit_points, maximum_hit_points, row_version, resource_count, class_count, hit_die_count, subclass_count, feature_count, feat_count, proficiency_count, minute, last_long_rest_end_minute, rest_module, rest_type, rest_key, rest_kind, rest_start_minute, rest_start_hit_points, sleep_minutes, light_minutes, strenuous_minutes, rest_phase, last_activity, consecutive_strenuous_minutes, interrupted, equipment_count, temporary_hit_points, death_successes, death_failures, stable, dead, stable_recovery_minute", values.toArray());
+        HealthState health = state.health(); Collections.addAll(values, state.equipment().size(), health.temporaryHitPoints(), health.deathSuccesses(), health.deathFailures(), health.stable() ? 1 : 0, health.dead() ? 1 : 0, health.stableRecoveryMinute(), rest.second(), rest.lastLongRestEndSecond(), health.stableRecoverySecond());
+        insert(connection, "s2_character_event_state", "character_id, event_sequence, phase, class_module, class_type, class_key, strength, dexterity, constitution, intelligence, wisdom, charisma, total_level, proficiency_bonus, hit_points, maximum_hit_points, row_version, resource_count, class_count, hit_die_count, subclass_count, feature_count, feat_count, proficiency_count, minute, last_long_rest_end_minute, rest_module, rest_type, rest_key, rest_kind, rest_start_minute, rest_start_hit_points, sleep_minutes, light_minutes, strenuous_minutes, rest_phase, last_activity, consecutive_strenuous_minutes, interrupted, equipment_count, temporary_hit_points, death_successes, death_failures, stable, dead, stable_recovery_minute, rest_second, last_long_rest_end_second, stable_recovery_second", values.toArray());
         int i = 0;
         for (ResourceState value : state.resources()) { values = childValues(state, sequence, phase, i++); values.addAll(ruleValues(value.identity())); Collections.addAll(values, value.current(), value.maximum(), value.unlimited() ? 1 : 0); insert(connection, "s2_character_event_resource", "character_id, event_sequence, phase, resource_index, resource_module, resource_type, resource_key, current_value, maximum_value, unlimited", values.toArray()); }
         i = 0;
@@ -638,7 +703,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         i = 0;
         for (ProficiencyState value : state.proficiencies()) { values = childValues(state, sequence, phase, i++); values.addAll(slotValues(value.sourceSlot())); values.addAll(ruleValues(value.target())); values.add(value.acquiredAtTotalLevel()); insert(connection, "s2_character_event_proficiency", "character_id, event_sequence, phase, proficiency_index, " + SLOT_COLUMNS + ", target_module, target_type, target_key, acquired_total_level", values.toArray()); }
         i = 0;
-        for (EquipmentItem value : state.equipment()) { values = childValues(state, sequence, phase, i++); values.add(bytes(value.itemId())); values.addAll(ruleValues(value.item())); values.add(ascii(value.location())); insert(connection, "s2_character_event_equipment", "character_id, event_sequence, phase, equipment_index, item_id, item_module, item_type, item_key, location", values.toArray()); }
+        for (EquipmentItem value : state.equipment()) { values = childValues(state, sequence, phase, i++); values.add(bytes(value.itemId())); values.addAll(ruleValues(value.item())); Collections.addAll(values,ascii(value.location()),value.groundCombatId()==null?null:bytes(value.groundCombatId()),value.groundX(),value.groundY()); insert(connection, "s2_character_event_equipment", "character_id, event_sequence, phase, equipment_index, item_id, item_module, item_type, item_key, location, ground_combat_id, ground_x, ground_y", values.toArray()); }
     }
     private static List<Object> childValues(State state, long sequence, String phase, int index) { return new ArrayList<>(List.of(bytes(state.characterId()), sequence, ascii(phase), index)); }
     private static RestState readRest(ResultSet row) throws SQLException {
@@ -649,12 +714,12 @@ public final class JdbcSchema2CharacterRuntimeRepository {
             int interrupted = integer(row, "interrupted"); require(interrupted <= 1);
             attempt = new RestAttempt(rule, ascii(row, "rest_kind", 16), number(row, "rest_start_minute"), integer(row, "rest_start_hit_points"), number(row, "sleep_minutes"), number(row, "light_minutes"), number(row, "strenuous_minutes"), ascii(row, "rest_phase", 24), nullableAscii(row, "last_activity", 16), number(row, "consecutive_strenuous_minutes"), interrupted == 1);
         }
-        return new RestState(number(row, "minute"), row.getObject("last_long_rest_end_minute") == null ? null : number(row, "last_long_rest_end_minute"), attempt);
+        return new RestState(number(row, "minute"),integer(row,"rest_second"), row.getObject("last_long_rest_end_minute") == null ? null : number(row, "last_long_rest_end_minute"), row.getObject("last_long_rest_end_second")==null?null:integer(row,"last_long_rest_end_second"), attempt);
     }
     private static HealthState readHealth(ResultSet row) throws SQLException {
         int stable = integer(row, "stable"), dead = integer(row, "dead"); require(stable <= 1 && dead <= 1);
         return new HealthState(integer(row, "temporary_hit_points"), integer(row, "death_successes"), integer(row, "death_failures"), stable == 1, dead == 1,
-                row.getObject("stable_recovery_minute") == null ? null : number(row, "stable_recovery_minute"));
+                row.getObject("stable_recovery_minute") == null ? null : number(row, "stable_recovery_minute"),row.getObject("stable_recovery_second")==null?null:integer(row,"stable_recovery_second"));
     }
     private static String text(ResultSet row, String key) throws SQLException { Object value = row.getObject(key); require(value instanceof String); return (String) value; }
     private static RuleIdentity nullableRule(ResultSet row, String prefix) throws SQLException { if (row.getObject(prefix + "_module") == null) { require(row.getObject(prefix + "_type") == null && row.getObject(prefix + "_key") == null); return null; } return rule(row, prefix); }

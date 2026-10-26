@@ -71,3 +71,13 @@ GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_health` TO 'dnd_tool_rules_instal
 GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_health` TO 'dnd_tool_rules_installer'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_vital_effect` TO 'dnd_tool_rules_installer'@'127.0.0.1';
 GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, kind, dice_count, dice_sides, modifier, damage_type, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_vital_effect` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+
+-- Typed combat source material; installation does not grant game eligibility.
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_combat` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_combat` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_weapon_attack` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, item_module_key, item_rule_type, item_rule_key, ability_policy, dice_count, dice_sides, damage_type, reach_feet, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_weapon_attack` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_movement` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, owner_module_key, owner_rule_type, owner_rule_key, walk_speed_feet, algorithm, author_note) ON `dnd_tool_rules`.`rule_schema2_movement` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_combat_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, operation, field_key, text_value, integer_value, boolean_value, reference_module_key, reference_rule_type, reference_rule_key) ON `dnd_tool_rules`.`rule_schema2_combat_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';

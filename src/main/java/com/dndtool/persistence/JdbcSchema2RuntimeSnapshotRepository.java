@@ -64,7 +64,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                         value.minimumEnabledMembers(), value.authorNote(), bit(row.enabled()));
             } else if (row instanceof FinalCharacterSource source) {
                 if (!key.ruleType().equals("character.subrace")) insertSource(connection, identity, i, source);
-            } else if (JdbcSchema2GrowthSnapshotRows.supports(row) || JdbcSchema2EquipmentSnapshotRows.supports(row)) {
+            } else if (JdbcSchema2GrowthSnapshotRows.supports(row) || JdbcSchema2EquipmentSnapshotRows.supports(row) || JdbcSchema2CombatSnapshotRows.supports(row)) {
                 // Insert after all class source rows; the owner can belong to a later loaded package.
             } else {
                 throw invalid();
@@ -78,6 +78,8 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             JdbcSchema2GrowthSnapshotRows.storeRule(connection, identity, i, typed.rules().get(i));
         for (int i = 0; i < typed.rules().size(); i++) if (JdbcSchema2EquipmentSnapshotRows.supports(typed.rules().get(i)))
             JdbcSchema2EquipmentSnapshotRows.store(connection, identity, i, typed.rules().get(i));
+        for (int i = 0; i < typed.rules().size(); i++) if (JdbcSchema2CombatSnapshotRows.supports(typed.rules().get(i)))
+            JdbcSchema2CombatSnapshotRows.store(connection, identity, i, typed.rules().get(i));
         for (int i = 0; i < typed.entries().size(); i++) {
             var row = typed.entries().get(i); var value = row.entry(); var key = value.identity();
             if (JdbcSchema2GrowthSnapshotRows.storeEntry(connection, identity, i, row)) continue;
@@ -176,6 +178,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             })) require(rules.putIfAbsent(row.index(), row.value()) == null);
             for (var row : JdbcSchema2GrowthSnapshotRows.readRules(connection, identity).entrySet()) require(rules.putIfAbsent(row.getKey(), row.getValue()) == null);
             for (var row : JdbcSchema2EquipmentSnapshotRows.read(connection, identity).entrySet()) require(rules.putIfAbsent(row.getKey(), row.getValue()) == null);
+            for (var row : JdbcSchema2CombatSnapshotRows.read(connection, identity).entrySet()) require(rules.putIfAbsent(row.getKey(), row.getValue()) == null);
             require(rules.size() <= MAX_RULES);
             for (int i = 0; i < rules.size(); i++) require(rules.containsKey(i));
             TreeMap<Integer, FinalEntry> entryRows = new TreeMap<>();
@@ -280,7 +283,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
         else if (prerequisite != null) { require(field == Field.PREREQUISITE || field == Field.MULTICLASS_PREREQUISITE); value = new PrerequisiteValue(predicates.take(chain, step, prefix.equals("before_") ? "BEFORE" : "AFTER", integer(result, prefix + "prerequisite_groups"))); }
         else {
             String type;
-            if (field == Field.OWNER || field == Field.PROFICIENCY || field == Field.STEALTH_SKILL) type = binaryAscii(result, prefix + "reference_rule_type", 32);
+            if (field == Field.OWNER || field == Field.PROFICIENCY || field == Field.STEALTH_SKILL || field == Field.ITEM) type = binaryAscii(result, prefix + "reference_rule_type", 32);
             else {
                 require(referenceType == null && (field == Field.LANGUAGE || field == Field.TOOL || field == Field.PARENT_RACE || field == Field.OWNER_CLASS));
                 type = field == Field.TOOL ? "character.tool" : field == Field.PARENT_RACE ? "character.race" : field == Field.OWNER_CLASS ? "character.class" : "character.language";

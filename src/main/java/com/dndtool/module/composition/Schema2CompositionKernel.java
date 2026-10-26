@@ -51,7 +51,7 @@ public final class Schema2CompositionKernel {
         FEATURE_KIND("feature_kind"), EXECUTION_ALGORITHM("execution_algorithm"), PREREQUISITE("prerequisite"),
         ABILITY_KEY("ability_key"), PROFICIENCY("proficiency"), GROWTH_GRANT("growth_grant"), ALGORITHM("algorithm"), KIND("kind"), ARMOR_CLASS("armor_class"), STRENGTH_MINIMUM("strength_minimum"),
         STEALTH_DISADVANTAGE("stealth_disadvantage"), HANDS("hands"), STEALTH_SKILL("stealth_skill"),
-        DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ENABLED("enabled");
+        DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"), ENABLED("enabled");
         private final String key;
         Field(String key) { this.key = key; }
         public String key() { return key; }
@@ -86,7 +86,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -149,6 +149,14 @@ public final class Schema2CompositionKernel {
     public record VitalEffectDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             VitalEffectKind kind, int diceCount, int diceSides, int modifier, DamageType damageType,
             String algorithm, String authorNote) implements Definition { }
+    public record CombatDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            String algorithm, String authorNote) implements Definition { }
+    public enum WeaponAbilityPolicy { STRENGTH, FINESSE }
+    public record WeaponAttackDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity item, WeaponAbilityPolicy abilityPolicy, int diceCount, int diceSides, DamageType damageType,
+            int reachFeet, String algorithm, String authorNote) implements Definition { }
+    public record MovementDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity owner, int walkSpeedFeet, String algorithm, String authorNote) implements Definition { }
     public sealed interface GrowthGrantSpec permits FixedGrowthGrant, ChoiceGrowthGrant { }
     public record FixedGrowthGrant(RuleIdentity target) implements GrowthGrantSpec { }
     public record ChoiceGrowthGrant(RuleIdentity candidates, int count) implements GrowthGrantSpec { }
@@ -208,7 +216,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -264,6 +272,16 @@ public final class Schema2CompositionKernel {
     public record FinalVitalEffect(VitalEffectDefinition definition, boolean enabled) implements FinalRule {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
+    public record FinalCombat(CombatDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalWeaponAttack(WeaponAttackDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalMovement(MovementDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+
     public record FinalEntry(Entry entry, boolean enabled) { }
 
     /** Only the strict reader can create package evidence. All source arrays are private snapshots. */
@@ -530,6 +548,16 @@ public final class Schema2CompositionKernel {
             try {
                 if (declaration.getKey() instanceof RuleIdentity) {
                     Definition original = definition(encoded, source);
+                    if(original instanceof WeaponAttackDefinition || original instanceof MovementDefinition) {
+                        RuleIdentity target=original instanceof WeaponAttackDefinition weapon ? weapon.item() : ((MovementDefinition)original).owner();
+                        Map<Field,FieldState> prior=new HashMap<>();int declarationIndex=declarations.get(declaration.getKey());
+                        for(FieldChain chain:chains) if(chain.target().equals(target))
+                            for(ChainStep step:chain.steps()) if(step.loadIndex()<declarationIndex || (step.loadIndex()==declarationIndex&&step.op().equals("initial")))prior.put(chain.field(),step.after());
+                        Map<Identity,MutableObject> originalReferences=new HashMap<>();
+                        if(!prior.isEmpty())originalReferences.put(target,new MutableObject(target,prior,source));
+                        validateCombatReferences(original instanceof WeaponAttackDefinition weapon ? new FinalWeaponAttack(weapon,true)
+                                : new FinalMovement((MovementDefinition)original,true),originalReferences,source);
+                    }
                     if (original instanceof ItemDefinition item) {
                         Map<Identity, MutableObject> originalReferences = new HashMap<>();
                         int declarationIndex = declarations.get(declaration.getKey());
@@ -640,6 +668,14 @@ public final class Schema2CompositionKernel {
                     checkReference(pack, subclass.ownerClass(), "character.class", objects, row.location.child("owner_class"));
                 if (row.value instanceof FeatureDefinition feature)
                     checkReference(pack, feature.owner(), "character.class|character.subclass", objects, row.location.child("owner"));
+                if (row.value instanceof WeaponAttackDefinition weapon) {
+                    checkReference(pack,weapon.item(),"equipment.item",objects,row.location.child("item"));
+                    validateCombatReferences(new FinalWeaponAttack(weapon,true),objects,row.location);
+                }
+                if (row.value instanceof MovementDefinition movement) {
+                    checkReference(pack,movement.owner(),"character.race|character.subrace",objects,row.location.child("owner"));
+                    validateCombatReferences(new FinalMovement(movement,true),objects,row.location);
+                }
                 if (row.value instanceof ItemDefinition item) {
                     checkReference(pack, item.proficiency(), referenceType(Field.PROFICIENCY), objects, row.location.child("proficiency"));
                     if (item.stealthSkill() != null) checkReference(pack, item.stealthSkill(), referenceType(Field.STEALTH_SKILL), objects, row.location.child("stealth_skill"));
@@ -1065,7 +1101,7 @@ public final class Schema2CompositionKernel {
     }
 
     private static boolean executionType(String type) {
-        return Set.of("equipment.item", "adventure.health", "adventure.vital_effect").contains(type);
+        return Set.of("equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type);
     }
     private static Definition executionDefinition(Object input, RuleIdentity identity, Location source) {
         Set<String> required = new HashSet<>(Set.of("identity", "display_name", "description", "source_page", "algorithm"));
@@ -1073,6 +1109,10 @@ public final class Schema2CompositionKernel {
         if (identity.ruleType().equals("equipment.item")) {
             required.addAll(Set.of("kind", "armor_class", "strength_minimum", "stealth_disadvantage", "hands", "proficiency"));
             optional.add("stealth_skill");
+        } else if (identity.ruleType().equals("equipment.weapon_attack")) {
+            required.addAll(Set.of("item", "ability_policy", "dice_count", "dice_sides", "damage_type", "reach_feet"));
+        } else if (identity.ruleType().equals("character.movement")) {
+            required.addAll(Set.of("owner", "walk_speed_feet"));
         } else if (identity.ruleType().equals("adventure.vital_effect")) {
             required.addAll(Set.of("kind", "dice_count", "dice_sides", "modifier")); optional.add("damage_type");
         }
@@ -1082,6 +1122,15 @@ public final class Schema2CompositionKernel {
         int page = sourcePage(identity.ruleType(), row.get("source_page"), source.child("source_page"));
         String algorithm = mechanismAlgorithm(identity.ruleType(), row.get("algorithm"), source.child("algorithm"));
         String note = row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null;
+        if (identity.ruleType().equals("adventure.combat")) return new CombatDefinition(identity,name,description,page,algorithm,note);
+        if (identity.ruleType().equals("character.movement")) return new MovementDefinition(identity,name,description,page,
+                typedReference(row.get("owner"), "character.race|character.subrace", source.child("owner")),
+                walkingSpeed(row.get("walk_speed_feet"), source.child("walk_speed_feet")),algorithm,note);
+        if (identity.ruleType().equals("equipment.weapon_attack")) return new WeaponAttackDefinition(identity,name,description,page,
+                typedReference(row.get("item"), "equipment.item", source.child("item")),
+                enumValue(WeaponAbilityPolicy.class,row.get("ability_policy"),source.child("ability_policy")),
+                integer(row.get("dice_count"),1,4,source.child("dice_count")), weaponDie(row.get("dice_sides"),source.child("dice_sides")),
+                weaponDamage(row.get("damage_type"),source.child("damage_type")),reach(row.get("reach_feet"),source.child("reach_feet")),algorithm,note);
         if (identity.ruleType().equals("adventure.health")) return new HealthDefinition(identity, name, description, page, algorithm, note);
         if (identity.ruleType().equals("equipment.item")) {
             EquipmentKind kind = enumValue(EquipmentKind.class, row.get("kind"), source.child("kind"));
@@ -1106,6 +1155,27 @@ public final class Schema2CompositionKernel {
         if ((kind == VitalEffectKind.DAMAGE) != (damage != null) || (count == 0 ? sides != 0 : !Set.of(4,6,8,10,12).contains(sides)))
             throw fail("S2_TYPE", Stage.AUTHOR, "Vital effect kind and complete dice mechanics disagree", source);
         return new VitalEffectDefinition(identity,name,description,page,kind,count,sides,modifier,damage,algorithm,note);
+    }
+    private static int walkingSpeed(Object value, Location source) {
+        int result=integer(value,5,120,source);
+        if(result%5!=0) throw fail("S2_TYPE",Stage.AUTHOR,"Walking speed must use five-foot increments",source);
+        return result;
+    }
+    private static int weaponDie(Object value, Location source) {
+        int result=integer(value,4,12,source);
+        if(!Set.of(4,6,8,10,12).contains(result)) throw fail("S2_TYPE",Stage.AUTHOR,"Unsupported weapon die",source);
+        return result;
+    }
+    private static int reach(Object value, Location source) {
+        int result=integer(value,5,10,source);
+        if(result!=5&&result!=10) throw fail("S2_TYPE",Stage.AUTHOR,"Unsupported melee reach",source);
+        return result;
+    }
+    private static DamageType weaponDamage(Object value, Location source) {
+        DamageType result=enumValue(DamageType.class,value,source);
+        if(!Set.of(DamageType.BLUDGEONING,DamageType.PIERCING,DamageType.SLASHING).contains(result))
+            throw fail("S2_TYPE",Stage.AUTHOR,"Ordinary melee profiles require physical damage",source);
+        return result;
     }
     private static boolean booleanAtom(Object value, Location source) {
         if (!(value instanceof Boolean result)) throw fail("S2_TYPE", Stage.AUTHOR, "Expected boolean", source);
@@ -1321,7 +1391,7 @@ public final class Schema2CompositionKernel {
         for (Field item : domainFields(target)) if (item.key().equals(key)) field = item;
         if (field == null) throw fail("S2_FIELD_UNKNOWN", Stage.AUTHOR, "Unknown atomic domain field", source.child("field"));
         if (op.equals("clear_field")) {
-            if (!clearableField(field)) throw fail("S2_FIELD_NOT_CLEARABLE", Stage.AUTHOR, "Field does not permit clearing", source.child("field"));
+            if (!clearableField(field) || (field == Field.DAMAGE_TYPE && !((RuleIdentity) target).ruleType().equals("adventure.vital_effect"))) throw fail("S2_FIELD_NOT_CLEARABLE", Stage.AUTHOR, "Field does not permit clearing", source.child("field"));
             return new ClearField(target, field);
         }
         Object value = row.get("value");
@@ -1334,7 +1404,11 @@ public final class Schema2CompositionKernel {
                         ? proficiencyCategory(((RuleIdentity) target).ruleType(), value, source.child("value")).name() : category(value, source.child("value")).name());
             case SOURCE_PAGE -> new IntegerValue(sourcePage(((RuleIdentity) target).ruleType(), value, source.child("value")));
             case MINIMUM_ENABLED_MEMBERS -> new IntegerValue(integer(value, 1, 128, source.child("value")));
-            case LANGUAGE, TOOL, PARENT_RACE, OWNER_CLASS, OWNER, PROFICIENCY, STEALTH_SKILL -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
+            case LANGUAGE, TOOL, PARENT_RACE, OWNER_CLASS, PROFICIENCY, STEALTH_SKILL, ITEM -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
+            case OWNER -> new IdentityValue(typedReference(value, ((RuleIdentity)target).ruleType().equals("character.movement") ? "character.race|character.subrace" : "character.class|character.subclass",source.child("value")));
+            case ABILITY_POLICY -> new TextValue(enumValue(WeaponAbilityPolicy.class,value,source.child("value")).name());
+            case REACH_FEET -> new IntegerValue(reach(value,source.child("value")));
+            case WALK_SPEED_FEET -> new IntegerValue(walkingSpeed(value,source.child("value")));
             case HIT_DIE_SIDES -> new IntegerValue(hitDieSides(value, source.child("value")));
             case SUPPORTED_MAXIMUM_LEVEL -> new IntegerValue(integer(value, 1, 20, source.child("value")));
             case PROFICIENCY_BONUS_PROFILE, MAXIMUM_PROFILE, RECOVERY_PROFILE -> new TextValue(profile(field, value, source.child("value")));
@@ -1358,10 +1432,10 @@ public final class Schema2CompositionKernel {
             case STRENGTH_MINIMUM -> { int minimum = integer(value, 0, 15, source.child("value")); if (!Set.of(0,13,15).contains(minimum)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported armor strength minimum", source); yield new IntegerValue(minimum); }
             case STEALTH_DISADVANTAGE -> new BooleanValue(booleanAtom(value, source.child("value")));
             case HANDS -> new IntegerValue(integer(value, 0, 2, source.child("value")));
-            case DICE_COUNT -> new IntegerValue(integer(value, 0, 20, source.child("value")));
-            case DICE_SIDES -> { int sides = integer(value, 0, 12, source.child("value")); if (!Set.of(0,4,6,8,10,12).contains(sides)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported vital die", source); yield new IntegerValue(sides); }
+            case DICE_COUNT -> new IntegerValue(integer(value, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 1 : 0, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 4 : 20, source.child("value")));
+            case DICE_SIDES -> { if (((RuleIdentity)target).ruleType().equals("equipment.weapon_attack")) yield new IntegerValue(weaponDie(value,source.child("value"))); int sides = integer(value, 0, 12, source.child("value")); if (!Set.of(0,4,6,8,10,12).contains(sides)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported vital die", source); yield new IntegerValue(sides); }
             case MODIFIER -> new IntegerValue(integer(value, -1000, 1000, source.child("value")));
-            case DAMAGE_TYPE -> new TextValue(enumValue(DamageType.class, value, source.child("value")).name());
+            case DAMAGE_TYPE -> new TextValue((((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? weaponDamage(value,source.child("value")) : enumValue(DamageType.class, value, source.child("value"))).name());
             case ALGORITHM -> new TextValue(mechanismAlgorithm(((RuleIdentity) target).ruleType(), value, source.child("value")));
             case GRANT -> new GrantValue(grant(value, source.child("value")));
             case ENABLED -> throw new AssertionError("Enabled is not a domain field");
@@ -1396,7 +1470,7 @@ public final class Schema2CompositionKernel {
         String type = string(row.get("rule_type"), source.child("rule_type"));
         if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
                 "character.class_progression", "character.resource", "character.subclass", "character.feature",
-                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect").contains(type) && !sourceType(type))
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
         String prefix = switch (type) {
@@ -1410,6 +1484,9 @@ public final class Schema2CompositionKernel {
             case "adventure.rest" -> "rest";
             case "adventure.check" -> "check";
             case "equipment.item" -> "item";
+            case "adventure.combat" -> "combat";
+            case "equipment.weapon_attack" -> "weapon_attack";
+            case "character.movement" -> "movement";
             case "adventure.health" -> "health";
             case "adventure.vital_effect" -> "vital_effect";
             default -> null;
@@ -1423,7 +1500,8 @@ public final class Schema2CompositionKernel {
         return switch (type) {
             case "adventure.rest" -> integer(input, 87, 87, source);
             case "adventure.check" -> integer(input, 77, 77, source);
-            case "equipment.item" -> integer(input, 62, 73, source);
+            case "equipment.item", "equipment.weapon_attack" -> integer(input, 62, 73, source);
+            case "adventure.combat" -> integer(input, 90, 95, source);
             case "adventure.health" -> integer(input, 98, 98, source);
             case "adventure.vital_effect" -> integer(input, 96, 99, source);
             default -> integer(input, 3, 74, source);
@@ -1434,6 +1512,9 @@ public final class Schema2CompositionKernel {
             case "adventure.check" -> "SRD_2014_ABILITY_CHECK_V1";
             case "adventure.rest" -> "SRD_2014_REST_V1";
             case "equipment.item" -> "SRD_2014_EQUIPMENT_V1";
+            case "adventure.combat" -> "SRD_2014_COMBAT_V1";
+            case "equipment.weapon_attack" -> "SRD_2014_MELEE_WEAPON_ATTACK_V1";
+            case "character.movement" -> "SRD_2014_WALKING_SPEED_V1";
             case "adventure.health" -> "SRD_2014_HEALTH_V1";
             case "adventure.vital_effect" -> "DIRECT_VITAL_EFFECT_V1";
             default -> throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported mechanism domain", source);
@@ -1467,7 +1548,8 @@ public final class Schema2CompositionKernel {
             case TOOL -> "character.tool";
             case PARENT_RACE -> "character.race";
             case OWNER_CLASS -> "character.class";
-            case OWNER -> "character.class|character.subclass";
+            case OWNER -> "character.class|character.subclass|character.race|character.subrace";
+            case ITEM -> "equipment.item";
             case PROFICIENCY -> "character.proficiency|character.tool";
             case STEALTH_SKILL -> "character.proficiency";
             default -> throw new IllegalArgumentException("Field is not a catalog reference");
@@ -1480,7 +1562,7 @@ public final class Schema2CompositionKernel {
 
     private static boolean tracedCharacterType(String type) {
         return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
-                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect").contains(type);
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -1718,15 +1800,34 @@ public final class Schema2CompositionKernel {
         }
     }
 
+    private static void validateCombatReferences(FinalRule rule, Map<Identity, MutableObject> objects, Location source) {
+        RuleIdentity reference=rule instanceof FinalWeaponAttack weapon ? weapon.definition().item()
+                : rule instanceof FinalMovement movement ? movement.definition().owner() : null;
+        if(reference==null)return;
+        MutableObject target=objects.get(reference);
+        if(target==null || (rule.enabled()&&!enabled(target)))
+            throw fail("S2_REFERENCE_MISSING",Stage.FINAL,"Combat rule requires an available typed source",source);
+        if(rule instanceof FinalWeaponAttack && !"WEAPON".equals(textField(target.fields,Field.KIND)))
+            throw fail("S2_TYPE",Stage.FINAL,"Weapon attack requires an actual weapon item",source);
+    }
+
     private static void finalValidation(Map<Identity, MutableObject> objects) {
         Map<RuleIdentity, Set<RuleIdentity>> candidates = new HashMap<>();
         Set<RuleIdentity> progressionOwners = new HashSet<>();
         Map<RuleIdentity, Map<Integer, Boolean>> levels = new HashMap<>();
         Map<RuleIdentity, Integer> subclassSelectionLevels = new HashMap<>();
-        int enabledRests = 0, enabledChecks = 0, enabledHealth = 0;
+        int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0;
+        Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>();
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
                 FinalRule checked = finalRule(rule, object.fields);
+                validateCombatReferences(checked,objects,object.source);
+                if(checked instanceof FinalCombat && checked.enabled() && ++enabledCombat>1)
+                    throw fail("S2_COMBAT_AMBIGUOUS",Stage.FINAL,"At most one combat algorithm may be enabled",object.source);
+                if(checked instanceof FinalWeaponAttack weapon && checked.enabled() && !weaponItems.add(weapon.definition().item()))
+                    throw fail("S2_WEAPON_ATTACK_AMBIGUOUS",Stage.FINAL,"An item has multiple enabled melee profiles",object.source);
+                if(checked instanceof FinalMovement movement && checked.enabled() && !movementOwners.add(movement.definition().owner()))
+                    throw fail("S2_MOVEMENT_AMBIGUOUS",Stage.FINAL,"A character source has multiple enabled walking speeds",object.source);
                 if (checked instanceof FinalHealth && checked.enabled() && ++enabledHealth > 1)
                     throw fail("S2_HEALTH_AMBIGUOUS", Stage.FINAL, "At most one health algorithm may be enabled", object.source);
                 if (checked instanceof FinalItem item) validateEquipmentReferences(item, objects, object.source);
@@ -1862,9 +1963,11 @@ public final class Schema2CompositionKernel {
         if (type.equals("character.proficiency")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
                 Field.CATEGORY, Field.ABILITY_KEY, Field.AUTHOR_NOTE);
         if (type.equals("catalog.proficiency_set")) return List.of(Field.DISPLAY_NAME, Field.CATEGORY, Field.MINIMUM_ENABLED_MEMBERS, Field.AUTHOR_NOTE);
+        if (type.equals("equipment.weapon_attack")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ITEM,Field.ABILITY_POLICY,Field.DICE_COUNT,Field.DICE_SIDES,Field.DAMAGE_TYPE,Field.REACH_FEET,Field.ALGORITHM,Field.AUTHOR_NOTE);
+        if (type.equals("character.movement")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.OWNER,Field.WALK_SPEED_FEET,Field.ALGORITHM,Field.AUTHOR_NOTE);
         if (type.equals("equipment.item")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.ARMOR_CLASS, Field.STRENGTH_MINIMUM, Field.STEALTH_DISADVANTAGE, Field.HANDS, Field.PROFICIENCY, Field.STEALTH_SKILL, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.vital_effect")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.DICE_COUNT, Field.DICE_SIDES, Field.MODIFIER, Field.DAMAGE_TYPE, Field.ALGORITHM, Field.AUTHOR_NOTE);
-        if (type.equals("adventure.rest") || type.equals("adventure.check") || type.equals("adventure.health")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
+        if (type.equals("adventure.rest") || type.equals("adventure.check") || type.equals("adventure.health") || type.equals("adventure.combat")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (sourceType(type)) return type.equals("character.subrace")
                 ? List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.PARENT_RACE, Field.AUTHOR_NOTE)
                 : List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.AUTHOR_NOTE);
@@ -1953,6 +2056,9 @@ public final class Schema2CompositionKernel {
             if (definition instanceof RestDefinition value) return new FinalRest(value, enabled);
             if (definition instanceof CheckDefinition value) return new FinalCheck(value, enabled);
             if (definition instanceof ItemDefinition value) return new FinalItem(value, enabled);
+            if (definition instanceof CombatDefinition value) return new FinalCombat(value, enabled);
+            if (definition instanceof WeaponAttackDefinition value) return new FinalWeaponAttack(value, enabled);
+            if (definition instanceof MovementDefinition value) return new FinalMovement(value, enabled);
             if (definition instanceof HealthDefinition value) return new FinalHealth(value, enabled);
             if (definition instanceof VitalEffectDefinition value) return new FinalVitalEffect(value, enabled);
             return new FinalProficiencySet((ProficiencySetDefinition) definition, enabled);
@@ -2084,6 +2190,15 @@ public final class Schema2CompositionKernel {
             result.put("kind", item.kind().name()); result.put("armor_class", item.armorClass()); result.put("strength_minimum", item.strengthMinimum());
             result.put("stealth_disadvantage", item.stealthDisadvantage()); result.put("hands", item.hands()); result.put("proficiency", identityJson(item.proficiency()));
             if (item.stealthSkill() != null) result.put("stealth_skill", identityJson(item.stealthSkill()));
+        } else if (value instanceof CombatDefinition combat) {
+            result.put("description",combat.description());result.put("source_page",combat.sourcePage());result.put("algorithm",combat.algorithm());
+        } else if (value instanceof WeaponAttackDefinition weapon) {
+            result.put("description",weapon.description());result.put("source_page",weapon.sourcePage());result.put("algorithm",weapon.algorithm());
+            result.put("item",identityJson(weapon.item()));result.put("ability_policy",weapon.abilityPolicy().name());
+            result.put("dice_count",weapon.diceCount());result.put("dice_sides",weapon.diceSides());result.put("damage_type",weapon.damageType().name());result.put("reach_feet",weapon.reachFeet());
+        } else if (value instanceof MovementDefinition movement) {
+            result.put("description",movement.description());result.put("source_page",movement.sourcePage());result.put("algorithm",movement.algorithm());
+            result.put("owner",identityJson(movement.owner()));result.put("walk_speed_feet",movement.walkSpeedFeet());
         } else if (value instanceof HealthDefinition health) {
             result.put("description", health.description()); result.put("source_page", health.sourcePage()); result.put("algorithm", health.algorithm());
         } else if (value instanceof VitalEffectDefinition effect) {
@@ -2124,7 +2239,7 @@ public final class Schema2CompositionKernel {
         return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
     }
     private static boolean newAdvancementType(String type) {
-        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect").contains(type);
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),

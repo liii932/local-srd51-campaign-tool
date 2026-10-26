@@ -17,7 +17,7 @@ schema 1 来源表不被 schema 2 安装改写。[来源到运行快照](schema-
 
 `database/rules/migration/V003__schema2-source-ledger.sql` 建立独立 RULES 账本，
 既有历史保持不可变；V005 保存成长、资源和休息材料，V006/V007 保存检定、装备与健康材料。
-24 个 schema 2 表均为 InnoDB，其中三个账本/控制表与 21 张类型化作者材料表分别承担事实职责。
+28 个 schema 2 表均为 InnoDB，其中三个账本/控制表与 25 张类型化作者材料表分别承担事实职责。
 技术身份、版本、枚举和摘要使用 VARBINARY，
 因此大小写及尾字符按字节比较。没有跨 schema FK 或运行表写入。
 
@@ -143,11 +143,11 @@ ZIP 字节计数等于全部安装的实际原始 ZIP 长度之和。安装与�
 `rule-source-accepter.sql` 是独立账号模板，只能 INSERT 新验收及更新验收计数；
 它对旧 S 仅获 `UPDATE(control_id)` 以支持锁读，执行路径不更新旧 S。
 二者都不能改写已有制品/作者材料/验收或写 schema 账本。accepter 对作者材料只有 SELECT，
-app/agent 对 31 个准确表只有 SELECT。
+app/agent 对 35 个准确表只有 SELECT。
 迁移身份仍独立，没有新增账号创建、密码或 schema 通配能力。
 
 SQL 文件只表示可审阅迁移/权限源，不证明真实数据库执行。部署前分别授权并核对准确
-V001—V007 历史、31 张表、93 个触发器、所有列/约束/索引、DEFINER、跨库入向 FK、
+V001—V008 历史、35 张表、105 个触发器、所有列/约束/索引、DEFINER、跨库入向 FK、
 继承角色和既有宽权限。只读核验结合 `rule-source-schema.sql` 与
 `rule-schema2-source-ledger.sql`；后者不输出 ZIP 正文。
 
