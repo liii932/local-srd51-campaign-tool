@@ -21,7 +21,9 @@
 [检定、装备与健康作者类型](schema-2-foundation-authoring.md)。当前运行 V028—V031 另提供
 [准确镜像与类型化事实存储](schema-2-character-fact-storage.md)，并由
 [角色基础消费者](schema-2-character-foundations.md)执行真实检定、装备与健康命令，保存局部历史；
-这些单角色 INTERNAL 能力及已有成长/休息不等于完整基础体系或战役初始化。
+另有[战斗作者](schema-2-combat-authoring.md)及[施法作者](schema-2-spell-authoring.md)的准确来源/镜像，
+由[内部战斗](schema-2-combat.md)及[有限施法](schema-2-spells.md)执行其封闭机制。
+这些 INTERNAL 能力及已有成长/休息不等于完整基础体系或战役初始化。
 生产安装采用封闭门：
 
 | 实际内容 | 离线结果 |
@@ -51,7 +53,7 @@ schema 2 单独读取 `evidence_version=2` 的 `maintenance.json`；schema 1 的
 | `isolated_operation` | 新操作为 `none`；查证为已完成独立执行者隔离的准确原 UUIDv4 |
 | 两个 history minimum | 分别约束锁住的旧永久 S 版本和 schema 2 完整账本版本，不可用零点副本代替连续历史 |
 | `state_directory` | 每条源谱系唯一、绝对、owner-only，全部 schema 1/2 安装、接受和查证共用 |
-| `schema-audit.txt` | 实际批准 V001—V008 全定义及全部对象、触发器/DEFINER、入向引用、角色与最小权限，排除并发 DDL/其他写入口 |
+| `schema-audit.txt` | 实际批准 V001—V010 全定义及全部对象、触发器/DEFINER、入向引用、角色与最小权限，排除并发 DDL/其他写入口 |
 | `history-audit.txt` | 两个账本检查点、永久非删除完整历史、独立接管链及没有回退/空克隆/删改/滞后副本的实际证据 |
 | `isolation-audit.txt` | 准确目标/谱系、能力与操作、期限、共享状态目录及未决交接；查证还证明原进程/连接/重连/任务路径无法继续 SQL 或 commit |
 

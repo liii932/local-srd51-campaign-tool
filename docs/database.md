@@ -24,7 +24,7 @@
 V019 建立永久运行身份登记、不可变快照头和类型化语言镜像；V020 追加空工具镜像表。它们不复制旧
 规则目录或创建战役，当前 Repository 只接受 DRAFT PARTITION。身份、调用方事务、授权
 与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。应用迁移清单预期
-V001—V034；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
+V001—V038；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
 V021 追加 schema 2 INTERNAL 类型化组合、最终规则、完整覆盖链、永久守卫与操作收据；
 来源读取和原子转存合同见[来源到运行快照](rules/schema-2-runtime-snapshot.md)，增量授权见
 [schema 2 运行权限](../database/grants/schema2-runtime-snapshot.sql)。迁移和授权文件不表示已执行。
@@ -48,6 +48,18 @@ V033 保存[内部战斗](rules/schema-2-combat.md)的聚合、命令、前后�
 同战役、准确规则绑定和起点秒必须一致。权限和只读核验分别见
 [战斗权限](../database/grants/schema2-combat-runtime.sql)、[战斗核验](../database/verify/schema2-combat-runtime.sql)
 及[规则镜像核验](../database/verify/v032-schema2-combat-rules.sql)。SQL 源不证明已执行。
+V035 保存[有限施法作者](rules/schema-2-spell-authoring.md)的两个法术、生命领域一级配置与
+完整字段链，并以前向约束接入真实圣徽。V036 保存[施法与持续效果](rules/schema-2-spells.md)
+的类型化命令／目标、施法结果、效果、贡献骰与豁免，并扩展原角色战斗因果子事件以记录
+资源消费和治疗；HP、资源及秒时钟仍由原角色拥有。V036 同时前向修正战斗帧状态 CHECK，
+既有迁移不改写。增量见[施法权限](../database/grants/schema2-spell-runtime.sql)、
+[规则镜像核验](../database/verify/v035-schema2-spell-rules.sql)与[事实核验](../database/verify/schema2-spell-runtime.sql)；
+V037 保存 Wizard profile、可学习名单和固定环境定义；V038 保存法术书事实、多层反应、Ready、Shield、
+专注 holder、独立区域压制原因和战外场景状态，并扩展因果健康与时间输入。
+V038 在任何持久 DDL 前要求 `s2_combat_runtime` 为空，包括已经 ENDED 的旧事实；旧 INTERNAL
+动作图和请求格式不自动转换。存在真实旧 DRAFT 战斗历史时须另行审查迁移／恢复方案，不删除历史绕过此门。
+
+这些源文件不证明迁移、授权或真实数据库验收已经完成。
 同 run 的唯一角色约束维持当前内部时钟所有权，不开放完整战役初始化或多角色生命周期。
 [有限运行权限](../database/grants/schema2-character-runtime.sql)仅给应用 SELECT/INSERT，
 [只读核验](../database/verify/schema2-character-runtime.sql)另行执行；没有隐含迁移或授权。
@@ -56,11 +68,12 @@ V022 不推测旧 DRAFT 的授予来源；若已经有一级创建快照，预�
 [授予权限](../database/grants/character-proficiency-grants.sql)与规则快照权限分别审核和应用。
 
 独立 `RULES` 链位于 `database/rules/migration/`，目标为 `dnd_tool_rules.rule_schema_meta`，
-本链包括 V001—V008，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
+本链包括 V001—V010，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
 V005 保存成长、资源、休息和类型化条目/前提/修改材料，V006/V007 保存
-[检定、装备与健康作者来源](rules/schema-2-foundation-authoring.md)，V008 保存三类战斗作者定义和原子修改；既有历史保持不可变。
-当前来源 schema 合计 35 张表、105 个触发器。schema 1 和 schema 2 共用原安装锁，各自核对所属历史与计数。
-schema 2 原始制品、独立接受和控制账本绑定 25 张类型化作者材料表。成长定义、稳定等级条目、
+[检定、装备与健康作者来源](rules/schema-2-foundation-authoring.md)，V008 保存三类战斗作者定义和原子修改，
+V009/V010 保存法术、施法配置、Wizard 学习名单、固定环境与修改的类型化作者材料；既有历史保持不可变。
+当前来源 schema 合计 42 张表、126 个触发器。schema 1 和 schema 2 共用原安装锁，各自核对所属历史与计数。
+schema 2 原始制品、独立接受和控制账本绑定 32 张类型化作者材料表。成长定义、稳定等级条目、
 起始/多职业来源槽、子职业、特性、专长、有界熟练集合与休息声明保留原始作者序号和完整引用。
 能力前提按组/备选序号保存；存在标记区分省略和空前提。有限 profile、最高支持等级、采用范围与
 执行模式均与全部原 ZIP 逐列核对，包含未选中包和全部子原子。
@@ -68,7 +81,7 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 来源存储不放宽完整基础包与非空 add-on 的安装资格门，也不授予完整职业升级或发布资格。
 结构、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)和
 [schema 2 来源账本](rules/schema-2-source-ledger.md)。新增 SQL 与权限文件不表示已经在数据库执行。
-运行 V001—V034 与来源 V001—V008 共 42 份迁移源。作者来源、运行镜像与真实角色命令/历史
+运行 V001—V038 与来源 V001—V010 共 48 份迁移源。作者来源、运行镜像与真实角色命令/历史
 分别按各自合同核验；该 INTERNAL 接入不开放完整战役，不建立第二个 JNDI，
 也不执行外部迁移或授权。
 
@@ -85,7 +98,7 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 | 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
 | 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
 | 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
-| 独立 disposable 实例 | V001—V034 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
+| 独立 disposable 实例 | V001—V038 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
 | 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
 
 运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源

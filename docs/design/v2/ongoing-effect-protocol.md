@@ -1,11 +1,22 @@
 # v2 持续效果生效、压制、恢复贡献与结束协议
 
-状态：公共生命周期、责任、时序和验收合同已确定；具体效果族、真实消费者、SQL、文件字节
-及 Host 入口尚待采用。本文完成持续效果的 P0 协议，不代表完整效果族或持续效果引擎已经实现。
+状态：公共生命周期、责任、时序和验收合同已确定；[有限 INTERNAL 施法与场景](../../rules/schema-2-spells.md)
+已采用 Bless 的真实来源、固定目标、攻击/CON/死亡豁免贡献、专注/到期与同强 SHADOWED 恢复，
+Shield 的个人回合期限、Bless／Ready spell 的唯一专注 holder，以及固定 DM 抗魔区域对
+Bless／Shield 目标应用的独立多原因 SUPPRESSED。场景 owner 保留战外效果、原因和类型化历史／直接恢复。
+其他效果族、完整文件及 Host 仍待采用；
+公共协议与这一封闭消费者不代表完整持续效果引擎已经实现。
 它沿用[模组接口基线](module-interface-baseline.md)、[机制接入责任清单](mechanism-integration-checklist.md)、
 [动作继续协议](action-continuation-protocol.md)、[运行与事务](runtime-and-transactions.md)、
 [保存与恢复](save-and-recovery.md)及[玩家步骤](player-steps-and-auto-save.md)。
 legacy RELEASED v1、完整 SRD DRAFT 和 archive format 2 未激活的边界不变。
+
+当前 Bless 以唯一角色秒时钟到期，落选来源保留原期限和专注，不因恢复贡献重复施法或退款。
+`END_COMBAT` 可将同一场景转为 `EXPLORATION` 并保留尚存效果；未结动作流和 Shield／Ready
+回合期限仍须先处理，不能猜成秒数。当前 owner 仅覆盖封闭场景内的时间、移动、施法、
+健康与 Bless 到期，不代表跨场景统一战役时间或完整周期义务／结束回调已经接通。
+固定十尺 `DM_ANTIMAGIC_ZONE_V1` 是环境机制；真实八环 Antimagic Field、Dispel Magic
+及其他压制来源仍须各自闭环，不能由这个切片推断支持。
 
 ## 范围与原文边界
 
@@ -437,5 +448,8 @@ plan → consumer、状态/历史/版本、文件/恢复/清理映射及实际�
 本文确定公共协议；各具体类型采用时仍须交付准确 typed 字段、原子作者参数、规范字节及
 独立向量、真实来源/快照/贡献与转换消费者、SQL/锁/权限、完整存档分区/恢复映射、持久
 预留/物理峰值、故障注入和真实 Host 验收。字段义务不能由空集合或 N/A 掩盖。
-完成公共 P0 不等于 Bless/Aid/Haste、毒病、区域或全部持续类型已经实现；不改变
+Bless、Shield、固定 DM 区域的独立压制及战外保留的有限内部采用见
+[施法合同](../../rules/schema-2-spells.md)；Aid/Haste、毒病、真实 Antimagic Field／Dispel Magic、
+其余区域与压制来源、周期义务和结束回调仍须各自闭环。有限场景 owner 不代替统一战役时间
+及跨场景效果责任，也不改变
 [采用边界](adoption-boundaries.md)和[完整 SRD 跨领域发布门](../../rules/srd-5.1-complete.md#6-完成判定)。

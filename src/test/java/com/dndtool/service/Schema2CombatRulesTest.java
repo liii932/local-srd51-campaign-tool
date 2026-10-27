@@ -177,11 +177,13 @@ class Schema2CombatRulesTest {
         var failure=assertThrows(IllegalArgumentException.class,()->rules.preflight(UUID.randomUUID(),combat,campaign,roster,null,command));
         assertEquals("ACTION_FLOW_RULE_UNSUPPORTED",failure.getMessage());
     }
-    @Test void endingCombatMidRoundRejectsBeforeAnyTimeStateOrDice() {
-        start(new Position(0,0),new Position(2,0));Battle original=battle;
-        var failure=assertThrows(IllegalArgumentException.class,()->rules.preflight(UUID.randomUUID(),combat,campaign,roster,battle,Command.action(Kind.END_COMBAT,a)));
-        assertEquals("S2_COMBAT_ROUND_NOT_CLOSED",failure.getMessage());assertSame(original,battle);
-        for(Context context:roster.values())assertEquals(0,context.character().rest().second());
+    @Test void endingCombatMidRoundEntersExplorationWithoutStartingAnotherTurn() {
+        start(new Position(0,0),new Position(2,0));
+        var result=apply(Command.action(Kind.END_COMBAT,a));assertEquals(Status.EXPLORATION,battle.status());
+        assertEquals(1,battle.turnNumber());assertEquals(a,battle.activeActor());assertTrue(result.rolls().isEmpty());
+        for(Context context:roster.values())assertEquals(6,context.character().rest().second());
+        apply(Command.action(Kind.CLOSE_SCENE,a));assertEquals(Status.ENDED,battle.status());
+        for(Context context:roster.values())assertEquals(6,context.character().rest().second());
     }
     @Test void endingTheFinalTurnClosesItsSequenceAndSettlesSixSecondsWithoutStartingAnotherTurn() {
         start(new Position(0,0),new Position(0,1));apply(Command.move(a,List.of(new Position(1,0),new Position(2,0))));
@@ -189,13 +191,14 @@ class Schema2CombatRulesTest {
         assertEquals(0,roster.get(a).character().hitPoints());apply(Command.action(Kind.BEGIN_ATTACK,b));
         var prepared=rules.preflight(UUID.randomUUID(),combat,campaign,roster,battle,Command.action(Kind.END_COMBAT,b));
         assertEquals(Set.of(a,b),prepared.possibleHealthTargets());assertEquals(0,prepared.requiredSuffixEvents());
-        var ended=apply(Command.action(Kind.END_COMBAT,b));assertEquals(Status.ENDED,battle.status());
+        var ended=apply(Command.action(Kind.END_COMBAT,b));assertEquals(Status.EXPLORATION,battle.status());
         assertEquals(1,battle.round());assertEquals(2,battle.turnNumber());assertEquals(b,battle.activeActor());
         assertTrue(actor(b).sequence().closed());assertEquals(1,actor(b).sequence().forfeited());
         assertTrue(ended.rolls().isEmpty());assertEquals(2,ended.healthChanges().size());
         assertTrue(ended.healthChanges().stream().allMatch(change->change.timeAdvance() && change.seconds()==6 && !change.deathSave()));
         for(Context context:roster.values())assertEquals(6,context.character().rest().second());
         assertEquals(0,roster.get(a).character().health().deathFailures());
+        var closed=apply(Command.action(Kind.CLOSE_SCENE,b));assertEquals(Status.ENDED,battle.status());assertTrue(closed.healthChanges().isEmpty());assertTrue(closed.rolls().isEmpty());
     }
     @Test void startReservesAllRuntimeRoundTimeAndMaximumStableRecoveryOnlyAtAdmission() {
         assertEquals(253,Schema2CombatRules.START_TIME_HEADROOM_MINUTES);
@@ -208,7 +211,8 @@ class Schema2CombatRulesTest {
         apply(Command.action(Kind.END_TURN,a));apply(Command.action(Kind.END_TURN,b));
         for(Context context:roster.values()) {assertEquals(boundary+1,context.character().rest().minute());assertEquals(5,context.character().rest().second());}
         apply(Command.action(Kind.END_TURN,a));apply(Command.action(Kind.END_COMBAT,b));
-        assertEquals(Status.ENDED,battle.status());
+        assertEquals(Status.EXPLORATION,battle.status());
+        apply(Command.action(Kind.CLOSE_SCENE,b));assertEquals(Status.ENDED,battle.status());
         for(Context context:roster.values())assertEquals(11,context.character().rest().second());
     }
     private void setClock(long minute,int second) {

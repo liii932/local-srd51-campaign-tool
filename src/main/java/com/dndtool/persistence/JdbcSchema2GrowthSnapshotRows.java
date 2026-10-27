@@ -94,7 +94,7 @@ final class JdbcSchema2GrowthSnapshotRows {
     static final String GROWTH_COLUMNS="growth_kind, growth_target_module, growth_target_type, growth_target_key, growth_count";
     static List<Object> extraState(FieldState state,Field field){
         FieldValue value=state.value(); List<Object> values=new ArrayList<>();
-        values.add(value instanceof IdentityValue ref&&(field==Field.OWNER||field==Field.PROFICIENCY||field==Field.STEALTH_SKILL||field==Field.ITEM)?ascii(ref.value().ruleType()):null);
+        values.add(value instanceof IdentityValue ref&&(field==Field.OWNER||field==Field.PROFICIENCY||field==Field.STEALTH_SKILL||field==Field.ITEM||Set.of(Field.REQUIRED_SUBCLASS,Field.REQUIRED_FEATURE,Field.SLOT_RESOURCE,Field.RANK2_SLOT_RESOURCE,Field.RANK3_SLOT_RESOURCE,Field.SPELL,Field.BLESS,Field.CURE_WOUNDS,Field.MATERIAL_ITEM).contains(field))?ascii(ref.value().ruleType()):null);
         values.add(value instanceof PrerequisiteValue predicate?predicate.value().allOf().size():null);
         values.addAll(value instanceof GrowthGrantValue grant?growth(grant.value()):Arrays.asList(null,null,null,null,null));return values;
     }

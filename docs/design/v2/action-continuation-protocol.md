@@ -2,11 +2,20 @@
 
 状态：统一控制协议、领域责任和验收条件已确定；[有限 INTERNAL 战斗消费者](../../rules/schema-2-combat.md)
 已采用普通近战、移动、机会攻击的真实 owner、类型化存储及直接恢复。
+[有限 INTERNAL 施法与场景合同](../../rules/schema-2-spells.md)另以同一 flow 接通
+Bless/Cure Wounds、Shield/Counterspell 真实反应链及封闭触发的 Ready attack／move／spell；
+真实成本、原骰、父子帧、专注与领域后果随类型化场景历史直接恢复。施法资格限该合同的
+生命领域一级角色与单职业 Wizard 1—5 级学习／准备模型。
 其他执行分支、完整文件映射和 Host 入口仍须各自采用，本文不证明所有分支已经可以运行。
 它遵循[模组接口基线](module-interface-baseline.md)、[机制接入责任清单](mechanism-integration-checklist.md)、
 [运行与事务](runtime-and-transactions.md)、[保存与恢复](save-and-recovery.md)及
 [玩家步骤](player-steps-and-auto-save.md)。legacy RELEASED v1、DRAFT 状态和 archive format 2
 未激活的边界保持不变；本文不授权迁移、规则接受、数据库业务写入或部署。
+
+已接窗口包括命中后伤害前、施法完成前和 Ready 的有限完成触发；OPEN/CLOSED 窗口仍阻断
+新的根动作与主动结束专注，须先明确决策并继续同一父动作。当前 Counterspell 仅采用
+当前真实法术位范围内的自动反制；四环以上能力检定的公共检查接入、Shield 的 Magic Missile
+伤害 producer、长施法等分支仍须独立闭环，不能从类型登记或局部计算逻辑推断支持。
 
 ## 范围与共同不变量
 
@@ -469,7 +478,9 @@ producer → owner plan → consumer、状态/历史/文件映射、实际验证
 | 坏文件与重启 | 改一父键/ordinal/成本/骰/顺序/spent/计步来源即拒绝；重启不 resume、不清 pending，仅按救援 END 和新运行恢复。 |
 | 容量/清理闭包 | 最坏合法子链和全部终态实际费用有界且不超预留；FINAL/B 任一失败保完整工作集；真实入向引用和 owner 叶子同一清理事务，无半套删除。 |
 
-公共协议已确定为正式设计输入。各具体反应/选择仍须完成类型字段、
+公共协议已确定为正式设计输入。Shield、Counterspell 与 Ready 的有限内部采用以
+[施法合同](../../rules/schema-2-spells.md)为准，场景类型化存储与直接恢复不代替完整文件及 Host 验收。
+其余具体反应/选择仍须完成类型字段、
 规范字节/独立向量、真实调用、SQL/锁/权限、持久预留、文件完整覆盖、故障及 Host 验收；
 这些实施责任、持续效果的具体消费者及多目标结算合同的采用缺口不能因公共协议或目录模型存在而标为已支持。
 发布仍须通过[完整 SRD 跨领域门](../../rules/srd-5.1-complete.md#6-完成判定)。

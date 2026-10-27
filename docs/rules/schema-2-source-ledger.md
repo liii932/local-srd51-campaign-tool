@@ -6,18 +6,21 @@
 [模组接口基线](../design/v2/module-interface-baseline.md)。纯验证向量不能取得安装或验收资格。
 
 这里保存可重新解析的完整制品，以及与原 ZIP 精确一致的类型化初始熟练、职业成长、资源、休息及
-[检定、装备与健康作者材料](schema-2-foundation-authoring.md)，
+[检定、装备与健康作者材料](schema-2-foundation-authoring.md)、
+[战斗作者材料](schema-2-combat-authoring.md)及[有限施法作者材料](schema-2-spell-authoring.md)，
 不把通用规则袋当作业务来源模型。语言、工具等既有
 schema 1 来源表不被 schema 2 安装改写。[来源到运行快照](schema-2-runtime-snapshot.md)从准确
 原包重建有限类型材料及完整字段链；尚未采用的其他领域来源、完整运行目录、战役创建和 archive 2
-开放仍属于后续采用边界。来源账本只确认原始事实与接受证据；成长、休息、检定、装备和健康由运行快照的显式消费者执行。
+开放仍属于后续采用边界。来源账本只确认原始事实与接受证据；成长、休息、检定、装备、健康、
+有界战斗及有限施法由运行快照的显式消费者执行。
 完整基础包未过全域完整性门时 `S2_BASE_INCOMPLETE`；没有现行业务算法支持的机制不能靠安装或人工验收取得运行资格。
 
 ## 表与身份
 
 `database/rules/migration/V003__schema2-source-ledger.sql` 建立独立 RULES 账本，
-既有历史保持不可变；V005 保存成长、资源和休息材料，V006/V007 保存检定、装备与健康材料。
-28 个 schema 2 表均为 InnoDB，其中三个账本/控制表与 25 张类型化作者材料表分别承担事实职责。
+既有历史保持不可变；V005 保存成长、资源和休息材料，V006/V007 保存检定、装备与健康材料，
+V008/V009 保存战斗与有限施法材料，V010 保存法师学习目录与固定 DM 环境。来源完整链为 V001—V010。
+35 个 schema 2 表均为 InnoDB，其中三个账本/控制表与 32 张类型化作者材料表分别承担事实职责。
 技术身份、版本、枚举和摘要使用 VARBINARY，
 因此大小写及尾字符按字节比较。没有跨 schema FK 或运行表写入。
 
@@ -43,10 +46,21 @@ schema 1 来源表不被 schema 2 安装改写。[来源到运行快照](schema-
 | `rule_schema2_ability_requirement` | definitions/changes 作者身份下的组序号、备选序号、冻结能力键和最低值；保留 AND 组与 OR 备选的准确原始结构 |
 | `rule_schema2_rest` | 原始 `adventure.rest` 声明、页码 87 和准确 `SRD_2014_REST_V1` 算法 |
 | `rule_schema2_check` | 原始 `adventure.check` 定义、页码 77、准确 `SRD_2014_ABILITY_CHECK_V1` 算法；操作复用 `rule_schema2_advancement_change` 的类型化列 |
-| `rule_schema2_equipment_item` | 原始 `equipment.item` 定义、种类、AC、力量要求、隐匿劣势、手数、完整熟练和可空隐匿技能引用、白名单算法 |
+| `rule_schema2_equipment_item` | 原始 `equipment.item` 定义、种类、AC、力量要求、隐匿劣势、手数、适用的完整熟练和可空隐匿技能引用、白名单算法；HOLY_SYMBOL 按施法作者合同省略熟练引用 |
 | `rule_schema2_health` | 原始 `adventure.health` 定义、页码 98 和准确 `SRD_2014_HEALTH_V1` 算法 |
 | `rule_schema2_vital_effect` | 原始 `adventure.vital_effect` 定义、种类、骰数/骰面、有符号修正、适用伤害类型和准确 `DIRECT_VITAL_EFFECT_V1` 算法 |
 | `rule_schema2_execution_change` | 装备、健康与直接效果的原始字段/启停/清空操作；文本、有符号整数、布尔与完整引用列互斥，保留目标和作者序号 |
+| `rule_schema2_combat` | 原始有界战斗定义、准确算法、出处及作者序号 |
+| `rule_schema2_weapon_attack` | 原始近战定义、真实物品引用、攻击属性、伤害骰/类型及触及 |
+| `rule_schema2_movement` | 原始步行定义、完整种族/亚种族 owner 与速度 |
+| `rule_schema2_combat_change` | 战斗、近战与步行的原始字段/启停/备注清空操作，完整原子引用及作者序号 |
+| `rule_schema2_spell` | 原始 Bless/Cure Wounds、Shield/Counterspell 及闭合只读元数据法术定义、准确算法/出处和作者序号 |
+| `rule_schema2_spellcasting` | 原始生命领域一级配置、职业/子职业/特性/资源/两个法术/圣徽的完整引用及施法属性 |
+| `rule_schema2_spell_change` | 法术和生命领域配置的原始字段/启停/备注清空操作，完整原子引用及作者序号 |
+| `rule_schema2_wizard_spellcasting` | 原始法师准确职业/Spellcasting 特性/三类位资源、INT、算法和作者序号 |
+| `rule_schema2_spellbook_member` | 法师可学习名单的完整 entry 身份和法术引用；不是角色已学/准备事实 |
+| `rule_schema2_environment` | 原始固定十尺 DM 抗魔环境、来源页 0 和明确家规算法 |
+| `rule_schema2_wizard_change` | 法师配置、学习成员和环境规则的原始字段/启停/备注清空操作及完整目标与原子引用 |
 
 类型化作者材料按准确原包和作者序号标识；前提子原子另加 `author_kind/group_index/alternative_index`。作者序号保留
 同类文件按 ASCII 路径排序、各文件内按原始数组位置累积的零基位置；包括其他领域，
@@ -65,9 +79,10 @@ profile 文本保存作者的准确有限协议值，恢复 profile 上限为 20
 继续拒绝未知、畸形或不受支持值。所有新域以类型化列和子行保存，不保存 JSON 或最终组合值。
 SQL CHECK 提供列形状、引用类型和基础范围约束，不能替代组合器的引用闭包与 profile 语义校验。
 
-前向材料迁移只增加新表与约束，不要求既有 artifact/acceptance 为空，也不猜测回填 ZIP 内容。
+前向材料迁移增加类型化表并扩展准确约束；V009/V010 以前向 ALTER 接入圣徽、施法/法师/环境及对应字段白名单，
+不要求既有 artifact/acceptance 为空，也不猜测回填 ZIP 内容。
 不含相应领域的旧包投影为空，仍可读；含相应声明或操作却缺少等价物理行时，
-完整 reader 拒绝该账本。此规则不改变旧表、不允许补写不可变事实或授权迁移执行。
+完整 reader 拒绝该账本。此规则不改写既有原包事实、不允许补写不可变事实或授权迁移执行。
 
 持久协议准确为 author schema 2、artifact protocol 1、operation fingerprint version 1、
 canonical profile `schema2-production-json-1`。logical SHA 取自
@@ -111,8 +126,10 @@ ZIP 字节计数等于全部安装的实际原始 ZIP 长度之和。安装与�
 [类型化角色事实存储](schema-2-character-fact-storage.md)。来源读回、规则镜像和仓储直接恢复
 各自验证所属事实；[角色基础消费者](schema-2-character-foundations.md)再验证实际命令与历史语义，
 来源读回或仓储恢复不能代替完整战役资格。
+运行 V035/V037 保存准确施法、法师和环境规则及字段链，V036/V038 保存真实施法、法术书、
+反应、持续效果和探索事实；来源 V001—V010 与运行 V001—V038 共 48 份迁移源，均不构成实际迁移执行证据。
 
-共享 reader 同时有界读取全部 21 张作者材料表，与每个准确 ZIP 的原始类型化声明和操作逐列比较。
+共享 reader 同时有界读取全部 32 张作者材料表，与每个准确 ZIP 的原始类型化声明和操作逐列比较。
 比较包含未选中包、可空字段、完整引用、稳定等级/来源槽、前提两级顺序、有限 profile、支持范围、执行模式、两类复合 grant，以及新定义的种类/算法/条件引用、有符号修正与清空事实；
 缺失、多余、错误包/版本/序号和任一值不一致均拒绝。不能用组合后的最终值代替作者声明或历史操作，也不能只比较制品头摘要。
 作者读取和纯材料字段链还原均校验完整原声明及历史原子的目标类型约束，后包覆盖不能掩盖非法作者事实。
@@ -139,15 +156,15 @@ ZIP 字节计数等于全部安装的实际原始 ZIP 长度之和。安装与�
 
 ## 账号与独立引擎验收
 
-`rule-source-installer.sql` 对新制品与 21 张作者材料表只有准确列级 INSERT，并获安装计数列 UPDATE；没有新验收 INSERT。
+`rule-source-installer.sql` 对新制品与 32 张作者材料表只有准确列级 INSERT，并获安装计数列 UPDATE；没有新验收 INSERT。
 `rule-source-accepter.sql` 是独立账号模板，只能 INSERT 新验收及更新验收计数；
 它对旧 S 仅获 `UPDATE(control_id)` 以支持锁读，执行路径不更新旧 S。
 二者都不能改写已有制品/作者材料/验收或写 schema 账本。accepter 对作者材料只有 SELECT，
-app/agent 对 35 个准确表只有 SELECT。
+app/agent 对 42 个准确表只有 SELECT。
 迁移身份仍独立，没有新增账号创建、密码或 schema 通配能力。
 
 SQL 文件只表示可审阅迁移/权限源，不证明真实数据库执行。部署前分别授权并核对准确
-V001—V008 历史、35 张表、105 个触发器、所有列/约束/索引、DEFINER、跨库入向 FK、
+V001—V010 历史、42 张表、126 个触发器、所有列/约束/索引、DEFINER、跨库入向 FK、
 继承角色和既有宽权限。只读核验结合 `rule-source-schema.sql` 与
 `rule-schema2-source-ledger.sql`；后者不输出 ZIP 正文。
 

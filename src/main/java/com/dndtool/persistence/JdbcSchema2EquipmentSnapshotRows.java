@@ -51,7 +51,7 @@ final class JdbcSchema2EquipmentSnapshotRows {
                         int page = number(rows,"source_page",0,1000), index = number(rows,"rule_index",0,255); boolean enabled = bool(rows,"enabled"); FinalRule rule;
                         try {
                             rule = switch (table) {
-                                case "equipment_item" -> new FinalItem(new ItemDefinition(identity,name,description,page,EquipmentKind.valueOf(ascii(rows,"kind",16)),number(rows,"armor_class",0,20),number(rows,"strength_minimum",0,15),bool(rows,"stealth_disadvantage"),number(rows,"hands",0,2),reference(rows,"proficiency",false),reference(rows,"stealth_skill",true),algorithm,note),enabled);
+                                case "equipment_item" -> new FinalItem(new ItemDefinition(identity,name,description,page,EquipmentKind.valueOf(ascii(rows,"kind",16)),number(rows,"armor_class",0,20),number(rows,"strength_minimum",0,15),bool(rows,"stealth_disadvantage"),number(rows,"hands",0,2),reference(rows,"proficiency",true),reference(rows,"stealth_skill",true),algorithm,note),enabled);
                                 case "health" -> new FinalHealth(new HealthDefinition(identity,name,description,page,algorithm,note),enabled);
                                 default -> new FinalVitalEffect(new VitalEffectDefinition(identity,name,description,page,VitalEffectKind.valueOf(ascii(rows,"kind",16)),number(rows,"dice_count",0,20),number(rows,"dice_sides",0,12),signedModifier(rows,"modifier"),rows.getObject("damage_type") == null ? null : DamageType.valueOf(ascii(rows,"damage_type",16)),algorithm,note),enabled);
                             };

@@ -173,7 +173,7 @@ public final class Schema2CombatRuntimeService {
     }
 
     static void requireNoActiveCombat(Connection connection,UUID campaign) throws SQLException {
-        if (new JdbcSchema2CombatRuntimeRepository().findByCampaign(connection,campaign).stream().anyMatch(h->h.current().status()==Schema2CombatState.Status.ACTIVE))
+        if (new JdbcSchema2CombatRuntimeRepository().findByCampaign(connection,campaign).stream().anyMatch(h->h.current().status()!=Schema2CombatState.Status.ENDED))
             throw rejected("S2_CHARACTER_COMBAT_ACTIVE");
     }
     static void validateCharacterReferences(Connection connection,JdbcSchema2CharacterRuntimeRepository.History history,DataSource runtime) throws SQLException {
@@ -192,7 +192,7 @@ public final class Schema2CombatRuntimeService {
             var change=owner.resolution().healthChanges().get(index);
             if (!change.characterId().equals(history.current().characterId()) || !change.before().equals(child.before())
                     || !change.after().equals(child.after()) || !change.frameKey().equals(input.frameKey())
-                    || !change.healthResult().equals(child.healthResult())
+                    || !Objects.equals(change.healthResult(),child.healthResult())
                     || !Objects.equals(input.actorId(),owner.command().actorId()==null?change.characterId():owner.command().actorId())
                     || input.damageAmount()!=change.damageAmount() || input.critical()!=change.critical() || input.secondsAdvanced()!=change.seconds()) throw new SQLException("S2_COMBAT_CHARACTER_REFERENCE");
         }
@@ -246,12 +246,12 @@ public final class Schema2CombatRuntimeService {
                     var childCommand=Schema2CombatCharacterFacts.command(roster.get(change.characterId()).material(),request.combatId(),event.operationId(),
                             event.command().actorId()==null?change.characterId():event.command().actorId(),change);
                     if (!actual.operationId().equals(child)||!actual.command().equals(childCommand)||!actual.before().equals(change.before())
-                            ||!actual.after().equals(change.after())||!actual.healthResult().equals(change.healthResult())) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
+                            ||!actual.after().equals(change.after())||!Objects.equals(actual.healthResult(),change.healthResult())) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
                     versions.put(change.characterId(),change.after().version());
                 }
                 preceding=versions;
             }
-            if (history.current().status()==Schema2CombatState.Status.ACTIVE) for (var entry:all.entrySet())
+            if (history.current().status()!=Schema2CombatState.Status.ENDED) for (var entry:all.entrySet())
                 if (entry.getValue().current().version()!=preceding.get(entry.getKey())) throw rejected("S2_COMBAT_DEPENDENCY_HISTORY");
         } catch (IllegalArgumentException|IndexOutOfBoundsException invalid) { throw new SQLException("S2_COMBAT_HISTORY_CORRUPT",invalid); }
     }
@@ -275,34 +275,33 @@ public final class Schema2CombatRuntimeService {
     private void reserve(History previous,Schema2CombatRules.Prepared prepared,
             Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Request request) {
         try {
-            int suffix=prepared.requiredSuffixEvents();
-            int nextOrdinal=previous==null?0:request.command().kind()==Kind.END_TURN
-                    ?(previous.current().activeOrdinal()+1)%histories.size():previous.current().activeOrdinal();
-            int closing=request.command().kind()==Kind.END_COMBAT?0:histories.size()-nextOrdinal;
-            int remaining=request.command().kind()==Kind.MOVE?request.command().path().size():previous!=null&&previous.current().activeFlow()!=null
-                    ?previous.current().activeFlow().movement().path().size()-previous.current().activeFlow().movement().cursor():0;
-            JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(previous,prepared.before(),suffix+closing,histories.size(),remaining);
-            // No inventory or progression changes during combat: each possible health child has
-            // the same bounded structural footprint. Reserve every actor's maximum OA suffix.
-            Set<UUID> affected=new HashSet<>(); int children=1;
-            switch (request.command().kind()) {
-                case MOVE -> { affected.add(request.command().actorId()); children=histories.size()-1; }
-                case ATTACK -> affected.add(request.command().targetId());
-                case DECLARE_OPPORTUNITY_ATTACK -> affected.add(previous.current().activeFlow().movement().actorId());
-                case START, END_COMBAT -> affected.addAll(prepared.possibleHealthTargets());
-                case END_TURN -> {
-                    if(previous.current().activeOrdinal()+1==previous.current().initiative().size()) { affected.addAll(histories.keySet()); children=2; }
-                    int next=(previous.current().activeOrdinal()+1)%previous.current().initiative().size();
-                    UUID actor=previous.current().initiative().get(next).characterId();
-                    var state=histories.get(actor).current();
-                    if(state.hitPoints()==0&&!state.health().stable()&&!state.health().dead()) affected.add(actor);
-                }
-                default -> { }
+            Battle before=prepared.before(); Command command=request.command();
+            int suffix=prepared.requiredSuffixEvents(); boolean closing=command.kind()==Kind.CLOSE_SCENE;
+            int closeEvents=closing?0:1; // explicit terminal scene close
+            if(!closing && (before==null || before.status()==Schema2CombatState.Status.ACTIVE))closeEvents++;
+            if(!closing && before!=null) {
+                closeEvents+=(int)before.concentrationHolders().stream().map(ConcentrationHolder::actorId).distinct().count();
+                closeEvents+=(int)before.environmentZones().stream().filter(z->z.endedOperationId()==null).count();
+                if(before.shields().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)
+                        || before.readyPreparations().stream().anyMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING))closeEvents+=histories.size();
             }
-            for (var entry:histories.entrySet()) {
-                int current=affected.contains(entry.getKey())?children:0;
-                int closure=request.command().kind()==Kind.END_COMBAT?0:entry.getValue().current().health().dead()?1:2;
-                JdbcSchema2CharacterRuntimeRepository.checkCombatCapacity(entry.getValue(),current+closure);
+            if(Set.of(Kind.CAST,Kind.READY_SPELL,Kind.CREATE_ENVIRONMENT_ZONE).contains(command.kind()))closeEvents++;
+            if(Set.of(Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL,Kind.DECLARE_SHIELD).contains(command.kind()))closeEvents+=histories.size();
+            int remaining=command.kind()==Kind.MOVE?command.path().size():before==null||before.activeFlow()==null?0:
+                    before.activeFlow().movements().stream().filter(m->m.status()==MovementStatus.PENDING).mapToInt(m->m.path().size()-m.cursor()).sum();
+            JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(previous,before,suffix+closeEvents,histories.size(),remaining);
+            // The mandatory path may pass all optional reactions. Already accepted attacks/casts
+            // still need their damage/healing and root exploration-time children before returning.
+            Map<UUID,Integer> required=new HashMap<>();for(UUID id:histories.keySet())required.put(id,0);
+            if(before!=null && before.activeFlow()!=null) {
+                for(var attack:before.activeFlow().attacks())if(attack.status()==AttackStatus.HIT_PENDING_DAMAGE)required.merge(attack.targetId(),1,Integer::sum);
+                for(var cast:before.activeFlow().casts())if(cast.status()==CastStatus.PENDING)for(UUID target:cast.targets())required.merge(target,1,Integer::sum);
+                if(before.status()==Schema2CombatState.Status.EXPLORATION)for(UUID id:histories.keySet())required.merge(id,1,Integer::sum);
+            }
+            for(UUID id:prepared.possibleHealthTargets())required.merge(id,2,Integer::sum);
+            for(var entry:histories.entrySet()) {
+                int closure=closing?0:3; // ending this round and any pending turn-bound facts
+                JdbcSchema2CharacterRuntimeRepository.checkCombatCapacity(entry.getValue(),required.get(entry.getKey())+closure);
             }
         } catch (SQLException|IllegalArgumentException exhausted) { throw rejected("S2_COMBAT_CAPACITY"); }
     }
@@ -310,7 +309,7 @@ public final class Schema2CombatRuntimeService {
     private static String fingerprint(Request request) {
         try {
             var bytes=new ByteArrayOutputStream(); var out=new DataOutputStream(bytes);
-            text(out,"local-dnd/schema2-combat-command/1"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
+            text(out,"local-dnd/schema2-combat-command/2"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
             var binding=request.rules(); text(out,binding.canonicalProfile()); text(out,binding.compositionAlgorithm());
             out.writeInt(binding.members().size());
             for (var m:binding.members()) { text(out,m.moduleKey()); text(out,m.releaseVersion()); text(out,m.role().name()); text(out,m.rawZipSha256()); text(out,m.logicalSha256()); }
@@ -322,9 +321,30 @@ public final class Schema2CombatRuntimeService {
             out.writeInt(command.deployments().size()); for (Deployment d:command.deployments()) { id(out,d.characterId()); out.writeInt(d.position().x()); out.writeInt(d.position().y()); out.writeInt(d.side()); }
             out.writeInt(command.tieBreakOrder().size()); for (UUID id:command.tieBreakOrder()) id(out,id);
             id(out,command.flowKey()); id(out,command.leafKey()); id(out,command.windowKey()); id(out,command.opportunityKey());
+            cast(out,command.castInput());
+            ReadyInput ready=command.readyInput();out.writeBoolean(ready!=null);
+            if(ready!=null) {
+                text(out,ready.trigger().kind().name());id(out,ready.trigger().subjectId());position(out,ready.trigger().position());
+                text(out,ready.responseKind().name());id(out,ready.targetId());id(out,ready.itemId());
+                out.writeInt(ready.path().size());for(Position point:ready.path())position(out,point);cast(out,ready.spell());
+            }
+            id(out,command.readyKey());ZoneInput zone=command.zoneInput();out.writeBoolean(zone!=null);
+            if(zone!=null){ruleIdentity(out,zone.rule());position(out,zone.center());}id(out,command.zoneKey());
+            var health=command.healthInput();out.writeBoolean(health!=null);
+            if(health!=null){ruleIdentity(out,health.rule());ruleIdentity(out,health.effect());text(out,Objects.toString(health.temporaryChoice(),""));text(out,health.adjudication());}
+            out.writeInt(command.seconds());
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException|NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
+    private static void cast(DataOutputStream out,CastInput cast)throws IOException {
+        out.writeBoolean(cast!=null);if(cast==null)return;
+        ruleIdentity(out,cast.castingRule());ruleIdentity(out,cast.spell());out.writeInt(cast.targets().size());
+        for(UUID target:cast.targets())id(out,target);id(out,cast.materialItemId());out.writeInt(cast.slotLevel());id(out,cast.targetCastFrameKey());
+    }
+    private static void ruleIdentity(DataOutputStream out,com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity identity)throws IOException {
+        out.writeBoolean(identity!=null);if(identity!=null){text(out,identity.moduleKey());text(out,identity.ruleType());text(out,identity.ruleKey());}
+    }
+    private static void position(DataOutputStream out,Position point)throws IOException {out.writeBoolean(point!=null);if(point!=null){out.writeInt(point.x());out.writeInt(point.y());}}
     private static void text(DataOutputStream out,String value) throws IOException { byte[] bytes=value.getBytes(StandardCharsets.UTF_8); out.writeInt(bytes.length); out.write(bytes); }
     private static void id(DataOutputStream out,UUID id) throws IOException { out.writeBoolean(id!=null); if(id!=null) { out.writeLong(id.getMostSignificantBits()); out.writeLong(id.getLeastSignificantBits()); } }
     private static void uuid(UUID id) { if(id==null||id.version()!=4||id.variant()!=2) throw rejected("S2_COMBAT_IDENTITY"); }

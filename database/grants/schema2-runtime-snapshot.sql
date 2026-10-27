@@ -20,3 +20,12 @@ GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_proficiency_grant` TO 'dnd_too
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_combat` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_weapon_attack` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_movement` TO 'dnd_tool_se_app'@'127.0.0.1';
+
+-- Finite spell definitions and their exact casting sources share the snapshot transaction.
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_spell` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_spellcasting` TO 'dnd_tool_se_app'@'127.0.0.1';
+
+-- Wizard catalogs, learning entries and independent environmental definitions.
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_wizard_spellcasting` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_environment` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_spellbook_member` TO 'dnd_tool_se_app'@'127.0.0.1';

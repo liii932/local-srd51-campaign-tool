@@ -55,6 +55,7 @@ public final class Schema2CharacterRuntimeService {
     private final Schema2CharacterRestRules rests = new Schema2CharacterRestRules();
     private final Schema2CharacterCheckRules checks = new Schema2CharacterCheckRules();
     private final Schema2CharacterEquipmentRules equipment = new Schema2CharacterEquipmentRules();
+    private final Schema2WizardSpellbookRules spellbooks = new Schema2WizardSpellbookRules();
     private final Schema2CharacterHealthRules health = new Schema2CharacterHealthRules();
     private final JdbcSchema2CharacterRuntimeRepository characters = new JdbcSchema2CharacterRuntimeRepository();
     private final JdbcSchema2RuntimeSnapshotRepository snapshots = new JdbcSchema2RuntimeSnapshotRepository();
@@ -260,7 +261,7 @@ public final class Schema2CharacterRuntimeService {
             JdbcSchema2CharacterRuntimeRepository.validate(history);
             for (Event event : history.events()) {
                 State after = event.after(); rules.validateState(material.projection(), after); rests.validateState(material.projection(), after);
-                equipment.validateState(material.projection(), after); health.validateState(after);
+                equipment.validateState(material.projection(), after); health.validateState(after); spellbooks.validateState(material.projection(),after);
                 Request request = new Request(event.operationId(), after.identity(), after.campaignId(), after.characterId(),
                         after.preparationOperationId(), Schema2RulesBinding.from(material.projection()),
                         event.before() == null ? -1 : event.before().version(), event.command(),
@@ -291,6 +292,10 @@ public final class Schema2CharacterRuntimeService {
             return checks.verify(material.projection(), before, command, checkResult);
         }
         if (checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+        if (Schema2WizardSpellbookRules.handles(command)) {
+            if (roll!=null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
+            return spellbooks.apply(material.projection(),before,command);
+        }
         if (Schema2CharacterEquipmentRules.handles(command)) {
             if (roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
             return equipment.apply(material.projection(), before, command, request.operationId());
@@ -318,6 +323,7 @@ public final class Schema2CharacterRuntimeService {
     }
 
     private Schema2CharacterProgressionRules.PreparedAdvance prepareAdvance(Material material, State before, Command command) {
+        spellbooks.requireLearningCompleteBeforeAdvance(material.projection(),before);
         var prepared = rules.prepareAdvance(material.projection(), before,
                 command.kind().equals("CHARACTER_ADVANCED") ? command.targetClass() : before.characterClass(),
                 before.level() + 1, command.hpChoice(), command.growthChoices());
@@ -455,6 +461,11 @@ public final class Schema2CharacterRuntimeService {
                 text(out, combat.combatId().toString()); text(out, combat.combatOperationId().toString());
                 text(out, combat.frameKey().toString()); text(out, combat.actorId().toString());
                 out.writeInt(combat.damageAmount()); out.writeBoolean(combat.critical()); out.writeInt(combat.secondsAdvanced());
+            }
+            SpellbookInput book=command.spellbookInput();
+            if(book!=null) {
+                rule(out,book.castingRule()); out.writeInt(book.learned().size());for(RuleIdentity spell:book.learned())rule(out,spell);
+                out.writeInt(book.prepared().size());for(RuleIdentity spell:book.prepared())rule(out,spell);
             }
             out.writeInt(request.initialAbilities().size());
             for (var entry : request.initialAbilities().entrySet()) { text(out, entry.getKey()); out.writeInt(entry.getValue()); }

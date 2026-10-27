@@ -95,7 +95,7 @@ final class Schema2GrowthRules {
                 before.characterClass(), abilities, targetLevel, 2 + (targetLevel - 1) / 4,
                 before.hitPoints() + minimum, before.maximumHitPoints() + minimum, classes, dice, subclasses,
                 features(catalog, classes, subclasses), feats, grants, before.version() + 1,
-                resources(catalog, classes, abilities, oldResources), before.rest(), before.equipment(), before.health());
+                resources(catalog, classes, abilities, oldResources), before.rest(), before.equipment(), before.health(), before.spellbook());
         validate(material, candidate);
         return new Prepared(candidate, target.hitDieSides(), constitution, minimum, maximum);
     }

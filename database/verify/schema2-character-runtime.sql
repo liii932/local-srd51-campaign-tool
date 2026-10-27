@@ -41,7 +41,7 @@ WHERE s.total_level <> (SELECT SUM(c.class_level) FROM s2_character_event_class 
    OR s.total_level <> (SELECT SUM(h.maximum_value) FROM s2_character_event_hit_die h WHERE h.character_id = s.character_id AND h.event_sequence = s.event_sequence AND h.phase = s.phase);
 -- Required nullable union fields must never pass through SQL UNKNOWN.
 SELECT HEX(e.character_id) AS character_id, e.event_sequence FROM s2_character_event e
-WHERE e.event_kind = _binary'RESOURCE_SPENT'
+WHERE e.event_kind IN (_binary'RESOURCE_SPENT', _binary'COMBAT_RESOURCE_SPENT')
   AND (e.resource_module IS NULL OR e.resource_type IS NULL OR e.resource_type <> _binary'character.resource' OR e.resource_key IS NULL);
 -- T1 grant provenance belongs to state; growth commands may select only growth-owned slots.
 SELECT HEX(c.character_id) AS character_id, c.event_sequence FROM s2_character_command_proficiency c
@@ -79,7 +79,7 @@ SELECT HEX(s.character_id) AS character_id, s.event_sequence, s.phase FROM s2_ch
 WHERE s.equipment_count <> (SELECT COUNT(*) FROM s2_character_event_equipment q WHERE q.character_id = s.character_id AND q.event_sequence = s.event_sequence AND q.phase = s.phase);
 SELECT HEX(e.character_id) AS character_id, e.event_sequence FROM s2_character_event e
 WHERE (SELECT COUNT(*) FROM s2_character_equipment_command c WHERE c.character_id = e.character_id AND c.event_sequence = e.event_sequence) <> IF(e.event_kind IN (_binary'ITEM_ACQUIRED', _binary'ITEM_REMOVED', _binary'ITEM_EQUIPPED', _binary'ITEM_UNEQUIPPED'), 1, 0)
-   OR (SELECT COUNT(*) FROM s2_character_health_event h WHERE h.character_id = e.character_id AND h.event_sequence = e.event_sequence) <> IF(e.event_kind IN (_binary'HEALTH_EFFECT_RESOLVED', _binary'DEATH_SAVE_RESOLVED'), 1, 0);
+   OR (SELECT COUNT(*) FROM s2_character_health_event h WHERE h.character_id = e.character_id AND h.event_sequence = e.event_sequence) <> IF(e.event_kind IN (_binary'HEALTH_EFFECT_RESOLVED', _binary'DEATH_SAVE_RESOLVED', _binary'COMBAT_DAMAGE_APPLIED', _binary'COMBAT_DEATH_SAVE_RESOLVED', _binary'COMBAT_TIME_ADVANCED', _binary'COMBAT_HEALING_APPLIED'), 1, 0);
 SELECT HEX(h.character_id) AS character_id, h.event_sequence FROM s2_character_health_event h
 WHERE h.die_count <> (SELECT COUNT(*) FROM s2_character_health_die d WHERE d.character_id = h.character_id AND d.event_sequence = h.event_sequence);
 SELECT HEX(q.character_id) AS character_id, q.event_sequence, q.phase FROM s2_character_event_equipment q

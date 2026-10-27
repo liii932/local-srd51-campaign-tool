@@ -1,4 +1,4 @@
--- Apply only after explicit review of V033 and the application account.
+-- Apply only after explicit review of V033–V038 and the application account.
 -- Immutable INTERNAL combat facts and causal character health inputs.
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_runtime` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_member` TO 'dnd_tool_se_app'@'127.0.0.1';
@@ -23,3 +23,20 @@ GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_movement_point` TO 'dnd_tool_se
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_attack` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_attack_die` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_character_combat_input` TO 'dnd_tool_se_app'@'127.0.0.1';
+
+-- Type-preserving reactions, persistent scenes and character spellbook facts.
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_ready_input` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_ready_point` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_ready_target` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_zone_command` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_health_command` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_reaction_option` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_window_trigger` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_ready_release` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_ability_check` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_ready` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_trigger` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_shield` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_concentration` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_environment` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_suppression` TO 'dnd_tool_se_app'@'127.0.0.1';
