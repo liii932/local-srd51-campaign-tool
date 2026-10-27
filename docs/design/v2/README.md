@@ -28,6 +28,7 @@ canonical/archive 目标为 `2/2`，发布状态保持 DRAFT。它不是所有�
 | schema 2 检定、装备与健康基础 | [角色基础合同](../../rules/schema-2-character-foundations.md) | 真实检定、装备/护甲限制、单目标环境健康效果、死亡豁免与稳定恢复；准确来源和状态历史贯通，仍为单角色 INTERNAL |
 | schema 2 内部战斗与动作继续 | [作者来源](../../rules/schema-2-combat-authoring.md)、[战斗合同](../../rules/schema-2-combat.md) | 准确来源/镜像、真实先攻/回合/近战/移动/OA、倒地/掉落、唯一秒时钟、历史与直接恢复；内部采用不开放怪物、完整基础包或 Host |
 | schema 2 有限施法与持续效果 | [施法作者来源](../../rules/schema-2-spell-authoring.md)、[施法合同](../../rules/schema-2-spells.md) | 生命领域一级 Bless/Cure Wounds、法师 1—5 级真实法术书/准备支持的 Shield/Counterspell、Ready 攻击/移动/法术、独立环境压制与战斗/探索交接；准确来源/镜像及局部历史贯通，完整 base/Host/archive 2 仍关闭 |
+| 施法与持续效果的后续扩展 | [施法扩展合同](spellcasting-extension-contract.md) | 施法授权、学习/准备、资源/组件、施法时间和效果分派的目标接口；明确共享机制、模组内容、采用顺序与验收门，不扩大当前有限支持范围 |
 | 共同业务守卫与初始化准备 | [共同业务事务](../../rules/business-write-transactions.md) | 全部现有写入口共享接纳与故障边界；初始计划与快照原子准备，完整业务/历史初始化仍须满足全部采用前提 |
 | 单个机制怎样完整接入 | [机制接入责任清单](mechanism-integration-checklist.md) | 规则、执行、状态、历史、恢复和验证的责任及采用门；供每个机制逐项填写 |
 | 攻击、移动、施法和反应的暂停与继续 | [动作继续协议](action-continuation-protocol.md) | 唯一动作流、类型化阶段、反应与选择、一次消费和精确恢复；具体机制另按责任清单采用 |
