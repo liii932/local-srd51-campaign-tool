@@ -18,6 +18,17 @@
 修正可复用父命令的状态、事件、存档和事务，不必新建表或独立入口；必须指向真实父消费者
 及证据，不能仅因无自有表或 UI 把责任标为 N/A。
 
+## 当前有限消费者的责任落点
+
+[有限施法合同](../../rules/schema-2-spells.md)及[作者来源](../../rules/schema-2-spell-authoring.md)
+记录生命领域 Bless/Cure Wounds、法师学习/准备与 Shield/Counterspell、Ready、固定 DM 抗魔区域和
+有限探索交接的 INTERNAL 范围。来源与规则镜像由 Spell/Wizard SourceRows、SnapshotRows 保存，
+角色法术书与资源由 `Schema2WizardSpellbookRules` 及角色历史拥有；唯一动作流由
+`Schema2ActionFlowRules` 保存 checkpoint/反应/继续，持续效果与探索分别由
+`Schema2OngoingEffectRules`、`Schema2ExplorationRules` 接合。实际状态、根事件、原骰、成本和
+幂等结果仍由 `Schema2CombatRuntimeService` 在共同事务内接受，真实数据库验收和完整
+Host/base/archive 2 资格保持独立。这些具体落点可用于本清单的责任引用，不能推导未登记机制支持。
+
 ## 逐项责任与交付
 
 1. **原文与适用范围** — 责任：领域设计者、内容作者。

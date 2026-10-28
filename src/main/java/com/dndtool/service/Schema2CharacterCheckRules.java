@@ -46,7 +46,7 @@ public final class Schema2CharacterCheckRules {
         }
         // Obtaining a feature/feat is not an execution owner for its check modifiers, rerolls,
         // restrictions or advantage. This slice accepts no acquired unresolved influence.
-        if (!before.features().isEmpty() || !before.feats().isEmpty()) throw invalid("S2_CHECK_EFFECT_UNSUPPORTED");
+        Schema2SpellRules.requireSupportedFeatures(material,before,"S2_CHECK_EFFECT_UNSUPPORTED");
         var definitions = material.projection().rules().stream().filter(FinalCheck.class::isInstance)
                 .map(FinalCheck.class::cast).filter(FinalCheck::enabled).toList();
         CheckInput input = command.checkInput();
@@ -99,7 +99,7 @@ public final class Schema2CharacterCheckRules {
         return new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(),
                 before.characterClass(), before.abilities(), before.level(), before.proficiencyBonus(), before.hitPoints(),
                 before.maximumHitPoints(), before.classes(), before.hitDicePools(), before.subclasses(), before.features(),
-                before.feats(), before.proficiencies(), before.version() + 1, before.resources(), before.rest(), before.equipment(), before.health());
+                before.feats(), before.proficiencies(), before.version() + 1, before.resources(), before.rest(), before.equipment(), before.health(), before.spellbook());
     }
     private static IllegalArgumentException invalid(String code) { return new IllegalArgumentException(code); }
 }

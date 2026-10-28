@@ -126,6 +126,9 @@ class Schema2CombatRuntimeServiceTest {
         assertEquals(Status.COMMITTED,restored.service.restore(saved).status()); assertEquals(saved,restored.service.read(f.combat)); assertEquals(0,restored.rolls);
         f.commit(Command.action(Kind.END_TURN,f.a));
         f.commit(Command.action(Kind.END_COMBAT,f.b));
+        assertEquals(Schema2CharacterRuntimeService.Status.REJECTED,f.characterService.execute(f.characterRequest(f.a,
+                new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT",ENERGY,1,null,null))).status());
+        f.commit(Command.action(Kind.CLOSE_SCENE,f.b));
         assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(f.characterRequest(f.a,
                 new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT",ENERGY,1,null,null))).status());
     }
@@ -181,27 +184,36 @@ class Schema2CombatRuntimeServiceTest {
     static final class Fixture {
         final UUID a=UUID.fromString("10000000-0000-4000-8000-000000000001"),b=UUID.fromString("20000000-0000-4000-8000-000000000002");
         final UUID campaign=UUID.fromString("30000000-0000-4000-8000-000000000003"),combat=UUID.fromString("40000000-0000-4000-8000-000000000004");
-        final ProductionSchema2Projection material=Schema2CombatTestFixture.material();
-        final Schema2RulesBinding binding=Schema2RulesBinding.from(material);
-        final Schema2SourceReadFixture source=new Schema2SourceReadFixture(Schema2GrantFixtures.artifacts(Schema2CombatTestFixture.packages()));
+        final ProductionSchema2Projection material;
+        final Schema2RulesBinding binding;
+        final Schema2SourceReadFixture source;
         final Schema2RuntimeJdbcFixture runtime=new Schema2RuntimeJdbcFixture();
         final Schema2CharacterRuntimeService characterService=new Schema2CharacterRuntimeService(runtime.dataSource());
         final List<Member> members=new ArrayList<>(); final Map<UUID,UUID> items=new HashMap<>();
         final ArrayDeque<Integer> nextRolls=new ArrayDeque<>(); int rolls; Battle battle;
         final Schema2CombatRuntimeService service=new Schema2CombatRuntimeService(runtime.dataSource(),sides->{rolls++;return nextRolls.isEmpty()?(sides==20?10:1):nextRolls.removeFirst();});
         Fixture(boolean initialize) throws Exception {
+            this(initialize,Schema2CombatTestFixture.packages(),INITIAL_CHOICES);
+        }
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices) throws Exception {
+            this(initialize,packages,choices,CLASS);
+        }
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices,RuleIdentity startingClass) throws Exception {
+            var artifacts=Schema2GrantFixtures.artifacts(packages);
+            material=ProductionSchema2Projection.compose(artifacts); binding=Schema2RulesBinding.from(material);
+            source=new Schema2SourceReadFixture(artifacts);
             int ordinal=0;
             for(UUID character:List.of(a,b)) {
                 ordinal++; Identity identity=new Identity(stable(ordinal,1),stable(ordinal,2)); UUID preparation=stable(ordinal,3);
                 members.add(new Member(character,identity,preparation));
                 var selection=new Schema2InitialProficiencyRules.Request(new Schema2InitialProficiencyRules.Sources(
-                        new RuleIdentity(BASE,"character.race","race.human"),null,new RuleIdentity(BASE,"character.background","background.guard"),CLASS),Map.of());
+                        new RuleIdentity(BASE,"character.race","race.human"),null,new RuleIdentity(BASE,"character.background","background.guard"),startingClass),Map.of());
                 var prepared=new Schema2InitializationPreparationService(source.dataSource()).prepare(new Schema2InitializationPreparationService.Request(
                         preparation,identity,campaign,character,source.selections(),null,selection));
                 var transfer=new Schema2SnapshotTransferService(source.dataSource(),runtime.dataSource()).transferPrepared(prepared);
                 assertEquals(Schema2SnapshotTransferService.Status.COMMITTED,transfer.status(),transfer.code());
                 if(initialize) {
-                    var initial=new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED",null,0,null,null,null,INITIAL_CHOICES);
+                    var initial=new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED",null,0,null,null,null,choices);
                     var created=characterService.execute(new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),identity,campaign,character,preparation,binding,-1,initial,fullAbilities()));
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,created.status(),created.code());
                     UUID item=stable(ordinal,4); items.put(character,item);

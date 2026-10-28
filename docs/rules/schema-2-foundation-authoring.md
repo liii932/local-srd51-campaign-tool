@@ -49,7 +49,7 @@
 ## 装备字段与完整引用
 
 `equipment.item` 另外必需 `kind`、`armor_class`、`strength_minimum`、
-`stealth_disadvantage`、`hands`、`proficiency`；仅 `stealth_skill` 是可选领域字段。
+`stealth_disadvantage`、`hands`；`proficiency` 按物品类别要求，`stealth_skill` 按隐匿劣势要求。
 整数初步范围分别为 AC 0—20、力量要求 0—15、手数 0—2；完整声明还必须满足下表。
 `stealth_disadvantage` 必须是 JSON 布尔值，不能用文本或整数替代。
 
@@ -60,14 +60,17 @@
 | `SHIELD` | 2 | 0 | 1 | `character.proficiency`，类别 `ARMOR` |
 | `TOOL` | 0 | 0 | 1 或 2 | `character.tool` |
 | `WEAPON` | 0 | 0 | 1 或 2 | `character.proficiency`，类别 `WEAPON` |
+| `HOLY_SYMBOL` | 0 | 0 | 1 | 必须省略 |
 
 仅护甲可声明隐匿劣势。`stealth_disadvantage=true` 时必须提供完整 `stealth_skill`，
 其目标必须是 `category=SKILL` 且 `ability_key=ability.dexterity` 的真实熟练定义；
-为 false 时必须省略该字段。盾、工具和武器均为 false 且不携带 `stealth_skill`。
+为 false 时必须省略该字段。盾、工具、武器和圣徽均为 false 且不携带 `stealth_skill`。
 应用不根据显示名称或自由规则键猜测技能身份。
+圣徽的真实持有与施法组件资格见[施法作者合同](schema-2-spell-authoring.md)；
+其余类别继续要求准确熟练引用，`proficiency` 仍不能用 `clear_field` 清空。
 
 引用只能指向本包或加载在前的真实定义；外部原始所有者必须是本包的直接依赖。
-禁用装备仍须保留存在且类别正确的引用；启用装备的熟练与适用隐匿技能目标还必须启用。
+禁用装备仍须保留其类别要求的真实引用；启用装备的适用熟练与隐匿技能目标还必须启用。
 原始声明和最终投影均校验这些条件，后续覆盖不能掩盖原始类别或引用错误。
 工具熟练目录、装备定义与角色已经持有或穿戴某实例是不同事实；本合同只保存定义。
 
@@ -120,8 +123,8 @@ V007 增加 `rule_schema2_equipment_item`、`rule_schema2_health`、
 不把对象压成 JSON 文本。共享 reader 对全部包逐列比较原 ZIP，包含未选中包；
 缺失、多余、跨包、序号或值不一致均拒绝。负修正及严格清空也参与来源读回校验。
 
-RULES 的 V001—V008 合计 35 张表、105 个触发器，其中 25 张为 schema 2 类型化作者材料表；
-加运行 V001—V034，共 42 份迁移源。既有历史不可改写；迁移、授权与真实引擎验收各是独立检查点。
+RULES 的 V001—V009 合计 38 张表、114 个触发器，其中 schema 2 为三个账本表与 28 张类型化作者材料表；
+加运行 V001—V036，共 45 份迁移源。既有历史不可改写；迁移、授权与真实引擎验收各是独立检查点。
 installer 仅获准确材料列 INSERT，accepter/app/agent 对这些材料只读，仓储不拥有提交或回滚权限。
 
 `Schema2CompositionKernel` 与 `ProductionSchema2Projection` 支持这些类型的纯组合、完整链及

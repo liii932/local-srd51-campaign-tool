@@ -104,6 +104,67 @@ class JdbcSchema2CharacterRuntimeRepositoryTest {
         try (var transaction = BusinessWriteTransactions.openInternal(fixture.dataSource())) { assertThrows(SQLException.class, () -> REPOSITORY.restore(transaction.connection(), history())); transaction.rollback(); }
         assertTrue(fixture.rows("s2_character_runtime").isEmpty());
     }
+    @Test void combatDeathSavePreservesOptionalBlessDieInAppendAndDirectRestore() throws Exception {
+        for (List<Integer> dice : List.of(List.<Integer>of(), List.of(1), List.of(2), List.of(3), List.of(4))) {
+            History expected = deathSaveHistory("COMBAT_DEATH_SAVE_RESOLVED", dice);
+            var fixture = seeded();
+            try (var transaction = BusinessWriteTransactions.openInternal(fixture.dataSource())) {
+                for (Event event : expected.events()) REPOSITORY.append(transaction.connection(), event);
+                transaction.commit();
+            }
+            assertEquals(expected, REPOSITORY.read(fixture.connection, CHARACTER));
+            assertEquals(dice.size(), fixture.rows("s2_character_health_die").size());
+            assertEquals(dice.size(), fixture.rows("s2_character_health_event").getLast().get("die_count"));
+            var restored = seeded();
+            try (var transaction = BusinessWriteTransactions.openInternal(restored.dataSource())) {
+                REPOSITORY.restore(transaction.connection(), expected);
+                transaction.commit();
+            }
+            assertEquals(expected, REPOSITORY.read(restored.connection, CHARACTER));
+            if (!dice.isEmpty()) {
+                restored.rows("s2_character_health_die").getLast().put("die_value", 5);
+                assertThrows(SQLException.class, () -> REPOSITORY.read(restored.connection, CHARACTER));
+            }
+        }
+    }
+    @Test void deathSaveRejectsMultipleOrNonD4BonusesAndStandaloneBlessBeforeWriting() throws Exception {
+        for (History malformed : List.of(
+                deathSaveHistory("COMBAT_DEATH_SAVE_RESOLVED", List.of(5)),
+                deathSaveHistory("COMBAT_DEATH_SAVE_RESOLVED", List.of(1, 2)),
+                deathSaveHistory("DEATH_SAVE_RESOLVED", List.of(4)))) {
+            var fixture = seeded();
+            int writes = fixture.writes;
+            try (var transaction = BusinessWriteTransactions.openInternal(fixture.dataSource())) {
+                assertThrows(SQLException.class, () -> REPOSITORY.restore(transaction.connection(), malformed));
+                transaction.rollback();
+            }
+            assertEquals(writes, fixture.writes);
+        }
+        assertDoesNotThrow(() -> JdbcSchema2CharacterRuntimeRepository.validate(deathSaveHistory("DEATH_SAVE_RESOLVED", List.of())));
+    }
+    private static History deathSaveHistory(String kind, List<Integer> dice) {
+        State initial = state(0, 1, 9, 1, 3, 3);
+        State down = healthState(initial, 1, HealthState.INITIAL);
+        State saved = healthState(initial, 2, new HealthState(0, 1, 0, false, false, null));
+        RuleIdentity health = new RuleIdentity("example", "adventure.health", "health.standard");
+        UUID combat = UUID.randomUUID(), operation = UUID.randomUUID();
+        HealthInput input = new HealthInput(health, null, null, "Combat turn begins");
+        Command damage = new Command("COMBAT_DAMAGE_APPLIED", null, 0, null, null, null, GrowthChoices.EMPTY,
+                null, null, null, input, new CombatInput(combat, operation, UUID.randomUUID(), CHARACTER, 9, false));
+        Command death = new Command(kind, null, 0, null, null, null, GrowthChoices.EMPTY,
+                null, null, null, input, kind.equals("COMBAT_DEATH_SAVE_RESOLVED")
+                        ? new CombatInput(combat, operation, UUID.randomUUID(), CHARACTER, 0, false) : null);
+        return new History(saved, List.of(
+                event(new Command("INITIALIZED", null, 0, null, null), null, initial),
+                new Event(UUID.randomUUID(), "a".repeat(64), damage, null, initial, down, null, new HealthResult(List.of(), null, null, 9, 9)),
+                new Event(UUID.randomUUID(), "a".repeat(64), death, null, down, saved, null, new HealthResult(dice, 10, null, 0, 0))));
+    }
+    private static State healthState(State initial, long version, HealthState health) {
+        return new State(initial.identity(), initial.campaignId(), initial.characterId(), initial.preparationOperationId(),
+                initial.characterClass(), initial.abilities(), initial.level(), initial.proficiencyBonus(), 0, initial.maximumHitPoints(),
+                initial.classes(), initial.hitDicePools(), initial.subclasses(), initial.features(), initial.feats(), initial.proficiencies(),
+                version, initial.resources(), initial.rest(), initial.equipment(), health);
+    }
     private static History history() {
         State initial = state(0, 1, 9, 1, 3, 3), advanced = state(1, 2, 15, 2, 4, 4), spent = state(2, 2, 15, 2, 2, 4), recovered = state(3, 2, 15, 2, 4, 4);
         return new History(recovered, List.of(

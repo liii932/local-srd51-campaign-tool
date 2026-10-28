@@ -26,7 +26,7 @@ public final class Schema2CharacterEquipmentRules {
             throw invalid("S2_EQUIPMENT_COMMAND");
         if (before.hitPoints() == 0 || before.health().dead()) throw invalid("S2_EQUIPMENT_HEALTH");
         if (before.rest().active() != null) throw invalid("S2_EQUIPMENT_REST_ACTIVE");
-        requireNoUnownedEffects(before);
+        requireNoUnownedEffects(material,before);
         var input = command.equipmentInput();
         var next = new ArrayList<>(before.equipment()); long minutes = 0;
         if (command.kind().equals("ITEM_ACQUIRED")) {
@@ -63,7 +63,7 @@ public final class Schema2CharacterEquipmentRules {
         State after = new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(), before.characterClass(),
                 before.abilities(), before.level(), before.proficiencyBonus(), before.hitPoints(), before.maximumHitPoints(), before.classes(),
                 before.hitDicePools(), before.subclasses(), before.features(), before.feats(), before.proficiencies(), before.version() + 1,
-                before.resources(), clock, next, before.health());
+                before.resources(), clock, next, before.health(), before.spellbook());
         validateState(material, after); return after;
     }
 
@@ -90,7 +90,7 @@ public final class Schema2CharacterEquipmentRules {
     }
 
     public Derived derive(ProductionSchema2Projection material, State state) {
-        validateState(material, state); requireNoUnownedEffects(state);
+        validateState(material, state); requireNoUnownedEffects(material,state);
         int dexterity = Math.floorDiv(state.abilities().get("ability.dexterity") - 10, 2);
         int ac = 10 + dexterity, shield = 0, speed = 0; boolean untrained = false;
         Set<RuleIdentity> stealth = new HashSet<>();
@@ -129,6 +129,9 @@ public final class Schema2CharacterEquipmentRules {
             if (owners.size() != 1 || owners.getFirst().definition().advancementScope() != ProgressionScope.CHARACTER_ADVANCEMENT)
                 throw invalid(code);
         }
+    }
+    static void requireNoUnownedEffects(ProductionSchema2Projection material,State state) {
+        Schema2SpellRules.requireSupportedFeatures(material,state,"S2_EQUIPMENT_EFFECT_UNSUPPORTED");
     }
     static void requireNoUnownedEffects(State state) {
         if (!state.features().isEmpty() || !state.feats().isEmpty()) throw invalid("S2_EQUIPMENT_EFFECT_UNSUPPORTED");

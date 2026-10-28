@@ -100,6 +100,19 @@ V029/V031 的[角色事实仓储](rules/schema-2-character-fact-storage.md)保�
 仍写入原角色事件，与战斗根在共同事务中原子提交。保存/恢复保留已完成前缀与唯一未决叶子，
 不复制 HP 或时钟、不重放已付成本。此 INTERNAL 接合不开放完整初始化、Host 或完整战役文件。
 
+[有限施法](rules/schema-2-spells.md)复用这一 owner 与唯一动作流。`Schema2SpellRules` 从
+[施法作者来源](rules/schema-2-spell-authoring.md)及实际角色事实验证生命领域一级的 Bless／Cure Wounds，
+或单职业法师 1—5 级的 Shield／Counterspell；`Schema2WizardSpellbookRules` 独立拥有真实学习与准备，
+作者配置不等于角色已知。成本和治疗通过准确根操作／施法帧的角色因果子事件提交，法术位、HP 和
+秒时钟仍由原角色唯一拥有。`Schema2ActionFlowRules` 保存命中后伤害前、施放完成前及 Ready 触发后
+的真实 checkpoint，反应可嵌套，暂停与恢复不重掷、不重付或隐式 PASS。
+
+`Schema2OngoingEffectRules` 区分 Bless 同强来源的 SHADOWED 与固定 DM 抗魔区域的独立压制原因，
+专注持有者准确关联 Bless 或 held Ready spell。`Schema2ExplorationRules` 在战斗与有限探索间交接同一
+场景 owner，保留效果、区域与时钟，并在重入战斗时建立真实先攻；关闭场景必须满足效果与环境闭包。
+V035/V037 保存类型化规则镜像，V036/V038 保存施法、学习/准备、反应、区域/压制及探索事实；
+独立恢复重验完整历史与准确规则，不向最新来源补字段。完整 Host、base 和 archive format 2 保持关闭。
+
 ## 3. 产品范围
 
 ### 3.1 当前冻结 v1 已实现
@@ -198,7 +211,7 @@ V014 为 236 个职业/子职业特性固定自动、有限 DM 裁决或阻断�
 等级，并为 16 个职业资源固定执行与恢复 profile。类型化资源恢复、裁决键和逐职业矩阵见
 `docs/rules/class-features-v2.md`。V015 增加多职业先决条件和熟练 profile、逐职业 ASI 等级、
 可扩展专长状态（当前仅 Grappler）、不同生命骰组合及事件关联选择；V018 固定职业施法贡献并
-提供共享法术位上限计算基础，但法术权威状态/升级事务集成与 Grappler 战斗效果保持阻断，见
+提供共享法术位上限计算基础，但多职业施法权威状态/升级事务集成与 Grappler 战斗效果保持阻断，见
 `docs/rules/multiclass-asi-feats-v2.md` 与 `docs/rules/multiclass-spell-slots-v2.md`。V017 和内部 DRAFT codec 使用
 `eventSequence`/`eventTail` 为当前角色状态建立数据库 ID 无关的事件闭包，提供严格读取、规范写出、
 预览和调用方事务内恢复基础；它不接入 Host 路由或 released dispatcher。完整身份、archive

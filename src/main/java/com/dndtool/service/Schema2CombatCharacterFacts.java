@@ -7,7 +7,7 @@ import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
-/** Typed causal child of a combat operation; health remains in the character history. */
+/** Typed causal child of a combat operation; resources and health remain in the character history. */
 final class Schema2CombatCharacterFacts {
     private Schema2CombatCharacterFacts() { }
 
@@ -21,17 +21,44 @@ final class Schema2CombatCharacterFacts {
 
     static Command command(ProductionSchema2Projection material, UUID combatId, UUID operationId,
             UUID actorId, Schema2CombatState.HealthChange change) {
-        return new Command(change.timeAdvance() ? "COMBAT_TIME_ADVANCED" : change.deathSave() ? "COMBAT_DEATH_SAVE_RESOLVED" : "COMBAT_DAMAGE_APPLIED",
-                null, 0, null, null, null, GrowthChoices.EMPTY, null, null, null,
-                new HealthInput(healthRule(material), null, null, "Combat owner accepted consequence"),
+        return new Command(change.environmentInput()!=null ? "COMBAT_ENVIRONMENT_HEALTH" : change.resource() != null ? "COMBAT_RESOURCE_SPENT" : change.healing() ? "COMBAT_HEALING_APPLIED"
+                        : change.timeAdvance() ? "COMBAT_TIME_ADVANCED" : change.deathSave() ? "COMBAT_DEATH_SAVE_RESOLVED" : "COMBAT_DAMAGE_APPLIED",
+                change.resource(), change.resourceAmount(), null, null, null, GrowthChoices.EMPTY, null, null, null,
+                change.environmentInput()!=null?change.environmentInput():change.resource() != null ? null : new HealthInput(healthRule(material), null, null, "Combat owner accepted consequence"),
                 new CombatInput(combatId, operationId, change.frameKey(), actorId, change.damageAmount(), change.critical(),change.seconds()));
     }
 
     static State verify(ProductionSchema2Projection material, State before, Command command, HealthResult result, State savedAfter) {
-        if (before == null || command.combatInput() == null || result == null
-                || !healthRule(material).equals(command.healthInput().rule()))
+        if (before == null || command.combatInput() == null)
+            throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+        if (command.kind().equals("COMBAT_RESOURCE_SPENT")) {
+            if (result != null || command.healthInput() != null || command.amount() != 1)
+                throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            return new Schema2CharacterProgressionRules().spend(material, before, command.resource(), command.amount());
+        }
+        if (result == null || command.healthInput() == null || !healthRule(material).equals(command.healthInput().rule()))
             throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
         var health = new Schema2CharacterHealthRules();
+        if(command.kind().equals("COMBAT_ENVIRONMENT_HEALTH")) {
+            var input=command.healthInput();
+            Command normal=new Command("HEALTH_EFFECT_RESOLVED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,input);
+            var prepared=health.prepare(material,before,normal);
+            var resolved=health.resolve(prepared,result.dice(),result.deathD20(),result.recoveryD4());
+            var effect=material.projection().rules().stream().filter(FinalVitalEffect.class::isInstance).map(FinalVitalEffect.class::cast)
+                    .filter(e->e.enabled()&&e.identity().equals(input.effect())).findFirst().orElseThrow(()->new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT"));
+            if(!result.equals(resolved.result()) || command.combatInput().damageAmount()!=(effect.definition().kind()==VitalEffectKind.DAMAGE?result.rolledAmount():0))
+                throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            return dropAfterDamage(before,resolved.state(),savedAfter,command);
+        }
+        if (command.kind().equals("COMBAT_HEALING_APPLIED")) {
+            var healed=health.applyHealing(before, command.combatInput().damageAmount());
+            if (result.dice().size()!=1 || result.dice().getFirst()<1 || result.dice().getFirst()>8
+                    || result.deathD20()!=null || result.recoveryD4()!=null
+                    || healed.result().rolledAmount()!=result.rolledAmount()
+                    || healed.result().appliedAmount()!=result.appliedAmount())
+                throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            return healed.state();
+        }
         if (command.kind().equals("COMBAT_TIME_ADVANCED")) {
             State after=Schema2CombatTimeRules.advanceSeconds(material,before,command.combatInput().secondsAdvanced());
             if(!result.equals(new HealthResult(List.of(),null,null,0,(int)(after.hitPoints()-before.hitPoints()))))
@@ -41,13 +68,20 @@ final class Schema2CombatCharacterFacts {
         if (command.kind().equals("COMBAT_DEATH_SAVE_RESOLVED")) {
             Command death = new Command("DEATH_SAVE_RESOLVED", null, 0, null, null, null,
                     GrowthChoices.EMPTY, null, null, null, command.healthInput());
-            return health.verify(material, before, death, result);
+            if (result.dice().size() > 1 || result.deathD20() == null)
+                throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            int bonus=result.dice().isEmpty()?0:result.dice().getFirst();
+            var resolved=health.resolveDeathSave(health.prepare(material,before,death),result.deathD20(),bonus,result.recoveryD4());
+            if (!resolved.result().equals(result)) throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            return resolved.state();
         }
         if (!command.kind().equals("COMBAT_DAMAGE_APPLIED")) throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
-        var damage = health.applyDamage(before, command.combatInput().damageAmount(), command.combatInput().critical());
+        var damage = health.applyDamage(material, before, command.combatInput().damageAmount(), command.combatInput().critical());
         if (!result.equals(new HealthResult(List.of(), null, null, damage.requestedAmount(), damage.appliedAmount())))
             throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
-        State after=damage.state();
+        return dropAfterDamage(before,damage.state(),savedAfter,command);
+    }
+    private static State dropAfterDamage(State before,State after,State savedAfter,Command command) {
         if(after.hitPoints()==0 && before.equipment().stream().anyMatch(item->Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(item.location()))) {
             if(savedAfter==null) throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
             EquipmentItem held=before.equipment().stream().filter(item->Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(item.location())).findFirst().orElseThrow();

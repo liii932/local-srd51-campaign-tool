@@ -99,7 +99,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V034 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V038 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -133,6 +133,10 @@ mvn '-DargLine=-Xmx256m' '-Dtest=Schema2SourceInstallationTest,Schema2OperationT
 第二组覆盖原包与接受事实分别不可改写、来源双摘要回读、独立操作指纹、实际协调器与 JDBC
 仓储衔接、共享维护锁/未决标记、显式审阅、旧票据、故障回滚及提交结果未知后的原操作查证。
 CLI 子进程测试核对真实命令的稳定诊断；共用存储和旧离线安装测试保护 schema 1 路径。
+安装、维护证据和票据测试依赖 POSIX owner-only 权限与 `SecureDirectoryStream`，须在支持这些
+能力的 Linux/WSL 文件系统运行；纯 ZIP/组合测试另按自身前提执行。原生 Windows provider
+不支持这些目录能力，相关安装测试可能在建立夹具或打开安全目录时失败，不能据此宣称
+安装链路通过，也不能把省略相关测试后的结果称为完整回归；应记录平台限制并在支持环境重跑。
 来源容量用例在 256 MiB 测试堆中保留前像，安装接近 raw/expanded 各 8 MiB 总限额的最后一个包，
 核对完整后像，并证明下一包在 DML 前拒绝；这不替代真实驱动的容量与时限验收。
 来源 schema/授权的静态测试和 JDBC 协议代理不替代真实 MySQL 的权限、约束、并发及持久化验收。
@@ -258,7 +262,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V034 完整运行清单及来源 V001—V008（两链共 42 份迁移源）。
+并核对 V001—V038 完整运行清单及来源 V001—V010（两链共 48 份迁移源）。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -366,7 +370,7 @@ mvn '-Dtest=Schema2CheckCompositionTest,Schema2EquipmentHealthCompositionTest,Jd
 已实现的成长/休息验证继续使用下节入口。
 
 WAR 包含严格作者/组合和真实来源读取类；来源 SQL、离线安装器、作者包及测试向量排除。
-来源 V001—V008 的 35 张表、105 个触发器及 25 张类型化材料表须在另行授权的隔离 MySQL
+来源 V001—V010 的 42 张表、126 个触发器及 32 张类型化材料表须在另行授权的隔离 MySQL
 实例验收；代理和静态结构测试不能替代真实 CHECK、FK、权限、锁或持久化事实。
 
 ## Schema 2 角色成长、资源与休息验证
@@ -398,7 +402,7 @@ mvn '-Dtest=JdbcSchema2CheckSnapshotTest,JdbcSchema2EquipmentHealthSnapshotTest,
 核对封闭输入/结果、有效骰模式、完整装备健康前后状态、有序原骰、追加读回、直接恢复、
 孤儿与类型化行缺失、结构/邻接/预算限制及整笔回滚；这些测试保存已经准备的事实，不执行新业务。
 
-运行链为 V001—V034，来源保持 V001—V008，共 42 份迁移源。WAR 须包含镜像/事实仓储及
+运行链为 V001—V038，来源保持 V001—V010，共 48 份迁移源。WAR 须包含镜像/事实仓储及
 全部运行迁移，排除来源 SQL、离线写入工具、测试向量和真实存档。Check/Equipment/Health
 消费者、请求幂等和 RuntimeService 命令使用下节验证；仓储测试本身只作为存储事实的证据。
 现有成长/休息测试保护新增字段的中性保留，DRAFT、Host、archive 2 和安装门保持。
@@ -463,7 +467,7 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V034 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V038 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 
@@ -496,3 +500,35 @@ mvn '-Dtest=Schema2CombatCompositionTest,JdbcSchema2CombatSourceTest,JdbcSchema2
 
 WAR 包含战斗消费者／仓储和运行 V032—V034，排除来源 V008、离线写入工具与测试向量。
 JDBC 代理及静态 SQL 检查不代替真实 MySQL、迁移执行、授权、部署、Host 或 archive format 2 验收。
+
+## Schema 2 有限施法与持续效果验证
+
+[施法作者](rules/schema-2-spell-authoring.md)与[有限施法](rules/schema-2-spells.md)分层选择聚焦测试：
+
+```bash
+mvn '-Dtest=Schema2SpellCompositionTest,JdbcSchema2SpellSourceTest,JdbcSchema2SpellSnapshotTest,Schema2SpellSchemaTest' test
+mvn '-Dtest=Schema2SpellRulesTest,Schema2SpellRuntimeServiceTest,Schema2SpellRuntimeSchemaTest' test
+```
+
+新增 Wizard／环境与反应切片时，按改动选择：
+
+```bash
+mvn '-Dtest=Schema2WizardCompositionTest,JdbcSchema2WizardSourceTest,JdbcSchema2WizardSnapshotTest,Schema2WizardSpellbookRulesTest' test
+mvn '-Dtest=Schema2ReactionSpellRulesTest,Schema2ReadyRulesTest,Schema2ReadySpellRulesTest,Schema2OngoingEffectRulesTest,Schema2ExplorationRulesTest' test
+mvn '-Dtest=Schema2WizardRuntimeServiceTest,Schema2ExplorationRuntimeServiceTest,JdbcSchema2CombatRuntimeRepositoryTest,Schema2SceneRuntimeSchemaTest' test
+```
+
+作者与存储测试核对完整身份、学习名单、固定区域、全部原包与类型化行，不以可学习声明代替角色知识。
+真实角色测试经过初始化、逐级成长、每级学习和长休准备，验证重复／越级学习、非法准备与元数据法术执行拒绝。
+反应测试覆盖命中后伤害前的 Shield、Counterspell 嵌套、Ready attack/move/spell 的准备／触发／释放、
+一次成本、专注占用、PASS 与到期。持续效果测试分别验证同名 SHADOWED、多个独立 SUPPRESSED 原因、
+解除与重新求值、战斗结束／重入、探索时间和健康后果。
+事务与历史测试经过真实准备、角色、场景及历史仓储，核对重复请求／过期版本、paused leaf 直接恢复、
+缺失／多余／孤儿行拒绝、故障回滚和 UNKNOWN 原操作查证。共享角色与战斗消费者改变时，补选其对应
+定向测试，验证法术书、成本和时间的中性保留。代理 JDBC 与静态 SQL 不替代真实 MySQL 约束、权限、
+并发和持久化验收。
+
+当前批准链为运行 V001—V038 与来源 V001—V010，共 48 份迁移源；来源为 42 张表、126 个触发器，
+其中 schema 2 为三个账本表与 32 张类型化作者材料表。WAR 须包含施法／场景消费者、类型化仓储和
+运行 V035—V038，排除来源 V009/V010、离线写入工具、作者包与测试向量。
+这些命令描述可重复验证方法，不表示真实数据库或完整发布门已验收。

@@ -20,7 +20,9 @@ public final class RuleSchemaMigrations {
             new Expectation(SCHEMA_ROLE, 5, "V005__schema2-advancement-source.sql", "2dfdecf8cb30fcc71f7e011550ce3b32334340aab5ff546f4e71e53e13147e5c"),
             new Expectation(SCHEMA_ROLE, 6, "V006__schema2-check-source.sql", "9c495e9af9ce06b1e98fba9e44ef159cebbe8ef5f058254e54f8f83a0c7aca30"),
             new Expectation(SCHEMA_ROLE, 7, "V007__schema2-equipment-health-source.sql", "d5bc25f01389e7811280b97c36202b066142efb6ee5521cbb7fccb0def25de45"),
-            new Expectation(SCHEMA_ROLE, 8, "V008__schema2-combat-source.sql", "eb0bf9e4675cfed03ec5e5e57f026b57e6bd3409edf98eaf6a9e6e680485cfe2"));
+            new Expectation(SCHEMA_ROLE, 8, "V008__schema2-combat-source.sql", "eb0bf9e4675cfed03ec5e5e57f026b57e6bd3409edf98eaf6a9e6e680485cfe2"),
+            new Expectation(SCHEMA_ROLE, 9, "V009__schema2-spell-source.sql", "7ffe0707112cf3051d0a80c346360be5e4f933f8046830321fd3ac4f68196cfc"),
+            new Expectation(SCHEMA_ROLE, 10, "V010__schema2-wizard-environment-source.sql", "3386950595e0c24eade84c6b9b1c38145ffe8aefcb786b6cc66f663ebd2c3d74"));
 
     private RuleSchemaMigrations() {
     }

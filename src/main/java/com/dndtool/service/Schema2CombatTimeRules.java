@@ -36,7 +36,7 @@ public final class Schema2CombatTimeRules {
         State after = new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(),
                 before.characterClass(), before.abilities(), before.level(), before.proficiencyBonus(), hp,
                 before.maximumHitPoints(), before.classes(), before.hitDicePools(), before.subclasses(), before.features(),
-                before.feats(), before.proficiencies(), before.version() + 1, before.resources(), clock, before.equipment(), health);
+                before.feats(), before.proficiencies(), before.version() + 1, before.resources(), clock, before.equipment(), health, before.spellbook());
         growth.validateState(material, after);
         rests.validateState(material, after);
         healthRules.validateState(after);

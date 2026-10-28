@@ -19,7 +19,7 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - 已在该 DRAFT 身份下建立 12 职业/子职业的 236 项特性三态矩阵，以及职业资源的类型化
   容量/休息恢复边界，并建立多职业先决条件/熟练增量、ASI 和可扩展专长状态（当前仅
   Grappler）的 DRAFT 角色切片；V018 进一步固定十二职业的多职业施法贡献，并提供共享法术位
-  上限计算基础，但法术权威状态、升级事务集成和 Grappler 战斗效果仍阻断。该内部规则基础不
+  上限计算基础，但多职业施法的权威状态与升级事务集成、Grappler 战斗效果仍阻断。该内部规则基础不
   等于发布或开放可达业务入口，完整规则族会保持 DRAFT，直到主要规则领域完成跨领域发布候选验收；
 - DRAFT 的[语言与工具熟练目录](./docs/rules/tool-catalog-partition.md)提供严格作者包、双分区离线安装、
   来源读取与调用方事务运行镜像；仅为 PARTITION，不提供完整规则或游戏运行资格；
@@ -51,6 +51,11 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - schema 2 的[内部战斗与动作继续](./docs/rules/schema-2-combat.md)连接同战役中冻结绑定一致、
   同秒起点的独立 prepared 角色，提供先攻/回合、单次近战攻击、移动、机会攻击暂停/继续与准确恢复；
   失去意识记录倒地和手持物掉落，每完整 round 沿唯一角色时钟推进六秒，完整基础包与 Host 仍未开放；
+- schema 2 的[有限施法](./docs/rules/schema-2-spells.md)提供生命领域一级 Bless／Cure Wounds，以及
+  单职业法师 1—5 级真实法术书、准备清单和法术位支持的 Shield／Counterspell；Ready 攻击、移动与
+  一动作法术复用同一反应流，成本只支付一次。Bless 的贡献、专注、到期、同强覆盖恢复与固定 DM
+  抗魔区域的独立压制原因随事实保存；战斗可转入共享时钟的有限探索并保留效果，再重新进入先攻。
+  这些能力保持 INTERNAL；完整法术目录执行、完整基础包、Host 与完整战役文件仍关闭；
 - 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
 - 执行普通、优势和劣势 d20 检定，并保存候选骰、修正、DC、结果和内部事件；
 - 通过封闭的类型化效果调整字段、授予物品、记录消息或更新合法实体位置；
@@ -163,7 +168,7 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
 
 当前自动化使用 `dnd_tool_se` 作为本地部署运行库，使用 `dnd_tool_se_it` 执行临时表集成测试；
-完整 V001—V034 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
+完整 V001—V038 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
 运行实例内创建改名 schema，也不改写迁移 SQL。运行、只读核验、正式迁移、集成测试和隔离重放
 使用不同账号。现有少量测试数据的运行库可继续作为开发部署目标，但不能作为集成测试或迁移重放
 目标，使用前仍需盘点和备份。精确账号权限与 Agent 检查点见[数据库说明](./docs/database.md)。
@@ -196,7 +201,7 @@ src/main/java/com/dndtool/
   service/         业务验证、诊断编排、事务、幂等和存档服务
   web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V034 只增不改运行数据库迁移
+                    V001—V038 只增不改运行数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
@@ -223,6 +228,8 @@ tools/              数据库备份和独立规则哈希验证工具
 | [schema 2 检定、装备与健康基础](./docs/rules/schema-2-character-foundations.md) | 真实检定、装备实例、健康变化、命令幂等、完整局部历史与直接恢复 |
 | [schema 2 战斗作者来源](./docs/rules/schema-2-combat-authoring.md) | 战斗算法、真实近战武器及步行来源、来源 V008 和运行 V032 镜像 |
 | [schema 2 内部战斗与动作继续](./docs/rules/schema-2-combat.md) | 真实攻击/移动/机会攻击、回合、倒地/掉落、共享秒时钟、完整历史与恢复 |
+| [schema 2 施法作者来源](./docs/rules/schema-2-spell-authoring.md) | 生命领域/法师准确来源、学习名单、固定抗魔环境与 V009/V010、V035/V037 镜像 |
+| [schema 2 有限施法与持续效果](./docs/rules/schema-2-spells.md) | 真实成本/法术书、Shield/Counterspell/Ready、独立压制、专注/到期及探索转移 |
 | [共同业务写入与初始化准备](./docs/rules/business-write-transactions.md) | 全部写入口、永久守卫、事务故障隔离及绑定初始计划的原子准备 |
 | [SRD 5.1 本地原文索引](./docs/references/srd-5.1/README.md) | 按主题定位 403 页检索文本，核对本地 PDF 与官方出处 |
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |

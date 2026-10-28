@@ -28,6 +28,13 @@ public final class Schema2CharacterHealthRules {
     /** Shared health owner for a server-proved damage packet; this method never rolls or creates an effect. */
     public DamageResolution applyDamage(State before, int amount, boolean critical) {
         prepareDamage(before);
+        return damageValidated(before,amount,critical);
+    }
+    public DamageResolution applyDamage(ProductionSchema2Projection material, State before, int amount, boolean critical) {
+        prepareDamage(material,before);
+        return damageValidated(before,amount,critical);
+    }
+    private DamageResolution damageValidated(State before,int amount,boolean critical) {
         if (amount < 0 || amount > 65535) throw invalid("S2_HEALTH_DAMAGE_AMOUNT");
         HealthState old = before.health(), next = old;
         int absorbed = Math.min(old.temporaryHitPoints(), amount), remaining = amount - absorbed;
@@ -42,13 +49,30 @@ public final class Schema2CharacterHealthRules {
         return new DamageResolution(after, amount, applied, critical);
     }
 
+    public Resolution applyHealing(State before, int amount) {
+        validateState(before);
+        if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
+        if (before.rest().active()!=null || before.version()>=JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS-1) throw invalid("S2_HEALTH_COMMAND");
+        var healing=heal(before.hitPoints(),before.maximumHitPoints(),amount);
+        HealthState next=healing.applied()>0?living(before.health().temporaryHitPoints()):before.health();
+        State after=copy(before,healing.after(),next,before.rest(),before.version()+1); validateState(after);
+        return new Resolution(after,new HealthResult(List.of(),null,null,amount,(int)healing.applied()));
+    }
+
+    public void prepareDamage(ProductionSchema2Projection material, State before) {
+        Schema2SpellRules.requireSupportedFeatures(material,before,"S2_HEALTH_EFFECT_UNSUPPORTED");
+        prepareDamageCore(before);
+    }
     /** Preflight usable by attack owners before their first random draw. */
     public void prepareDamage(State before) {
+        if (!before.features().isEmpty() || !before.feats().isEmpty()) throw invalid("S2_HEALTH_EFFECT_UNSUPPORTED");
+        prepareDamageCore(before);
+    }
+    private void prepareDamageCore(State before) {
         validateState(before);
         if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
         if (before.rest().active() != null) throw invalid("S2_HEALTH_REST_ACTIVE");
         if (before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
-        if (!before.features().isEmpty() || !before.feats().isEmpty()) throw invalid("S2_HEALTH_EFFECT_UNSUPPORTED");
     }
 
     public State verifyDamage(State before, int amount, boolean critical, DamageResolution saved) {
@@ -68,7 +92,10 @@ public final class Schema2CharacterHealthRules {
         public int diceCount() { return effect == null ? 0 : effect.diceCount(); }
         public int diceSides() { return effect == null ? 0 : effect.diceSides(); }
         public boolean needsRecoveryD4(Integer deathD20) {
-            return deathSave() && deathD20 != null && deathD20 >= 10 && deathD20 < 20 && before.health().deathSuccesses() == 2;
+            return deathD20!=null && needsRecoveryD4(deathD20,0);
+        }
+        public boolean needsRecoveryD4(int deathD20, int bonus) {
+            return deathSave() && deathD20!=1 && deathD20<20 && deathD20+bonus>=10 && before.health().deathSuccesses()==2;
         }
     }
 
@@ -78,7 +105,7 @@ public final class Schema2CharacterHealthRules {
         if (!handles(command) || before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
         if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
         if (before.rest().active() != null) throw invalid("S2_HEALTH_REST_ACTIVE");
-        if (!before.features().isEmpty() || !before.feats().isEmpty()) throw invalid("S2_HEALTH_EFFECT_UNSUPPORTED");
+        Schema2SpellRules.requireSupportedFeatures(material,before,"S2_HEALTH_EFFECT_UNSUPPORTED");
         var owners = material.projection().rules().stream().filter(FinalHealth.class::isInstance).map(FinalHealth.class::cast).filter(FinalHealth::enabled).toList();
         HealthInput input = command.healthInput();
         if (owners.size() != 1 || !owners.getFirst().identity().equals(input.rule())
@@ -99,37 +126,43 @@ public final class Schema2CharacterHealthRules {
         return new PreparedHealth(before, copy(before, before.hitPoints(), before.health(), before.rest(), before.version() + 1), input, effect);
     }
 
+    /** A combat saving-throw owner proves the optional single Bless d4; natural 1/20 retain their own semantics. */
+    public Resolution resolveDeathSave(PreparedHealth prepared, int deathD20, int bonus, Integer recoveryD4) {
+        if (prepared==null || !prepared.deathSave() || deathD20<1 || deathD20>20 || bonus<0 || bonus>4
+                || prepared.needsRecoveryD4(deathD20,bonus)!=(recoveryD4!=null)
+                || recoveryD4!=null && (recoveryD4<1 || recoveryD4>4)) throw invalid("S2_HEALTH_RANDOM_RESULT");
+        State before=prepared.before; HealthState old=before.health(), next; long hp=0; int applied=0;
+        if (deathD20==20) {hp=1;applied=1;next=living(old.temporaryHitPoints());}
+        else if (deathD20!=1 && deathD20+bonus>=10) {
+            int successes=old.deathSuccesses()+1;
+            next=successes==3?new HealthState(old.temporaryHitPoints(),0,0,true,false,before.rest().minute()+recoveryD4*60L,before.rest().second())
+                    :new HealthState(old.temporaryHitPoints(),successes,old.deathFailures(),false,false,null);
+        } else next=failure(old,old.temporaryHitPoints(),deathD20==1?2:1);
+        State after=copy(before,hp,next,before.rest(),before.version()+1);validateState(after);
+        return new Resolution(after,new HealthResult(bonus==0?List.of():List.of(bonus),deathD20,recoveryD4,0,applied));
+    }
+
     /** Uses saved dice only. No dice source, command replay or benefit reapplication is involved in verification. */
     public Resolution resolve(PreparedHealth prepared, List<Integer> dice, Integer deathD20, Integer recoveryD4) {
         if (prepared == null || dice == null || dice.size() != prepared.diceCount()
                 || dice.stream().anyMatch(value -> value == null || value < 1 || value > prepared.diceSides())) throw invalid("S2_HEALTH_RANDOM_RESULT");
+        if (prepared.deathSave()) return resolveDeathSave(prepared,deathD20==null?0:deathD20,0,recoveryD4);
         State before = prepared.before; HealthState old = before.health(), next = old;
         long hp = before.hitPoints(); int amount = 0, applied = 0;
-        if (prepared.deathSave()) {
-            if (deathD20 == null || deathD20 < 1 || deathD20 > 20 || prepared.needsRecoveryD4(deathD20) != (recoveryD4 != null)
-                    || recoveryD4 != null && (recoveryD4 < 1 || recoveryD4 > 4)) throw invalid("S2_HEALTH_RANDOM_RESULT");
-            if (deathD20 == 20) { hp = 1; applied = 1; next = living(old.temporaryHitPoints()); }
-            else if (deathD20 >= 10) {
-                int successes = old.deathSuccesses() + 1;
-                next = successes == 3 ? new HealthState(old.temporaryHitPoints(), 0, 0, true, false, before.rest().minute() + recoveryD4 * 60L,before.rest().second())
-                        : new HealthState(old.temporaryHitPoints(), successes, old.deathFailures(), false, false, null);
-            } else next = failure(old, old.temporaryHitPoints(), deathD20 == 1 ? 2 : 1);
-        } else {
-            if (deathD20 != null || recoveryD4 != null) throw invalid("S2_HEALTH_RANDOM_RESULT");
-            amount = Math.max(0, dice.stream().mapToInt(Integer::intValue).sum() + prepared.effect.modifier());
-            switch (prepared.effect.kind()) {
-                case DAMAGE -> {
-                    var damage=applyDamage(before,amount,false);
-                    hp=damage.state().hitPoints();next=damage.state().health();applied=damage.appliedAmount();
-                }
-                case HEALING -> {
-                    var healing = heal(hp, before.maximumHitPoints(), amount); hp = healing.after(); applied = (int) healing.applied();
-                    if (applied > 0) next = living(old.temporaryHitPoints());
-                }
-                case TEMP_HP -> {
-                    if (prepared.input.temporaryChoice().equals("REPLACE")) {
-                        applied = amount; next = new HealthState(amount, old.deathSuccesses(), old.deathFailures(), old.stable(), old.dead(), old.stableRecoveryMinute(),old.stableRecoverySecond());
-                    }
+        if (deathD20 != null || recoveryD4 != null) throw invalid("S2_HEALTH_RANDOM_RESULT");
+        amount = Math.max(0, dice.stream().mapToInt(Integer::intValue).sum() + prepared.effect.modifier());
+        switch (prepared.effect.kind()) {
+            case DAMAGE -> {
+                var damage=damageValidated(before,amount,false);
+                hp=damage.state().hitPoints();next=damage.state().health();applied=damage.appliedAmount();
+            }
+            case HEALING -> {
+                var healing = heal(hp, before.maximumHitPoints(), amount); hp = healing.after(); applied = (int) healing.applied();
+                if (applied > 0) next = living(old.temporaryHitPoints());
+            }
+            case TEMP_HP -> {
+                if (prepared.input.temporaryChoice().equals("REPLACE")) {
+                    applied = amount; next = new HealthState(amount, old.deathSuccesses(), old.deathFailures(), old.stable(), old.dead(), old.stableRecoveryMinute(),old.stableRecoverySecond());
                 }
             }
         }
@@ -192,7 +225,7 @@ public final class Schema2CharacterHealthRules {
     private static State copy(State before, long hp, HealthState health, RestState clock, long version) {
         return new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(), before.characterClass(),
                 before.abilities(), before.level(), before.proficiencyBonus(), hp, before.maximumHitPoints(), before.classes(), before.hitDicePools(),
-                before.subclasses(), before.features(), before.feats(), before.proficiencies(), version, before.resources(), clock, before.equipment(), health);
+                before.subclasses(), before.features(), before.feats(), before.proficiencies(), version, before.resources(), clock, before.equipment(), health, before.spellbook());
     }
     private static IllegalArgumentException invalid(String code) { return new IllegalArgumentException(code); }
 }

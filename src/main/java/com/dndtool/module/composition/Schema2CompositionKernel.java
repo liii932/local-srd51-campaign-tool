@@ -51,7 +51,7 @@ public final class Schema2CompositionKernel {
         FEATURE_KIND("feature_kind"), EXECUTION_ALGORITHM("execution_algorithm"), PREREQUISITE("prerequisite"),
         ABILITY_KEY("ability_key"), PROFICIENCY("proficiency"), GROWTH_GRANT("growth_grant"), ALGORITHM("algorithm"), KIND("kind"), ARMOR_CLASS("armor_class"), STRENGTH_MINIMUM("strength_minimum"),
         STEALTH_DISADVANTAGE("stealth_disadvantage"), HANDS("hands"), STEALTH_SKILL("stealth_skill"),
-        DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"), ENABLED("enabled");
+        DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"), REQUIRED_SUBCLASS("required_subclass"), REQUIRED_FEATURE("required_feature"), SLOT_RESOURCE("slot_resource"), BLESS("bless"), CURE_WOUNDS("cure_wounds"), MATERIAL_ITEM("material_item"), RANK2_SLOT_RESOURCE("rank2_slot_resource"), RANK3_SLOT_RESOURCE("rank3_slot_resource"), SPELL("spell"), ENABLED("enabled");
         private final String key;
         Field(String key) { this.key = key; }
         public String key() { return key; }
@@ -86,7 +86,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -138,7 +138,7 @@ public final class Schema2CompositionKernel {
             String algorithm, String authorNote) implements Definition { }
     public record CheckDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             String algorithm, String authorNote) implements Definition { }
-    public enum EquipmentKind { LIGHT_ARMOR, MEDIUM_ARMOR, HEAVY_ARMOR, SHIELD, TOOL, WEAPON }
+    public enum EquipmentKind { LIGHT_ARMOR, MEDIUM_ARMOR, HEAVY_ARMOR, SHIELD, TOOL, WEAPON, HOLY_SYMBOL }
     public enum VitalEffectKind { DAMAGE, HEALING, TEMP_HP }
     public enum DamageType { ACID, BLUDGEONING, COLD, FIRE, FORCE, LIGHTNING, NECROTIC, PIERCING, POISON, PSYCHIC, RADIANT, SLASHING, THUNDER }
     public record ItemDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
@@ -157,6 +157,20 @@ public final class Schema2CompositionKernel {
             int reachFeet, String algorithm, String authorNote) implements Definition { }
     public record MovementDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             RuleIdentity owner, int walkSpeedFeet, String algorithm, String authorNote) implements Definition { }
+    public record SpellDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            String algorithm, String authorNote) implements Definition { }
+    public record SpellcastingDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity ownerClass, RuleIdentity requiredSubclass, RuleIdentity requiredFeature, RuleIdentity slotResource,
+            RuleIdentity bless, RuleIdentity cureWounds, RuleIdentity materialItem, String abilityKey,
+            String algorithm, String authorNote) implements Definition { }
+    /** A frozen Wizard learning catalog; actual learned/prepared spells belong to character facts. */
+    public record WizardSpellcastingDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity ownerClass, RuleIdentity requiredFeature, RuleIdentity slotResource,
+            RuleIdentity rank2SlotResource, RuleIdentity rank3SlotResource, String abilityKey,
+            String algorithm, String authorNote) implements Definition { }
+    /** Fixed, explicitly authored DM environment, never evidence of an Antimagic Field spell cast. */
+    public record EnvironmentDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            String algorithm, String authorNote) implements Definition { }
     public sealed interface GrowthGrantSpec permits FixedGrowthGrant, ChoiceGrowthGrant { }
     public record FixedGrowthGrant(RuleIdentity target) implements GrowthGrantSpec { }
     public record ChoiceGrowthGrant(RuleIdentity candidates, int count) implements GrowthGrantSpec { }
@@ -164,7 +178,7 @@ public final class Schema2CompositionKernel {
     public sealed interface GrantSpec permits FixedGrant, ChoiceGrant { GrantCategory category(); }
     public record FixedGrant(GrantCategory category, RuleIdentity target) implements GrantSpec { }
     public record ChoiceGrant(GrantCategory category, RuleIdentity candidates, int count) implements GrantSpec { }
-    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry, ClassLevelEntry, ProficiencyMemberEntry, GrowthProficiencyGrantEntry {
+    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry, ClassLevelEntry, ProficiencyMemberEntry, GrowthProficiencyGrantEntry, SpellbookEntry {
         EntryIdentity identity();
         String authorNote();
         RuleIdentity target();
@@ -186,6 +200,9 @@ public final class Schema2CompositionKernel {
     }
     public record GrowthProficiencyGrantEntry(EntryIdentity identity, GrowthGrantSpec grant, String authorNote) implements Entry {
         @Override public RuleIdentity target() { return grant instanceof FixedGrowthGrant fixed ? fixed.target() : ((ChoiceGrowthGrant) grant).candidates(); }
+    }
+    public record SpellbookEntry(EntryIdentity identity, RuleIdentity spell, String authorNote) implements Entry {
+        @Override public RuleIdentity target() { return spell; }
     }
     public sealed interface FieldValue permits TextValue, IntegerValue, IdentityValue, BooleanValue, GrantValue, PrerequisiteValue, GrowthGrantValue { }
     public record TextValue(String value) implements FieldValue { }
@@ -216,7 +233,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -282,6 +299,18 @@ public final class Schema2CompositionKernel {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
 
+    public record FinalSpell(SpellDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalSpellcasting(SpellcastingDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalWizardSpellcasting(WizardSpellcastingDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalEnvironment(EnvironmentDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
     public record FinalEntry(Entry entry, boolean enabled) { }
 
     /** Only the strict reader can create package evidence. All source arrays are private snapshots. */
@@ -558,10 +587,42 @@ public final class Schema2CompositionKernel {
                         validateCombatReferences(original instanceof WeaponAttackDefinition weapon ? new FinalWeaponAttack(weapon,true)
                                 : new FinalMovement((MovementDefinition)original,true),originalReferences,source);
                     }
+                    if (original instanceof SpellcastingDefinition casting) {
+                        Map<Identity,MutableObject> originalReferences=new HashMap<>(); int declarationIndex=declarations.get(declaration.getKey());
+                        for (RuleIdentity target : spellcastingReferences(casting).values()) {
+                            Map<Field,FieldState> prior=new HashMap<>();
+                            for (FieldChain chain:chains) if (chain.target().equals(target)) for (ChainStep step:chain.steps())
+                                if (step.loadIndex()<declarationIndex || step.loadIndex()==declarationIndex&&step.op().equals("initial")) prior.put(chain.field(),step.after());
+                            if (!prior.isEmpty()) originalReferences.put(target,new MutableObject(target,prior,source));
+                        }
+                        validateSpellcastingReferences(new FinalSpellcasting(casting,true),originalReferences,source);
+                    }
+                    if (original instanceof WizardSpellcastingDefinition casting) {
+                        Map<Identity,MutableObject> originalReferences=new HashMap<>(); int declarationIndex=declarations.get(declaration.getKey());
+                        for(RuleIdentity target:wizardReferences(casting).values()) {
+                            Map<Field,FieldState> prior=new HashMap<>();
+                            for(FieldChain chain:chains) if(chain.target().equals(target)) for(ChainStep step:chain.steps())
+                                if(step.loadIndex()<declarationIndex || step.loadIndex()==declarationIndex&&step.op().equals("initial")) prior.put(chain.field(),step.after());
+                            if(!prior.isEmpty()) originalReferences.put(target,new MutableObject(target,prior,source));
+                        }
+                        validateWizardReferences(new FinalWizardSpellcasting(casting,true),originalReferences,source);
+                    }
+                    if(original instanceof FeatureDefinition feature) {
+                        Set<Identity> targets=new HashSet<>();targets.add(feature.owner());
+                        for(var object:objects.values())if(object.identity instanceof RuleIdentity r && r.ruleType().equals("character.wizard_spellcasting"))targets.add(r);
+                        Map<Identity,MutableObject> originalReferences=new HashMap<>();int declarationIndex=declarations.get(declaration.getKey());
+                        for(Identity target:targets) {
+                            Map<Field,FieldState> prior=new HashMap<>();
+                            for(FieldChain chain:chains)if(chain.target().equals(target))for(ChainStep step:chain.steps())
+                                if(step.loadIndex()<declarationIndex || step.loadIndex()==declarationIndex&&step.op().equals("initial"))prior.put(chain.field(),step.after());
+                            if(!prior.isEmpty())originalReferences.put(target,new MutableObject(target,prior,source));
+                        }
+                        validateWizardAuxiliaryFeature(new FinalFeature(feature,true),originalReferences,source);
+                    }
                     if (original instanceof ItemDefinition item) {
                         Map<Identity, MutableObject> originalReferences = new HashMap<>();
                         int declarationIndex = declarations.get(declaration.getKey());
-                        for (RuleIdentity target : item.stealthSkill() == null ? List.of(item.proficiency()) : List.of(item.proficiency(), item.stealthSkill())) {
+                        for (RuleIdentity target : java.util.stream.Stream.of(item.proficiency(), item.stealthSkill()).filter(Objects::nonNull).toList()) {
                             Map<Field, FieldState> prior = new HashMap<>();
                             for (FieldChain chain : chains) if (chain.target().equals(target))
                                 for (ChainStep step : chain.steps()) if (step.loadIndex() < declarationIndex || (step.loadIndex() == declarationIndex && step.op().equals("initial"))) prior.put(chain.field(), step.after());
@@ -569,7 +630,16 @@ public final class Schema2CompositionKernel {
                         }
                         validateEquipmentReferences(new FinalItem(item, true), originalReferences, source);
                     }
-                } else entry(encoded, source);
+                } else {
+                    Entry original=entry(encoded,source);
+                    if(original instanceof SpellbookEntry member) {
+                        FieldState algorithm=null;int declarationIndex=declarations.get(declaration.getKey());
+                        for(FieldChain chain:chains)if(chain.target().equals(member.spell())&&chain.field()==Field.ALGORITHM)
+                            for(ChainStep step:chain.steps())if(step.loadIndex()<declarationIndex || step.loadIndex()==declarationIndex&&step.op().equals("initial"))algorithm=step.after();
+                        if(algorithm==null || !(algorithm.value() instanceof TextValue value) || !wizardSpell(value.value()))
+                            throw fail("S2_TYPE",Stage.FINAL,"Original Wizard learning member is not a Wizard spell",source);
+                    }
+                }
             } catch (Schema2Exception malformed) {
                 throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid original stored declaration", source);
             }
@@ -676,12 +746,24 @@ public final class Schema2CompositionKernel {
                     checkReference(pack,movement.owner(),"character.race|character.subrace",objects,row.location.child("owner"));
                     validateCombatReferences(new FinalMovement(movement,true),objects,row.location);
                 }
+                if (row.value instanceof SpellcastingDefinition casting) {
+                    for (var reference : spellcastingReferences(casting).entrySet())
+                        checkReference(pack, reference.getValue(), referenceType(reference.getKey()), objects, row.location.child(reference.getKey().key()));
+                    validateSpellcastingReferences(new FinalSpellcasting(casting,true),objects,row.location);
+                }
+                if (row.value instanceof WizardSpellcastingDefinition casting) {
+                    for (var reference : wizardReferences(casting).entrySet())
+                        checkReference(pack,reference.getValue(),referenceType(reference.getKey()),objects,row.location.child(reference.getKey().key()));
+                    validateWizardReferences(new FinalWizardSpellcasting(casting,true),objects,row.location);
+                }
                 if (row.value instanceof ItemDefinition item) {
-                    checkReference(pack, item.proficiency(), referenceType(Field.PROFICIENCY), objects, row.location.child("proficiency"));
+                    if (item.proficiency() != null) checkReference(pack, item.proficiency(), referenceType(Field.PROFICIENCY), objects, row.location.child("proficiency"));
                     if (item.stealthSkill() != null) checkReference(pack, item.stealthSkill(), referenceType(Field.STEALTH_SKILL), objects, row.location.child("stealth_skill"));
                     validateEquipmentReferences(new FinalItem(item, true), objects, row.location);
                 }
             }
+            for(Located<Definition> row:pack.definitions)if(row.value instanceof FeatureDefinition feature)
+                validateWizardAuxiliaryFeature(new FinalFeature(feature,true),objects,row.location);
             for (Located<Entry> row : pack.entries) {
                 Entry value = row.value;
                 Field reference = referenceField(value.identity());
@@ -692,6 +774,8 @@ public final class Schema2CompositionKernel {
                 else if (value instanceof GrowthProficiencyGrantEntry grant)
                     checkGrowthGrantReference(pack, grant.grant(), objects, row.location.child("growth_grant"));
                 else checkReference(pack, value.target(), referenceType(reference), objects, row.location.child(reference.key()));
+                if(value instanceof SpellbookEntry member && !wizardSpell(textField(objects.get(member.spell()).fields,Field.ALGORITHM)))
+                    throw fail("S2_TYPE",Stage.AUTHOR,"Original Wizard learning member must be a Wizard spell",row.location);
             }
             for (Located<Change> row : pack.changes) {
                 Change change = row.value;
@@ -1101,18 +1185,22 @@ public final class Schema2CompositionKernel {
     }
 
     private static boolean executionType(String type) {
-        return Set.of("equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type);
+        return Set.of("equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
     }
     private static Definition executionDefinition(Object input, RuleIdentity identity, Location source) {
         Set<String> required = new HashSet<>(Set.of("identity", "display_name", "description", "source_page", "algorithm"));
         Set<String> optional = new HashSet<>(Set.of("author_note"));
         if (identity.ruleType().equals("equipment.item")) {
-            required.addAll(Set.of("kind", "armor_class", "strength_minimum", "stealth_disadvantage", "hands", "proficiency"));
-            optional.add("stealth_skill");
+            required.addAll(Set.of("kind", "armor_class", "strength_minimum", "stealth_disadvantage", "hands"));
+            optional.addAll(Set.of("stealth_skill", "proficiency"));
         } else if (identity.ruleType().equals("equipment.weapon_attack")) {
             required.addAll(Set.of("item", "ability_policy", "dice_count", "dice_sides", "damage_type", "reach_feet"));
         } else if (identity.ruleType().equals("character.movement")) {
             required.addAll(Set.of("owner", "walk_speed_feet"));
+        } else if (identity.ruleType().equals("character.spellcasting")) {
+            required.addAll(Set.of("owner_class", "required_subclass", "required_feature", "slot_resource", "bless", "cure_wounds", "material_item", "ability_key"));
+        } else if (identity.ruleType().equals("character.wizard_spellcasting")) {
+            required.addAll(Set.of("owner_class", "required_feature", "slot_resource", "rank2_slot_resource", "rank3_slot_resource", "ability_key"));
         } else if (identity.ruleType().equals("adventure.vital_effect")) {
             required.addAll(Set.of("kind", "dice_count", "dice_sides", "modifier")); optional.add("damage_type");
         }
@@ -1122,6 +1210,33 @@ public final class Schema2CompositionKernel {
         int page = sourcePage(identity.ruleType(), row.get("source_page"), source.child("source_page"));
         String algorithm = mechanismAlgorithm(identity.ruleType(), row.get("algorithm"), source.child("algorithm"));
         String note = row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null;
+        if (identity.ruleType().equals("adventure.spell")) {
+            if (page != spellSourcePage(algorithm)) throw fail("S2_TYPE",Stage.AUTHOR,"Spell source page differs from its algorithm",source);
+            return new SpellDefinition(identity,name,description,page,algorithm,note);
+        }
+        if (identity.ruleType().equals("character.spellcasting")) {
+            String ability=abilityKey(row.get("ability_key"),source.child("ability_key"));
+            if (!ability.equals("ability.wisdom")) throw fail("S2_TYPE",Stage.AUTHOR,"Life domain casting requires Wisdom",source);
+            return new SpellcastingDefinition(identity,name,description,page,
+                    typedReference(row.get("owner_class"),"character.class",source.child("owner_class")),
+                    typedReference(row.get("required_subclass"),"character.subclass",source.child("required_subclass")),
+                    typedReference(row.get("required_feature"),"character.feature",source.child("required_feature")),
+                    typedReference(row.get("slot_resource"),"character.resource",source.child("slot_resource")),
+                    typedReference(row.get("bless"),"adventure.spell",source.child("bless")),
+                    typedReference(row.get("cure_wounds"),"adventure.spell",source.child("cure_wounds")),
+                    typedReference(row.get("material_item"),"equipment.item",source.child("material_item")),ability,algorithm,note);
+        }
+        if (identity.ruleType().equals("character.wizard_spellcasting")) {
+            String ability=abilityKey(row.get("ability_key"),source.child("ability_key"));
+            if (!ability.equals("ability.intelligence")) throw fail("S2_TYPE",Stage.AUTHOR,"Wizard casting requires Intelligence",source);
+            return new WizardSpellcastingDefinition(identity,name,description,page,
+                    typedReference(row.get("owner_class"),"character.class",source.child("owner_class")),
+                    typedReference(row.get("required_feature"),"character.feature",source.child("required_feature")),
+                    typedReference(row.get("slot_resource"),"character.resource",source.child("slot_resource")),
+                    typedReference(row.get("rank2_slot_resource"),"character.resource",source.child("rank2_slot_resource")),
+                    typedReference(row.get("rank3_slot_resource"),"character.resource",source.child("rank3_slot_resource")),ability,algorithm,note);
+        }
+        if (identity.ruleType().equals("adventure.environment")) return new EnvironmentDefinition(identity,name,description,page,algorithm,note);
         if (identity.ruleType().equals("adventure.combat")) return new CombatDefinition(identity,name,description,page,algorithm,note);
         if (identity.ruleType().equals("character.movement")) return new MovementDefinition(identity,name,description,page,
                 typedReference(row.get("owner"), "character.race|character.subrace", source.child("owner")),
@@ -1138,7 +1253,9 @@ public final class Schema2CompositionKernel {
             int strength = integer(row.get("strength_minimum"), 0, 15, source.child("strength_minimum"));
             int hands = integer(row.get("hands"), 0, 2, source.child("hands"));
             boolean stealth = booleanAtom(row.get("stealth_disadvantage"), source.child("stealth_disadvantage"));
-            RuleIdentity proficiency = typedReference(row.get("proficiency"), kind == EquipmentKind.TOOL ? "character.tool" : "character.proficiency", source.child("proficiency"));
+            RuleIdentity proficiency = row.containsKey("proficiency") ? typedReference(row.get("proficiency"), kind == EquipmentKind.TOOL ? "character.tool" : "character.proficiency", source.child("proficiency")) : null;
+            if ((kind == EquipmentKind.HOLY_SYMBOL) != (proficiency == null) || kind == EquipmentKind.HOLY_SYMBOL && hands != 1)
+                throw fail("S2_TYPE",Stage.AUTHOR,"Only a one-hand holy symbol omits proficiency",source);
             RuleIdentity skill = row.containsKey("stealth_skill") ? typedReference(row.get("stealth_skill"), "character.proficiency", source.child("stealth_skill")) : null;
             boolean armor = Set.of(EquipmentKind.LIGHT_ARMOR, EquipmentKind.MEDIUM_ARMOR, EquipmentKind.HEAVY_ARMOR).contains(kind);
             if (stealth != (skill != null) || (armor ? hands != 0 || ac < 10 || !Set.of(0,13,15).contains(strength)
@@ -1250,9 +1367,9 @@ public final class Schema2CompositionKernel {
 
     private static Set<String> executionAlgorithms(FeatureExecution mode) {
         return switch (mode) {
-            case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1");
+            case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1", "SRD_2014_WIZARD_SPELLCASTING_V1");
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
-            case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1");
+            case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
         };
     }
 
@@ -1287,7 +1404,7 @@ public final class Schema2CompositionKernel {
     }
 
     private static boolean optionalField(Field field) {
-        return Set.of(Field.AUTHOR_NOTE, Field.ABILITY_KEY, Field.MULTICLASS_PREREQUISITE, Field.STEALTH_SKILL, Field.DAMAGE_TYPE).contains(field);
+        return Set.of(Field.AUTHOR_NOTE, Field.ABILITY_KEY, Field.MULTICLASS_PREREQUISITE, Field.STEALTH_SKILL, Field.DAMAGE_TYPE, Field.PROFICIENCY).contains(field);
     }
 
     private static boolean clearableField(Field field) { return Set.of(Field.AUTHOR_NOTE, Field.STEALTH_SKILL, Field.DAMAGE_TYPE).contains(field); }
@@ -1368,6 +1485,7 @@ public final class Schema2CompositionKernel {
         if (reference == Field.GROWTH_GRANT) return new GrowthProficiencyGrantEntry(entry, growthGrant(row.get("growth_grant"), source.child("growth_grant")), note);
         RuleIdentity target = typedReference(row.get(reference.key()), referenceType(reference), source.child(reference.key()));
         if (reference == Field.PROFICIENCY) return new ProficiencyMemberEntry(entry, target, note);
+        if (reference == Field.SPELL) return new SpellbookEntry(entry, target, note);
         return reference == Field.LANGUAGE ? new LanguageEntry(entry, target, note) : new ToolEntry(entry, target, note);
     }
 
@@ -1404,7 +1522,7 @@ public final class Schema2CompositionKernel {
                         ? proficiencyCategory(((RuleIdentity) target).ruleType(), value, source.child("value")).name() : category(value, source.child("value")).name());
             case SOURCE_PAGE -> new IntegerValue(sourcePage(((RuleIdentity) target).ruleType(), value, source.child("value")));
             case MINIMUM_ENABLED_MEMBERS -> new IntegerValue(integer(value, 1, 128, source.child("value")));
-            case LANGUAGE, TOOL, PARENT_RACE, OWNER_CLASS, PROFICIENCY, STEALTH_SKILL, ITEM -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
+            case LANGUAGE, TOOL, PARENT_RACE, OWNER_CLASS, PROFICIENCY, STEALTH_SKILL, ITEM, REQUIRED_SUBCLASS, REQUIRED_FEATURE, SLOT_RESOURCE, RANK2_SLOT_RESOURCE, RANK3_SLOT_RESOURCE, BLESS, CURE_WOUNDS, MATERIAL_ITEM, SPELL -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
             case OWNER -> new IdentityValue(typedReference(value, ((RuleIdentity)target).ruleType().equals("character.movement") ? "character.race|character.subrace" : "character.class|character.subclass",source.child("value")));
             case ABILITY_POLICY -> new TextValue(enumValue(WeaponAbilityPolicy.class,value,source.child("value")).name());
             case REACH_FEET -> new IntegerValue(reach(value,source.child("value")));
@@ -1452,11 +1570,12 @@ public final class Schema2CompositionKernel {
         RuleIdentity rule = ruleIdentity(row.get("rule"), source.child("rule"));
         boolean catalog = Set.of("catalog.language_set", "catalog.tool_set", "catalog.proficiency_set").contains(rule.ruleType());
         boolean progression = rule.ruleType().equals("character.class_progression");
-        if (!catalog && !sourceType(rule.ruleType()) && !progression)
+        boolean spellbook = rule.ruleType().equals("character.wizard_spellcasting");
+        if (!catalog && !sourceType(rule.ruleType()) && !progression && !spellbook)
             throw fail("S2_TYPE", Stage.AUTHOR, "Entry owner requires a catalog set or character source", source.child("rule").child("rule_type"));
         String collection = string(row.get("collection_key"), source.child("collection_key"));
         if (!(progression ? Set.of("levels", "starting_proficiencies", "multiclass_proficiencies").contains(collection)
-                : collection.equals(catalog ? "members" : "proficiency_grants")))
+                : collection.equals(spellbook ? "spells" : catalog ? "members" : "proficiency_grants")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unknown collection key for this owner type", source.child("collection_key"));
         String owner = moduleKey(row.get("module_key"), source.child("module_key"));
         String key = identifier(row.get("entry_key"), "[a-z][a-z0-9_]{0,63}", source.child("entry_key"));
@@ -1470,7 +1589,7 @@ public final class Schema2CompositionKernel {
         String type = string(row.get("rule_type"), source.child("rule_type"));
         if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
                 "character.class_progression", "character.resource", "character.subclass", "character.feature",
-                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type) && !sourceType(type))
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
         String prefix = switch (type) {
@@ -1487,6 +1606,9 @@ public final class Schema2CompositionKernel {
             case "adventure.combat" -> "combat";
             case "equipment.weapon_attack" -> "weapon_attack";
             case "character.movement" -> "movement";
+            case "character.spellcasting", "character.wizard_spellcasting" -> "spellcasting";
+            case "adventure.environment" -> "environment";
+            case "adventure.spell" -> "spell";
             case "adventure.health" -> "health";
             case "adventure.vital_effect" -> "vital_effect";
             default -> null;
@@ -1502,12 +1624,22 @@ public final class Schema2CompositionKernel {
             case "adventure.check" -> integer(input, 77, 77, source);
             case "equipment.item", "equipment.weapon_attack" -> integer(input, 62, 73, source);
             case "adventure.combat" -> integer(input, 90, 95, source);
+            case "adventure.spell" -> integer(input, 114, 187, source);
+            case "character.wizard_spellcasting" -> integer(input, 52, 53, source);
+            case "adventure.environment" -> integer(input, 0, 0, source);
+            case "character.spellcasting" -> integer(input, 16, 17, source);
             case "adventure.health" -> integer(input, 98, 98, source);
             case "adventure.vital_effect" -> integer(input, 96, 99, source);
             default -> integer(input, 3, 74, source);
         };
     }
     private static String mechanismAlgorithm(String type, Object input, Location source) {
+        if (type.equals("adventure.spell")) {
+            String actual=string(input,source);
+            if (!SPELL_METADATA.containsKey(actual))
+                throw fail("S2_TYPE",Stage.AUTHOR,"Unsupported spell algorithm",source);
+            return actual;
+        }
         String expected = switch (type) {
             case "adventure.check" -> "SRD_2014_ABILITY_CHECK_V1";
             case "adventure.rest" -> "SRD_2014_REST_V1";
@@ -1515,6 +1647,9 @@ public final class Schema2CompositionKernel {
             case "adventure.combat" -> "SRD_2014_COMBAT_V1";
             case "equipment.weapon_attack" -> "SRD_2014_MELEE_WEAPON_ATTACK_V1";
             case "character.movement" -> "SRD_2014_WALKING_SPEED_V1";
+            case "character.spellcasting" -> "LIFE_DOMAIN_LEVEL1_V1";
+            case "character.wizard_spellcasting" -> "SRD_2014_WIZARD_PREPARED_V1";
+            case "adventure.environment" -> "DM_ANTIMAGIC_ZONE_V1";
             case "adventure.health" -> "SRD_2014_HEALTH_V1";
             case "adventure.vital_effect" -> "DIRECT_VITAL_EFFECT_V1";
             default -> throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported mechanism domain", source);
@@ -1535,6 +1670,7 @@ public final class Schema2CompositionKernel {
             case "catalog.language_set" -> Field.LANGUAGE;
             case "catalog.tool_set" -> Field.TOOL;
             case "catalog.proficiency_set" -> Field.PROFICIENCY;
+            case "character.wizard_spellcasting" -> Field.SPELL;
             case "character.class_progression" -> identity.collectionKey().equals("levels") ? Field.LEVEL : Field.GROWTH_GRANT;
             default -> {
                 if (sourceType(identity.rule().ruleType())) yield Field.GRANT;
@@ -1549,7 +1685,11 @@ public final class Schema2CompositionKernel {
             case PARENT_RACE -> "character.race";
             case OWNER_CLASS -> "character.class";
             case OWNER -> "character.class|character.subclass|character.race|character.subrace";
-            case ITEM -> "equipment.item";
+            case ITEM, MATERIAL_ITEM -> "equipment.item";
+            case REQUIRED_SUBCLASS -> "character.subclass";
+            case REQUIRED_FEATURE -> "character.feature";
+            case SLOT_RESOURCE, RANK2_SLOT_RESOURCE, RANK3_SLOT_RESOURCE -> "character.resource";
+            case BLESS, CURE_WOUNDS, SPELL -> "adventure.spell";
             case PROFICIENCY -> "character.proficiency|character.tool";
             case STEALTH_SKILL -> "character.proficiency";
             default -> throw new IllegalArgumentException("Field is not a catalog reference");
@@ -1562,7 +1702,7 @@ public final class Schema2CompositionKernel {
 
     private static boolean tracedCharacterType(String type) {
         return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
-                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type);
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -1787,7 +1927,7 @@ public final class Schema2CompositionKernel {
     }
 
     private static void validateEquipmentReferences(FinalItem item, Map<Identity, MutableObject> objects, Location source) {
-        var d = item.definition(); MutableObject proficiency = objects.get(d.proficiency());
+        var d = item.definition(); if (d.kind() == EquipmentKind.HOLY_SYMBOL) return; MutableObject proficiency = objects.get(d.proficiency());
         if (proficiency == null || (item.enabled() && !enabled(proficiency))) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Equipment proficiency is not available", source);
         String category = d.proficiency().ruleType().equals("character.tool") ? "TOOL" : textField(proficiency.fields, Field.CATEGORY);
         String expected = d.kind() == EquipmentKind.TOOL ? "TOOL" : d.kind() == EquipmentKind.WEAPON ? "WEAPON" : "ARMOR";
@@ -1811,17 +1951,133 @@ public final class Schema2CompositionKernel {
             throw fail("S2_TYPE",Stage.FINAL,"Weapon attack requires an actual weapon item",source);
     }
 
+    private record SpellMetadata(int level,int page,boolean wizard) { }
+    private static final Map<String,SpellMetadata> SPELL_METADATA=Map.ofEntries(
+            Map.entry("SRD_2014_BLESS_V1",new SpellMetadata(1,122,false)),
+            Map.entry("SRD_2014_CURE_WOUNDS_V1",new SpellMetadata(1,132,false)),
+            Map.entry("SRD_2014_SHIELD_V1",new SpellMetadata(1,179,true)),
+            Map.entry("SRD_2014_COUNTERSPELL_V1",new SpellMetadata(3,131,true)),
+            Map.entry("SRD_2014_ALARM_METADATA_V1",new SpellMetadata(1,114,true)),
+            Map.entry("SRD_2014_BURNING_HANDS_METADATA_V1",new SpellMetadata(1,123,true)),
+            Map.entry("SRD_2014_CHARM_PERSON_METADATA_V1",new SpellMetadata(1,124,true)),
+            Map.entry("SRD_2014_COLOR_SPRAY_METADATA_V1",new SpellMetadata(1,125,true)),
+            Map.entry("SRD_2014_COMPREHEND_LANGUAGES_METADATA_V1",new SpellMetadata(1,126,true)),
+            Map.entry("SRD_2014_DETECT_MAGIC_METADATA_V1",new SpellMetadata(1,134,true)),
+            Map.entry("SRD_2014_DISGUISE_SELF_METADATA_V1",new SpellMetadata(1,135,true)),
+            Map.entry("SRD_2014_EXPEDITIOUS_RETREAT_METADATA_V1",new SpellMetadata(1,141,true)),
+            Map.entry("SRD_2014_FALSE_LIFE_METADATA_V1",new SpellMetadata(1,142,true)),
+            Map.entry("SRD_2014_FEATHER_FALL_METADATA_V1",new SpellMetadata(1,142,true)),
+            Map.entry("SRD_2014_FIND_FAMILIAR_METADATA_V1",new SpellMetadata(1,143,true)),
+            Map.entry("SRD_2014_FOG_CLOUD_METADATA_V1",new SpellMetadata(1,146,true)),
+            Map.entry("SRD_2014_GREASE_METADATA_V1",new SpellMetadata(1,150,true)),
+            Map.entry("SRD_2014_MAGE_ARMOR_METADATA_V1",new SpellMetadata(1,160,true)),
+            Map.entry("SRD_2014_MAGIC_MISSILE_METADATA_V1",new SpellMetadata(1,161,true)),
+            Map.entry("SRD_2014_SLEEP_METADATA_V1",new SpellMetadata(1,180,true)),
+            Map.entry("SRD_2014_THUNDERWAVE_METADATA_V1",new SpellMetadata(1,187,true)));
+    public static int spellLevel(String algorithm) { return spellMetadata(algorithm).level(); }
+    public static int spellSourcePage(String algorithm) { return spellMetadata(algorithm).page(); }
+    public static boolean wizardSpell(String algorithm) { return SPELL_METADATA.containsKey(algorithm) && SPELL_METADATA.get(algorithm).wizard(); }
+    private static SpellMetadata spellMetadata(String algorithm) {
+        SpellMetadata result=SPELL_METADATA.get(algorithm);
+        if(result==null)throw new IllegalArgumentException("S2_SPELL_UNAVAILABLE");
+        return result;
+    }
+    private static Map<Field,RuleIdentity> spellcastingReferences(SpellcastingDefinition d) {
+        return Map.of(Field.OWNER_CLASS,d.ownerClass(),Field.REQUIRED_SUBCLASS,d.requiredSubclass(),Field.REQUIRED_FEATURE,d.requiredFeature(),
+                Field.SLOT_RESOURCE,d.slotResource(),Field.BLESS,d.bless(),Field.CURE_WOUNDS,d.cureWounds(),Field.MATERIAL_ITEM,d.materialItem());
+    }
+    private static void validateSpellcastingReferences(FinalSpellcasting casting, Map<Identity,MutableObject> objects, Location source) {
+        var d=casting.definition();
+        for (RuleIdentity reference : spellcastingReferences(d).values()) {
+            var target=objects.get(reference);
+            if (target==null || casting.enabled()&&!enabled(target)) throw fail("S2_REFERENCE_MISSING",Stage.FINAL,"Casting requires its exact available sources",source);
+        }
+        var subclass=objects.get(d.requiredSubclass()).fields; var feature=objects.get(d.requiredFeature()).fields;
+        var slots=objects.get(d.slotResource()).fields;
+        if (!((IdentityValue)subclass.get(Field.OWNER_CLASS).value()).value().equals(d.ownerClass())
+                || ((IntegerValue)subclass.get(Field.SELECTION_LEVEL).value()).value()!=1
+                || !((IdentityValue)feature.get(Field.OWNER).value()).value().equals(d.requiredSubclass())
+                || ((IntegerValue)feature.get(Field.LEVEL).value()).value()!=1
+                || !"FEATURE".equals(textField(feature,Field.FEATURE_KIND)) || !"AUTOMATIC".equals(textField(feature,Field.EXECUTION_MODE))
+                || !"LIFE_DOMAIN_LEVEL1_V1".equals(textField(feature,Field.EXECUTION_ALGORITHM))
+                || !((IdentityValue)slots.get(Field.OWNER_CLASS).value()).value().equals(d.ownerClass())
+                || !"1-20:2".equals(textField(slots,Field.MAXIMUM_PROFILE)) || !"1-20:LONG_REST".equals(textField(slots,Field.RECOVERY_PROFILE))
+                || !"AUTOMATIC".equals(textField(slots,Field.EXECUTION_MODE))
+                || !"SRD_2014_BLESS_V1".equals(textField(objects.get(d.bless()).fields,Field.ALGORITHM))
+                || !"SRD_2014_CURE_WOUNDS_V1".equals(textField(objects.get(d.cureWounds()).fields,Field.ALGORITHM))
+                || !"HOLY_SYMBOL".equals(textField(objects.get(d.materialItem()).fields,Field.KIND)))
+            throw fail("S2_TYPE",Stage.FINAL,"Casting sources disagree with the complete Life domain level one profile",source);
+    }
+
+    private static Map<Field,RuleIdentity> wizardReferences(WizardSpellcastingDefinition d) {
+        return Map.of(Field.OWNER_CLASS,d.ownerClass(),Field.REQUIRED_FEATURE,d.requiredFeature(),Field.SLOT_RESOURCE,d.slotResource(),
+                Field.RANK2_SLOT_RESOURCE,d.rank2SlotResource(),Field.RANK3_SLOT_RESOURCE,d.rank3SlotResource());
+    }
+    private static void validateWizardReferences(FinalWizardSpellcasting casting,Map<Identity,MutableObject> objects,Location source) {
+        var d=casting.definition();
+        for(RuleIdentity reference:wizardReferences(d).values()) {
+            var target=objects.get(reference);
+            if(target==null||casting.enabled()&&!enabled(target))throw fail("S2_REFERENCE_MISSING",Stage.FINAL,"Wizard requires exact available sources",source);
+        }
+        var feature=objects.get(d.requiredFeature()).fields;
+        if(!((IdentityValue)feature.get(Field.OWNER).value()).value().equals(d.ownerClass())
+                ||((IntegerValue)feature.get(Field.LEVEL).value()).value()!=1
+                ||!"FEATURE".equals(textField(feature,Field.FEATURE_KIND))||!"AUTOMATIC".equals(textField(feature,Field.EXECUTION_MODE))
+                ||!"SRD_2014_WIZARD_SPELLCASTING_V1".equals(textField(feature,Field.EXECUTION_ALGORITHM))
+                ||new HashSet<>(List.of(d.slotResource(),d.rank2SlotResource(),d.rank3SlotResource())).size()!=3)
+            throw fail("S2_TYPE",Stage.FINAL,"Wizard casting requires the actual first-level class Spellcasting feature",source);
+        List<RuleIdentity> resources=List.of(d.slotResource(),d.rank2SlotResource(),d.rank3SlotResource());
+        List<String> profiles=List.of("1:2,2:3,3-20:4","3:2,4-20:3","5:2,6-20:3");
+        for(int i=0;i<resources.size();i++) {
+            var slot=objects.get(resources.get(i)).fields;
+            if(!((IdentityValue)slot.get(Field.OWNER_CLASS).value()).value().equals(d.ownerClass())
+                    ||!profiles.get(i).equals(textField(slot,Field.MAXIMUM_PROFILE))
+                    ||!"1-20:LONG_REST".equals(textField(slot,Field.RECOVERY_PROFILE))
+                    ||!"AUTOMATIC".equals(textField(slot,Field.EXECUTION_MODE)))
+                throw fail("S2_TYPE",Stage.FINAL,"Wizard slot resource differs from its bounded class table",source);
+        }
+    }
+
+    private static void validateWizardAuxiliaryFeature(FinalFeature feature,Map<Identity,MutableObject> objects,Location source) {
+        var d=feature.definition();String algorithm=d.executionAlgorithm();
+        if(!Set.of("SRD_2014_WIZARD_ARCANE_RECOVERY_V1","SRD_2014_EVOCATION_SAVANT_V1","SRD_2014_SCULPT_SPELLS_V1").contains(algorithm))return;
+        boolean recovery=algorithm.equals("SRD_2014_WIZARD_ARCANE_RECOVERY_V1");
+        var owner=objects.get(d.owner());RuleIdentity ownerClass=d.owner();
+        if(owner==null || d.kind()!=FeatureKind.FEATURE || d.executionMode()!=FeatureExecution.BLOCKED || d.level()!=(recovery?1:2)
+                || !d.owner().ruleType().equals(recovery?"character.class":"character.subclass"))
+            throw fail("S2_TYPE",Stage.FINAL,"Wizard auxiliary feature has the wrong acquisition contract",source);
+        if(!recovery) {
+            if(((IntegerValue)owner.fields.get(Field.SELECTION_LEVEL).value()).value()!=2)
+                throw fail("S2_TYPE",Stage.FINAL,"Evocation auxiliary feature requires the second-level tradition",source);
+            ownerClass=((IdentityValue)owner.fields.get(Field.OWNER_CLASS).value()).value();
+        }
+        RuleIdentity expected=ownerClass;
+        if(objects.values().stream().noneMatch(o -> o.identity instanceof RuleIdentity r && r.ruleType().equals("character.wizard_spellcasting")
+                && ((IdentityValue)o.fields.get(Field.OWNER_CLASS).value()).value().equals(expected)))
+            throw fail("S2_REFERENCE_MISSING",Stage.FINAL,"Wizard auxiliary feature requires its real casting class",source);
+    }
+
     private static void finalValidation(Map<Identity, MutableObject> objects) {
         Map<RuleIdentity, Set<RuleIdentity>> candidates = new HashMap<>();
         Set<RuleIdentity> progressionOwners = new HashSet<>();
         Map<RuleIdentity, Map<Integer, Boolean>> levels = new HashMap<>();
         Map<RuleIdentity, Integer> subclassSelectionLevels = new HashMap<>();
-        int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0;
-        Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>();
+        int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
+        Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
                 FinalRule checked = finalRule(rule, object.fields);
                 validateCombatReferences(checked,objects,object.source);
+                if(checked instanceof FinalFeature feature) validateWizardAuxiliaryFeature(feature,objects,object.source);
+                if (checked instanceof FinalSpellcasting casting) {
+                    validateSpellcastingReferences(casting,objects,object.source);
+                    if (casting.enabled()&&++enabledCasting>1) throw fail("S2_SPELLCASTING_AMBIGUOUS",Stage.FINAL,"The finite casting profile must be unique",object.source);
+                }
+                if (checked instanceof FinalWizardSpellcasting wizard) {
+                    validateWizardReferences(wizard,objects,object.source);
+                    if(wizard.enabled() && !wizardOwners.add(wizard.definition().ownerClass()))
+                        throw fail("S2_SPELLCASTING_AMBIGUOUS",Stage.FINAL,"Wizard owner has multiple enabled profiles",object.source);
+                }
                 if(checked instanceof FinalCombat && checked.enabled() && ++enabledCombat>1)
                     throw fail("S2_COMBAT_AMBIGUOUS",Stage.FINAL,"At most one combat algorithm may be enabled",object.source);
                 if(checked instanceof FinalWeaponAttack weapon && checked.enabled() && !weaponItems.add(weapon.definition().item()))
@@ -1897,10 +2153,12 @@ public final class Schema2CompositionKernel {
             }
             RuleIdentity candidate = ((IdentityValue) object.fields.get(reference).value()).value();
             MutableObject target = objects.get(candidate);
-            if (owner == null || !identity.collectionKey().equals("members") || target == null
+            if (owner == null || !identity.collectionKey().equals(reference == Field.SPELL ? "spells" : "members") || target == null
                     || !Arrays.asList(referenceType(reference).split("[|]")).contains(candidate.ruleType())) {
                 throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Final entry ownership and typed catalog references must remain valid", object.source);
             }
+            if (reference == Field.SPELL && !wizardSpell(textField(target.fields,Field.ALGORITHM)))
+                throw fail("S2_TYPE",Stage.FINAL,"Wizard learning member must be on the closed Wizard spell list",object.source);
             if (reference == Field.PROFICIENCY) {
                 String expectedCategory = textField(owner.fields, Field.CATEGORY);
                 String actualCategory = candidate.ruleType().equals("character.tool") ? "TOOL" : textField(target.fields, Field.CATEGORY);
@@ -1915,6 +2173,11 @@ public final class Schema2CompositionKernel {
                 if (candidates.getOrDefault(identity, Set.of()).size() < minimum) {
                     throw fail("S2_CANDIDATES_INSUFFICIENT", Stage.FINAL, "Distinct enabled catalog candidates are below the declared minimum", object.source);
                 }
+            }
+            if (object.identity instanceof RuleIdentity identity && identity.ruleType().equals("character.wizard_spellcasting") && enabled(object)) {
+                long firstLevel = candidates.getOrDefault(identity,Set.of()).stream()
+                        .filter(spell -> spellLevel(textField(objects.get(spell).fields,Field.ALGORITHM))==1).count();
+                if(firstLevel<6) throw fail("S2_CANDIDATES_INSUFFICIENT",Stage.FINAL,"Wizard learning catalog requires six distinct first-level choices",object.source);
             }
             if (object.identity instanceof RuleIdentity identity && identity.ruleType().equals("character.class_progression")
                     && textField(object.fields, Field.ADVANCEMENT_SCOPE).equals(ProgressionScope.CHARACTER_ADVANCEMENT.name())) {
@@ -1963,6 +2226,10 @@ public final class Schema2CompositionKernel {
         if (type.equals("character.proficiency")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
                 Field.CATEGORY, Field.ABILITY_KEY, Field.AUTHOR_NOTE);
         if (type.equals("catalog.proficiency_set")) return List.of(Field.DISPLAY_NAME, Field.CATEGORY, Field.MINIMUM_ENABLED_MEMBERS, Field.AUTHOR_NOTE);
+        if (type.equals("character.spellcasting")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.OWNER_CLASS,Field.REQUIRED_SUBCLASS,Field.REQUIRED_FEATURE,Field.SLOT_RESOURCE,Field.BLESS,Field.CURE_WOUNDS,Field.MATERIAL_ITEM,Field.ABILITY_KEY,Field.ALGORITHM,Field.AUTHOR_NOTE);
+        if (type.equals("character.wizard_spellcasting")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.OWNER_CLASS,Field.REQUIRED_FEATURE,Field.SLOT_RESOURCE,Field.RANK2_SLOT_RESOURCE,Field.RANK3_SLOT_RESOURCE,Field.ABILITY_KEY,Field.ALGORITHM,Field.AUTHOR_NOTE);
+        if (type.equals("adventure.environment")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ALGORITHM,Field.AUTHOR_NOTE);
+        if (type.equals("adventure.spell")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ALGORITHM,Field.AUTHOR_NOTE);
         if (type.equals("equipment.weapon_attack")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ITEM,Field.ABILITY_POLICY,Field.DICE_COUNT,Field.DICE_SIDES,Field.DAMAGE_TYPE,Field.REACH_FEET,Field.ALGORITHM,Field.AUTHOR_NOTE);
         if (type.equals("character.movement")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.OWNER,Field.WALK_SPEED_FEET,Field.ALGORITHM,Field.AUTHOR_NOTE);
         if (type.equals("equipment.item")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.ARMOR_CLASS, Field.STRENGTH_MINIMUM, Field.STEALTH_DISADVANTAGE, Field.HANDS, Field.PROFICIENCY, Field.STEALTH_SKILL, Field.ALGORITHM, Field.AUTHOR_NOTE);
@@ -2059,6 +2326,10 @@ public final class Schema2CompositionKernel {
             if (definition instanceof CombatDefinition value) return new FinalCombat(value, enabled);
             if (definition instanceof WeaponAttackDefinition value) return new FinalWeaponAttack(value, enabled);
             if (definition instanceof MovementDefinition value) return new FinalMovement(value, enabled);
+            if (definition instanceof SpellDefinition value) return new FinalSpell(value, enabled);
+            if (definition instanceof SpellcastingDefinition value) return new FinalSpellcasting(value, enabled);
+            if (definition instanceof WizardSpellcastingDefinition value) return new FinalWizardSpellcasting(value, enabled);
+            if (definition instanceof EnvironmentDefinition value) return new FinalEnvironment(value, enabled);
             if (definition instanceof HealthDefinition value) return new FinalHealth(value, enabled);
             if (definition instanceof VitalEffectDefinition value) return new FinalVitalEffect(value, enabled);
             return new FinalProficiencySet((ProficiencySetDefinition) definition, enabled);
@@ -2107,6 +2378,7 @@ public final class Schema2CompositionKernel {
         if (reference == Field.GRANT) return new ProficiencyGrantEntry(identity, ((GrantValue) fields.get(Field.GRANT).value()).value(), noteField(fields));
         RuleIdentity target = ((IdentityValue) fields.get(reference).value()).value();
         if (reference == Field.PROFICIENCY) return new ProficiencyMemberEntry(identity, target, noteField(fields));
+        if (reference == Field.SPELL) return new SpellbookEntry(identity, target, noteField(fields));
         return reference == Field.LANGUAGE ? new LanguageEntry(identity, target, noteField(fields)) : new ToolEntry(identity, target, noteField(fields));
     }
 
@@ -2188,8 +2460,23 @@ public final class Schema2CompositionKernel {
         } else if (value instanceof ItemDefinition item) {
             result.put("description", item.description()); result.put("source_page", item.sourcePage()); result.put("algorithm", item.algorithm());
             result.put("kind", item.kind().name()); result.put("armor_class", item.armorClass()); result.put("strength_minimum", item.strengthMinimum());
-            result.put("stealth_disadvantage", item.stealthDisadvantage()); result.put("hands", item.hands()); result.put("proficiency", identityJson(item.proficiency()));
+            result.put("stealth_disadvantage", item.stealthDisadvantage()); result.put("hands", item.hands()); if (item.proficiency() != null) result.put("proficiency", identityJson(item.proficiency()));
             if (item.stealthSkill() != null) result.put("stealth_skill", identityJson(item.stealthSkill()));
+        } else if (value instanceof SpellDefinition spell) {
+            result.put("description",spell.description()); result.put("source_page",spell.sourcePage()); result.put("algorithm",spell.algorithm());
+        } else if (value instanceof SpellcastingDefinition casting) {
+            result.put("description",casting.description()); result.put("source_page",casting.sourcePage()); result.put("algorithm",casting.algorithm());
+            result.put("owner_class",identityJson(casting.ownerClass())); result.put("required_subclass",identityJson(casting.requiredSubclass()));
+            result.put("required_feature",identityJson(casting.requiredFeature())); result.put("slot_resource",identityJson(casting.slotResource()));
+            result.put("bless",identityJson(casting.bless())); result.put("cure_wounds",identityJson(casting.cureWounds()));
+            result.put("material_item",identityJson(casting.materialItem())); result.put("ability_key",casting.abilityKey());
+        } else if (value instanceof WizardSpellcastingDefinition casting) {
+            result.put("description",casting.description()); result.put("source_page",casting.sourcePage()); result.put("algorithm",casting.algorithm());
+            result.put("owner_class",identityJson(casting.ownerClass())); result.put("required_feature",identityJson(casting.requiredFeature()));
+            result.put("slot_resource",identityJson(casting.slotResource())); result.put("rank2_slot_resource",identityJson(casting.rank2SlotResource()));
+            result.put("rank3_slot_resource",identityJson(casting.rank3SlotResource())); result.put("ability_key",casting.abilityKey());
+        } else if (value instanceof EnvironmentDefinition environment) {
+            result.put("description",environment.description());result.put("source_page",environment.sourcePage());result.put("algorithm",environment.algorithm());
         } else if (value instanceof CombatDefinition combat) {
             result.put("description",combat.description());result.put("source_page",combat.sourcePage());result.put("algorithm",combat.algorithm());
         } else if (value instanceof WeaponAttackDefinition weapon) {
@@ -2220,6 +2507,7 @@ public final class Schema2CompositionKernel {
         else if (value instanceof ClassLevelEntry level) { result.put("level", level.level()); result.put("asi_available", level.asiAvailable()); }
         else if (value instanceof ProficiencyMemberEntry member) result.put("proficiency", identityJson(member.proficiency()));
         else if (value instanceof GrowthProficiencyGrantEntry grant) result.put("growth_grant", growthGrantJson(grant.grant()));
+        else if (value instanceof SpellbookEntry member) result.put("spell",identityJson(member.spell()));
         else result.put(value instanceof LanguageEntry ? "language" : "tool", identityJson(value.target()));
         if (value.authorNote() != null) result.put("author_note", value.authorNote());
         return result;
@@ -2239,7 +2527,7 @@ public final class Schema2CompositionKernel {
         return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
     }
     private static boolean newAdvancementType(String type) {
-        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement").contains(type);
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),

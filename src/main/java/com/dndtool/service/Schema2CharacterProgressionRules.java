@@ -109,7 +109,7 @@ public final class Schema2CharacterProgressionRules {
         return validateState(material, new State(capacity.identity(), capacity.campaignId(), capacity.characterId(), capacity.preparationOperationId(),
                 capacity.characterClass(), capacity.abilities(), capacity.level(), capacity.proficiencyBonus(),
                 capacity.hitPoints() + difference, capacity.maximumHitPoints() + difference, capacity.classes(), capacity.hitDicePools(),
-                capacity.subclasses(), capacity.features(), capacity.feats(), capacity.proficiencies(), capacity.version(), capacity.resources(), capacity.rest(), capacity.equipment(), capacity.health()));
+                capacity.subclasses(), capacity.features(), capacity.feats(), capacity.proficiencies(), capacity.version(), capacity.resources(), capacity.rest(), capacity.equipment(), capacity.health(), capacity.spellbook()));
     }
 
     public State spend(ProductionSchema2Projection material, State state, RuleIdentity identity, long amount) {
@@ -253,13 +253,13 @@ public final class Schema2CharacterProgressionRules {
             int maximumHitDice, List<ResourceState> resources) {
         if (state.classes().size() != 1) return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(),
                 state.characterClass(), state.abilities(), level, state.proficiencyBonus(), hp, maximumHp, state.classes(), state.hitDicePools(),
-                state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version() + 1, resources, state.rest(), state.equipment(), state.health());
+                state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version() + 1, resources, state.rest(), state.equipment(), state.health(), state.spellbook());
         List<HitDicePool> pools = level == state.level() ? state.hitDicePools()
                 : List.of(new HitDicePool(state.hitDicePools().getFirst().sides(), hitDice, maximumHitDice));
         return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(),
                 state.characterClass(), state.abilities(), level, 2 + (level - 1) / 4, hp, maximumHp,
                 List.of(new ClassLevel(state.characterClass(), level)), pools, state.subclasses(), state.features(), state.feats(), state.proficiencies(),
-                state.version() + 1, resources, state.rest(), state.equipment(), state.health());
+                state.version() + 1, resources, state.rest(), state.equipment(), state.health(), state.spellbook());
     }
 
     private static void abilities(Map<String, Integer> values) {

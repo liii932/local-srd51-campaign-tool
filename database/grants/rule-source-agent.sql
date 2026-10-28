@@ -37,3 +37,14 @@ GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_combat` TO 'dnd_tool_rules_agent'
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_weapon_attack` TO 'dnd_tool_rules_agent'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_movement` TO 'dnd_tool_rules_agent'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_combat_change` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+
+-- Typed finite Life domain spell source; all role boundaries remain separate.
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_spell` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_spellcasting` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_spell_change` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+
+-- Typed Wizard learning catalogs and fixed environmental mechanisms.
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_wizard_spellcasting` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_environment` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_spellbook_member` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_wizard_change` TO 'dnd_tool_rules_agent'@'127.0.0.1';
