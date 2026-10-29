@@ -11,6 +11,8 @@ import java.util.Map;
 
 /** Bounded JSON syntax reader. Schema interpretation belongs to the composition reader. */
 final class Schema2StrictJson {
+    // The complete monster stat_block is a 25-field atom; width stays bounded independently of tokens.
+    private static final int MAX_OBJECT_FIELDS = 32;
     private final String text;
     private final Schema2CompositionKernel.Location source;
     private int position;
@@ -60,7 +62,7 @@ final class Schema2StrictJson {
         if (take('}')) return result;
         while (true) {
             whitespace();
-            if (++tokens > 32768 || result.size() >= 16) throw budget();
+            if (++tokens > 32768 || result.size() >= MAX_OBJECT_FIELDS) throw budget();
             if (peek() != '"') throw syntax("Expected an object key");
             int start = position;
             String key = string();

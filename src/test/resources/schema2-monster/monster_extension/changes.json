@@ -1,0 +1,167 @@
+[
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "monster_base",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.hell_hound"
+    },
+    "field": "stat_block",
+    "value": {
+      "size": "MEDIUM",
+      "creature_type": "FIEND",
+      "alignment": "lawful evil",
+      "armor_class": 15,
+      "armor_description": "natural armor",
+      "hit_points": 45,
+      "hit_dice_count": 7,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 14,
+      "walk_speed_feet": 50,
+      "abilities": {
+        "strength": 17,
+        "dexterity": 12,
+        "constitution": 14,
+        "intelligence": 6,
+        "wisdom": 13,
+        "charisma": 6
+      },
+      "saving_throws": [],
+      "skills": [
+        {
+          "skill_key": "skill.perception",
+          "bonus": 5
+        }
+      ],
+      "damage_defenses": [
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "FIRE",
+          "qualifier": "ALL"
+        }
+      ],
+      "condition_immunities": [],
+      "darkvision_feet": 60,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 15,
+      "languages": [
+        {
+          "name": "Infernal",
+          "understands": true,
+          "speaks": false
+        }
+      ],
+      "challenge_numerator": 3,
+      "challenge_denominator": 1,
+      "experience_points": 700,
+      "traits": [
+        {
+          "key": "keen_hearing_and_smell",
+          "display_name": "Keen Hearing and Smell",
+          "description": "The hound has advantage on Wisdom (Perception) checks that rely on hearing or smell.",
+          "scope": "PERCEPTION_HEARING_SMELL_ONLY"
+        },
+        {
+          "key": "pack_tactics",
+          "display_name": "Pack Tactics",
+          "description": "The hound has advantage on an attack roll against a creature if at least one of the hound’s allies is within 5 feet of the creature and the ally isn’t incapacitated.",
+          "scope": "ATTACK_ROLL_PACK_TACTICS_ONLY"
+        }
+      ]
+    }
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "fire_breath"
+    },
+    "field": "action_profile",
+    "value": {
+      "display_name": "Fire Breath",
+      "description": "The hound exhales fire in a 15-foot cone. Each creature in that area must make a DC 12 Dexterity saving throw, taking 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+      "source_page": 322,
+      "mode": "SAVE_DAMAGE_BATCH_V1",
+      "mechanism": "HELL_HOUND_FIRE_BREATH_V1",
+      "save_policy": {
+        "ability_key": "ability.dexterity",
+        "dc_mode": "FIXED_DC",
+        "dc": 12,
+        "fail_outcome": "FULL",
+        "success_outcome": "HALF"
+      },
+      "damage_profile": {
+        "dice_count": 6,
+        "dice_sides": 6,
+        "damage_type": "FIRE",
+        "delivery": "OTHER_DELIVERY",
+        "ability_modifier": "NO_ABILITY_MODIFIER"
+      },
+      "area": {
+        "shape": "CONE",
+        "length_feet": 15,
+        "origin_policy": "EXCLUDE_ORIGIN"
+      },
+      "recharge": {
+        "dice_sides": 6,
+        "minimum_roll": 5,
+        "turn_start": true,
+        "short_rest": true,
+        "long_rest": true
+      }
+    }
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "monster_base",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.hell_hound"
+    },
+    "field": "author_note"
+  },
+  {
+    "op": "clear_field",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "fire_breath"
+    },
+    "field": "author_note"
+  },
+  {
+    "op": "set_enabled",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "bite"
+    },
+    "value": false
+  }
+]

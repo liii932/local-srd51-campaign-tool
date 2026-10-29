@@ -164,6 +164,14 @@ public final class SchemaMigrations {
     static final String V038_SCRIPT_NAME = "V038__schema2-reactions-and-ongoing-scenes.sql";
     static final String V038_APPROVED_SHA256 = "3449378f943deea0fee5b3711c13f2a67fde7edaafe0646f6b650a513de37ee5";
 
+    static final int V039_VERSION = 39;
+    static final String V039_SCRIPT_NAME = "V039__schema2-monster-rules.sql";
+    static final String V039_APPROVED_SHA256 = "1128fbaf4955634a04e206e40a5af0a3e532fc2035511d140ce53a3a9bd71ea4";
+
+    static final int V040_VERSION = 40;
+    static final String V040_SCRIPT_NAME = "V040__schema2-monster-breath-runtime.sql";
+    static final String V040_APPROVED_SHA256 = "a9fa6c6c3afa348cccdf01c1786103ff94cd7ac8b663389242bd4b49555d6abf";
+
     private static final String RESOURCE_DIRECTORY = "/db/migration/";
     private static final String SCOPE_BEGIN = "-- CHECKSUM-SCOPE-BEGIN";
     private static final String SCOPE_END = "-- CHECKSUM-SCOPE-END";
@@ -210,7 +218,9 @@ public final class SchemaMigrations {
             new Definition(V035_VERSION, V035_SCRIPT_NAME, V035_APPROVED_SHA256),
             new Definition(V036_VERSION, V036_SCRIPT_NAME, V036_APPROVED_SHA256),
             new Definition(V037_VERSION, V037_SCRIPT_NAME, V037_APPROVED_SHA256),
-            new Definition(V038_VERSION, V038_SCRIPT_NAME, V038_APPROVED_SHA256));
+            new Definition(V038_VERSION, V038_SCRIPT_NAME, V038_APPROVED_SHA256),
+            new Definition(V039_VERSION, V039_SCRIPT_NAME, V039_APPROVED_SHA256),
+            new Definition(V040_VERSION, V040_SCRIPT_NAME, V040_APPROVED_SHA256));
 
     private SchemaMigrations() {
     }

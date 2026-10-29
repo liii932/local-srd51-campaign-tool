@@ -56,6 +56,10 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
   一动作法术复用同一反应流，成本只支付一次。Bless 的贡献、专注、到期、同强覆盖恢复与固定 DM
   抗魔区域的独立压制原因随事实保存；战斗可转入共享时钟的有限探索并保留效果，再重新进入先攻。
   这些能力保持 INTERNAL；完整法术目录执行、完整基础包、Host 与完整战役文件仍关闭；
+- schema 2 的[有限怪物与火焰吐息](./docs/rules/schema-2-monster-breath.md)连接类型化怪物／动作来源、
+  规则镜像和真实场景：由服务端完整点格目标产生一次共享 6d6、逐目标 DEX、同时伤害和专注后果，
+  保留动作／充能、唯一继续点、怪物防御及完整局部历史恢复。未登记动作、完整怪物目录执行、
+  通用体积／遮挡、完整文件与发布资格仍须各自消费者和验收；
 - 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
 - 执行普通、优势和劣势 d20 检定，并保存候选骰、修正、DC、结果和内部事件；
 - 通过封闭的类型化效果调整字段、授予物品、记录消息或更新合法实体位置；
@@ -168,7 +172,7 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
 
 当前自动化使用 `dnd_tool_se` 作为本地部署运行库，使用 `dnd_tool_se_it` 执行临时表集成测试；
-完整 V001—V038 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
+完整 V001—V040 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
 运行实例内创建改名 schema，也不改写迁移 SQL。运行、只读核验、正式迁移、集成测试和隔离重放
 使用不同账号。现有少量测试数据的运行库可继续作为开发部署目标，但不能作为集成测试或迁移重放
 目标，使用前仍需盘点和备份。精确账号权限与 Agent 检查点见[数据库说明](./docs/database.md)。
@@ -201,7 +205,7 @@ src/main/java/com/dndtool/
   service/         业务验证、诊断编排、事务、幂等和存档服务
   web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V038 只增不改运行数据库迁移
+                    V001—V040 只增不改运行数据库迁移
 src/main/webapp/    JSP、web.xml 和主机端 JavaScript
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
@@ -230,6 +234,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [schema 2 内部战斗与动作继续](./docs/rules/schema-2-combat.md) | 真实攻击/移动/机会攻击、回合、倒地/掉落、共享秒时钟、完整历史与恢复 |
 | [schema 2 施法作者来源](./docs/rules/schema-2-spell-authoring.md) | 生命领域/法师准确来源、学习名单、固定抗魔环境与 V009/V010、V035/V037 镜像 |
 | [schema 2 有限施法与持续效果](./docs/rules/schema-2-spells.md) | 真实成本/法术书、Shield/Counterspell/Ready、独立压制、专注/到期及探索转移 |
+| [schema 2 有限怪物与火焰吐息](./docs/rules/schema-2-monster-breath.md) | 类型化怪物/动作、完整点格目标、共享伤害/豁免、充能、专注共同切面与局部恢复 |
 | [共同业务写入与初始化准备](./docs/rules/business-write-transactions.md) | 全部写入口、永久守卫、事务故障隔离及绑定初始计划的原子准备 |
 | [SRD 5.1 本地原文索引](./docs/references/srd-5.1/README.md) | 按主题定位 403 页检索文本，核对本地 PDF 与官方出处 |
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |

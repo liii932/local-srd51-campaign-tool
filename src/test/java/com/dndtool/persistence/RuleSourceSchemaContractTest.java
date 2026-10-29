@@ -74,7 +74,11 @@ class RuleSourceSchemaContractTest {
             while (matcher.find()) tables.add(matcher.group(1));
             var currentTables = new java.util.HashSet<>(TABLES);
             currentTables.add("rule_tool");
-            currentTables.addAll(Set.of("rule_schema2_artifact", "rule_schema2_acceptance", "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_health", "rule_schema2_vital_effect", "rule_schema2_combat", "rule_schema2_weapon_attack", "rule_schema2_movement", "rule_schema2_combat_change", "rule_schema2_spell", "rule_schema2_spellcasting", "rule_schema2_spell_change", "rule_schema2_wizard_spellcasting", "rule_schema2_environment", "rule_schema2_spellbook_member", "rule_schema2_wizard_change"));
+            currentTables.addAll(Set.of("rule_schema2_artifact", "rule_schema2_acceptance", "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_health", "rule_schema2_vital_effect", "rule_schema2_combat", "rule_schema2_weapon_attack", "rule_schema2_movement", "rule_schema2_combat_change", "rule_schema2_spell", "rule_schema2_spellcasting", "rule_schema2_spell_change", "rule_schema2_wizard_spellcasting", "rule_schema2_environment", "rule_schema2_spellbook_member", "rule_schema2_wizard_change",
+                "rule_schema2_monster", "rule_schema2_monster_action", "rule_schema2_monster_change",
+                "rule_schema2_monster_stat", "rule_schema2_monster_save", "rule_schema2_monster_skill",
+                "rule_schema2_monster_defense", "rule_schema2_monster_condition", "rule_schema2_monster_language",
+                "rule_schema2_monster_trait", "rule_schema2_monster_action_value"));
             assertEquals(currentTables, tables);
             assertEquals("", matcher.replaceAll("").trim());
         }
@@ -87,7 +91,7 @@ class RuleSourceSchemaContractTest {
             if (privilege.equals("SELECT")) reads++;
             else assertNull(writes.put(matcher.group(2), privilege));
         }
-        assertEquals(41, reads);
+        assertEquals(52, reads);
         Map<String, String> expectedWrites = new LinkedHashMap<>(Map.of(
                 "rule_release", "INSERT (module_key, release_version, canonical_format_version, archive_format_version, hash_algorithm), UPDATE (canonical_format_version, archive_format_version, hash_algorithm, content_sha256, installation_revision)",
                 "rule_language", "INSERT, DELETE, UPDATE (display_name, description, category, source_page, sort_order)",
@@ -129,6 +133,17 @@ class RuleSourceSchemaContractTest {
         expectedWrites.put("rule_schema2_environment", "INSERT (artifact_module_key, release_version, author_index, module_key, rule_type, rule_key, display_name, description, source_page, algorithm, author_note)");
         expectedWrites.put("rule_schema2_spellbook_member", "INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, spell_module_key, spell_rule_type, spell_rule_key, author_note)");
         expectedWrites.put("rule_schema2_wizard_change", "INSERT (artifact_module_key, release_version, author_index, target_kind, rule_module_key, rule_type, rule_key, collection_key, entry_module_key, entry_key, operation, field_key, text_value, integer_value, boolean_value, reference_module_key, reference_rule_type, reference_rule_key)");
+        expectedWrites.put("rule_schema2_monster", "INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, display_name, description, source_page, author_note)");
+        expectedWrites.put("rule_schema2_monster_action", "INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, author_note)");
+        expectedWrites.put("rule_schema2_monster_change", "INSERT (artifact_module_key, release_version, author_index, target_kind, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, operation, field_key, text_value, integer_value, boolean_value, atom_kind)");
+        expectedWrites.put("rule_schema2_monster_stat", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, size, creature_type, alignment, armor_class, armor_description, hit_points, hit_dice_count, hit_dice_sides, hit_dice_modifier, walk_speed_feet, strength, dexterity, constitution, intelligence, wisdom, charisma, darkvision_feet, blindsight_feet, tremorsense_feet, truesight_feet, passive_perception, challenge_numerator, challenge_denominator, experience_points)");
+        expectedWrites.put("rule_schema2_monster_save", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, ability_key, bonus)");
+        expectedWrites.put("rule_schema2_monster_skill", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, skill_key, bonus)");
+        expectedWrites.put("rule_schema2_monster_defense", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, kind, damage_type, qualifier)");
+        expectedWrites.put("rule_schema2_monster_condition", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, condition_key)");
+        expectedWrites.put("rule_schema2_monster_language", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, name, understands, speaks)");
+        expectedWrites.put("rule_schema2_monster_trait", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, trait_key, trait_scope, display_name, description)");
+        expectedWrites.put("rule_schema2_monster_action_value", "INSERT (artifact_module_key, release_version, owner_kind, owner_index, display_name, description, source_page, mode, mechanism, save_ability_key, save_dc_mode, save_dc, fail_outcome, success_outcome, damage_dice_count, damage_dice_sides, damage_type, damage_delivery, damage_ability_modifier, area_shape, area_length_feet, area_origin_policy, recharge_dice_sides, recharge_minimum_roll, recharge_turn_start, recharge_short_rest, recharge_long_rest)");
         assertEquals(expectedWrites, writes);
         assertEquals("", matcher.replaceAll("").trim());
     }

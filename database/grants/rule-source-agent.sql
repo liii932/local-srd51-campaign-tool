@@ -48,3 +48,16 @@ GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_wizard_spellcasting` TO 'dnd_tool
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_environment` TO 'dnd_tool_rules_agent'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_spellbook_member` TO 'dnd_tool_rules_agent'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_wizard_change` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+
+-- Typed monster declarations, whole-atom changes and independent profile rows.
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_action` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_change` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_stat` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_save` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_skill` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_defense` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_condition` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_language` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_trait` TO 'dnd_tool_rules_agent'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_action_value` TO 'dnd_tool_rules_agent'@'127.0.0.1';

@@ -216,10 +216,10 @@ public final class Schema2SpellRules {
             effects.add(e);
         }
         List<ReadyPreparation> ready=b.readyPreparations().stream().map(r->holder.kind()==ConcentrationKind.READY_SPELL && r.readyKey().equals(holder.sourceKey()) && Set.of(ReadyStatus.PREPARING,ReadyStatus.ARMED).contains(r.status())?new ReadyPreparation(r.readyKey(),r.actorId(),r.declaredTurnNumber(),r.expiresAtTurnNumber(),r.input(),ReadyStatus.LOST,r.heldCastFrameKey(),reason):r).toList();
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,ready,b.triggerFacts(),b.shields(),b.concentrationHolders().stream().filter(h->!h.actorId().equals(caster)).toList(),b.environmentZones(),b.suppressionCauses());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,ready,b.triggerFacts(),b.shields(),b.concentrationHolders().stream().filter(h->!h.actorId().equals(caster)).toList(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
     }
     public static Battle withEffects(Battle b,List<OngoingEffect> effects) {
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
     }
     private static Combatant member(Battle b,UUID id) {return b.combatants().stream().filter(c -> c.characterId().equals(id)).findFirst().orElseThrow(() -> invalid("S2_SPELL_TARGET"));}
     private static IllegalArgumentException invalid(String code) {return new IllegalArgumentException(code);}

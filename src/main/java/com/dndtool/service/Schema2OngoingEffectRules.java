@@ -96,7 +96,7 @@ public final class Schema2OngoingEffectRules {
     public static Battle withCauses(Battle battle,List<SuppressionCause> causes) {
         return new Battle(battle.combatId(),battle.campaignId(),battle.combatRule(),battle.status(),battle.round(),battle.turnNumber(),
                 battle.activeOrdinal(),battle.version(),battle.combatants(),battle.initiative(),battle.flows(),battle.ongoingEffects(),
-                battle.readyPreparations(),battle.triggerFacts(),battle.shields(),battle.concentrationHolders(),battle.environmentZones(),causes);
+                battle.readyPreparations(),battle.triggerFacts(),battle.shields(),battle.concentrationHolders(),battle.environmentZones(),causes,battle.monsters(),battle.saveDamageBatches(),battle.monsterRests());
     }
 
     public static boolean isSuppressed(Battle battle, UUID effectKey, UUID targetId) {

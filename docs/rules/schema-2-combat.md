@@ -5,6 +5,8 @@
 `Schema2CombatRuntimeService` 是有限 INTERNAL 战斗消费者。它通过真实准备、来源快照和角色历史，
 接纳先攻、回合、普通近战攻击、步行、疾走、撤离、闪避、起身及机会攻击；
 [施法与持续效果](schema-2-spells.md)沿同一 owner 接纳 Bless、Cure Wounds、Shield、Counterspell、Ready、独立抗魔环境和探索场景。
+[有限怪物合同](schema-2-monster-breath.md)另接入准确部署、怪物回合、充能及火焰吐息批次，
+复用原角色健康与唯一动作流，不开放其他怪物动作。
 规则数据来自[战斗作者合同](schema-2-combat-authoring.md)，动作流遵守
 [动作继续协议](../design/v2/action-continuation-protocol.md)。
 
@@ -12,7 +14,8 @@
 攻击、反应、移动和健康后果；模组提供明确的战斗算法、武器攻击参数和角色速度。
 不存在动态脚本、任意效果参数袋或模组自定义执行阶段。
 
-一个战斗引用同一 campaign 的 2—16 个真实准备角色。各角色保留自己的 run、snapshot、
+一个战斗引用同一 campaign 的真实准备角色，并可按[有限怪物合同](schema-2-monster-breath.md)
+部署准确怪物；角色保留自己的 run、snapshot、
 preparation 绑定，冻结规则绑定必须完全一致，开始时角色时钟的分钟和秒必须相同。
 这扩展的是 INTERNAL 多角色战斗接合，不能把独立准备记录称为已完成的整战役初始化。
 
@@ -67,8 +70,9 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 拾取、重新装备、爬行及任意条件／效果仍需独立动作消费者；掉落物不会伪装为 `CARRIED`。
 
 施法资格、组件、共享法术位、Wizard 法术书、Bless／Shield 贡献、专注、同名覆盖、独立压制、
-Ready 及探索持续见[施法合同](schema-2-spells.md)。怪物动作、双持附赠攻击、Extra Attack、抗性、
-其他法术／反应机制仍须各自消费者，不能借通用命令绕过其成本与后果。
+Ready 及探索持续见[施法合同](schema-2-spells.md)。怪物吐息与其适用防御见
+[有限怪物合同](schema-2-monster-breath.md)；其他怪物动作、双持附赠攻击、Extra Attack、
+角色抗性和其他法术／反应机制仍须各自消费者，不能借通用命令绕过其成本与后果。
 
 ## 暂停、反应和继续
 

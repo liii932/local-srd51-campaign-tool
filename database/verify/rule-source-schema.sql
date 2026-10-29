@@ -7,7 +7,7 @@ SHOW GRANTS;
 
 SELECT schema_version, CONVERT(script_name USING latin1) AS script_name,
     CONVERT(script_sha256 USING latin1) AS script_sha256, applied_at
-FROM rule_schema_meta ORDER BY schema_version LIMIT 11;
+FROM rule_schema_meta ORDER BY schema_version LIMIT 12;
 SELECT control_id, protocol_version, metadata_row_count, row_version
 FROM rule_installation_control ORDER BY control_id LIMIT 2;
 

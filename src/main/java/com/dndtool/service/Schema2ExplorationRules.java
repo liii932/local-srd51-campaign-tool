@@ -100,6 +100,6 @@ public final class Schema2ExplorationRules {
         var holders=battle.concentrationHolders().stream().filter(h->h.kind()!=ConcentrationKind.BLESS_EFFECT||!ended.contains(h.sourceKey())).toList();
         return new Battle(battle.combatId(),battle.campaignId(),battle.combatRule(),battle.status(),battle.round(),battle.turnNumber(),
                 battle.activeOrdinal(),battle.version(),battle.combatants(),battle.initiative(),battle.flows(),effects,battle.readyPreparations(),
-                battle.triggerFacts(),battle.shields(),holders,battle.environmentZones(),battle.suppressionCauses());
+                battle.triggerFacts(),battle.shields(),holders,battle.environmentZones(),battle.suppressionCauses(),battle.monsters(),battle.saveDamageBatches(),battle.monsterRests());
     }
 }

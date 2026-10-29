@@ -10,7 +10,7 @@ import java.util.*;
 
 /** Typed, append-only combat facts. The caller owns the common guarded transaction. */
 public final class JdbcSchema2CombatRuntimeRepository {
-    public static final int MAX_EVENTS = 128, MAX_COMBATANTS = 16, MAX_HISTORY_CHILD_ROWS = 65536;
+    public static final int MAX_EVENTS = 128, MAX_COMBATANTS = 64, MAX_CHARACTER_MEMBERS = 16, MAX_HISTORY_CHILD_ROWS = 65536;
     public static final Comparator<UUID> UUID_ORDER = Comparator.comparing(UUID::toString);
     public record Member(UUID characterId, Identity identity, UUID preparationOperationId) { }
     public record Dependency(UUID characterId, long version) { }
@@ -22,7 +22,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
     public record History(Battle current, List<Member> members, List<Event> events) {
         public History { members = List.copyOf(members); events = List.copyOf(events); }
     }
-    private static final List<String> TABLES = List.of("s2_combat_member", "s2_combat_event", "s2_combat_dependency", "s2_combat_character_result", "s2_combat_command_point", "s2_combat_command_deployment", "s2_combat_command_tie", "s2_combat_roll", "s2_combat_fact", "s2_combat_state", "s2_combat_actor", "s2_combat_initiative", "s2_combat_flow", "s2_combat_frame", "s2_combat_window", "s2_combat_opportunity", "s2_combat_opportunity_item", "s2_combat_movement", "s2_combat_movement_point", "s2_combat_attack", "s2_combat_attack_die", "s2_combat_cast_command", "s2_combat_cast_command_target", "s2_combat_ongoing_effect", "s2_combat_ongoing_target", "s2_combat_cast", "s2_combat_cast_target", "s2_combat_cast_die", "s2_combat_saving_throw", "s2_combat_ready_input", "s2_combat_ready_point", "s2_combat_ready_target", "s2_combat_zone_command", "s2_combat_health_command", "s2_combat_reaction_option", "s2_combat_window_trigger", "s2_combat_ready_release", "s2_combat_ability_check", "s2_combat_ready", "s2_combat_trigger", "s2_combat_shield", "s2_combat_concentration", "s2_combat_environment", "s2_combat_suppression");
+    private static final List<String> TABLES = java.util.stream.Stream.concat(List.of("s2_combat_member", "s2_combat_event", "s2_combat_dependency", "s2_combat_character_result", "s2_combat_command_point", "s2_combat_command_deployment", "s2_combat_command_tie", "s2_combat_roll", "s2_combat_fact", "s2_combat_state", "s2_combat_actor", "s2_combat_initiative", "s2_combat_flow", "s2_combat_frame", "s2_combat_window", "s2_combat_opportunity", "s2_combat_opportunity_item", "s2_combat_movement", "s2_combat_movement_point", "s2_combat_attack", "s2_combat_attack_die", "s2_combat_cast_command", "s2_combat_cast_command_target", "s2_combat_ongoing_effect", "s2_combat_ongoing_target", "s2_combat_cast", "s2_combat_cast_target", "s2_combat_cast_die", "s2_combat_saving_throw", "s2_combat_ready_input", "s2_combat_ready_point", "s2_combat_ready_target", "s2_combat_zone_command", "s2_combat_health_command", "s2_combat_reaction_option", "s2_combat_window_trigger", "s2_combat_ready_release", "s2_combat_ability_check", "s2_combat_ready", "s2_combat_trigger", "s2_combat_shield", "s2_combat_concentration", "s2_combat_environment", "s2_combat_suppression").stream(), JdbcSchema2MonsterBreathRows.TABLES.stream()).toList();
     private final JdbcSchema2CharacterRuntimeRepository characters = new JdbcSchema2CharacterRuntimeRepository();
 
     public History read(Connection connection, UUID combatId) throws SQLException {
@@ -39,7 +39,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
             return null;
         }
         int[] memberIndex = {0};
-        List<Member> members = query(connection,"s2_combat_member","combat_id",bytes(combatId),"member_index",MAX_COMBATANTS,row -> {
+        List<Member> members = query(connection,"s2_combat_member","combat_id",bytes(combatId),"member_index",MAX_CHARACTER_MEMBERS,row -> {
             require(integer(row,"member_index") == memberIndex[0]++);
             return new Member(id(row,"character_id"),new Identity(id(row,"run_id"),id(row,"snapshot_id")),id(row,"preparation_operation_id"));
         });
@@ -168,8 +168,10 @@ public final class JdbcSchema2CombatRuntimeRepository {
         var healthRows=indexed(data,"s2_combat_health_command",combat,sequence,"command_index",1,r->r);
         JdbcSchema2CharacterRuntimeRepository.HealthInput health=null;
         if(!healthRows.isEmpty()) {var r=healthRows.getFirst();health=new JdbcSchema2CharacterRuntimeRepository.HealthInput(rule(r,"rule"),nullableRule(r,"effect"),nullableAscii(r,"temporary_choice"),utf8(r,"adjudication"));}
+        var monster=JdbcSchema2MonsterBreathRows.readCommand((table,order,maximum)->indexed(data,table,combat,sequence,
+                table.equals("s2_combat_monster_deployment")?"deployment_index":"input_index",maximum,r->r));
         return new Command(en(Kind.class,row,"command_kind"),nullableId(row,"actor_id"),nullableId(row,"target_id"),nullableId(row,"item_id"),path,deployments,ties,
-                nullableId(row,"flow_key"),nullableId(row,"leaf_key"),nullableId(row,"window_key"),nullableId(row,"opportunity_key"),cast,ready,nullableId(row,"ready_key"),zone,nullableId(row,"zone_key"),health,integer(row,"seconds"));
+                nullableId(row,"flow_key"),nullableId(row,"leaf_key"),nullableId(row,"window_key"),nullableId(row,"opportunity_key"),cast,ready,nullableId(row,"ready_key"),zone,nullableId(row,"zone_key"),health,integer(row,"seconds"),monster.deployments(),monster.breath(),monster.rest());
     }
 
     private static Battle state(Rows data, UUID combat, long sequence, String phase, UUID campaign) throws SQLException {
@@ -253,7 +255,9 @@ public final class JdbcSchema2CombatRuntimeRepository {
         List<EnvironmentZone> zones=new ArrayList<>();for(var r:scoped(data,"s2_combat_environment",combat,sequence,phase,"zone_index",16)) {require(integer(r,"zone_index")==zones.size());zones.add(new EnvironmentZone(id(r,"zone_key"),rule(r,"rule"),new Position(signed(r,"x"),signed(r,"y")),id(r,"created_operation_id"),nullableId(r,"ended_operation_id")));}
         List<SuppressionCause> causes=new ArrayList<>();for(var r:scoped(data,"s2_combat_suppression",combat,sequence,phase,"cause_index",512)) {require(integer(r,"cause_index")==causes.size());causes.add(new SuppressionCause(id(r,"cause_key"),id(r,"zone_key"),id(r,"effect_key"),id(r,"target_id"),id(r,"established_operation_id"),nullableId(r,"released_operation_id"),r.get("release_reason")==null?null:en(SuppressionReleaseReason.class,r,"release_reason")));}
         require(readies.size()==integer(root,"ready_count")&&triggers.size()==integer(root,"trigger_count")&&shields.size()==integer(root,"shield_count")&&holders.size()==integer(root,"holder_count")&&zones.size()==integer(root,"zone_count")&&causes.size()==integer(root,"cause_count"));
-        return new Battle(combat,campaign,new RuleIdentity(ascii(root,"rule_module"),ascii(root,"rule_type"),ascii(root,"rule_key")),en(Status.class,root,"combat_status"),integer(root,"round_number"),number(root,"turn_number"),integer(root,"active_ordinal"),number(root,"row_version"),actors,initiative,flows,effects,readies,triggers,shields,holders,zones,causes);
+        var monster=JdbcSchema2MonsterBreathRows.readState((table,order,maximum)->scoped(data,table,combat,sequence,phase,order,maximum),
+                integer(root,"monster_count"),integer(root,"batch_count"),integer(root,"monster_rest_count"));
+        return new Battle(combat,campaign,new RuleIdentity(ascii(root,"rule_module"),ascii(root,"rule_type"),ascii(root,"rule_key")),en(Status.class,root,"combat_status"),integer(root,"round_number"),number(root,"turn_number"),integer(root,"active_ordinal"),number(root,"row_version"),actors,initiative,flows,effects,readies,triggers,shields,holders,zones,causes,monster.monsters(),monster.batches(),monster.rests());
     }
 
     private static ReadyInput readReadyInput(Rows data,UUID combat,long sequence,String phase,Map<String,Object> r)throws SQLException {
@@ -297,6 +301,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
         if(c.readyInput()!=null)writeReadyInput(result,combat,sequence,"COMMAND",0,c.readyInput());
         if(c.zoneInput()!=null) {Map<String,Object> r=base(combat,sequence,"command_index",0,"x",c.zoneInput().center().x(),"y",c.zoneInput().center().y());ruleColumns(r,"rule",c.zoneInput().rule());add(result,"s2_combat_zone_command",r);}
         if(c.healthInput()!=null) {var h=c.healthInput();Map<String,Object> r=base(combat,sequence,"command_index",0,"temporary_choice",a(h.temporaryChoice()),"adjudication",h.adjudication()==null?null:h.adjudication().getBytes(StandardCharsets.UTF_8));ruleColumns(r,"rule",h.rule());nullableRuleColumns(r,"effect",h.effect());add(result,"s2_combat_health_command",r);}
+        JdbcSchema2MonsterBreathRows.commandRows(result,combat,sequence,c);
         for(int i=0;i<c.path().size();i++){Position p=c.path().get(i);add(result,"s2_combat_command_point",base(combat,sequence,"point_index",i,"x",p.x(),"y",p.y()));}
         for(int i=0;i<c.deployments().size();i++){Deployment d=c.deployments().get(i);add(result,"s2_combat_command_deployment",base(combat,sequence,"deployment_index",i,"character_id",bytes(d.characterId()),"x",d.position().x(),"y",d.position().y(),"side",d.side()));}
         for(int i=0;i<c.tieBreakOrder().size();i++)add(result,"s2_combat_command_tie",base(combat,sequence,"tie_index",i,"character_id",bytes(c.tieBreakOrder().get(i))));
@@ -308,7 +313,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
     }
     private static void stateRows(Map<String,List<Map<String,Object>>> out,Battle state,long sequence,String phase)throws SQLException{
         UUID combat=state.combatId();
-        add(out,"s2_combat_state",phase(combat,sequence,phase,"state_index",0,"rule_module",a(state.combatRule().moduleKey()),"rule_type",a(state.combatRule().ruleType()),"rule_key",a(state.combatRule().ruleKey()),"combat_status",a(state.status()),"round_number",state.round(),"turn_number",state.turnNumber(),"active_ordinal",state.activeOrdinal(),"row_version",state.version(),"ongoing_effect_count",state.ongoingEffects().size(),"ready_count",state.readyPreparations().size(),"trigger_count",state.triggerFacts().size(),"shield_count",state.shields().size(),"holder_count",state.concentrationHolders().size(),"zone_count",state.environmentZones().size(),"cause_count",state.suppressionCauses().size()));
+        add(out,"s2_combat_state",phase(combat,sequence,phase,"state_index",0,"rule_module",a(state.combatRule().moduleKey()),"rule_type",a(state.combatRule().ruleType()),"rule_key",a(state.combatRule().ruleKey()),"combat_status",a(state.status()),"round_number",state.round(),"turn_number",state.turnNumber(),"active_ordinal",state.activeOrdinal(),"row_version",state.version(),"ongoing_effect_count",state.ongoingEffects().size(),"ready_count",state.readyPreparations().size(),"trigger_count",state.triggerFacts().size(),"shield_count",state.shields().size(),"holder_count",state.concentrationHolders().size(),"zone_count",state.environmentZones().size(),"cause_count",state.suppressionCauses().size(),"monster_count",state.monsters().size(),"batch_count",state.saveDamageBatches().size(),"monster_rest_count",state.monsterRests().size()));
         for(int i=0;i<state.combatants().size();i++){Combatant c=state.combatants().get(i);AttackSequence s=c.sequence();add(out,"s2_combat_actor",phase(combat,sequence,phase,"actor_index",i,"character_id",bytes(c.characterId()),"x",c.position().x(),"y",c.position().y(),"side",c.side(),"action_available",bit(c.actionAvailable()),"reaction_available",bit(c.reactionAvailable()),"movement_spent_half_feet",c.movementSpentHalfFeet(),"movement_bonus",c.movementBonus(),"disengaged",bit(c.disengaged()),"dodging",bit(c.dodging()),"prone",bit(c.prone()),"sequence_key",s==null?null:bytes(s.sequenceKey()),"attack_limit",s==null?null:s.limit(),"performed",s==null?null:s.performed(),"forfeited",s==null?null:s.forfeited(),"sequence_closed",s==null?null:bit(s.closed())));}
         for(int i=0;i<state.initiative().size();i++){Initiative n=state.initiative().get(i);add(out,"s2_combat_initiative",phase(combat,sequence,phase,"initiative_index",i,"character_id",bytes(n.characterId()),"d20",n.d20(),"dexterity_modifier",n.dexterityModifier(),"total",n.total(),"ordinal",n.ordinal()));}
         for(int i=0;i<state.ongoingEffects().size();i++) {
@@ -345,10 +350,11 @@ public final class JdbcSchema2CombatRuntimeRepository {
                 SavingThrowAttempt save=f.savingThrows().get(si);add(out,"s2_combat_saving_throw",flow(combat,sequence,phase,fi,"save_index",si,"frame_key",bytes(save.frameKey()),"subject_id",bytes(save.subjectId()),"save_kind",a(save.kind()),"ability_key",a(save.abilityKey()),"d20",save.d20(),"ability_modifier",save.abilityModifier(),"proficiency_bonus",save.proficiencyBonus(),"blessing_effect_key",b(save.blessingEffectKey()),"blessing_d4",save.blessingD4(),"difficulty_class",save.difficultyClass(),"total",save.total(),"success",bit(save.success())));
             }
         }
+        JdbcSchema2MonsterBreathRows.stateRows(out,combat,sequence,phase,state);
     }
 
     public static void validate(History history)throws SQLException{
-        require(history!=null&&!history.events().isEmpty()&&history.events().size()<=MAX_EVENTS&&history.members().size()>=2&&history.members().size()<=MAX_COMBATANTS);
+        require(history!=null&&!history.events().isEmpty()&&history.events().size()<=MAX_EVENTS&&history.members().size()>=2&&history.members().size()<=MAX_CHARACTER_MEMBERS);
         List<UUID> members=history.members().stream().map(Member::characterId).toList();require(new HashSet<>(members).size()==members.size()&&members.equals(members.stream().sorted(UUID_ORDER).toList()));
         for(Member m:history.members()){uuid(m.characterId());uuid(m.identity().runId());uuid(m.identity().snapshotId());uuid(m.preparationOperationId());}
         Set<UUID> operations=new HashSet<>(),children=new HashSet<>();Battle previous=null;long rows=0;
@@ -370,6 +376,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
                         && change.healthResult()==null && change.damageAmount()==0 && !change.critical() && !change.deathSave() && !change.timeAdvance() && !change.healing()
                         : change.resourceAmount()==0 && change.healthResult()!=null);
                 require(!change.healing() || !change.critical() && !change.deathSave() && !change.timeAdvance());
+                require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
             }
             validateCastResults(e);validateExtendedTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
@@ -445,7 +452,8 @@ public final class JdbcSchema2CombatRuntimeRepository {
         if (retained + (suffixEvents + 1L) * perEvent > MAX_HISTORY_CHILD_ROWS)
             throw new SQLException("S2_COMBAT_CAPACITY");
     }
-    private static void validateState(Battle b,List<UUID> members)throws SQLException{
+    private static void validateState(Battle b,List<UUID> characterMembers)throws SQLException{
+        List<UUID> members=JdbcSchema2MonsterBreathRows.validateState(b,characterMembers);
         uuid(b.combatId());uuid(b.campaignId());require(b.combatRule()!=null&&b.combatRule().ruleType().equals("adventure.combat")&&b.status()!=null&&b.round()>=1&&b.turnNumber()>=1&&b.activeOrdinal()>=0&&b.activeOrdinal()<members.size()&&b.version()>=0);
         require(b.combatants().stream().map(Combatant::characterId).toList().equals(members)&&b.initiative().size()==members.size());
         Set<UUID> initiative=new HashSet<>();for(int i=0;i<b.initiative().size();i++){Initiative n=b.initiative().get(i);require(initiative.add(n.characterId())&&members.contains(n.characterId())&&n.ordinal()==i&&n.d20()>=1&&n.d20()<=20&&n.dexterityModifier()>=-5&&n.dexterityModifier()<=10&&n.total()==n.d20()+n.dexterityModifier());}
@@ -550,11 +558,13 @@ public final class JdbcSchema2CombatRuntimeRepository {
                 &&(c.zoneInput()!=null)==(c.kind()==Kind.CREATE_ENVIRONMENT_ZONE)&&(c.zoneKey()!=null)==(c.kind()==Kind.END_ENVIRONMENT_ZONE)
                 &&(c.readyKey()!=null)==(c.kind()==Kind.RELEASE_READY)
                 &&(move?!c.path().isEmpty()&&c.path().size()<=64:c.path().isEmpty())
-                &&(start?c.deployments().size()>=2&&c.deployments().size()<=MAX_COMBATANTS:c.deployments().isEmpty())
+                &&(start?c.deployments().size()>=2&&c.deployments().size()<=MAX_CHARACTER_MEMBERS&&c.deployments().size()+c.monsterDeployments().size()<=MAX_COMBATANTS:c.deployments().isEmpty()&&c.monsterDeployments().isEmpty())
                 &&(start||reenter||c.tieBreakOrder().isEmpty())&&(c.flowKey()!=null)==(reaction||continuation)
-                &&(c.leafKey()!=null)==(reaction||continuation)&&(c.windowKey()!=null)==(reaction||continuation)&&(c.opportunityKey()!=null)==reaction
+                &&(c.leafKey()!=null)==(reaction||continuation)&&(reaction?c.windowKey()!=null:continuation?c.kind()==Kind.CONTINUE_FLOW||c.windowKey()!=null:c.windowKey()==null)&&(c.opportunityKey()!=null)==reaction
                 &&(c.kind()==Kind.EXPLORATION_ADVANCE_TIME?c.seconds()>=1&&c.seconds()<=60:c.seconds()==0));
         for(UUID id:Arrays.asList(c.actorId(),c.targetId(),c.itemId(),c.flowKey(),c.leafKey(),c.windowKey(),c.opportunityKey(),c.readyKey(),c.zoneKey()))if(id!=null)uuid(id);
+        require((c.breathInput()!=null)==(c.kind()==Kind.MONSTER_BREATH));
+        require((c.monsterRestInput()!=null)==(c.kind()==Kind.BEGIN_MONSTER_REST||c.kind()==Kind.COMPLETE_MONSTER_REST));
         if(c.castInput()!=null)validateCastInput(c.castInput());if(c.readyInput()!=null)validateReadyInput(c.readyInput());
         if(c.zoneInput()!=null)require(ruleType(c.zoneInput().rule(),"adventure.environment")&&c.zoneInput().center()!=null);
     }

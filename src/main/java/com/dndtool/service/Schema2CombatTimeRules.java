@@ -10,13 +10,20 @@ public final class Schema2CombatTimeRules {
 
     /** The combat owner supplies the registered duration after proving the full round is complete. */
     public static State advanceSeconds(ProductionSchema2Projection material, State before, int seconds) {
+        if(seconds>60)throw invalid("S2_COMBAT_TIME_INPUT");return advance(material,before,seconds);
+    }
+    /** Only the typed monster-rest completion owner may derive this longer interval. */
+    static State advanceRestSeconds(ProductionSchema2Projection material, State before, int seconds) {
+        return advance(material,before,seconds);
+    }
+    private static State advance(ProductionSchema2Projection material, State before, int seconds) {
         var growth = new Schema2CharacterProgressionRules();
         var rests = new Schema2CharacterRestRules();
         var healthRules = new Schema2CharacterHealthRules();
         growth.validateState(material, before);
         rests.validateState(material, before);
         healthRules.validateState(before);
-        if (seconds < 1 || seconds > 60 || before.rest().active() != null)
+        if (seconds < 1 || seconds > 28800 || before.rest().active() != null)
             throw invalid("S2_COMBAT_TIME_INPUT");
         if (before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1)
             throw invalid("S2_COMBAT_TIME_CAPACITY");

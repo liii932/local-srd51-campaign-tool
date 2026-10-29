@@ -17,6 +17,11 @@ import com.dndtool.module.composition.ProductionRuleArtifact;
 
 /** SQL protocol fixture only; provides no MySQL constraint, privilege, or durability evidence. */
 final class Schema2SourceJdbcFixture {
+    private static final Set<String> MONSTER_TABLES = Set.of(
+            "rule_schema2_monster", "rule_schema2_monster_action", "rule_schema2_monster_change",
+            "rule_schema2_monster_stat", "rule_schema2_monster_save", "rule_schema2_monster_skill",
+            "rule_schema2_monster_defense", "rule_schema2_monster_condition", "rule_schema2_monster_language",
+            "rule_schema2_monster_trait", "rule_schema2_monster_action_value");
     Object[] legacyControl = {1, 1, 1L, 0L};
     Map<String, Object> control = row("control_id, protocol_version, metadata_row_count, installation_count, acceptance_count, raw_zip_byte_count, row_version",
             1, 1, 1L, 0L, 0L, 0L, 0L);
@@ -86,7 +91,13 @@ final class Schema2SourceJdbcFixture {
             }
             case "setNull" -> { parameters.put((int) args[0], null); yield null; }
             case "setQueryTimeout" -> { assertEquals(5, args[0]); yield null; }
-            case "setMaxRows" -> { limit[0] = (int) args[0]; assertTrue(limit[0] >= 1 && limit[0] <= 65537); yield null; }
+            case "setMaxRows" -> {
+                limit[0] = (int) args[0];
+                if (MONSTER_TABLES.stream().anyMatch(table -> sql.contains(" FROM " + table + " ")))
+                    assertEquals(159745, limit[0]);
+                else assertTrue(limit[0] >= 1 && limit[0] <= 65537);
+                yield null;
+            }
             case "executeQuery" -> {
                 assertTrue(limit[0] > 0); queries.add(sql);
                 List<Object[]> rows = select(sql, parameters);
@@ -147,7 +158,7 @@ final class Schema2SourceJdbcFixture {
             assertEquals(parameters.size(), parameter - 1);
             if (table.equals("rule_schema2_artifact")) { row.put("installed_at", LocalDateTime.of(2026, 1, 1, 0, 0).plusSeconds(artifacts.size())); artifacts.add(row); }
             else if (table.equals("rule_schema2_acceptance")) { row.put("accepted_at", LocalDateTime.of(2026, 2, 1, 0, 0).plusSeconds(acceptances.size())); acceptances.add(row); }
-            else if (Set.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_health", "rule_schema2_vital_effect", "rule_schema2_combat", "rule_schema2_combat_change", "rule_schema2_movement", "rule_schema2_weapon_attack").contains(table))
+            else if (MONSTER_TABLES.contains(table) || Set.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_health", "rule_schema2_vital_effect", "rule_schema2_combat", "rule_schema2_combat_change", "rule_schema2_movement", "rule_schema2_weapon_attack").contains(table))
                 characterTables.computeIfAbsent(table, ignored -> new ArrayList<>()).add(row);
             else throw new AssertionError("Unexpected insert " + sql);
             return;

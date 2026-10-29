@@ -1,0 +1,224 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "monster_base",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.hell_hound"
+    },
+    "display_name": "Hell Hound",
+    "description": "Medium fiend, lawful evil.",
+    "source_page": 321,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "FIEND",
+      "alignment": "lawful evil",
+      "armor_class": 15,
+      "armor_description": "natural armor",
+      "hit_points": 45,
+      "hit_dice_count": 7,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 14,
+      "walk_speed_feet": 50,
+      "abilities": {
+        "strength": 17,
+        "dexterity": 12,
+        "constitution": 14,
+        "intelligence": 6,
+        "wisdom": 13,
+        "charisma": 6
+      },
+      "saving_throws": [],
+      "skills": [
+        {
+          "skill_key": "skill.perception",
+          "bonus": 5
+        }
+      ],
+      "damage_defenses": [
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "FIRE",
+          "qualifier": "ALL"
+        }
+      ],
+      "condition_immunities": [],
+      "darkvision_feet": 60,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 15,
+      "languages": [
+        {
+          "name": "Infernal",
+          "understands": true,
+          "speaks": false
+        }
+      ],
+      "challenge_numerator": 3,
+      "challenge_denominator": 1,
+      "experience_points": 700,
+      "traits": [
+        {
+          "key": "keen_hearing_and_smell",
+          "display_name": "Keen Hearing and Smell",
+          "description": "The hound has advantage on Wisdom (Perception) checks that rely on hearing or smell.",
+          "scope": "PERCEPTION_HEARING_SMELL_ONLY"
+        },
+        {
+          "key": "pack_tactics",
+          "display_name": "Pack Tactics",
+          "description": "The hound has advantage on an attack roll against a creature if at least one of the hound’s allies is within 5 feet of the creature and the ally isn’t incapacitated.",
+          "scope": "ATTACK_ROLL_PACK_TACTICS_ONLY"
+        }
+      ]
+    },
+    "author_note": "Original stat block; only the registered breath action executes."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "monster_base",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.mummy"
+    },
+    "display_name": "Mummy",
+    "description": "Medium undead, lawful evil; the ordinary Mummy, not a Mummy Lord.",
+    "source_page": 333,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "UNDEAD",
+      "alignment": "lawful evil",
+      "armor_class": 11,
+      "armor_description": "natural armor",
+      "hit_points": 58,
+      "hit_dice_count": 9,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 18,
+      "walk_speed_feet": 20,
+      "abilities": {
+        "strength": 16,
+        "dexterity": 8,
+        "constitution": 15,
+        "intelligence": 6,
+        "wisdom": 10,
+        "charisma": 12
+      },
+      "saving_throws": [
+        {
+          "ability_key": "ability.wisdom",
+          "bonus": 2
+        }
+      ],
+      "skills": [],
+      "damage_defenses": [
+        {
+          "kind": "VULNERABILITY",
+          "damage_type": "FIRE",
+          "qualifier": "ALL"
+        },
+        {
+          "kind": "RESISTANCE",
+          "damage_type": "BLUDGEONING",
+          "qualifier": "NONMAGICAL_ATTACKS"
+        },
+        {
+          "kind": "RESISTANCE",
+          "damage_type": "PIERCING",
+          "qualifier": "NONMAGICAL_ATTACKS"
+        },
+        {
+          "kind": "RESISTANCE",
+          "damage_type": "SLASHING",
+          "qualifier": "NONMAGICAL_ATTACKS"
+        },
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "NECROTIC",
+          "qualifier": "ALL"
+        },
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "POISON",
+          "qualifier": "ALL"
+        }
+      ],
+      "condition_immunities": [
+        "charmed",
+        "exhaustion",
+        "frightened",
+        "paralyzed",
+        "poisoned"
+      ],
+      "darkvision_feet": 60,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 10,
+      "languages": [
+        {
+          "name": "The languages it knew in life",
+          "understands": true,
+          "speaks": true
+        }
+      ],
+      "challenge_numerator": 3,
+      "challenge_denominator": 1,
+      "experience_points": 700,
+      "traits": []
+    },
+    "author_note": "Original stat block; only the registered breath action executes."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "monster_base",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.commoner"
+    },
+    "display_name": "Commoner",
+    "description": "Medium humanoid (any race), any alignment; one bystander with Common.",
+    "source_page": 398,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "HUMANOID",
+      "alignment": "any alignment",
+      "armor_class": 10,
+      "armor_description": "unarmored",
+      "hit_points": 4,
+      "hit_dice_count": 1,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 0,
+      "walk_speed_feet": 30,
+      "abilities": {
+        "strength": 10,
+        "dexterity": 10,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 10
+      },
+      "saving_throws": [],
+      "skills": [],
+      "damage_defenses": [],
+      "condition_immunities": [],
+      "darkvision_feet": 0,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 10,
+      "languages": [
+        {
+          "name": "Common",
+          "understands": true,
+          "speaks": true
+        }
+      ],
+      "challenge_numerator": 0,
+      "challenge_denominator": 1,
+      "experience_points": 10,
+      "traits": []
+    },
+    "author_note": "Original stat block; only the registered breath action executes."
+  }
+]

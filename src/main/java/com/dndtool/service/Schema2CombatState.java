@@ -1,6 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
+import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
 import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthResult;
 import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
 import java.util.*;
@@ -9,15 +10,15 @@ import java.util.*;
 public final class Schema2CombatState {
     private Schema2CombatState() { }
     public enum Status { ACTIVE, EXPLORATION, ENDED }
-    public enum Kind { START, END_TURN, DASH, DISENGAGE, DODGE, STAND_UP, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
+    public enum Kind { START, MONSTER_BREATH, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, STAND_UP, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
         ADVANCE_WINDOW, CONTINUE_MOVEMENT, CONTINUE_FLOW, CAST, READY_ATTACK, READY_MOVE, READY_SPELL,
         CREATE_ENVIRONMENT_ZONE, END_ENVIRONMENT_ZONE, EXPLORATION_HEALTH, EXPLORATION_ADVANCE_TIME, EXPLORATION_MOVE, REENTER_COMBAT, CLOSE_SCENE, END_CONCENTRATION, END_COMBAT }
     public enum FlowStatus { ACTIVE, COMPLETED }
-    public enum FrameKind { MOVEMENT, ATTACK, CAST, READY_RELEASE, HEALTH, SAVING_THROW, REACTION_SELECTION }
+    public enum FrameKind { SAVE_DAMAGE, MOVEMENT, ATTACK, CAST, READY_RELEASE, HEALTH, SAVING_THROW, REACTION_SELECTION }
     public enum Invocation { ROOT, REACTION, CONTINUATION }
     public enum FrameStatus { RUNNABLE, WAITING_WINDOW, WAITING_CHILD, PENDING, DECIDED, TERMINAL }
-    public enum Stage { MOVEMENT_LEAVE_REACH_BEFORE, MOVEMENT_CONTINUE, ATTACK_HIT_BEFORE_DAMAGE,
+    public enum Stage { SAVE_DAMAGE_ROLLED, SAVE_DAMAGE_COMPLETED, MOVEMENT_LEAVE_REACH_BEFORE, MOVEMENT_CONTINUE, ATTACK_HIT_BEFORE_DAMAGE,
         ATTACK_RESOLVED, CAST_BEFORE_COMPLETION, CAST_RESOLVED, READY_TRIGGER_AFTER, READY_RELEASE_RESOLVED,
         SAVING_THROW_RESOLVED, HEALTH_RESOLVED, MOVEMENT_COMPLETED, MOVEMENT_STOPPED }
     public enum WindowStatus { OPEN, CLOSED, CONSUMED }
@@ -26,7 +27,7 @@ public final class Schema2CombatState {
     public enum EffectStatus { ACTIVE, ENDED }
     public enum ReactionKind { OPPORTUNITY_ATTACK, SHIELD, COUNTERSPELL, READY_RELEASE }
     public enum TriggerKind { MOVEMENT_LEAVE_REACH_BEFORE, ATTACK_HIT_BEFORE_DAMAGE, CAST_BEFORE_COMPLETION,
-        CREATURE_ENTER_CELL_AFTER, ATTACK_COMPLETED, CAST_COMPLETED }
+        CREATURE_ENTER_CELL_AFTER, ATTACK_COMPLETED, CAST_COMPLETED, MONSTER_ACTION_COMPLETED }
     public enum CastStatus { PENDING, HELD, RESOLVED, COUNTERED }
     public enum AttackStatus { HIT_PENDING_DAMAGE, RESOLVED }
     public enum ReadyResponseKind { ATTACK, MOVE, SPELL }
@@ -46,7 +47,14 @@ public final class Schema2CombatState {
     public record Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path,
             List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey,
             UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey,
-            ZoneInput zoneInput, UUID zoneKey, com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput healthInput, int seconds) {
+            ZoneInput zoneInput, UUID zoneKey, com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput healthInput, int seconds,
+            List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput) {
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput healthInput, int seconds, List<MonsterDeployment> monsterDeployments, BreathInput breathInput) {
+            this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,monsterDeployments,breathInput,null);
+        }
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput healthInput, int seconds) {
+            this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,List.of(),null);
+        }
         public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey) {
             this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,null,0);
         }
@@ -60,9 +68,21 @@ public final class Schema2CombatState {
             this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,null);
         }
         public Command {
-            if (kind==null || path==null || deployments==null || tieBreakOrder==null || path.size()>64 || deployments.size()>16 || tieBreakOrder.size()>16)
+            if (kind==null || path==null || deployments==null || tieBreakOrder==null || path.size()>64 || deployments.size()>64 || tieBreakOrder.size()>64 || monsterDeployments==null || monsterDeployments.size()>64 || monsterDeployments.stream().anyMatch(Objects::isNull))
                 throw invalid("S2_COMBAT_COMMAND");
-            path = List.copyOf(path); deployments = List.copyOf(deployments); tieBreakOrder = List.copyOf(tieBreakOrder);
+            path = List.copyOf(path); deployments = List.copyOf(deployments); tieBreakOrder = List.copyOf(tieBreakOrder); monsterDeployments=List.copyOf(monsterDeployments);
+        }
+        public static Command monsterRest(Kind kind, UUID monster, UUID rest, MonsterRestKind restKind) {
+            return new Command(kind,monster,null,null,List.of(),List.of(),List.of(),null,null,null,null,null,null,null,null,null,null,0,List.of(),null,new MonsterRestInput(rest,restKind));
+        }
+        public static Command start(List<Deployment> characters, List<MonsterDeployment> monsters, List<UUID> ties) {
+            return new Command(Kind.START,null,null,null,List.of(),characters,ties,null,null,null,null,null,null,null,null,null,null,0,monsters,null);
+        }
+        public static Command breath(UUID monster, EntryIdentity action, int direction) {
+            return new Command(Kind.MONSTER_BREATH,monster,null,null,List.of(),List.of(),List.of(),null,null,null,null,null,null,null,null,null,null,0,List.of(),new BreathInput(action,direction));
+        }
+        public static Command continueBreath(UUID monster,UUID flow,UUID leaf) {
+            return new Command(Kind.CONTINUE_FLOW,monster,null,null,List.of(),List.of(),List.of(),flow,leaf,null,null);
         }
         public static Command cast(UUID actor, CastInput input) { return new Command(Kind.CAST,actor,null,null,List.of(),List.of(),List.of(),null,null,null,null,input); }
         public static Command start(List<Deployment> deployments, List<UUID> ties) { return new Command(Kind.START,null,null,null,List.of(),deployments,ties,null,null,null,null); }
@@ -233,12 +253,71 @@ public final class Schema2CombatState {
         public Flow { frames = List.copyOf(frames); windows = List.copyOf(windows); movements=List.copyOf(movements); attacks = List.copyOf(attacks); casts = List.copyOf(casts); savingThrows = List.copyOf(savingThrows); readyReleases=List.copyOf(readyReleases); abilityChecks=List.copyOf(abilityChecks); }
         public Movement movement() { return frames.stream().filter(f->f.frameKey().equals(rootFrameKey)&&f.kind()==FrameKind.MOVEMENT).findFirst().flatMap(f->movements.stream().filter(m->m.movementKey().equals(f.ownerKey())).findFirst()).orElse(null); }
     }
+    public enum MonsterRestKind { SHORT, LONG }
+    public enum MonsterRestStatus { ACTIVE, COMPLETED, INTERRUPTED }
+    public record MonsterRestInput(UUID restKey, MonsterRestKind kind) {
+        public MonsterRestInput { if(kind==null)throw invalid("S2_MONSTER_REST_COMMAND");if(restKey!=null)uuid(restKey); }
+    }
+    public record MonsterRest(UUID restKey, UUID monsterId, MonsterRestKind kind, long startedAtSecond, long completesAtSecond, MonsterRestStatus status, UUID finishedOperationId) { }
+    public enum CreatureKind { CHARACTER, MONSTER }
+    public enum BatchStatus { ROLLED, COMPLETED, NO_TARGETS }
+    public enum CheckMode { ROLL, AUTO_FAILURE }
+    public enum ConcentrationDamageStatus { NOT_REQUIRED, FORCED_ENDED, CHECK_SUCCEEDED, CHECK_FAILED }
+    public record CreatureRef(CreatureKind kind, UUID creatureId) {
+        public CreatureRef { if(kind==null)throw invalid("S2_COMBAT_IDENTITY");uuid(creatureId); }
+    }
+    public record MonsterDeployment(UUID monsterId, RuleIdentity monster, Position position, int side) {
+        public MonsterDeployment { uuid(monsterId); if(!validMonsterIdentity(monster)||position==null)throw invalid("S2_COMBAT_DEPLOYMENT"); if(side<0||side>15)throw invalid("S2_COMBAT_SIDE"); }
+    }
+    /** Direction is one of the eight server enumerated compass cones, clockwise from east. */
+    public record BreathInput(EntryIdentity action, int direction) {
+        public BreathInput { if(!validMonsterActionIdentity(action))throw invalid("S2_BREATH_COMMAND");if(direction<0||direction>7)throw invalid("S2_BREATH_AREA"); }
+    }
+    public record MonsterActionUse(EntryIdentity action, boolean available) { }
+    /** The sole mutable health owner for this finite monster domain; monsters die at zero HP. */
+    public record MonsterInstance(UUID monsterId, RuleIdentity monster, int hitPoints, boolean dead,
+            List<MonsterActionUse> actionUses) {
+        public MonsterInstance { actionUses=List.copyOf(actionUses); }
+    }
+    public record AreaCandidate(CreatureRef creature, Position position, boolean included, String reason) { }
+    public record TargetSetProof(String policy, long rosterVersion, Position origin, int direction,
+            List<AreaCandidate> candidates, List<CreatureRef> targets) {
+        public TargetSetProof { candidates=List.copyOf(candidates);targets=List.copyOf(targets); }
+    }
+    public record SharedDamageRoll(UUID rollKey, List<Integer> dice, int rawTotal, int effectiveTotal) {
+        public SharedDamageRoll { dice=List.copyOf(dice); }
+    }
+    public record BatchCheck(int targetOrdinal, String purpose, String abilityKey, CheckMode mode,
+            Integer firstD20, Integer secondD20, int abilityModifier, int proficiencyBonus,
+            boolean advantage, boolean disadvantage, UUID blessingEffectKey, Integer blessingD4,
+            int difficultyClass, int total, boolean success) { }
+    public record DefenseContribution(RuleIdentity source, String kind) { }
+    public record DamagePacket(UUID packetKey, int targetOrdinal, UUID sharedRollKey, int saveCheckIndex,
+            int beforeHitPoints, int beforeTemporaryHitPoints, int maximumHitPoints,
+            List<DefenseContribution> defenses, int damageAmount, int absorbedTemporaryHitPoints,
+            int afterHitPoints, int afterTemporaryHitPoints, boolean dead) {
+        public DamagePacket { defenses=List.copyOf(defenses); }
+    }
+    public record ConcentrationDamageObligation(int targetOrdinal, UUID holderSourceKey, UUID packetKey,
+            int damageAmount, int difficultyClass, ConcentrationDamageStatus status, Integer checkIndex) { }
+    public record SaveDamageBatch(UUID batchKey, UUID frameKey, UUID sourceId, EntryIdentity action,
+            UUID releaseOperationId, long releasedTurnNumber, TargetSetProof targetProof,
+            BatchStatus status, SharedDamageRoll sharedRoll, List<BatchCheck> checks,
+            List<DamagePacket> packets, List<ConcentrationDamageObligation> concentrationObligations) {
+        public SaveDamageBatch { checks=List.copyOf(checks);packets=List.copyOf(packets);concentrationObligations=List.copyOf(concentrationObligations); }
+    }
     public record Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status,
             int round, long turnNumber, int activeOrdinal, long version, List<Combatant> combatants,
             List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects,
             List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields,
             List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones,
-            List<SuppressionCause> suppressionCauses) {
+            List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches, List<MonsterRest> monsterRests) {
+        public Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status, int round, long turnNumber, int activeOrdinal, long version, List<Combatant> combatants, List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects, List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields, List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones, List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches) {
+            this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,ongoingEffects,readyPreparations,triggerFacts,shields,concentrationHolders,environmentZones,suppressionCauses,monsters,saveDamageBatches,List.of());
+        }
+        public Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status, int round, long turnNumber, int activeOrdinal, long version, List<Combatant> combatants, List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects, List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields, List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones, List<SuppressionCause> suppressionCauses) {
+            this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,ongoingEffects,readyPreparations,triggerFacts,shields,concentrationHolders,environmentZones,suppressionCauses,List.of(),List.of());
+        }
         public Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status,
                 int round, long turnNumber, int activeOrdinal, long version, List<Combatant> combatants,
                 List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects) {
@@ -249,7 +328,7 @@ public final class Schema2CombatState {
                 List<Initiative> initiative, List<Flow> flows) {
             this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,List.of());
         }
-        public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses); }
+        public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses);monsters=List.copyOf(monsters);saveDamageBatches=List.copyOf(saveDamageBatches);monsterRests=List.copyOf(monsterRests); }
         public UUID activeActor() { return initiative.get(activeOrdinal).characterId(); }
         public Flow activeFlow() { return flows.stream().filter(f -> f.status() == FlowStatus.ACTIVE).findFirst().orElse(null); }
     }
@@ -275,6 +354,14 @@ public final class Schema2CombatState {
     public record CombatFact(String kind, UUID subjectId, UUID referenceKey, String reason) { }
     public record Resolution(Battle after, List<HealthChange> healthChanges, List<Roll> rolls, List<CombatFact> facts) {
         public Resolution { healthChanges = List.copyOf(healthChanges); rolls = List.copyOf(rolls); facts = List.copyOf(facts); }
+    }
+    private static boolean validMonsterIdentity(RuleIdentity rule) {
+        return rule!=null&&"adventure.monster".equals(rule.ruleType())&&rule.moduleKey()!=null&&rule.moduleKey().matches("[a-z][a-z0-9_]{0,63}")
+                &&rule.ruleKey()!=null&&rule.ruleKey().matches("[a-z][a-z0-9_.]{0,127}")&&rule.ruleKey().matches("monster[.][a-z][a-z0-9_]*(?:[.][a-z0-9_]+)*");
+    }
+    private static boolean validMonsterActionIdentity(EntryIdentity entry) {
+        return entry!=null&&validMonsterIdentity(entry.rule())&&"actions".equals(entry.collectionKey())&&entry.moduleKey()!=null&&entry.moduleKey().matches("[a-z][a-z0-9_]{0,63}")
+                &&entry.entryKey()!=null&&entry.entryKey().matches("[a-z][a-z0-9_]{0,63}");
     }
     static void uuid(UUID id) { if (id == null || id.version() != 4 || id.variant() != 2) throw invalid("S2_COMBAT_IDENTITY"); }
     static IllegalArgumentException invalid(String code) { return new IllegalArgumentException(code); }

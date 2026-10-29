@@ -99,3 +99,27 @@ GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_spellbook_member` TO 'dnd_tool_ru
 GRANT INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, spell_module_key, spell_rule_type, spell_rule_key, author_note) ON `dnd_tool_rules`.`rule_schema2_spellbook_member` TO 'dnd_tool_rules_installer'@'127.0.0.1';
 GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_wizard_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';
 GRANT INSERT (artifact_module_key, release_version, author_index, target_kind, rule_module_key, rule_type, rule_key, collection_key, entry_module_key, entry_key, operation, field_key, text_value, integer_value, boolean_value, reference_module_key, reference_rule_type, reference_rule_key) ON `dnd_tool_rules`.`rule_schema2_wizard_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+
+-- Typed monster declarations, whole-atom changes and independent profile rows.
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, display_name, description, source_page, author_note) ON `dnd_tool_rules`.`rule_schema2_monster` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_action` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, author_note) ON `dnd_tool_rules`.`rule_schema2_monster_action` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, author_index, target_kind, rule_module_key, rule_type, rule_key, collection_key, module_key, entry_key, operation, field_key, text_value, integer_value, boolean_value, atom_kind) ON `dnd_tool_rules`.`rule_schema2_monster_change` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_stat` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, size, creature_type, alignment, armor_class, armor_description, hit_points, hit_dice_count, hit_dice_sides, hit_dice_modifier, walk_speed_feet, strength, dexterity, constitution, intelligence, wisdom, charisma, darkvision_feet, blindsight_feet, tremorsense_feet, truesight_feet, passive_perception, challenge_numerator, challenge_denominator, experience_points) ON `dnd_tool_rules`.`rule_schema2_monster_stat` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_save` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, ability_key, bonus) ON `dnd_tool_rules`.`rule_schema2_monster_save` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_skill` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, skill_key, bonus) ON `dnd_tool_rules`.`rule_schema2_monster_skill` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_defense` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, kind, damage_type, qualifier) ON `dnd_tool_rules`.`rule_schema2_monster_defense` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_condition` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, condition_key) ON `dnd_tool_rules`.`rule_schema2_monster_condition` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_language` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, name, understands, speaks) ON `dnd_tool_rules`.`rule_schema2_monster_language` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_trait` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, ordinal, trait_key, trait_scope, display_name, description) ON `dnd_tool_rules`.`rule_schema2_monster_trait` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT SELECT ON `dnd_tool_rules`.`rule_schema2_monster_action_value` TO 'dnd_tool_rules_installer'@'127.0.0.1';
+GRANT INSERT (artifact_module_key, release_version, owner_kind, owner_index, display_name, description, source_page, mode, mechanism, save_ability_key, save_dc_mode, save_dc, fail_outcome, success_outcome, damage_dice_count, damage_dice_sides, damage_type, damage_delivery, damage_ability_modifier, area_shape, area_length_feet, area_origin_policy, recharge_dice_sides, recharge_minimum_roll, recharge_turn_start, recharge_short_rest, recharge_long_rest) ON `dnd_tool_rules`.`rule_schema2_monster_action_value` TO 'dnd_tool_rules_installer'@'127.0.0.1';
