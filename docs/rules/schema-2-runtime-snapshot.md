@@ -6,11 +6,12 @@
 
 材料范围明确为 `INTERNAL`：当前类型为语言、工具、两类候选集合及其成员，以及种族、亚种、背景、
 职业的初始熟练来源元数据和稳定授予槽，以及类型化成长、子职业、特性、专长、熟练、资源、休息、
-检定、装备、健康、战斗、近战、步行、有限施法、法师学习名单及固定抗魔环境声明。来源读取、组合、运行存储和
+检定、装备、健康、战斗、近战、步行、有限施法、法师学习名单、固定抗魔环境及有限怪物／动作声明。来源读取、组合、运行存储和
 规则绑定可以独立验证；转存服务本身不创建战役、角色、业务历史或游戏执行视图。
 另行消费这些材料的[内部成长服务](schema-2-character-statistics.md)、[休息服务](schema-2-character-rest.md)
 及[角色基础服务](schema-2-character-foundations.md)保存其局部角色状态和历史；
-[内部战斗](schema-2-combat.md)及[有限施法](schema-2-spells.md)另保存战斗和施法事实，均不扩大完整初始化资格。
+[内部战斗](schema-2-combat.md)、[有限施法](schema-2-spells.md)及
+[有限怪物](schema-2-monster-breath.md)另保存各自真实事实，均不扩大完整初始化资格。
 [检定、装备与健康作者来源](schema-2-foundation-authoring.md)已通过运行 V028/V030 保存准确镜像
 和完整字段链。V029/V031 的[角色事实存储](schema-2-character-fact-storage.md)另保存类型化输入、结果、
 状态与历史；实际消费者另从准确镜像和保存骰点验证命令与后果，叶仓储负责结构与邻接。来源安装器仍拒绝所有
@@ -40,6 +41,9 @@ profile、有限支持范围和执行模式不能由组合最终值替代原始�
 来源 V009 的[施法作者材料](schema-2-spell-authoring.md)保存两个法术、生命领域一级配置和
 完整原子修改；来源 V010 追加法师配置、可学习法术成员和固定 DM 环境，
 职业/子职业/特性/资源/法术/圣徽引用及所有成员/修改均逐列核对全部原包，包含未选中包。
+来源 V011 的[有限怪物／动作](schema-2-monster-breath.md)保存完整复合 stat block／action
+profile 与所有子行；定义、actions 条目和字段操作各保留原身份／序号。所有材料同样逐列
+核对原包，防御的适用 gate 不能丢失；BLOCKED_METADATA 不取得动作执行资格。
 
 来源事务明确结束、连接状态恢复并关闭后才返回材料，随后才允许借运行连接。来源关闭失败
 不继续写运行库。调用方事务入口 `read` 要求既有只读 RR 事务，不改变连接状态、不提交或关闭。
@@ -63,7 +67,7 @@ PARTITION 头分离，不把旧固定单模组字段改成通用组合，也不�
 | `s2_runtime_proficiency_grant` | 来源类型/身份、原声明模组和稳定 slot key；原子 LANGUAGE/TOOL × FIXED/CHOICE、准确目标或集合及有界 count |
 | `s2_runtime_class_progression` / `s2_runtime_resource` | V027 的职业所有者、生命骰面数、完整 profile、支持等级/范围、前提存在标记和资源执行模式 |
 | `s2_runtime_subclass` / `s2_runtime_feature` / `s2_runtime_feat` | 完整来源身份、选择/获得等级、特性种类、执行模式/算法及专长前提 |
-| `s2_runtime_proficiency` / `s2_runtime_proficiency_set` / `s2_runtime_proficiency_entry` | 类型化技能/护甲/武器定义，技能属性，以及包含完整目标身份的有限候选集合 |
+| `s2_runtime_proficiency` / `s2_runtime_proficiency_set` / `s2_runtime_proficiency_entry` | 类型化技能/护甲/武器/豁免熟练定义，技能或 save 的准确属性，以及包含完整目标身份的有限候选集合 |
 | `s2_runtime_class_level_entry` / `s2_runtime_growth_grant` | 每级稳定条目、ASI 可用性，以及初始/多职业熟练的稳定槽和原子 FIXED/CHOICE 声明 |
 | `s2_runtime_rule_prerequisite` / `s2_runtime_chain_prerequisite` | AND 组/OR 项的类型化能力下限；分别保存最终规则及完整链步骤的原子值，不存 JSON 规则袋 |
 | `s2_runtime_rest` | 显式标准休息算法和原文来源；没有声明不获得休息执行能力 |
@@ -72,6 +76,7 @@ PARTITION 头分离，不把旧固定单模组字段改成通用组合，也不�
 | `s2_runtime_spell` / `s2_runtime_spellcasting` | 有限可执行法术、闭合只读元数据法术与生命领域一级配置、完整引用和来源链；元数据不授予施放能力 |
 | `s2_runtime_wizard_spellcasting` / `s2_runtime_spellbook_member` | V037 的法师职业/特性/三类位资源、INT 与学习名单完整成员引用；名单不等于角色已学或准备 |
 | `s2_runtime_environment` | V037 的固定十尺 DM 抗魔环境规则；实际区域位置和压制原因属场景业务事实 |
+| `s2_runtime_monster` / `s2_runtime_monster_action` 及八类类型化子表 | V039 的准确怪物／actions 身份、stat block、save／skill／defense／condition／language／trait 和 action profile；最终值与字段链步骤按 owner／step 独立绑定，不存第二份运行 HP 或 action-use |
 | `s2_runtime_field_chain` / `s2_runtime_chain_step` | 完整目标/字段、初始与显式覆盖步骤、前后类型化值、提供者、加载位置和作者位置 |
 | `s2_runtime_operation` | 不可改写的操作 UUID、CAPTURE/RESTORE、意图指纹、身份对、连续序号及数据库时间 |
 | `s2_runtime_control` | 永久单例守卫、协议、材料计数与版本 |
@@ -187,3 +192,15 @@ RELEASED v1，不激活 archive 2，也不自动装配第二 JNDI 或游戏运�
 施法、专注、Bless 实例、法术书/准备、反应/Ready、独立压制原因及战斗/探索交接由
 [有限施法消费者](schema-2-spells.md)沿 V036/V038 保存。镜像不创建第二份可写资源、HP、
 时钟或专注状态，也不表示来源安装、真实迁移、Host 或完整战役文件已经通过。
+
+## 有限怪物规则镜像
+
+V039 的十张表保存[有限怪物合同](schema-2-monster-breath.md)的最终定义／动作和完整复合
+字段链。stat block 与 action profile 的每个标量和有序子行均绑定原 snapshot、
+`owner_kind`、`owner_index` 与 `step_index`；复合值类型使用准确 `STAT_BLOCK`／
+`ACTION_PROFILE` discriminator，不复用自由 JSON。来源、最终值、覆盖前后值与生产编码
+分别核对，缺行／多行／孤儿／错误所有者或启用事实全部拒绝。
+
+V040 才保存真实怪物实例、健康、充能使用与吐息批次；镜像中 HP、动作定义及恢复策略
+是准确规则，不能作为可独立修改的当前状态。来源 reader、转存和镜像恢复不消费动作、
+不创建怪物／batch、不抽 recharge，也不放宽原完整初始化和安装资格门。

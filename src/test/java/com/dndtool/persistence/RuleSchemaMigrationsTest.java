@@ -16,10 +16,10 @@ class RuleSchemaMigrationsTest {
     @Test
     void independentApprovedChainMatchesExactlyTheOfflineSources() throws Exception {
         var chain = RuleSchemaMigrations.expectations();
-        assertEquals(10,chain.size());
-        assertEquals(10,chain.getLast().version());
-        assertEquals("V010__schema2-wizard-environment-source.sql",chain.getLast().scriptName());
-        assertEquals("3386950595e0c24eade84c6b9b1c38145ffe8aefcb786b6cc66f663ebd2c3d74",chain.getLast().scriptSha256());
+        assertEquals(11,chain.size());
+        assertEquals(11,chain.getLast().version());
+        assertEquals("V011__schema2-monster-source.sql",chain.getLast().scriptName());
+        assertEquals("fc939ad72e2495b60db8a710bc03c12a8c2c47d3c0e560a394d337c9a05cf6c2",chain.getLast().scriptSha256());
         try (var files = Files.list(SOURCE.getParent())) {
             assertEquals(chain.stream().map(RuleSchemaMigrations.Expectation::scriptName).sorted().toList(),
                     files.map(path -> path.getFileName().toString()).sorted().toList());
@@ -35,7 +35,7 @@ class RuleSchemaMigrationsTest {
                     .indexOf("-- CHECKSUM-SCOPE-END")).contains("'" + migration.scriptSha256() + "'"));
         }
         assertThrows(UnsupportedOperationException.class, () -> chain.clear());
-        assertEquals(38, SchemaMigrations.loadExpectations().size());
+        assertEquals(40, SchemaMigrations.loadExpectations().size());
         assertNull(getClass().getResource("/database/rules/migration/" + SOURCE.getFileName()));
         assertNull(getClass().getResource("/db/migration/" + SOURCE.getFileName()));
     }

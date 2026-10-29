@@ -29,3 +29,15 @@ GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_spellcasting` TO 'dnd_tool_se_
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_wizard_spellcasting` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_environment` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_spellbook_member` TO 'dnd_tool_se_app'@'127.0.0.1';
+
+-- Finite typed monster material and save-damage facts; separate reviewed grant checkpoint.
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_action` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_stat` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_save` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_skill` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_defense` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_condition` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_language` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_trait` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_runtime_monster_action_value` TO 'dnd_tool_se_app'@'127.0.0.1';

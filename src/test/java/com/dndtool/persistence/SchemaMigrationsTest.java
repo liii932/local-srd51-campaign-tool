@@ -8,10 +8,10 @@ import org.junit.jupiter.api.Test;
 
 class SchemaMigrationsTest {
     @Test
-    void packagedMigrationChainContainsApprovedV001ThroughV038() throws Exception {
+    void packagedMigrationChainContainsApprovedV001ThroughV040() throws Exception {
         List<SchemaMigrations.Expectation> expectations = SchemaMigrations.loadExpectations();
 
-        assertEquals(38, expectations.size());
+        assertEquals(40, expectations.size());
         assertExpectation(
                 expectations.get(0),
                 SchemaMigrations.V001_VERSION,
@@ -134,6 +134,8 @@ class SchemaMigrationsTest {
         assertExpectation(expectations.get(35), SchemaMigrations.V036_VERSION, SchemaMigrations.V036_SCRIPT_NAME, SchemaMigrations.V036_APPROVED_SHA256);
         assertExpectation(expectations.get(36), 37, "V037__schema2-wizard-environment-rules.sql", "7937263eb20e92adab82785aed6dead9ad99bd5fa46c941505c483bbc0f68cfb");
         assertExpectation(expectations.get(37), 38, "V038__schema2-reactions-and-ongoing-scenes.sql", "3449378f943deea0fee5b3711c13f2a67fde7edaafe0646f6b650a513de37ee5");
+        assertExpectation(expectations.get(38), SchemaMigrations.V039_VERSION, SchemaMigrations.V039_SCRIPT_NAME, SchemaMigrations.V039_APPROVED_SHA256);
+        assertExpectation(expectations.get(39), SchemaMigrations.V040_VERSION, SchemaMigrations.V040_SCRIPT_NAME, SchemaMigrations.V040_APPROVED_SHA256);
     }
 
     @Test

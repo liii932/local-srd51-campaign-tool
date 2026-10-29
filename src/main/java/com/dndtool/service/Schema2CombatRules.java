@@ -17,7 +17,7 @@ import static com.dndtool.service.Schema2CombatState.*;
 
 /** Closed ordinary-melee combat consumer. All preflight is pure and precedes the first die. */
 public final class Schema2CombatRules {
-    public static final int MAX_COMBATANTS = 16, MAX_FLOWS = 128, MAX_PATH = 64, MAX_FACTS = 4096;
+    public static final int MAX_COMBATANTS = 64, MAX_FLOWS = 128, MAX_PATH = 64, MAX_FACTS = 4096;
     public static final int START_TIME_HEADROOM_MINUTES = (JdbcSchema2CombatRuntimeRepository.MAX_EVENTS * 6 + 59) / 60 + 240;
     public record Context(ProductionSchema2Projection material, InitialPlan initial, State character) { }
     public static final class Prepared {
@@ -32,12 +32,12 @@ public final class Schema2CombatRules {
         public Battle before() { return before; }
         public Command command() { return command; }
         public int requiredSuffixEvents() {
-            return Schema2ActionFlowRules.handles(command.kind())?new Schema2ActionFlowRules(new Schema2CombatRules()).mandatorySuffix(roster,before,command):0;
+            return command.kind()==Kind.BEGIN_MONSTER_REST?1:Schema2SaveDamageRules.handles(before,command)?(command.kind()==Kind.MONSTER_BREATH?1:0)+new Schema2ActionFlowRules(new Schema2CombatRules()).batchAfterCost(roster,before,command.actorId()):Schema2ActionFlowRules.handles(command.kind())?new Schema2ActionFlowRules(new Schema2CombatRules()).mandatorySuffix(roster,before,command):0;
         }
         public Set<UUID> possibleHealthTargets() {
-            if(Schema2ActionFlowRules.handles(command.kind())||worldCommand(command.kind())||command.kind()==Kind.END_COMBAT)return Set.copyOf(roster.keySet());
+            if(Schema2SaveDamageRules.handles(before,command)||Schema2ActionFlowRules.handles(command.kind())||Schema2MonsterRestRules.handles(command.kind())||worldCommand(command.kind())||command.kind()==Kind.END_COMBAT)return Set.copyOf(roster.keySet());
             if(command.kind()==Kind.START)return roster.entrySet().stream().filter(e->e.getValue().character().hitPoints()==0&&!e.getValue().character().health().dead()&&!e.getValue().character().health().stable()).map(Map.Entry::getKey).collect(java.util.stream.Collectors.toUnmodifiableSet());
-            if(command.kind()==Kind.END_TURN)return before.activeOrdinal()+1==before.initiative().size()?Set.copyOf(roster.keySet()):Set.of(before.initiative().get(before.activeOrdinal()+1).characterId());
+            if(command.kind()==Kind.END_TURN)return before.activeOrdinal()+1==before.initiative().size()?Set.copyOf(roster.keySet()):roster.containsKey(before.initiative().get(before.activeOrdinal()+1).characterId())?Set.of(before.initiative().get(before.activeOrdinal()+1).characterId()):Set.of();
             return Set.of();
         }
     }
@@ -50,17 +50,17 @@ public final class Schema2CombatRules {
     public Prepared preflight(UUID operationId, UUID combatId, UUID campaignId, Map<UUID,Context> roster, Battle before, Command command) {
         uuid(operationId); uuid(combatId); uuid(campaignId);
         if (operationId.equals(combatId) || operationId.equals(campaignId) || combatId.equals(campaignId)) throw invalid("S2_COMBAT_IDENTITY");
-        if (roster == null || roster.size() < 2 || roster.size() > MAX_COMBATANTS || command == null) throw invalid("S2_COMBAT_ROSTER");
+        if (roster == null || roster.isEmpty() || roster.size() > MAX_COMBATANTS || command == null) throw invalid("S2_COMBAT_ROSTER");
         validateContexts(campaignId, roster);
         validateCommand(command);
         if (before != null) {
             validateState(before);
-            if (!before.combatId().equals(combatId) || !before.campaignId().equals(campaignId)
-                    || !roster.keySet().equals(before.combatants().stream().map(Combatant::characterId).collect(java.util.stream.Collectors.toSet())))
+            if (!before.combatId().equals(combatId) || !before.campaignId().equals(campaignId))
                 throw invalid("ACTION_FLOW_TARGET_MISMATCH");
+            Schema2MonsterRules.validate(roster,before);
             validateOngoing(roster,before);
             if (before.status() == Status.ENDED) throw invalid("S2_COMBAT_ENDED");
-            if(before.status()==Status.EXPLORATION && !worldCommand(command.kind()) && command.kind()!=Kind.CAST && command.kind()!=Kind.END_CONCENTRATION && !Schema2ActionFlowRules.continuation(command.kind()))throw invalid("S2_COMBAT_REQUIRED");
+            if(before.status()==Status.EXPLORATION && !worldCommand(command.kind()) && !Schema2MonsterRestRules.handles(command.kind()) && command.kind()!=Kind.CAST && command.kind()!=Kind.END_CONCENTRATION && !Schema2ActionFlowRules.continuation(command.kind()))throw invalid("S2_COMBAT_REQUIRED");
             if (before.version() >= MAX_FACTS - 1) throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");
             boolean continuation = Schema2ActionFlowRules.continuation(command.kind());
             if (before.activeFlow() != null && !continuation) throw invalid("ACTION_FLOW_BUSY");
@@ -123,12 +123,12 @@ public final class Schema2CombatRules {
 
     private void validateCommand(Command command) {
         for(UUID id:Arrays.asList(command.actorId(),command.targetId(),command.itemId(),command.flowKey(),command.leafKey(),command.windowKey(),command.opportunityKey(),command.readyKey(),command.zoneKey()))if(id!=null)uuid(id);
-        if(Schema2ActionFlowRules.handles(command.kind())||worldCommand(command.kind()))return;
+        if(Schema2SaveDamageRules.handles(null,command)||Schema2MonsterRestRules.handles(command.kind())||Schema2ActionFlowRules.handles(command.kind())||worldCommand(command.kind()))return;
         boolean start=command.kind()==Kind.START;
         if((start?command.actorId()!=null:command.actorId()==null)||command.targetId()!=null||command.itemId()!=null||!command.path().isEmpty()
-                ||(start?command.deployments().size()<2:!command.deployments().isEmpty())||(!start&&!command.tieBreakOrder().isEmpty())
+                ||(start?command.deployments().isEmpty():!command.deployments().isEmpty())||(!start&&!command.tieBreakOrder().isEmpty())
                 ||command.flowKey()!=null||command.leafKey()!=null||command.windowKey()!=null||command.opportunityKey()!=null||command.castInput()!=null
-                ||command.readyInput()!=null||command.readyKey()!=null||command.zoneInput()!=null||command.zoneKey()!=null||command.healthInput()!=null||command.seconds()!=0)throw invalid("S2_COMBAT_COMMAND");
+                ||command.readyInput()!=null||command.readyKey()!=null||command.zoneInput()!=null||command.zoneKey()!=null||command.healthInput()!=null||command.seconds()!=0||command.breathInput()!=null||command.monsterRestInput()!=null||(!start&&!command.monsterDeployments().isEmpty()))throw invalid("S2_COMBAT_COMMAND");
     }
 
     private RuleIdentity combatRule(Context context) {
@@ -158,10 +158,13 @@ public final class Schema2CombatRules {
         if (rows.size() != 1 || !rows.getFirst().definition().algorithm().equals("SRD_2014_MELEE_WEAPON_ATTACK_V1")) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
         return rows.getFirst().definition();
     }
+    int speed(Map<UUID,Context> roster,Battle b,UUID id) { return Schema2MonsterRules.isMonster(b,id)?Schema2MonsterRules.definition(roster,Schema2MonsterRules.instance(b,id).monster()).statBlock().walkSpeedFeet():speed(roster.get(id)); }
     private static boolean preparedItem(EquipmentItem item) { return Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(item.location()); }
 
     private void preflightIntent(Prepared p) {
         Command command = p.command;
+        if(Schema2SaveDamageRules.handles(p.before,command)) {new Schema2SaveDamageRules().prepare(p.roster,p.before,command);return;}
+        if(Schema2MonsterRestRules.handles(command.kind())) {Schema2MonsterRestRules.prepare(p.roster,p.before,command);return;}
         if(Schema2ActionFlowRules.handles(command.kind())) {new Schema2ActionFlowRules(this).prepare(p.roster,p.before,command);return;}
         if(worldCommand(command.kind())) {prepareWorld(p);return;}
         if (command.kind() == Kind.START) {
@@ -177,8 +180,13 @@ public final class Schema2CombatRules {
                 if(context.character().hitPoints()==0 && context.character().equipment().stream().anyMatch(Schema2CombatRules::preparedItem))throw invalid("S2_COMBAT_UNCONSCIOUS_EQUIPMENT");
                 prepareTurn(context);
             }
-            if (!ids.equals(p.roster.keySet()) || sides.size() < 2 || command.tieBreakOrder().size() != ids.size()
-                    || !new HashSet<>(command.tieBreakOrder()).equals(ids)) throw invalid("S2_COMBAT_DEPLOYMENT");
+            if(!ids.equals(p.roster.keySet()))throw invalid("S2_COMBAT_DEPLOYMENT");
+            for(MonsterDeployment deployment:command.monsterDeployments()) {
+                if(!ids.add(deployment.monsterId())||!positions.add(deployment.position()))throw invalid("S2_COMBAT_DEPLOYMENT");
+                sides.add(deployment.side());Schema2MonsterRules.initial(p.roster,deployment);
+            }
+            if(ids.size()<2||ids.size()>MAX_COMBATANTS||sides.size()<2||command.tieBreakOrder().size()!=ids.size()
+                    ||!new HashSet<>(command.tieBreakOrder()).equals(ids))throw invalid("S2_COMBAT_DEPLOYMENT");
             return;
         }
         Combatant actor = combatant(p.before,command.actorId());
@@ -193,16 +201,17 @@ public final class Schema2CombatRules {
             if (p.before.turnNumber() >= 1000000) throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");
             Map<UUID,Context> turnRoster=next==0?afterRound(p.roster):p.roster;
             Context incoming=turnRoster.get(p.before.initiative().get(next).characterId());
-            if (incoming.character().hitPoints()==0 && !incoming.character().health().stable() && !incoming.character().health().dead()
+            if (incoming!=null && incoming.character().hitPoints()==0 && !incoming.character().health().stable() && !incoming.character().health().dead()
                     && Schema2SpellRules.blessing(p.before,incoming.character().characterId())!=null && p.before.flows().size()>=MAX_FLOWS)
                 throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");
-            prepareTurn(incoming); return;
+            if(incoming!=null)prepareTurn(incoming); return;
         }
         if (command.kind() == Kind.END_COMBAT) {
             if(p.before.shields().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)||p.before.readyPreparations().stream().anyMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING))throw invalid("S2_COMBAT_TURN_FACTS_PENDING");
             afterRound(p.roster);return;
         }
-        active(p.roster.get(actor.characterId()));
+        if(Schema2MonsterRules.isMonster(p.before,actor.characterId())) {if(Schema2MonsterRules.instance(p.before,actor.characterId()).dead())throw invalid("S2_COMBAT_ACTOR_INACTIVE");if(command.kind()==Kind.BEGIN_ATTACK)throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");}
+        else active(p.roster.get(actor.characterId()));
         switch (command.kind()) {
             case DASH, DISENGAGE, DODGE, BEGIN_ATTACK -> {
                 if (!actor.actionAvailable()) throw invalid("S2_COMBAT_ACTION_UNAVAILABLE");
@@ -210,7 +219,7 @@ public final class Schema2CombatRules {
             }
             case FORFEIT_ATTACKS -> { if (actor.sequence() == null || actor.sequence().closed()) throw invalid("S2_COMBAT_SEQUENCE_UNAVAILABLE"); }
             case STAND_UP -> {
-                int speed=speed(p.roster.get(actor.characterId()));
+                int speed=speed(p.roster,p.before,actor.characterId());
                 if(!actor.prone() || speed==0 || 2*(speed+actor.movementBonus())-actor.movementSpentHalfFeet()<speed)throw invalid("S2_COMBAT_CANNOT_STAND");
             }
             default -> throw invalid("S2_COMBAT_COMMAND");
@@ -228,6 +237,11 @@ public final class Schema2CombatRules {
                 new HealthInput(owners.getFirst().identity(),null,null,"Combat turn begins"));
     }
     private Resolution execute(Prepared p, Draws dice) {
+        if(Schema2SaveDamageRules.handles(p.before,p.command)) {
+            Resolution result=new Schema2SaveDamageRules().execute(p.operationId,p.roster,p.before,p.command,dice::draw);validateState(result.after());
+            return new Resolution(result.after(),result.healthChanges(),dice.actual,result.facts());
+        }
+        if(Schema2MonsterRestRules.handles(p.command.kind()))return Schema2MonsterRestRules.execute(p.operationId,p.roster,p.before,p.command);
         if(worldCommand(p.command.kind()))return executeWorld(p,dice);
         if(Schema2ActionFlowRules.handles(p.command.kind())) {
             Resolution result=new Schema2ActionFlowRules(this).execute(p.operationId,p.roster,p.before,p.command,dice::draw);
@@ -248,11 +262,19 @@ public final class Schema2CombatRules {
                     d20=Math.min(d20,dice.draw("INITIATIVE_SECOND",deployment.characterId(),20));
                 initiatives.add(new Initiative(deployment.characterId(),d20,dex,d20 + dex,0));
             }
+            List<MonsterInstance> monsters=new ArrayList<>();
+            for(MonsterDeployment deployment:p.command.monsterDeployments()) {
+                MonsterInstance m=Schema2MonsterRules.initial(p.roster,deployment);monsters.add(m);
+                int dex=Schema2MonsterRules.modifier(Schema2MonsterRules.definition(p.roster,m.monster()).statBlock(),"ability.dexterity"),d20=dice.draw("INITIATIVE",m.monsterId(),20);
+                initiatives.add(new Initiative(m.monsterId(),d20,dex,d20+dex,0));
+            }
+            monsters.sort(Comparator.comparing(MonsterInstance::monsterId,(a,b)->{int h=Long.compareUnsigned(a.getMostSignificantBits(),b.getMostSignificantBits());return h!=0?h:Long.compareUnsigned(a.getLeastSignificantBits(),b.getLeastSignificantBits());}));
             initiatives.sort(Comparator.comparingInt(Initiative::total).reversed().thenComparingInt(i -> p.command.tieBreakOrder().indexOf(i.characterId())));
             List<Initiative> ordered = new ArrayList<>();
             for (int i=0;i<initiatives.size();i++) { var value = initiatives.get(i); ordered.add(new Initiative(value.characterId(),value.d20(),value.dexterityModifier(),value.total(),i)); }
-            List<Combatant> combatants = p.command.deployments().stream().sorted(Comparator.comparing(d->d.characterId().toString())).map(d -> new Combatant(d.characterId(),d.position(),d.side(),false,true,0,0,false,false,null,p.roster.get(d.characterId()).character().hitPoints()==0)).toList();
-            battle = new Battle(p.combatId,p.campaignId,combatRule(p.roster.values().iterator().next()),Status.ACTIVE,1,1,0,0,combatants,ordered,List.of());
+            List<Combatant> combatants = new ArrayList<>(p.command.deployments().stream().sorted(Comparator.comparing(d->d.characterId().toString())).map(d -> new Combatant(d.characterId(),d.position(),d.side(),false,true,0,0,false,false,null,p.roster.get(d.characterId()).character().hitPoints()==0)).toList());
+            for(MonsterDeployment d:p.command.monsterDeployments().stream().sorted(Comparator.comparing(MonsterDeployment::monsterId,(a,b)->{int h=Long.compareUnsigned(a.getMostSignificantBits(),b.getMostSignificantBits());return h!=0?h:Long.compareUnsigned(a.getLeastSignificantBits(),b.getLeastSignificantBits());})).toList())combatants.add(new Combatant(d.monsterId(),d.position(),d.side(),false,true,0,0,false,false,null,false));
+            battle = new Battle(p.combatId,p.campaignId,combatRule(p.roster.values().iterator().next()),Status.ACTIVE,1,1,0,0,combatants,ordered,List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),monsters,List.of(),List.of());
             battle = beginTurn(p,battle,dice,changes,facts);
             facts.add(new CombatFact("COMBAT_STARTED",battle.activeActor(),p.combatId,null));
         } else {
@@ -278,15 +300,15 @@ public final class Schema2CombatRules {
                 case DASH, DISENGAGE, DODGE, BEGIN_ATTACK -> {
                     AttackSequence sequence = p.command.kind() == Kind.BEGIN_ATTACK ? new AttackSequence(key(p.operationId,"sequence"),1,0,0,false) : actor.sequence();
                     battle = replaceActor(battle,new Combatant(actor.characterId(),actor.position(),actor.side(),false,actor.reactionAvailable(),actor.movementSpentHalfFeet(),
-                            actor.movementBonus() + (p.command.kind() == Kind.DASH ? speed(p.roster.get(actor.characterId())) : 0),
+                            actor.movementBonus() + (p.command.kind() == Kind.DASH ? speed(p.roster,battle,actor.characterId()) : 0),
                             actor.disengaged() || p.command.kind() == Kind.DISENGAGE,actor.dodging() || p.command.kind() == Kind.DODGE,sequence,actor.prone()));
                 }
                 case END_CONCENTRATION -> battle=Schema2SpellRules.end(battle,p.command.actorId(),"VOLUNTARY",facts);
-                case STAND_UP -> battle=replaceActor(battle,new Combatant(actor.characterId(),actor.position(),actor.side(),actor.actionAvailable(),actor.reactionAvailable(),actor.movementSpentHalfFeet()+speed(p.roster.get(actor.characterId())),actor.movementBonus(),actor.disengaged(),actor.dodging(),actor.sequence(),false));
+                case STAND_UP -> battle=replaceActor(battle,new Combatant(actor.characterId(),actor.position(),actor.side(),actor.actionAvailable(),actor.reactionAvailable(),actor.movementSpentHalfFeet()+speed(p.roster,battle,actor.characterId()),actor.movementBonus(),actor.disengaged(),actor.dodging(),actor.sequence(),false));
                 case FORFEIT_ATTACKS -> battle = replaceActor(battle,closeSequence(actor));
                 default -> throw invalid("S2_COMBAT_COMMAND");
             }
-            battle = new Battle(battle.combatId(),battle.campaignId(),battle.combatRule(),battle.status(),battle.round(),battle.turnNumber(),battle.activeOrdinal(),p.before.version()+1,battle.combatants(),battle.initiative(),battle.flows(),battle.ongoingEffects(),battle.readyPreparations(),battle.triggerFacts(),battle.shields(),battle.concentrationHolders(),battle.environmentZones(),battle.suppressionCauses());
+            battle = new Battle(battle.combatId(),battle.campaignId(),battle.combatRule(),battle.status(),battle.round(),battle.turnNumber(),battle.activeOrdinal(),p.before.version()+1,battle.combatants(),battle.initiative(),battle.flows(),battle.ongoingEffects(),battle.readyPreparations(),battle.triggerFacts(),battle.shields(),battle.concentrationHolders(),battle.environmentZones(),battle.suppressionCauses(),battle.monsters(),battle.saveDamageBatches(),battle.monsterRests());
             facts.add(new CombatFact(p.command.kind().name(),p.command.actorId(),p.combatId,null));
         }
         battle=reconcileEffects(p,battle,changes,facts);
@@ -298,12 +320,12 @@ public final class Schema2CombatRules {
     private static boolean worldCommand(Kind kind) {return Set.of(Kind.CREATE_ENVIRONMENT_ZONE,Kind.END_ENVIRONMENT_ZONE,Kind.EXPLORATION_HEALTH,Kind.EXPLORATION_ADVANCE_TIME,Kind.EXPLORATION_MOVE,Kind.REENTER_COMBAT,Kind.CLOSE_SCENE).contains(kind);}
     private void prepareWorld(Prepared p) {
         Command c=p.command;Battle b=p.before;
-        if(c.actorId()==null||!p.roster.containsKey(c.actorId())||!c.deployments().isEmpty()||c.itemId()!=null||c.flowKey()!=null||c.leafKey()!=null||c.windowKey()!=null||c.opportunityKey()!=null||c.castInput()!=null||c.readyInput()!=null||c.readyKey()!=null)throw invalid("S2_COMBAT_COMMAND");
+        if(c.actorId()==null||!p.roster.containsKey(c.actorId())||!c.deployments().isEmpty()||c.itemId()!=null||c.flowKey()!=null||c.leafKey()!=null||c.windowKey()!=null||c.opportunityKey()!=null||c.castInput()!=null||c.readyInput()!=null||c.readyKey()!=null||!c.monsterDeployments().isEmpty()||c.breathInput()!=null||c.monsterRestInput()!=null)throw invalid("S2_COMBAT_COMMAND");
         boolean healthCommand=c.kind()==Kind.EXPLORATION_HEALTH,move=c.kind()==Kind.EXPLORATION_MOVE,reenter=c.kind()==Kind.REENTER_COMBAT;
         if((c.targetId()!=null)!=healthCommand||(c.healthInput()!=null)!=healthCommand||(c.zoneInput()!=null)!=(c.kind()==Kind.CREATE_ENVIRONMENT_ZONE)||(c.zoneKey()!=null)!=(c.kind()==Kind.END_ENVIRONMENT_ZONE)||(move?c.path().isEmpty():!c.path().isEmpty())||(!reenter&&!c.tieBreakOrder().isEmpty())||((c.seconds()!=0)!=(c.kind()==Kind.EXPLORATION_ADVANCE_TIME)))throw invalid("S2_COMBAT_COMMAND");
         if(c.kind()==Kind.CREATE_ENVIRONMENT_ZONE) {
             var zone=Schema2OngoingEffectRules.createZone(p.roster,b,p.operationId,c.zoneInput());List<EnvironmentZone> zones=new ArrayList<>(b.environmentZones());zones.add(zone);
-            Battle candidate=new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),zones,b.suppressionCauses());
+            Battle candidate=new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),zones,b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
             Schema2OngoingEffectRules.reconcile(candidate,p.operationId);return;
         }
         if(c.kind()==Kind.END_ENVIRONMENT_ZONE) {Schema2OngoingEffectRules.endZone(b.environmentZones().stream().filter(z->z.zoneKey().equals(c.zoneKey())).findFirst().orElseThrow(()->invalid("S2_ENVIRONMENT_NOT_FOUND")),p.operationId);return;}
@@ -312,8 +334,8 @@ public final class Schema2CombatRules {
             case EXPLORATION_ADVANCE_TIME -> Schema2ExplorationRules.requireTimeSafe(p.roster,c.seconds());
             case EXPLORATION_MOVE -> {if(b.flows().size()>=MAX_FLOWS)throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");Schema2ExplorationRules.prepareMove(p.roster,b,c.actorId(),c.path());Schema2ActionFlowRules.requireCauseCapacity(p.roster,b,c);}
             case EXPLORATION_HEALTH -> {Schema2ExplorationRules.prepareHealth(p.roster,b,c.targetId(),c.healthInput());if(b.flows().size()>=MAX_FLOWS)throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");}
-            case REENTER_COMBAT -> {if(b.flows().size()>=MAX_FLOWS&&p.roster.entrySet().stream().anyMatch(e->e.getValue().character().hitPoints()==0&&!e.getValue().character().health().stable()&&!e.getValue().character().health().dead()&&Schema2SpellRules.blessing(b,e.getKey())!=null))throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");if(c.tieBreakOrder().size()!=p.roster.size()||!new HashSet<>(c.tieBreakOrder()).equals(p.roster.keySet()))throw invalid("S2_COMBAT_DEPLOYMENT");for(Context context:p.roster.values())prepareTurn(context);}
-            case CLOSE_SCENE -> {if(!b.concentrationHolders().isEmpty()||b.ongoingEffects().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)||b.shields().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)||b.readyPreparations().stream().anyMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)||b.environmentZones().stream().anyMatch(z->z.endedOperationId()==null))throw invalid("S2_SCENE_OBLIGATIONS_PENDING");}
+            case REENTER_COMBAT -> {if(b.flows().size()>=MAX_FLOWS&&p.roster.entrySet().stream().anyMatch(e->e.getValue().character().hitPoints()==0&&!e.getValue().character().health().stable()&&!e.getValue().character().health().dead()&&Schema2SpellRules.blessing(b,e.getKey())!=null))throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");if(c.tieBreakOrder().size()!=b.combatants().size()||!new HashSet<>(c.tieBreakOrder()).equals(b.combatants().stream().map(Combatant::characterId).collect(java.util.stream.Collectors.toSet())))throw invalid("S2_COMBAT_DEPLOYMENT");for(Context context:p.roster.values())prepareTurn(context);}
+            case CLOSE_SCENE -> {if(!b.concentrationHolders().isEmpty()||b.ongoingEffects().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)||b.shields().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)||b.readyPreparations().stream().anyMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)||b.environmentZones().stream().anyMatch(z->z.endedOperationId()==null)||b.monsterRests().stream().anyMatch(r->r.status()==MonsterRestStatus.ACTIVE))throw invalid("S2_SCENE_OBLIGATIONS_PENDING");}
             default -> throw invalid("S2_COMBAT_COMMAND");
         }
     }
@@ -324,7 +346,7 @@ public final class Schema2CombatRules {
                 List<EnvironmentZone> zones=new ArrayList<>(b.environmentZones());
                 if(c.kind()==Kind.CREATE_ENVIRONMENT_ZONE)zones.add(Schema2OngoingEffectRules.createZone(p.roster,b,p.operationId,c.zoneInput()));
                 else for(int i=0;i<zones.size();i++)if(zones.get(i).zoneKey().equals(c.zoneKey()))zones.set(i,Schema2OngoingEffectRules.endZone(zones.get(i),p.operationId));
-                b=new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),zones,b.suppressionCauses());
+                b=new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),zones,b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
             }
             case EXPLORATION_ADVANCE_TIME,EXPLORATION_MOVE -> {
                 if(c.kind()==Kind.EXPLORATION_MOVE) {
@@ -349,10 +371,11 @@ public final class Schema2CombatRules {
                 b=appendFlow(b,new Flow(key(p.operationId,"scene-flow"),owner,null,FlowStatus.COMPLETED,List.of(frame),List.of(),List.of(),List.of(),List.of(),saves,List.of(),List.of()));
             }
             case REENTER_COMBAT -> {
-                List<Initiative> order=new ArrayList<>();for(UUID actor:c.tieBreakOrder()) {Context context=p.roster.get(actor);int modifier=modifier(context.character(),"ability.dexterity"),roll=dice.draw("INITIATIVE",actor,20);if(equipment.derive(context.material(),context.character()).physicalCheckDisadvantage())roll=Math.min(roll,dice.draw("INITIATIVE_SECOND",actor,20));order.add(new Initiative(actor,roll,modifier,roll+modifier,0));}
+                b=Schema2MonsterRestRules.interrupt(b,p.operationId);
+                List<Initiative> order=new ArrayList<>();for(UUID actor:c.tieBreakOrder()) {Context context=p.roster.get(actor);int modifier=context==null?Schema2MonsterRules.modifier(Schema2MonsterRules.definition(p.roster,Schema2MonsterRules.instance(b,actor).monster()).statBlock(),"ability.dexterity"):modifier(context.character(),"ability.dexterity"),roll=dice.draw("INITIATIVE",actor,20);if(context!=null&&equipment.derive(context.material(),context.character()).physicalCheckDisadvantage())roll=Math.min(roll,dice.draw("INITIATIVE_SECOND",actor,20));order.add(new Initiative(actor,roll,modifier,roll+modifier,0));}
                 order.sort(Comparator.comparingInt(Initiative::total).reversed().thenComparingInt(i->c.tieBreakOrder().indexOf(i.characterId())));List<Initiative> numbered=new ArrayList<>();for(int i=0;i<order.size();i++) {Initiative value=order.get(i);numbered.add(new Initiative(value.characterId(),value.d20(),value.dexterityModifier(),value.total(),i));}
                 var actors=b.combatants().stream().map(a->new Combatant(a.characterId(),a.position(),a.side(),false,true,0,0,false,false,null,a.prone())).toList();
-                b=new Battle(b.combatId(),b.campaignId(),b.combatRule(),Status.ACTIVE,1,b.turnNumber()+1,0,b.version(),actors,numbered,b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses());b=beginTurn(p,b,dice,changes,facts);
+                b=new Battle(b.combatId(),b.campaignId(),b.combatRule(),Status.ACTIVE,1,b.turnNumber()+1,0,b.version(),actors,numbered,b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());b=beginTurn(p,b,dice,changes,facts);
             }
             case CLOSE_SCENE -> b=copy(b,Status.ENDED,b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants(),b.flows());
             default -> throw invalid("S2_COMBAT_COMMAND");
@@ -362,6 +385,16 @@ public final class Schema2CombatRules {
     }
 
     private Battle beginTurn(Prepared p, Battle battle, Draws dice, List<HealthChange> changes, List<CombatFact> facts) {
+        if(Schema2MonsterRules.isMonster(battle,battle.activeActor())) {
+            var monster=Schema2MonsterRules.instance(battle,battle.activeActor());List<MonsterActionUse> uses=new ArrayList<>();
+            for(var use:monster.actionUses()) {
+                boolean available=use.available();var profile=Schema2MonsterRules.action(p.roster,use.action());
+                if(!available&&battle.turnNumber()>1&&!monster.dead()) {int roll=dice.draw("MONSTER_RECHARGE",monster.monsterId(),profile.recharge().diceSides());available=roll>=profile.recharge().minimumRoll();facts.add(new CombatFact("MONSTER_RECHARGE_ROLLED",monster.monsterId(),key(p.operationId,"recharge-"+use.action().moduleKey()+":"+use.action().entryKey()),available?"RECHARGED":"NOT_RECHARGED"));}
+                uses.add(new MonsterActionUse(use.action(),available));
+            }
+            battle=Schema2MonsterRules.replace(battle,new MonsterInstance(monster.monsterId(),monster.monster(),monster.hitPoints(),monster.dead(),uses));
+            Combatant actor=combatant(battle,monster.monsterId());return replaceActor(battle,new Combatant(actor.characterId(),actor.position(),actor.side(),!monster.dead(),true,0,0,false,false,null,actor.prone()));
+        }
         battle=Schema2CombatStateValidator.expireTurnFacts(battle,facts);
         Combatant actor = combatant(battle,battle.activeActor()); Context context = p.roster.get(actor.characterId()); State current = context.character();
         if (current.hitPoints() == 0 && !current.health().dead() && !current.health().stable()) {
@@ -390,10 +423,10 @@ public final class Schema2CombatRules {
     }
     private static Map<UUID,Context> recordRoundTime(Prepared p,Battle battle,List<HealthChange> changes,List<CombatFact> facts) {
         Map<UUID,Context> contexts=afterRound(p.roster);
-        for(Combatant member:battle.combatants()) {
-            State before=p.roster.get(member.characterId()).character(),after=contexts.get(member.characterId()).character();
-            UUID timeKey=key(p.operationId,"round-time-"+member.characterId());
-            changes.add(new HealthChange(member.characterId(),before,after,timeKey,0,false,
+        for(UUID memberId:p.roster.keySet().stream().sorted(Comparator.comparing(UUID::toString)).toList()) {
+            State before=p.roster.get(memberId).character(),after=contexts.get(memberId).character();
+            UUID timeKey=key(p.operationId,"round-time-"+memberId);
+            changes.add(new HealthChange(memberId,before,after,timeKey,0,false,
                     new HealthResult(List.of(),null,null,0,(int)Math.max(0,after.hitPoints()-before.hitPoints())),false,true,6));
         }
         facts.add(new CombatFact("ROUND_TIME_ADVANCED",null,p.combatId,null));return contexts;
@@ -412,8 +445,8 @@ public final class Schema2CombatRules {
             int d20=dice.draw("CONCENTRATION_D20",subject,20);
             OngoingEffect blessing=Schema2SpellRules.blessing(battle,subject);
             Integer d4=blessing==null?null:dice.draw("BLESS_CONCENTRATION",subject,4);
-            int total=d20+mod+(d4==null?0:d4); boolean success=total>=dc;
-            saves.add(new SavingThrowAttempt(frameKey,subject,"CONCENTRATION","ability.constitution",d20,mod,0,
+            int pb=Schema2SavingThrowRules.proficiency(p.roster.get(subject),"ability.constitution");int total=d20+mod+pb+(d4==null?0:d4); boolean success=total>=dc;
+            saves.add(new SavingThrowAttempt(frameKey,subject,"CONCENTRATION","ability.constitution",d20,mod,pb,
                     blessing==null?null:blessing.effectKey(),d4,dc,total,success));
             if (!success) battle=Schema2SpellRules.end(battle,subject,"CONCENTRATION_SAVE_FAILED",facts);
         }
@@ -441,7 +474,7 @@ public final class Schema2CombatRules {
             b=replaceActor(b,new Combatant(a.characterId(),a.position(),a.side(),false,a.reactionAvailable(),a.movementSpentHalfFeet(),a.movementBonus(),a.disengaged(),a.dodging(),a.sequence(),true));
         }return b;
     }
-    private static Battle copy(Battle b,Status status,int round,long turn,int ordinal,List<Combatant> actors,List<Flow> flows) {return new Battle(b.combatId(),b.campaignId(),b.combatRule(),status,round,turn,ordinal,b.version(),actors,b.initiative(),flows,b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses());}
+    private static Battle copy(Battle b,Status status,int round,long turn,int ordinal,List<Combatant> actors,List<Flow> flows) {return new Battle(b.combatId(),b.campaignId(),b.combatRule(),status,round,turn,ordinal,b.version(),actors,b.initiative(),flows,b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());}
     private static Battle replaceActor(Battle b,Combatant actor) {return copy(b,b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants().stream().map(a->a.characterId().equals(actor.characterId())?actor:a).toList(),b.flows());}
     private static Battle replaceFlow(Battle b,Flow flow) {return copy(b,b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants(),b.flows().stream().map(f->f.flowKey().equals(flow.flowKey())?flow:f).toList());}
     private static Battle appendFlow(Battle b,Flow flow) {var flows=new ArrayList<>(b.flows());flows.add(flow);return copy(b,b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants(),flows);}

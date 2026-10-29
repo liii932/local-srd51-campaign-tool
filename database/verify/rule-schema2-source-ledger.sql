@@ -39,7 +39,18 @@ SELECT CONVERT(a.module_key USING latin1) AS module_key, CONVERT(a.release_versi
     (SELECT COUNT(*) FROM rule_schema2_wizard_spellcasting m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS wizard_spellcasting_count,
     (SELECT COUNT(*) FROM rule_schema2_environment m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS environment_count,
     (SELECT COUNT(*) FROM rule_schema2_spellbook_member m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS spellbook_member_count,
-    (SELECT COUNT(*) FROM rule_schema2_wizard_change m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS wizard_change_count
+    (SELECT COUNT(*) FROM rule_schema2_wizard_change m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS wizard_change_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_action m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_action_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_change m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_change_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_stat m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_stat_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_save m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_save_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_skill m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_skill_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_defense m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_defense_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_condition m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_condition_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_language m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_language_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_trait m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_trait_count,
+    (SELECT COUNT(*) FROM rule_schema2_monster_action_value m WHERE m.artifact_module_key = a.module_key AND m.release_version = a.release_version) AS monster_action_value_count
 FROM rule_schema2_artifact a ORDER BY a.installation_sequence LIMIT 17;
 SELECT CONVERT(module_key USING latin1) AS module_key, CONVERT(release_version USING latin1) AS release_version,
     installation_sequence, HEX(source_operation_id) AS source_operation_id,

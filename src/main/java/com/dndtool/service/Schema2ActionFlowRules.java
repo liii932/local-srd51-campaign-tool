@@ -22,13 +22,13 @@ final class Schema2ActionFlowRules {
     static boolean continuation(Kind k) { return Set.of(Kind.PASS_REACTION,Kind.DECLARE_OPPORTUNITY_ATTACK,Kind.DECLARE_SHIELD,Kind.DECLARE_COUNTERSPELL,Kind.RELEASE_READY,Kind.ADVANCE_WINDOW,Kind.CONTINUE_FLOW,Kind.CONTINUE_MOVEMENT).contains(k); }
     static boolean handles(Kind k) { return continuation(k)||Set.of(Kind.ATTACK,Kind.MOVE,Kind.CAST,Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL).contains(k); }
     void prepare(Map<UUID,Context> roster,Battle b,Command c) {
-        require(c.actorId()!=null && c.deployments().isEmpty() && c.tieBreakOrder().isEmpty() && c.zoneInput()==null && c.zoneKey()==null && c.healthInput()==null && c.seconds()==0,"S2_COMBAT_COMMAND");
+        require(c.actorId()!=null && c.deployments().isEmpty() && c.tieBreakOrder().isEmpty() && c.zoneInput()==null && c.zoneKey()==null && c.healthInput()==null && c.seconds()==0 && c.monsterDeployments().isEmpty() && c.breathInput()==null && c.monsterRestInput()==null,"S2_COMBAT_COMMAND");
         if(continuation(c.kind())) {
             Flow f=b.activeFlow(); require(f!=null&&f.flowKey().equals(c.flowKey())&&Objects.equals(f.leafFrameKey(),c.leafKey()),"ACTION_FLOW_TARGET_MISMATCH");
             Frame leaf=frame(f,c.leafKey());Window w=window(f,c.windowKey());
             require(Objects.equals(leaf.windowKey(),w.windowKey()),"ACTION_FLOW_TARGET_MISMATCH");
             if(c.kind()==Kind.CONTINUE_FLOW||c.kind()==Kind.CONTINUE_MOVEMENT) {
-                require(w.status()==WindowStatus.CLOSED&&w.ownerFrameKey().equals(leaf.frameKey())&&ownerActor(f,leaf).equals(c.actorId())&&c.opportunityKey()==null,"ACTION_FLOW_STAGE_INVALID");
+                require(w.status()==WindowStatus.CLOSED&&w.ownerFrameKey().equals(leaf.frameKey())&&(leaf.kind()==FrameKind.SAVE_DAMAGE?b.saveDamageBatches().stream().filter(v->v.frameKey().equals(leaf.frameKey())).findFirst().orElseThrow().sourceId():ownerActor(f,leaf)).equals(c.actorId())&&c.opportunityKey()==null,"ACTION_FLOW_STAGE_INVALID");
                 require(c.itemId()==null&&c.targetId()==null&&c.castInput()==null&&c.readyInput()==null&&c.readyKey()==null&&c.path().isEmpty(),"S2_COMBAT_COMMAND");return;
             }
             require(w.status()==WindowStatus.OPEN&&leaf.kind()==FrameKind.REACTION_SELECTION,"ACTION_FLOW_STAGE_INVALID");
@@ -51,7 +51,7 @@ final class Schema2ActionFlowRules {
             require(depth<8,"REACTION_DEPTH_LIMIT");require(chain+4<=32&&f.frames().size()+4<=1024&&f.windows().size()+3<=1024,"ACTION_FLOW_LIMIT_EXCEEDED");requireCauseCapacity(roster,b,c);requireStructureCapacity(roster,b,c);requireCharacterCapacity(roster,b,c);return;
         }
         require(c.flowKey()==null&&c.leafKey()==null&&c.windowKey()==null&&c.opportunityKey()==null&&c.readyKey()==null,"S2_COMBAT_COMMAND");
-        require(b.status()==Status.EXPLORATION&&c.kind()==Kind.CAST||c.actorId().equals(b.activeActor()),"S2_COMBAT_NOT_CURRENT_TURN");active(roster.get(c.actorId()).character());
+        require(b.status()==Status.EXPLORATION&&c.kind()==Kind.CAST||c.actorId().equals(b.activeActor()),"S2_COMBAT_NOT_CURRENT_TURN");require(roster.containsKey(c.actorId()),"S2_MONSTER_ACTION_UNSUPPORTED");active(roster.get(c.actorId()).character());
         require(b.flows().size()<Schema2CombatRules.MAX_FLOWS,"ACTION_FLOW_LIMIT_EXCEEDED");Combatant actor=actor(b,c.actorId());
         switch(c.kind()) {
             case ATTACK -> {
@@ -64,7 +64,7 @@ final class Schema2ActionFlowRules {
                 require(c.targetId()==null&&c.itemId()==null&&c.path().isEmpty()&&c.castInput()==null&&c.readyInput()!=null,"S2_COMBAT_COMMAND");
                 require(actor.actionAvailable(),"S2_COMBAT_ACTION_UNAVAILABLE");ReadyInput r=c.readyInput();validateTrigger(b,r.trigger());
                 require(b.readyPreparations().stream().noneMatch(v->v.actorId().equals(c.actorId())&&Set.of(ReadyStatus.PREPARING,ReadyStatus.ARMED).contains(v.status())),"S2_READY_ALREADY_ARMED");
-                if(c.kind()==Kind.READY_ATTACK) {require(r.responseKind()==ReadyResponseKind.ATTACK&&r.spell()==null&&r.path().isEmpty()&&r.targetId()!=null&&r.itemId()!=null,"S2_READY_COMMAND");require(!c.actorId().equals(r.targetId())&&actor(b,c.actorId()).side()!=actor(b,r.targetId()).side(),"S2_COMBAT_TARGET");combat.weapon(roster.get(c.actorId()),r.itemId());health.prepareDamage(roster.get(r.targetId()).material(),roster.get(r.targetId()).character());}
+                if(c.kind()==Kind.READY_ATTACK) {require(r.responseKind()==ReadyResponseKind.ATTACK&&r.spell()==null&&r.path().isEmpty()&&r.targetId()!=null&&r.itemId()!=null,"S2_READY_COMMAND");require(!c.actorId().equals(r.targetId())&&actor(b,c.actorId()).side()!=actor(b,r.targetId()).side(),"S2_COMBAT_TARGET");combat.weapon(roster.get(c.actorId()),r.itemId());prepareTargetHealth(roster,b,r.targetId());}
                 if(c.kind()==Kind.READY_MOVE) {require(r.responseKind()==ReadyResponseKind.MOVE&&r.spell()==null&&r.targetId()==null&&r.itemId()==null,"S2_READY_COMMAND");prepareMove(roster,b,c.actorId(),r.path(),true);}
                 if(c.kind()==Kind.READY_SPELL) {require(r.responseKind()==ReadyResponseKind.SPELL&&r.spell()!=null&&r.targetId()==null&&r.itemId()==null&&r.path().isEmpty(),"S2_READY_COMMAND");spells.prepare(roster,b,c.actorId(),r.spell());}
             }
@@ -72,13 +72,26 @@ final class Schema2ActionFlowRules {
         }
         requireCauseCapacity(roster,b,c);requireStructureCapacity(roster,b,c);requireCharacterCapacity(roster,b,c);
     }
+    private void prepareTargetHealth(Map<UUID,Context> roster,Battle b,UUID target) {
+        if(roster.containsKey(target))health.prepareDamage(roster.get(target).material(),roster.get(target).character());
+        else {var m=Schema2MonsterRules.instance(b,target);Schema2MonsterRules.definition(roster,m.monster());if(m.dead())throw invalid("S2_HEALTH_DEAD");}
+    }
+    int batchAfterCost(Map<UUID,Context> roster,Battle b,UUID source) {return b==null?0:readyCost(roster,b,TriggerKind.MONSTER_ACTION_COMPLETED,source,null);}
+    Resolution afterBatch(UUID operation,Map<UUID,Context> roster,Battle b,UUID source,UUID frame,Roller dice) {
+        Work w=new Work(operation,roster,b,dice);if(!w.open(frame,TriggerKind.MONSTER_ACTION_COMPLETED,source,null,null,0,0))w.finish(frame,Stage.SAVE_DAMAGE_COMPLETED);
+        return new Resolution(w.snapshot(),w.changes,List.of(),w.facts);
+    }
     private void prepareAttack(Map<UUID,Context> roster,Battle b,UUID source,UUID target,UUID item) {
         Combatant a=actor(b,source),t=actor(b,target);require(!source.equals(target)&&a.side()!=t.side(),"S2_COMBAT_TARGET");active(roster.get(source).character());
         WeaponAttackDefinition w=combat.weapon(roster.get(source),item);require(a.position().distanceFeet(t.position())<=w.reachFeet(),"S2_COMBAT_OUT_OF_REACH");
-        health.prepareDamage(roster.get(target).material(),roster.get(target).character());equipment.derive(roster.get(target).material(),roster.get(target).character());
+        prepareTargetHealth(roster,b,target);if(roster.containsKey(target))equipment.derive(roster.get(target).material(),roster.get(target).character());
     }
     private void prepareMove(Map<UUID,Context> roster,Battle b,UUID source,List<Position> path,boolean readied) {
-        Combatant a=actor(b,source);require(!a.prone(),"S2_COMBAT_PRONE");require(!path.isEmpty()&&path.size()<=64,"S2_COMBAT_PATH");
+        Combatant a=actor(b,source);
+        // No supported monster OA producer or typed reach reader exists in this slice. Prove
+        // the entire branch safe before moving even its first cell instead of omitting a reactor.
+        for(var monster:b.monsters()) {var candidate=actor(b,monster.monsterId());if(!monster.dead()&&candidate.side()!=a.side()&&candidate.reactionAvailable())throw invalid("S2_MONSTER_REACTION_UNSUPPORTED");}
+        require(!a.prone(),"S2_COMBAT_PRONE");require(!path.isEmpty()&&path.size()<=64,"S2_COMBAT_PATH");
         int allowance=readied?combat.speed(roster.get(source)):combat.speed(roster.get(source))+a.movementBonus()-a.movementSpentHalfFeet()/2;
         require(path.size()*5<=allowance,"S2_COMBAT_MOVEMENT_ALLOWANCE");Position previous=a.position();
         for(Position next:path) {require(previous.distanceFeet(next)==5&&b.combatants().stream().noneMatch(other->!other.characterId().equals(source)&&other.position().equals(next)),"S2_COMBAT_PATH");previous=next;}
@@ -109,7 +122,7 @@ final class Schema2ActionFlowRules {
     }
     private static void validateTrigger(Battle b,ReadyTrigger trigger) {
         require(trigger!=null&&trigger.subjectId()!=null&&b.combatants().stream().anyMatch(a->a.characterId().equals(trigger.subjectId())),"S2_READY_TRIGGER");
-        require(Set.of(TriggerKind.CREATURE_ENTER_CELL_AFTER,TriggerKind.ATTACK_COMPLETED,TriggerKind.CAST_COMPLETED).contains(trigger.kind()),"S2_READY_TRIGGER");
+        require(Set.of(TriggerKind.CREATURE_ENTER_CELL_AFTER,TriggerKind.ATTACK_COMPLETED,TriggerKind.CAST_COMPLETED,TriggerKind.MONSTER_ACTION_COMPLETED).contains(trigger.kind()),"S2_READY_TRIGGER");
         require((trigger.position()!=null)==(trigger.kind()==TriggerKind.CREATURE_ENTER_CELL_AFTER),"S2_READY_TRIGGER");
     }
     private static void requireCharacterCapacity(Map<UUID,Context> roster,Battle b,Command command) {
@@ -132,7 +145,7 @@ final class Schema2ActionFlowRules {
             case RELEASE_READY -> {ReadyPreparation ready=ready(b,command.readyKey());if(ready.input().responseKind()==ReadyResponseKind.ATTACK)needed.merge(ready.input().targetId(),1,Integer::sum);if(ready.input().responseKind()==ReadyResponseKind.SPELL&&isAlgorithm(roster,ready.actorId(),ready.input().spell().spell(),Schema2SpellRules.CURE_WOUNDS))needed.merge(ready.input().spell().targets().getFirst(),1,Integer::sum);}
             default -> { }
         }
-        for(var entry:needed.entrySet())require(roster.get(entry.getKey()).character().version()+entry.getValue()<com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS,"ACTION_FLOW_RESERVATION_INSUFFICIENT");
+        for(var entry:needed.entrySet())if(roster.containsKey(entry.getKey()))require(roster.get(entry.getKey()).character().version()+entry.getValue()<com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS,"ACTION_FLOW_RESERVATION_INSUFFICIENT");
     }
     private static boolean isAlgorithm(Map<UUID,Context> roster,UUID actor,RuleIdentity spell,String algorithm) {return roster.get(actor).material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).anyMatch(s->s.enabled()&&s.identity().equals(spell)&&algorithm.equals(s.definition().algorithm()));}
     private void requireStructureCapacity(Map<UUID,Context> roster,Battle b,Command command) {
@@ -150,7 +163,7 @@ final class Schema2ActionFlowRules {
         if(command.kind()==Kind.RELEASE_READY) {ReadyPreparation r=ready(b,command.readyKey());if(r.input().responseKind()==ReadyResponseKind.SPELL)input=r.input().spell();}
         if(input!=null&&isBless(roster,command.actorId(),input.spell()))addProspectiveBless(effects,proof,command.actorId(),input.spell(),input.targets(),roster);
         if(command.kind()==Kind.DECLARE_SHIELD)shields.add(new ShieldEffect(key(proof,"shield"),proof,command.actorId(),b.turnNumber(),b.turnNumber()+b.combatants().size(),EffectStatus.ACTIVE,null));
-        Battle base=new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),shields,b.concentrationHolders(),b.environmentZones(),b.suppressionCauses());
+        Battle base=new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),shields,b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
         var initial=Schema2OngoingEffectRules.reconcile(base,proof,0);base=Schema2OngoingEffectRules.withCauses(base,initial.causes());int bound=initial.causes().size();
         record Route(UUID actor,List<Position> path) { }
         List<Route> routes=new ArrayList<>();for(Flow f:b.flows())if(f.status()==FlowStatus.ACTIVE)for(Movement m:f.movements())if(m.status()==MovementStatus.PENDING)routes.add(new Route(m.actorId(),m.path().subList(m.cursor(),m.path().size())));
@@ -204,7 +217,7 @@ final class Schema2ActionFlowRules {
         TriggerFact t=new TriggerFact(key(subject,"frontier-trigger"),kind,subject,subject,null,position,0);
         return windowCost((int)b.readyPreparations().stream().filter(r->r.status()==ReadyStatus.ARMED&&actor(b,r.actorId()).reactionAvailable()&&roster.get(r.actorId()).character().hitPoints()>0&&matches(r.input().trigger(),t)).map(ReadyPreparation::actorId).distinct().count());
     }
-    private int shieldCandidates(Map<UUID,Context> roster,Battle b,UUID target) {if(!actor(b,target).reactionAvailable()||roster.get(target).character().hitPoints()==0)return 0;return spells.reactionOptions(roster,b,target,ReactionKind.SHIELD,null).isEmpty()?0:1;}
+    private int shieldCandidates(Map<UUID,Context> roster,Battle b,UUID target) {if(!roster.containsKey(target))return 0;if(!actor(b,target).reactionAvailable()||roster.get(target).character().hitPoints()==0)return 0;return spells.reactionOptions(roster,b,target,ReactionKind.SHIELD,null).isEmpty()?0:1;}
     private int counterCandidates(Map<UUID,Context> roster,Battle b,UUID caster) {
         int count=0;for(var entry:roster.entrySet()) {
             UUID id=entry.getKey();State state=entry.getValue().character();if(id.equals(caster)||!actor(b,id).reactionAvailable()||state.hitPoints()==0||state.spellbook()==null||actor(b,id).position().distanceFeet(actor(b,caster).position())>60)continue;
@@ -278,27 +291,31 @@ final class Schema2ActionFlowRules {
             EquipmentItem instance=source.character().equipment().stream().filter(i->i.itemId().equals(item)).findFirst().orElseThrow();
             RuleIdentity proficiency=source.material().projection().rules().stream().filter(FinalItem.class::isInstance).map(FinalItem.class::cast).filter(v->v.enabled()&&v.identity().equals(instance.item())).findFirst().orElseThrow().definition().proficiency();
             int pb=source.character().proficiencies().stream().anyMatch(v->v.target().equals(proficiency))?source.character().proficiencyBonus():0;
-            int distance=a.position().distanceFeet(t.position());boolean advantage=dest.character().hitPoints()==0||t.prone()&&distance<=5;
-            boolean disadvantage=equipment.derive(source.material(),source.character()).physicalCheckDisadvantage()||t.dodging()&&dest.character().hitPoints()>0&&combat.speed(dest)>0||t.prone()&&distance>5||a.prone();
+            int distance=a.position().distanceFeet(t.position());boolean advantage=targetHp(target)==0||t.prone()&&distance<=5;
+            boolean disadvantage=equipment.derive(source.material(),source.character()).physicalCheckDisadvantage()||t.dodging()&&targetHp(target)>0&&combat.speed(roster,b,target)>0||t.prone()&&distance>5||a.prone();
             int first=dice.draw("ATTACK_D20",subject,20);Integer second=advantage!=disadvantage?dice.draw("ATTACK_D20_SECOND",subject,20):null;int selected=second==null?first:advantage?Math.max(first,second):Math.min(first,second);
             OngoingEffect blessing=Schema2SpellRules.blessing(snapshot(),subject);Integer d4=blessing==null?null:dice.draw("BLESS_ATTACK",subject,4);int ac=armor(target);boolean hit=selected==20||selected!=1&&selected+ability+pb+(d4==null?0:d4)>=ac;
-            attacks.add(new AttackAttempt(id,subject,target,item,oa||readied?null:a.sequence().sequenceKey(),oa||readied?0:a.sequence().performed(),oa,first,second,selected,ability,pb,ac,advantage,disadvantage,hit&&(selected==20||dest.character().hitPoints()==0&&distance<=5),hit,List.of(),0,blessing==null?null:blessing.effectKey(),d4,hit?AttackStatus.HIT_PENDING_DAMAGE:AttackStatus.RESOLVED,hit,ac));
+            attacks.add(new AttackAttempt(id,subject,target,item,oa||readied?null:a.sequence().sequenceKey(),oa||readied?0:a.sequence().performed(),oa,first,second,selected,ability,pb,ac,advantage,disadvantage,hit&&(selected==20||targetHp(target)==0&&distance<=5),hit,List.of(),0,blessing==null?null:blessing.effectKey(),d4,hit?AttackStatus.HIT_PENDING_DAMAGE:AttackStatus.RESOLVED,hit,ac));
             if(hit&&open(id,TriggerKind.ATTACK_HIT_BEFORE_DAMAGE,subject,target,null,0,0))return;settleAttack(id);
         }
-        int armor(UUID subject) {Context c=roster.get(subject);int ac=equipment.derive(c.material(),c.character()).armorClass();if(b.shields().stream().anyMatch(e->e.actorId().equals(subject)&&e.status()==EffectStatus.ACTIVE&&!Schema2OngoingEffectRules.isSuppressed(b,e.effectKey(),subject)))ac+=5;return ac;}
+        int targetHp(UUID subject) {return roster.containsKey(subject)?Math.toIntExact(roster.get(subject).character().hitPoints()):Schema2MonsterRules.instance(b,subject).hitPoints();}
+        int armor(UUID subject) {Context c=roster.get(subject);int ac=c==null?Schema2MonsterRules.definition(roster,Schema2MonsterRules.instance(b,subject).monster()).statBlock().armorClass():equipment.derive(c.material(),c.character()).armorClass();if(b.shields().stream().anyMatch(e->e.actorId().equals(subject)&&e.status()==EffectStatus.ACTIVE&&!Schema2OngoingEffectRules.isSuppressed(b,e.effectKey(),subject)))ac+=5;return ac;}
         AttackAttempt attack(UUID id) {return attacks.stream().filter(a->a.frameKey().equals(id)).findFirst().orElseThrow();}
         void attack(AttackAttempt value) {for(int i=0;i<attacks.size();i++)if(attacks.get(i).frameKey().equals(value.frameKey()))attacks.set(i,value);}
         void settleAttack(UUID id) {
             AttackAttempt a=attack(id);int ac=armor(a.targetId());boolean hit=a.selectedD20()==20||a.selectedD20()!=1&&a.selectedD20()+a.abilityModifier()+a.proficiencyBonus()+(a.blessingD4()==null?0:a.blessingD4())>=ac;
             Context source=roster.get(a.actorId()),dest=roster.get(a.targetId());WeaponAttackDefinition profile=combat.weapon(source,a.itemId());
-            boolean critical=hit&&(a.selectedD20()==20||dest.character().hitPoints()==0&&Schema2ActionFlowRules.actor(b,a.actorId()).position().distanceFeet(Schema2ActionFlowRules.actor(b,a.targetId()).position())<=5);
+            boolean critical=hit&&(a.selectedD20()==20||targetHp(a.targetId())==0&&Schema2ActionFlowRules.actor(b,a.actorId()).position().distanceFeet(Schema2ActionFlowRules.actor(b,a.targetId()).position())<=5);
             List<Integer> damage=new ArrayList<>();int amount=0;
-            if(hit) {for(int i=0;i<profile.diceCount()*(critical?2:1);i++)damage.add(dice.draw("DAMAGE",a.actorId(),profile.diceSides()));amount=Math.max(0,damage.stream().mapToInt(Integer::intValue).sum()+a.abilityModifier());}
+            if(hit) {for(int i=0;i<profile.diceCount()*(critical?2:1);i++)damage.add(dice.draw("DAMAGE",a.actorId(),profile.diceSides()));amount=Math.max(0,damage.stream().mapToInt(Integer::intValue).sum()+a.abilityModifier());amount=Schema2MonsterRules.effectiveDamage(roster,b,a.targetId(),profile.damageType(),true,amount);}
             attack(new AttackAttempt(a.frameKey(),a.actorId(),a.targetId(),a.itemId(),a.sequenceKey(),a.attackOrdinal(),a.opportunityAttack(),a.firstD20(),a.secondD20(),a.selectedD20(),a.abilityModifier(),a.proficiencyBonus(),a.armorClass(),a.advantage(),a.disadvantage(),critical,hit,damage,amount,a.blessingEffectKey(),a.blessingD4(),AttackStatus.RESOLVED,a.initialHit(),ac));
             if(amount>0) {
-                var result=health.applyDamage(dest.material(),dest.character(),amount,critical);State after=result.state().hitPoints()==0?Schema2CombatEquipmentFacts.drop(result.state(),b.combatId(),Schema2ActionFlowRules.actor(b,a.targetId()).position()):result.state();
-                change(new HealthChange(a.targetId(),dest.character(),after,id,amount,critical,new HealthResult(List.of(),null,null,amount,result.appliedAmount()),false));afterDamage(id,a.targetId(),amount);
-                if(after.hitPoints()==0) {Combatant t=Schema2ActionFlowRules.actor(b,a.targetId());actor(new Combatant(t.characterId(),t.position(),t.side(),false,t.reactionAvailable(),t.movementSpentHalfFeet(),t.movementBonus(),t.disengaged(),t.dodging(),t.sequence(),true));}
+                if(dest==null)b=Schema2MonsterRules.damage(b,a.targetId(),amount);
+                else {
+                    var result=health.applyDamage(dest.material(),dest.character(),amount,critical);State after=result.state().hitPoints()==0?Schema2CombatEquipmentFacts.drop(result.state(),b.combatId(),Schema2ActionFlowRules.actor(b,a.targetId()).position()):result.state();
+                    change(new HealthChange(a.targetId(),dest.character(),after,id,amount,critical,new HealthResult(List.of(),null,null,amount,result.appliedAmount()),false));afterDamage(id,a.targetId(),amount);
+                }
+                if(targetHp(a.targetId())==0) {Combatant t=Schema2ActionFlowRules.actor(b,a.targetId());actor(new Combatant(t.characterId(),t.position(),t.side(),false,t.reactionAvailable(),t.movementSpentHalfFeet(),t.movementBonus(),t.disengaged(),t.dodging(),t.sequence(),true));}
             }
             if(a.sequenceKey()!=null) {Combatant actor=Schema2ActionFlowRules.actor(b,a.actorId());AttackSequence s=actor.sequence();int performed=s.performed()+1;actor(new Combatant(actor.characterId(),actor.position(),actor.side(),actor.actionAvailable(),actor.reactionAvailable(),actor.movementSpentHalfFeet(),actor.movementBonus(),actor.disengaged(),actor.dodging(),new AttackSequence(s.sequenceKey(),s.limit(),performed,s.forfeited(),performed+s.forfeited()==s.limit()),actor.prone()));}
             if(open(id,TriggerKind.ATTACK_COMPLETED,a.actorId(),a.targetId(),null,0,0))return;finish(id,Stage.ATTACK_RESOLVED);
@@ -306,8 +323,8 @@ final class Schema2ActionFlowRules {
         void afterDamage(UUID frame,UUID subject,int amount) {
             if(b.concentrationHolders().stream().noneMatch(h->h.actorId().equals(subject)))return;State state=roster.get(subject).character();
             if(state.hitPoints()==0||state.health().dead()) {endConcentration(subject,"INCAPACITATED");return;}
-            int dc=Math.max(10,amount/2),ability=mod(state,"ability.constitution"),d20=dice.draw("CONCENTRATION_D20",subject,20);OngoingEffect blessing=Schema2SpellRules.blessing(snapshot(),subject);Integer d4=blessing==null?null:dice.draw("BLESS_CONCENTRATION",subject,4);int total=d20+ability+(d4==null?0:d4);
-            saves.add(new SavingThrowAttempt(frame,subject,"CONCENTRATION","ability.constitution",d20,ability,0,blessing==null?null:blessing.effectKey(),d4,dc,total,total>=dc));if(total<dc)endConcentration(subject,"CONCENTRATION_SAVE_FAILED");
+            int dc=Math.max(10,amount/2),ability=mod(state,"ability.constitution"),d20=dice.draw("CONCENTRATION_D20",subject,20);OngoingEffect blessing=Schema2SpellRules.blessing(snapshot(),subject);Integer d4=blessing==null?null:dice.draw("BLESS_CONCENTRATION",subject,4);int pb=Schema2SavingThrowRules.proficiency(roster.get(subject),"ability.constitution"),total=d20+ability+pb+(d4==null?0:d4);
+            saves.add(new SavingThrowAttempt(frame,subject,"CONCENTRATION","ability.constitution",d20,ability,pb,blessing==null?null:blessing.effectKey(),d4,dc,total,total>=dc));if(total<dc)endConcentration(subject,"CONCENTRATION_SAVE_FAILED");
         }
         void beginMovement(UUID subject,List<Position> path,UUID parent,Invocation invocation,boolean readied) {
             UUID id=next("movement");addFrame(FrameKind.MOVEMENT,id,parent,invocation,Stage.MOVEMENT_CONTINUE);moves.add(new Movement(id,subject,Schema2ActionFlowRules.actor(b,subject).position(),path,0,0,MovementStatus.PENDING,null,readied,readied?combat.speed(roster.get(subject)):0));driveMovement(id);
@@ -429,7 +446,7 @@ final class Schema2ActionFlowRules {
                 int index=windows.indexOf(w);windows.set(index,new Window(w.windowKey(),w.ownerFrameKey(),w.checkpointOrdinal(),w.boundaryIndex(),WindowStatus.CONSUMED,w.opportunities(),w.trigger()));
                 Frame owner=get(w.ownerFrameKey());leaf=owner.frameKey();stage(owner.frameKey(),FrameStatus.RUNNABLE,owner.stage(),null,null);
                 if(owner.kind()==FrameKind.MOVEMENT)driveMovement(owner.frameKey());
-                else if(owner.stage()==Stage.READY_TRIGGER_AFTER)finish(owner.frameKey(),owner.kind()==FrameKind.ATTACK?Stage.ATTACK_RESOLVED:Stage.CAST_RESOLVED);
+                else if(owner.stage()==Stage.READY_TRIGGER_AFTER)finish(owner.frameKey(),owner.kind()==FrameKind.SAVE_DAMAGE?Stage.SAVE_DAMAGE_COMPLETED:owner.kind()==FrameKind.ATTACK?Stage.ATTACK_RESOLVED:Stage.CAST_RESOLVED);
                 else if(owner.kind()==FrameKind.ATTACK)settleAttack(owner.frameKey());else if(owner.kind()==FrameKind.CAST)completeCast(owner.frameKey(),false);else throw invalid("ACTION_FLOW_STAGE_INVALID");return;
             }
             Opportunity o=current(w);
@@ -464,7 +481,7 @@ final class Schema2ActionFlowRules {
     private List<Opportunity> candidates(Map<UUID,Context> roster,Battle b,Flow flow,TriggerFact trigger) {
         List<Opportunity> all=new ArrayList<>();
         List<UUID> candidateOrder=b.status()==Status.EXPLORATION?b.combatants().stream().map(Combatant::characterId).sorted(Comparator.comparing(UUID::toString)).toList():b.initiative().stream().map(Initiative::characterId).toList();
-        for(UUID id:candidateOrder) {Combatant actor=actor(b,id);State state=roster.get(id).character();if(!actor.reactionAvailable()||state.hitPoints()==0||state.health().dead())continue;
+        for(UUID id:candidateOrder) {if(!roster.containsKey(id))continue;Combatant actor=actor(b,id);State state=roster.get(id).character();if(!actor.reactionAvailable()||state.hitPoints()==0||state.health().dead())continue;
             List<ReactionOption> options=new ArrayList<>();
             if(trigger.kind()==TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE) {
                 Combatant mover=actor(b,trigger.subjectId());if(roster.get(mover.characterId()).character().hitPoints()>0&&!roster.get(mover.characterId()).character().health().dead()&&actor.side()!=mover.side()&&!mover.disengaged()) {
@@ -476,7 +493,7 @@ final class Schema2ActionFlowRules {
                 }
             } else if(trigger.kind()==TriggerKind.ATTACK_HIT_BEFORE_DAMAGE&&id.equals(trigger.targetId()))options.addAll(spells.reactionOptions(roster,b,id,ReactionKind.SHIELD,null));
             else if(trigger.kind()==TriggerKind.CAST_BEFORE_COMPLETION&&!id.equals(trigger.subjectId()))options.addAll(spells.reactionOptions(roster,b,id,ReactionKind.COUNTERSPELL,trigger.sourceFrameKey()));
-            else if(Set.of(TriggerKind.CREATURE_ENTER_CELL_AFTER,TriggerKind.ATTACK_COMPLETED,TriggerKind.CAST_COMPLETED).contains(trigger.kind())) {
+            else if(Set.of(TriggerKind.CREATURE_ENTER_CELL_AFTER,TriggerKind.ATTACK_COMPLETED,TriggerKind.CAST_COMPLETED,TriggerKind.MONSTER_ACTION_COMPLETED).contains(trigger.kind())) {
                 for(ReadyPreparation r:b.readyPreparations())if(r.actorId().equals(id)&&r.status()==ReadyStatus.ARMED&&matches(r.input().trigger(),trigger)&&readyAvailable(roster,b,r))options.add(new ReactionOption(ReactionKind.READY_RELEASE,null,null,null,0,r.readyKey()));
             }
             if(!options.isEmpty())all.add(new Opportunity(key(trigger.triggerKey(),"actor-"+id),id,all.size(),options,OpportunityStatus.PENDING,null,null,null));
@@ -500,7 +517,7 @@ final class Schema2ActionFlowRules {
     private static void active(State state) {require(state!=null&&state.hitPoints()>0&&!state.health().dead(),"S2_COMBAT_ACTOR_INACTIVE");}
     private static int mod(State state,String ability) {return Math.floorDiv(state.abilities().get(ability)-10,2);}
     static Battle rebuild(Battle b,List<Combatant> actors,List<Flow> flows,List<ReadyPreparation> ready,List<TriggerFact> triggers,List<ShieldEffect> shields,List<ConcentrationHolder> holders,long version) {
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),version,actors,b.initiative(),flows,b.ongoingEffects(),ready,triggers,shields,holders,b.environmentZones(),b.suppressionCauses());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),version,actors,b.initiative(),flows,b.ongoingEffects(),ready,triggers,shields,holders,b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
     }
     private static UUID key(UUID operation,String role) {UUID value=UUID.nameUUIDFromBytes((operation+":"+role).getBytes(StandardCharsets.UTF_8));return new UUID((value.getMostSignificantBits()&~0xF000L)|0x4000L,value.getLeastSignificantBits());}
     private static void require(boolean valid,String code) {if(!valid)throw invalid(code);}

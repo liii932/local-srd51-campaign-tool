@@ -127,11 +127,11 @@ class Schema2CompositionParsingTest {
         assertDoesNotThrow(()->Schema2StrictJson.parse(("[".repeat(15)+"0"+"]".repeat(15)).getBytes(StandardCharsets.UTF_8),source));
         assertDoesNotThrow(()->Schema2StrictJson.parse(("\""+"a".repeat(4096)+"\"").getBytes(StandardCharsets.UTF_8),source));
         assertDoesNotThrow(()->Schema2StrictJson.parse(arrayOf(256,"0").getBytes(StandardCharsets.UTF_8),source));
-        String object16="{"+String.join(",",java.util.stream.IntStream.range(0,16).mapToObj(i->"\"k"+i+"\":0").toList())+"}";
-        assertDoesNotThrow(()->Schema2StrictJson.parse(object16.getBytes(StandardCharsets.UTF_8),source));
+        String object32="{"+String.join(",",java.util.stream.IntStream.range(0,32).mapToObj(i->"\"k"+i+"\":0").toList())+"}";
+        assertDoesNotThrow(()->Schema2StrictJson.parse(object32.getBytes(StandardCharsets.UTF_8),source));
         String tokensAtLimit="["+String.join(",",Collections.nCopies(127,arrayOf(256,"0")))+","+arrayOf(127,"0")+"]";
         assertDoesNotThrow(()->Schema2StrictJson.parse(tokensAtLimit.getBytes(StandardCharsets.UTF_8),source));
-        for(String over:List.of("[".repeat(16)+"0"+"]".repeat(16),"\""+"a".repeat(4097)+"\"",arrayOf(257,"0"),object16.substring(0,object16.length()-1)+",\"k16\":0}",tokensAtLimit.substring(0,tokensAtLimit.length()-2)+",0]]")) {
+        for(String over:List.of("[".repeat(16)+"0"+"]".repeat(16),"\""+"a".repeat(4097)+"\"",arrayOf(257,"0"),object32.substring(0,object32.length()-1)+",\"k32\":0}",tokensAtLimit.substring(0,tokensAtLimit.length()-2)+",0]]")) {
             var failure=assertThrows(Schema2CompositionKernel.Schema2Exception.class,()->Schema2StrictJson.parse(over.getBytes(StandardCharsets.UTF_8),source));assertEquals("S2_BUDGET",failure.diagnostic().code());assertEquals("PARSE",failure.diagnostic().stage().name());
         }
         assertTimeoutPreemptively(Duration.ofSeconds(2),()->{var p=packages();raw(p,0,"rules.json","[".repeat(10000));rejected("S2_BUDGET","PARSE",p);});

@@ -1,4 +1,4 @@
--- Read-only structural verification after separately authorized V033–V038 installation.
+-- Read-only structural verification after separately authorized V033–V040 installation.
 -- JDBC and service readers additionally validate the complete typed graph and rule semantics.
 SELECT table_name, engine, table_collation FROM information_schema.tables
 WHERE table_schema = DATABASE() AND table_name IN ('s2_combat_runtime', 's2_combat_member', 's2_combat_event', 's2_combat_dependency', 's2_combat_character_result', 's2_combat_command_point', 's2_combat_command_deployment', 's2_combat_command_tie', 's2_combat_roll', 's2_combat_fact', 's2_combat_state', 's2_combat_actor', 's2_combat_initiative', 's2_combat_flow', 's2_combat_frame', 's2_combat_window', 's2_combat_opportunity', 's2_combat_opportunity_item', 's2_combat_movement', 's2_combat_movement_point', 's2_combat_attack', 's2_combat_attack_die', 's2_character_combat_input') ORDER BY table_name;
@@ -21,8 +21,8 @@ JOIN s2_combat_state s ON s.combat_id = b.combat_id AND s.phase = _binary'AFTER'
  AND s.event_sequence = (SELECT MAX(e.event_sequence) FROM s2_combat_event e WHERE e.combat_id = b.combat_id)
 WHERE s.combat_status <> _binary'ENDED' GROUP BY b.campaign_id HAVING COUNT(*) > 1;
 SELECT HEX(s.combat_id) AS combat_id, s.event_sequence, s.phase FROM s2_combat_state s
-WHERE (SELECT COUNT(*) FROM s2_combat_actor a WHERE a.combat_id = s.combat_id AND a.event_sequence = s.event_sequence AND a.phase = s.phase) <> (SELECT COUNT(*) FROM s2_combat_member m WHERE m.combat_id = s.combat_id)
-   OR (SELECT COUNT(*) FROM s2_combat_initiative i WHERE i.combat_id = s.combat_id AND i.event_sequence = s.event_sequence AND i.phase = s.phase) <> (SELECT COUNT(*) FROM s2_combat_member m WHERE m.combat_id = s.combat_id)
+WHERE (SELECT COUNT(*) FROM s2_combat_actor a WHERE a.combat_id = s.combat_id AND a.event_sequence = s.event_sequence AND a.phase = s.phase) <> s.monster_count + (SELECT COUNT(*) FROM s2_combat_member m WHERE m.combat_id = s.combat_id)
+   OR (SELECT COUNT(*) FROM s2_combat_initiative i WHERE i.combat_id = s.combat_id AND i.event_sequence = s.event_sequence AND i.phase = s.phase) <> s.monster_count + (SELECT COUNT(*) FROM s2_combat_member m WHERE m.combat_id = s.combat_id)
    OR (SELECT COUNT(*) FROM s2_combat_flow f WHERE f.combat_id = s.combat_id AND f.event_sequence = s.event_sequence AND f.phase = s.phase AND f.flow_status = _binary'ACTIVE') > 1;
 SELECT HEX(f.combat_id) AS combat_id, f.event_sequence, f.phase, f.flow_index FROM s2_combat_flow f
 WHERE NOT EXISTS (SELECT 1 FROM s2_combat_frame r WHERE r.combat_id = f.combat_id AND r.event_sequence = f.event_sequence AND r.phase = f.phase AND r.flow_index = f.flow_index AND r.frame_key = f.root_frame_key AND r.parent_frame_key IS NULL)

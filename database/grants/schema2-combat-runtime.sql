@@ -1,4 +1,4 @@
--- Apply only after explicit review of V033–V038 and the application account.
+-- Apply only after explicit review of V033–V040 and the application account.
 -- Immutable INTERNAL combat facts and causal character health inputs.
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_runtime` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_member` TO 'dnd_tool_se_app'@'127.0.0.1';
@@ -40,3 +40,19 @@ GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_shield` TO 'dnd_tool_se_app'@'1
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_concentration` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_environment` TO 'dnd_tool_se_app'@'127.0.0.1';
 GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_suppression` TO 'dnd_tool_se_app'@'127.0.0.1';
+
+-- Finite typed monster material and save-damage facts; separate reviewed grant checkpoint.
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_monster_deployment` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_input` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_monster` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_monster_action` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_save_damage_batch` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_candidate` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_target` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_die` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_check` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_packet` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_defense` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_breath_concentration` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_monster_rest_input` TO 'dnd_tool_se_app'@'127.0.0.1';
+GRANT SELECT, INSERT ON `dnd_tool_se`.`s2_combat_monster_rest` TO 'dnd_tool_se_app'@'127.0.0.1';

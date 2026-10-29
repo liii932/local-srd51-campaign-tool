@@ -21,7 +21,7 @@ public final class Schema2CombatRuntimeService {
         public Request {
             for (UUID id : Arrays.asList(operationId,combatId,campaignId)) uuid(id);
             if (Set.of(operationId,combatId,campaignId).size()!=3 || rules==null || members==null || command==null
-                    || members.size()<2 || members.size()>Schema2CombatRules.MAX_COMBATANTS || expectedCharacterVersions==null)
+                    || members.size()<2 || members.size()>JdbcSchema2CombatRuntimeRepository.MAX_CHARACTER_MEMBERS || expectedCharacterVersions==null)
                 throw rejected("S2_COMBAT_REQUEST");
             members = members.stream().sorted(Comparator.comparing(Member::characterId, JdbcSchema2CombatRuntimeRepository.UUID_ORDER)).toList();
             Set<UUID> ids = new HashSet<>();
@@ -40,6 +40,8 @@ public final class Schema2CombatRuntimeService {
         public Save { characters=List.copyOf(characters); }
     }
     private record Pending(UUID combatId,String digest,Save save,boolean isolated) { }
+    private record CharacterRead(Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,
+            Map<UUID,Schema2CharacterRuntimeService.Material> materials) { }
     private final DataSource runtime;
     private final IntUnaryOperator dice;
     private final JdbcSchema2CombatRuntimeRepository combats=new JdbcSchema2CombatRuntimeRepository();
@@ -72,8 +74,9 @@ public final class Schema2CombatRuntimeService {
             } else if (!previous.members().equals(request.members()) || !previous.current().campaignId().equals(request.campaignId()))
                 throw rejected("S2_COMBAT_BINDING");
             else if (previous.current().version()!=request.expectedVersion()) throw rejected("S2_COMBAT_STALE_VERSION");
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories=readCharacters(connection,request.members());
-            Map<UUID,Schema2CombatRules.Context> contexts=contexts(connection,request.members(),histories,request.expectedCharacterVersions());
+            var read=readCharacters(connection,request.members());
+            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories=read.histories();
+            Map<UUID,Schema2CombatRules.Context> contexts=contexts(request.members(),histories,request.expectedCharacterVersions(),read.materials());
             for (var context:contexts.values()) request.rules().verify(context.material());
             for (var entry:histories.entrySet()) if (entry.getValue().current().version()!=request.expectedCharacterVersions().get(entry.getKey()))
                 throw rejected("S2_COMBAT_STALE_CHARACTER");
@@ -110,8 +113,7 @@ public final class Schema2CombatRuntimeService {
         try (var session=BusinessWriteTransactions.openResolution(runtime)) {
             History history=combats.read(session.connection(),combatId);
             if (history==null) { session.rollback(); return null; }
-            validate(session.connection(),history);
-            var all=readCharacters(session.connection(),history.members());
+            var all=validate(session.connection(),history).histories();
             Save saved=new Save(history,history.members().stream().map(m->all.get(m.characterId())).toList());
             session.rollback(); return saved;
         }
@@ -188,6 +190,7 @@ public final class Schema2CombatRuntimeService {
             var input=child.command().combatInput(); Event owner=combats.findOperation(connection,input.combatOperationId());
             if (owner==null || !owner.after().combatId().equals(input.combatId()) || !owner.characterOperations().contains(child.operationId()))
                 throw new SQLException("S2_COMBAT_CHARACTER_REFERENCE");
+            if(input.secondsAdvanced()>60&&owner.command().kind()!=Kind.COMPLETE_MONSTER_REST)throw new SQLException("S2_COMBAT_CHARACTER_REFERENCE");
             int index=owner.characterOperations().indexOf(child.operationId());
             var change=owner.resolution().healthChanges().get(index);
             if (!change.characterId().equals(history.current().characterId()) || !change.before().equals(child.before())
@@ -198,41 +201,52 @@ public final class Schema2CombatRuntimeService {
         }
     }
 
-    private Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> readCharacters(Connection c,List<Member> members) throws SQLException {
+    private CharacterRead readCharacters(Connection c,List<Member> members) throws SQLException {
         Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> found=new LinkedHashMap<>();
+        Map<UUID,Schema2CharacterRuntimeService.Material> materials=new LinkedHashMap<>();
         for (Member member:members) {
             var history=characters.read(c,member.characterId());
             if (history==null) throw rejected("S2_COMBAT_CHARACTER_NOT_FOUND");
             var state=history.current();
             if (!member.identity().equals(state.identity()) || !member.preparationOperationId().equals(state.preparationOperationId())) throw rejected("S2_COMBAT_BINDING");
-            characterService.validateHistory(characterService.material(c,member.identity(),member.preparationOperationId()),history);
+            var material=characterService.material(c,member.identity(),member.preparationOperationId());
+            characterService.validateHistory(material,history); materials.put(member.characterId(),material);
             validateCharacterReferences(c,history); found.put(member.characterId(),history);
         }
-        return found;
+        return new CharacterRead(found,materials);
     }
-    private Map<UUID,Schema2CombatRules.Context> contexts(Connection c,List<Member> members,
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,Map<UUID,Long> versions) throws SQLException {
+    private Map<UUID,Schema2CharacterRuntimeService.Material> readMaterials(Connection c,List<Member> members) throws SQLException {
+        Map<UUID,Schema2CharacterRuntimeService.Material> materials=new LinkedHashMap<>();
+        for(Member member:members) materials.put(member.characterId(),characterService.material(c,member.identity(),member.preparationOperationId()));
+        return materials;
+    }
+    private Map<UUID,Schema2CombatRules.Context> contexts(List<Member> members,
+            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,Map<UUID,Long> versions,
+            Map<UUID,Schema2CharacterRuntimeService.Material> materials) {
         Map<UUID,Schema2CombatRules.Context> result=new LinkedHashMap<>();
         for (Member member:members) {
             var history=histories.get(member.characterId()); Long version=versions.get(member.characterId());
             if (history==null||version==null||version<0||version>=history.events().size()) throw rejected("S2_COMBAT_STALE_CHARACTER");
             var state=history.events().get(Math.toIntExact(version)).after();
-            var material=characterService.material(c,member.identity(),member.preparationOperationId());
+            var material=materials.get(member.characterId());
             result.put(member.characterId(),new Schema2CombatRules.Context(material.projection(),material.initial(),state));
         }
         return result;
     }
-    private void validate(Connection c,History history) throws SQLException {
+    private CharacterRead validate(Connection c,History history) throws SQLException {
         JdbcSchema2CombatRuntimeRepository.validate(history);
-        var all=readCharacters(c,history.members()); validateEvents(c,history,all);
+        var all=readCharacters(c,history.members()); validateEvents(history,all.histories(),all.materials());
+        return all;
     }
-    private void validateEvents(Connection c,History history,Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> all) throws SQLException {
+    private void validateEvents(History history,Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> all,
+            Map<UUID,Schema2CharacterRuntimeService.Material> materials) throws SQLException {
         try {
             Map<UUID,Long> preceding=null;
             for (Event event:history.events()) {
                 Map<UUID,Long> versions=new LinkedHashMap<>(); event.dependencies().forEach(d->versions.put(d.characterId(),d.version()));
                 if (preceding!=null&&!preceding.equals(versions)) throw rejected("S2_COMBAT_DEPENDENCY_HISTORY");
-                var roster=contexts(c,history.members(),all,versions);
+                // Materials were physically verified for this validation call. Only character state varies by event.
+                var roster=contexts(history.members(),all,versions,materials);
                 var binding=Schema2RulesBinding.from(roster.values().iterator().next().material());
                 Request request=new Request(event.operationId(),history.current().combatId(),history.current().campaignId(),binding,
                         history.members(),event.before()==null?-1:event.before().version(),versions,event.command());
@@ -265,7 +279,7 @@ public final class Schema2CombatRuntimeService {
     private void validateSaved(Connection c,Save save) throws SQLException {
         Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> all=new LinkedHashMap<>();
         for (var history:save.characters()) { characterService.validateRestoration(c,history); all.put(history.current().characterId(),history); }
-        try { validateEvents(c,save.combat(),all); } catch (SQLException|RuntimeException invalid) { throw rejected("S2_COMBAT_RESTORE_INVALID"); }
+        try { validateEvents(save.combat(),all,readMaterials(c,save.combat().members())); } catch (SQLException|RuntimeException invalid) { throw rejected("S2_COMBAT_RESTORE_INVALID"); }
     }
     private boolean sameCharacters(Connection c,Save save) throws SQLException {
         for (var history:save.characters()) if (!history.equals(characters.read(c,history.current().characterId()))) return false;
@@ -280,16 +294,17 @@ public final class Schema2CombatRuntimeService {
             int closeEvents=closing?0:1; // explicit terminal scene close
             if(!closing && (before==null || before.status()==Schema2CombatState.Status.ACTIVE))closeEvents++;
             if(!closing && before!=null) {
+                closeEvents+=(int)before.monsterRests().stream().filter(r->r.status()==MonsterRestStatus.ACTIVE).count();
                 closeEvents+=(int)before.concentrationHolders().stream().map(ConcentrationHolder::actorId).distinct().count();
                 closeEvents+=(int)before.environmentZones().stream().filter(z->z.endedOperationId()==null).count();
                 if(before.shields().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)
                         || before.readyPreparations().stream().anyMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING))closeEvents+=histories.size();
             }
-            if(Set.of(Kind.CAST,Kind.READY_SPELL,Kind.CREATE_ENVIRONMENT_ZONE).contains(command.kind()))closeEvents++;
+            if(Set.of(Kind.CAST,Kind.READY_SPELL,Kind.CREATE_ENVIRONMENT_ZONE,Kind.BEGIN_MONSTER_REST).contains(command.kind()))closeEvents++;
             if(Set.of(Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL,Kind.DECLARE_SHIELD).contains(command.kind()))closeEvents+=histories.size();
             int remaining=command.kind()==Kind.MOVE?command.path().size():before==null||before.activeFlow()==null?0:
                     before.activeFlow().movements().stream().filter(m->m.status()==MovementStatus.PENDING).mapToInt(m->m.path().size()-m.cursor()).sum();
-            JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(previous,before,suffix+closeEvents,histories.size(),remaining);
+            JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(previous,before,suffix+closeEvents,before==null?command.deployments().size()+command.monsterDeployments().size():before.combatants().size(),remaining);
             // The mandatory path may pass all optional reactions. Already accepted attacks/casts
             // still need their damage/healing and root exploration-time children before returning.
             Map<UUID,Integer> required=new HashMap<>();for(UUID id:histories.keySet())required.put(id,0);
@@ -300,7 +315,7 @@ public final class Schema2CombatRuntimeService {
             }
             for(UUID id:prepared.possibleHealthTargets())required.merge(id,2,Integer::sum);
             for(var entry:histories.entrySet()) {
-                int closure=closing?0:3; // ending this round and any pending turn-bound facts
+                int closure=closing?0:3+(before==null?0:(int)before.monsterRests().stream().filter(r->r.status()==MonsterRestStatus.ACTIVE).count())+(command.kind()==Kind.BEGIN_MONSTER_REST?1:0); // ending this round and any pending turn-bound facts
                 JdbcSchema2CharacterRuntimeRepository.checkCombatCapacity(entry.getValue(),required.get(entry.getKey())+closure);
             }
         } catch (SQLException|IllegalArgumentException exhausted) { throw rejected("S2_COMBAT_CAPACITY"); }
@@ -309,7 +324,7 @@ public final class Schema2CombatRuntimeService {
     private static String fingerprint(Request request) {
         try {
             var bytes=new ByteArrayOutputStream(); var out=new DataOutputStream(bytes);
-            text(out,"local-dnd/schema2-combat-command/2"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
+            text(out,"local-dnd/schema2-combat-command/3"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
             var binding=request.rules(); text(out,binding.canonicalProfile()); text(out,binding.compositionAlgorithm());
             out.writeInt(binding.members().size());
             for (var m:binding.members()) { text(out,m.moduleKey()); text(out,m.releaseVersion()); text(out,m.role().name()); text(out,m.rawZipSha256()); text(out,m.logicalSha256()); }
@@ -333,6 +348,9 @@ public final class Schema2CombatRuntimeService {
             var health=command.healthInput();out.writeBoolean(health!=null);
             if(health!=null){ruleIdentity(out,health.rule());ruleIdentity(out,health.effect());text(out,Objects.toString(health.temporaryChoice(),""));text(out,health.adjudication());}
             out.writeInt(command.seconds());
+            out.writeInt(command.monsterDeployments().size());for(MonsterDeployment d:command.monsterDeployments()) {id(out,d.monsterId());ruleIdentity(out,d.monster());position(out,d.position());out.writeInt(d.side());}
+            BreathInput breath=command.breathInput();out.writeBoolean(breath!=null);if(breath!=null) {entryIdentity(out,breath.action());out.writeInt(breath.direction());}
+            MonsterRestInput rest=command.monsterRestInput();out.writeBoolean(rest!=null);if(rest!=null) {id(out,rest.restKey());text(out,rest.kind().name());}
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException|NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
@@ -340,6 +358,9 @@ public final class Schema2CombatRuntimeService {
         out.writeBoolean(cast!=null);if(cast==null)return;
         ruleIdentity(out,cast.castingRule());ruleIdentity(out,cast.spell());out.writeInt(cast.targets().size());
         for(UUID target:cast.targets())id(out,target);id(out,cast.materialItemId());out.writeInt(cast.slotLevel());id(out,cast.targetCastFrameKey());
+    }
+    private static void entryIdentity(DataOutputStream out,com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity identity)throws IOException {
+        ruleIdentity(out,identity.rule());text(out,identity.collectionKey());text(out,identity.moduleKey());text(out,identity.entryKey());
     }
     private static void ruleIdentity(DataOutputStream out,com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity identity)throws IOException {
         out.writeBoolean(identity!=null);if(identity!=null){text(out,identity.moduleKey());text(out,identity.ruleType());text(out,identity.ruleKey());}

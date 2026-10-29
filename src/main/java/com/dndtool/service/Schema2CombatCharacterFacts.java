@@ -60,7 +60,7 @@ final class Schema2CombatCharacterFacts {
             return healed.state();
         }
         if (command.kind().equals("COMBAT_TIME_ADVANCED")) {
-            State after=Schema2CombatTimeRules.advanceSeconds(material,before,command.combatInput().secondsAdvanced());
+            State after=command.combatInput().secondsAdvanced()>60?Schema2CombatTimeRules.advanceRestSeconds(material,before,command.combatInput().secondsAdvanced()):Schema2CombatTimeRules.advanceSeconds(material,before,command.combatInput().secondsAdvanced());
             if(!result.equals(new HealthResult(List.of(),null,null,0,(int)(after.hitPoints()-before.hitPoints()))))
                 throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
             return after;

@@ -64,7 +64,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                         value.minimumEnabledMembers(), value.authorNote(), bit(row.enabled()));
             } else if (row instanceof FinalCharacterSource source) {
                 if (!key.ruleType().equals("character.subrace")) insertSource(connection, identity, i, source);
-            } else if (JdbcSchema2GrowthSnapshotRows.supports(row) || JdbcSchema2EquipmentSnapshotRows.supports(row) || JdbcSchema2CombatSnapshotRows.supports(row) || JdbcSchema2SpellSnapshotRows.supports(row) || JdbcSchema2WizardSnapshotRows.supports(row)) {
+            } else if (JdbcSchema2GrowthSnapshotRows.supports(row) || JdbcSchema2EquipmentSnapshotRows.supports(row) || JdbcSchema2CombatSnapshotRows.supports(row) || JdbcSchema2SpellSnapshotRows.supports(row) || JdbcSchema2WizardSnapshotRows.supports(row) || JdbcSchema2MonsterSnapshotRows.supports(row)) {
                 // Insert after all class source rows; the owner can belong to a later loaded package.
             } else {
                 throw invalid();
@@ -87,9 +87,10 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             JdbcSchema2SpellSnapshotRows.store(connection, identity, i, typed.rules().get(i));
         for (int i = 0; i < typed.rules().size(); i++) if (JdbcSchema2WizardSnapshotRows.supports(typed.rules().get(i)))
             JdbcSchema2WizardSnapshotRows.store(connection, identity, i, typed.rules().get(i));
+        for(int i=0;i<typed.rules().size();i++) if(JdbcSchema2MonsterSnapshotRows.supports(typed.rules().get(i))) JdbcSchema2MonsterSnapshotRows.store(connection,identity,i,typed.rules().get(i));
         for (int i = 0; i < typed.entries().size(); i++) {
             var row = typed.entries().get(i); var value = row.entry(); var key = value.identity();
-            if (JdbcSchema2GrowthSnapshotRows.storeEntry(connection, identity, i, row) || JdbcSchema2WizardSnapshotRows.storeEntry(connection,identity,i,row)) continue;
+            if (JdbcSchema2GrowthSnapshotRows.storeEntry(connection, identity, i, row) || JdbcSchema2WizardSnapshotRows.storeEntry(connection,identity,i,row) || JdbcSchema2MonsterSnapshotRows.storeEntry(connection,identity,i,row)) continue;
             if (value instanceof ProficiencyGrantEntry grant) {
                 List<Object> values = new ArrayList<>(List.of(identity.snapshotBytes(), i, ascii(key.rule().moduleKey()),
                         ascii(key.rule().ruleType()), ascii(key.rule().ruleKey()), ascii(key.collectionKey()), ascii(key.moduleKey()), ascii(key.entryKey())));
@@ -120,6 +121,8 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                         + prefixedState("before_") + ", " + prefixedState("after_"), values.toArray());
                 JdbcSchema2GrowthSnapshotRows.storeChainPredicate(connection, identity, i, j, "BEFORE", step.before());
                 JdbcSchema2GrowthSnapshotRows.storeChainPredicate(connection, identity, i, j, "AFTER", step.after());
+                JdbcSchema2MonsterSnapshotRows.storeChain(connection,identity,i,j,"BEFORE",step.before());
+                JdbcSchema2MonsterSnapshotRows.storeChain(connection,identity,i,j,"AFTER",step.after());
             }
         }
         Snapshot actual = readRows(connection, identity);
@@ -153,6 +156,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                         digest(result, "raw_zip_sha256"), digest(result, "logical_sha256")));
             }));
             // Domain rows are independently loaded. A shared ordered index prevents gaps or duplicate rules across typed tables.
+            var monsterAtoms=JdbcSchema2MonsterSnapshotRows.readAtoms(connection,identity);
             TreeMap<Integer, FinalRule> rules = new TreeMap<>();
             for (var row : rows(connection, identity, "s2_runtime_language", "rule_index", MAX_RULES, result -> {
                 RuleIdentity key = new RuleIdentity(binaryAscii(result, "module_key", 64), "character.language", binaryAscii(result, "rule_key", 128));
@@ -188,6 +192,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             for (var row : JdbcSchema2CombatSnapshotRows.read(connection, identity).entrySet()) require(rules.putIfAbsent(row.getKey(), row.getValue()) == null);
             for (var row : JdbcSchema2SpellSnapshotRows.read(connection, identity).entrySet()) require(rules.putIfAbsent(row.getKey(), row.getValue()) == null);
             for (var row : JdbcSchema2WizardSnapshotRows.read(connection, identity).entrySet()) require(rules.putIfAbsent(row.getKey(), row.getValue()) == null);
+            for(var row:JdbcSchema2MonsterSnapshotRows.readRules(connection,identity,monsterAtoms).entrySet())require(rules.putIfAbsent(row.getKey(),row.getValue())==null);
             require(rules.size() <= MAX_RULES);
             for (int i = 0; i < rules.size(); i++) require(rules.containsKey(i));
             TreeMap<Integer, FinalEntry> entryRows = new TreeMap<>();
@@ -213,6 +218,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             })) require(entryRows.putIfAbsent(row.index(), row.value()) == null);
             for (var row : JdbcSchema2GrowthSnapshotRows.readEntries(connection, identity).entrySet()) require(entryRows.putIfAbsent(row.getKey(), row.getValue()) == null);
             for (var row : JdbcSchema2WizardSnapshotRows.readEntries(connection, identity).entrySet()) require(entryRows.putIfAbsent(row.getKey(), row.getValue()) == null);
+            for(var row:JdbcSchema2MonsterSnapshotRows.readEntries(connection,identity,monsterAtoms).entrySet())require(entryRows.putIfAbsent(row.getKey(),row.getValue())==null);
             require(entryRows.size() <= MAX_ENTRIES);
             for (int i = 0; i < entryRows.size(); i++) require(entryRows.containsKey(i));
             List<FinalEntry> entries = List.copyOf(entryRows.values());
@@ -227,7 +233,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                 require(chainIndex >= 0 && chainIndex < storedChains.size());
                 Field field = storedChains.get(chainIndex).field;
                 return new StoredStep(chainIndex, integer(result, "step_index"), new ChainStep(binaryAscii(result, "operation", 11),
-                        readState(result, "before_", field, predicates, chainIndex, integer(result, "step_index")), readState(result, "after_", field, predicates, chainIndex, integer(result, "step_index")), new Provider(module, version), integer(result, "load_index"),
+                        readState(result, "before_", field, predicates, monsterAtoms, chainIndex, integer(result, "step_index")), readState(result, "after_", field, predicates, monsterAtoms, chainIndex, integer(result, "step_index")), new Provider(module, version), integer(result, "load_index"),
                         new Location(module, version, digest(result, "raw_zip_sha256"), binaryAscii(result, "author_path", 240),
                                 textAllowEmpty(result, "author_pointer", 4096), null), binaryAscii(result, "origin", 16)));
             });
@@ -241,7 +247,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                 }
                 chains.add(new FieldChain(chain.target, chain.field, chainSteps));
             }
-            require(cursor == steps.size()); predicates.complete();
+            require(cursor == steps.size()); predicates.complete();monsterAtoms.complete();
             require(header.members == members.size() && header.rules == rules.size() && header.entries == entries.size()
                     && header.chains == chains.size() && header.steps == steps.size());
             ProductionSchema2Projection rebuilt = ProductionSchema2Projection.restore(members, List.copyOf(rules.values()), entries, chains);
@@ -267,6 +273,8 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
     }
     private static List<Object> stateValues(FieldState state, Field field) {
         FieldValue value = state.value();
+        if(value instanceof MonsterStatBlockValue)value=new TextValue("STAT_BLOCK");
+        else if(value instanceof MonsterActionProfileValue)value=new TextValue("ACTION_PROFILE");
         List<Object> values = new ArrayList<>(Arrays.asList(ascii(state.state().name()), value instanceof TextValue text ? text.value() : null,
                 value instanceof IntegerValue integer ? integer.value() : null, value instanceof BooleanValue bool ? bit(bool.value()) : null,
                 value instanceof IdentityValue reference ? ascii(reference.value().moduleKey()) : null,
@@ -275,7 +283,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
         values.addAll(JdbcSchema2GrowthSnapshotRows.extraState(state, field));
         return values;
     }
-    private static FieldState readState(ResultSet result, String prefix, Field field, JdbcSchema2GrowthSnapshotRows.Predicates predicates, int chain, int step) throws SQLException {
+    private static FieldState readState(ResultSet result, String prefix, Field field, JdbcSchema2GrowthSnapshotRows.Predicates predicates, JdbcSchema2MonsterSnapshotRows.Atoms monsterAtoms, int chain, int step) throws SQLException {
         StateKind kind = StateKind.valueOf(binaryAscii(result, prefix + "state", 13));
         Object text = result.getObject(prefix + "text_value"), integer = result.getObject(prefix + "integer_value"), bool = result.getObject(prefix + "boolean_value"),
                 module = result.getObject(prefix + "reference_module_key"), key = result.getObject(prefix + "reference_rule_key"), referenceType = result.getObject(prefix + "reference_rule_type"), prerequisite = result.getObject(prefix + "prerequisite_groups");
@@ -285,7 +293,8 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
         int count = (text == null ? 0 : 1) + (integer == null ? 0 : 1) + (bool == null ? 0 : 1) + (module == null && key == null && referenceType == null ? 0 : 1) + (grant ? 1 : 0) + (growth ? 1 : 0) + (prerequisite == null ? 0 : 1);
         if (kind != StateKind.PRESENT) { require(count == 0); return new FieldState(kind, null); }
         require(count == 1); FieldValue value;
-        if (text != null) value = new TextValue(text(result, prefix + "text_value", 1000));
+        if(field==Field.STAT_BLOCK || field==Field.ACTION_PROFILE){require(text!=null);String marker=text(result,prefix+"text_value",1000);require(marker.equals(field==Field.STAT_BLOCK?"STAT_BLOCK":"ACTION_PROFILE"));value=monsterAtoms.take(prefix.equals("before_")?"BEFORE":"AFTER",chain,step,field);}
+        else if (text != null) value = new TextValue(text(result, prefix + "text_value", 1000));
         else if (integer != null) value = new IntegerValue(integer(result, prefix + "integer_value"));
         else if (bool != null) value = new BooleanValue(bool(result, prefix + "boolean_value"));
         else if (grant) { require(field == Field.GRANT); value = new GrantValue(readGrant(result, prefix)); }

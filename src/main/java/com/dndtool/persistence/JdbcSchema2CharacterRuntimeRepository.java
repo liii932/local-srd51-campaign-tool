@@ -213,7 +213,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         }
         public CombatInput {
             if (!validUuid(combatId) || !validUuid(combatOperationId) || !validUuid(frameKey) || !validUuid(actorId)
-                    || damageAmount < 0 || damageAmount > 65535 || secondsAdvanced<0 || secondsAdvanced>60) throw new IllegalArgumentException("S2_CHARACTER_COMBAT_INPUT");
+                    || damageAmount < 0 || damageAmount > 65535 || secondsAdvanced<0 || secondsAdvanced>28800) throw new IllegalArgumentException("S2_CHARACTER_COMBAT_INPUT");
         }
     }
     public record Command(String kind, RuleIdentity resource, long amount, String recoveryTrigger, String hpChoice,
@@ -287,7 +287,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                     && (!kind.equals("COMBAT_DEATH_SAVE_RESOLVED") || combatInput.damageAmount() == 0 && !combatInput.critical());
             else valid &= combatInput == null;
             if (combatInput != null) valid &= kind.equals("COMBAT_TIME_ADVANCED")
-                    ? combatInput.secondsAdvanced()>=1 && combatInput.secondsAdvanced()<=60 && combatInput.damageAmount()==0 && !combatInput.critical()
+                    ? combatInput.secondsAdvanced()>=1 && combatInput.secondsAdvanced()<=28800 && combatInput.damageAmount()==0 && !combatInput.critical()
                     : combatInput.secondsAdvanced()==0;
             if (spellbookKind(kind)) valid = resource==null && amount==0 && recoveryTrigger==null && hpChoice==null && targetClass==null
                     && GrowthChoices.EMPTY.equals(growthChoices) && restInput==null && checkInput==null && equipmentInput==null && healthInput==null

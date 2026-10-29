@@ -101,7 +101,7 @@ class V011CompleteCharacterCatalogDraftTest {
     void approvedManifestPreservesV011ThroughV018AsForwardOnlyHistory() throws Exception {
         var expectations = SchemaMigrations.loadExpectations();
 
-        assertEquals(38, expectations.size());
+        assertEquals(40, expectations.size());
         assertEquals(11, expectations.get(10).version());
         assertEquals("V011__complete_character_catalog_draft.sql",
                 expectations.get(10).scriptName());

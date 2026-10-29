@@ -1,0 +1,27 @@
+{
+  "author_schema_version": 2,
+  "module_key": "monster_extension",
+  "release_version": "1",
+  "package_display_name": "Atomic monster provenance changes",
+  "role": "extension",
+  "dependencies": [
+    {
+      "module_key": "monster_base",
+      "supported_versions": [
+        "1"
+      ]
+    }
+  ],
+  "compatible_combinations": [
+    {
+      "monster_base": "1"
+    }
+  ],
+  "load_order_constraints": [],
+  "files": [
+    {
+      "kind": "changes",
+      "path": "changes.json"
+    }
+  ]
+}

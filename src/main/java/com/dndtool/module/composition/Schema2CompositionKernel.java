@@ -39,6 +39,7 @@ public final class Schema2CompositionKernel {
     /** Same bounded categories as the existing tool proficiency partition. */
     public enum ToolCategory { ARTISAN, KIT, GAMING_SET, MUSICAL_INSTRUMENT, NAVIGATION, VEHICLE }
     public enum Field {
+        STAT_BLOCK("stat_block"), ACTION_PROFILE("action_profile"),
         DISPLAY_NAME("display_name"), DESCRIPTION("description"), CATEGORY("category"),
         SOURCE_PAGE("source_page"), MINIMUM_ENABLED_MEMBERS("minimum_enabled_members"),
         AUTHOR_NOTE("author_note"), LANGUAGE("language"), TOOL("tool"),
@@ -86,7 +87,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -121,7 +122,7 @@ public final class Schema2CompositionKernel {
     }
     public enum FeatureKind { FEATURE, OPTION }
     public enum FeatureExecution { AUTOMATIC, DM_ADJUDICATION, BLOCKED }
-    public enum ProficiencyCategory { SKILL, ARMOR, WEAPON, TOOL }
+    public enum ProficiencyCategory { SKILL, SAVING_THROW, ARMOR, WEAPON, TOOL }
     public record SubclassDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             RuleIdentity ownerClass, int selectionLevel, String authorNote) implements Definition { }
     public record FeatureDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
@@ -171,6 +172,40 @@ public final class Schema2CompositionKernel {
     /** Fixed, explicitly authored DM environment, never evidence of an Antimagic Field spell cast. */
     public record EnvironmentDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             String algorithm, String authorNote) implements Definition { }
+    public enum MonsterSize { TINY, SMALL, MEDIUM, LARGE, HUGE, GARGANTUAN }
+    public enum MonsterCreatureType { ABERRATION, BEAST, CELESTIAL, CONSTRUCT, DRAGON, ELEMENTAL, FEY, FIEND, GIANT, HUMANOID, MONSTROSITY, OOZE, PLANT, UNDEAD }
+    public enum MonsterDefenseKind { IMMUNITY, RESISTANCE, VULNERABILITY }
+    public record MonsterAbilities(int strength, int dexterity, int constitution, int intelligence, int wisdom, int charisma) { }
+    public record MonsterSaveBonus(String abilityKey, int bonus) { }
+    public record MonsterSkillBonus(String skillKey, int bonus) { }
+    public enum MonsterDefenseQualifier { ALL, NONMAGICAL_ATTACKS }
+    public record MonsterDamageDefense(MonsterDefenseKind kind, DamageType damageType, MonsterDefenseQualifier qualifier) { }
+    /** Language and trait text is stat-block metadata, never an executable grant or handler. */
+    public record MonsterLanguage(String name, boolean understands, boolean speaks) { }
+    public enum MonsterTraitScope { PERCEPTION_HEARING_SMELL_ONLY, ATTACK_ROLL_PACK_TACTICS_ONLY, UNSUPPORTED }
+    public record MonsterTrait(String key, MonsterTraitScope scope, String displayName, String description) { }
+    public record MonsterStatBlock(MonsterSize size, MonsterCreatureType creatureType, String alignment,
+            int armorClass, String armorDescription, int hitPoints, int hitDiceCount, int hitDiceSides, int hitDiceModifier,
+            int walkSpeedFeet, MonsterAbilities abilities, List<MonsterSaveBonus> savingThrows,
+            List<MonsterSkillBonus> skills, List<MonsterDamageDefense> damageDefenses, List<String> conditionImmunities,
+            int darkvisionFeet, int blindsightFeet, int tremorsenseFeet, int truesightFeet, int passivePerception,
+            List<MonsterLanguage> languages, int challengeNumerator, int challengeDenominator,
+            int experiencePoints, List<MonsterTrait> traits) {
+        public MonsterStatBlock {
+            savingThrows=List.copyOf(savingThrows); skills=List.copyOf(skills); damageDefenses=List.copyOf(damageDefenses);
+            conditionImmunities=List.copyOf(conditionImmunities); languages=List.copyOf(languages); traits=List.copyOf(traits);
+        }
+    }
+    public record MonsterDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            MonsterStatBlock statBlock, String authorNote) implements Definition { }
+    public enum MonsterActionMode { BLOCKED_METADATA, SAVE_DAMAGE_BATCH_V1 }
+    public record MonsterSavePolicy(String abilityKey, String dcMode, int dc, String failOutcome, String successOutcome) { }
+    public record MonsterDamageProfile(int diceCount, int diceSides, DamageType damageType, String delivery, String abilityModifier) { }
+    public record MonsterArea(String shape, int lengthFeet, String originPolicy) { }
+    public record MonsterRecharge(int diceSides, int minimumRoll, boolean turnStart, boolean shortRest, boolean longRest) { }
+    public record MonsterActionProfile(String displayName, String description, int sourcePage, MonsterActionMode mode,
+            String mechanism, MonsterSavePolicy savePolicy, MonsterDamageProfile damageProfile,
+            MonsterArea area, MonsterRecharge recharge) { }
     public sealed interface GrowthGrantSpec permits FixedGrowthGrant, ChoiceGrowthGrant { }
     public record FixedGrowthGrant(RuleIdentity target) implements GrowthGrantSpec { }
     public record ChoiceGrowthGrant(RuleIdentity candidates, int count) implements GrowthGrantSpec { }
@@ -178,7 +213,7 @@ public final class Schema2CompositionKernel {
     public sealed interface GrantSpec permits FixedGrant, ChoiceGrant { GrantCategory category(); }
     public record FixedGrant(GrantCategory category, RuleIdentity target) implements GrantSpec { }
     public record ChoiceGrant(GrantCategory category, RuleIdentity candidates, int count) implements GrantSpec { }
-    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry, ClassLevelEntry, ProficiencyMemberEntry, GrowthProficiencyGrantEntry, SpellbookEntry {
+    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry, ClassLevelEntry, ProficiencyMemberEntry, GrowthProficiencyGrantEntry, SpellbookEntry, MonsterActionEntry {
         EntryIdentity identity();
         String authorNote();
         RuleIdentity target();
@@ -204,7 +239,12 @@ public final class Schema2CompositionKernel {
     public record SpellbookEntry(EntryIdentity identity, RuleIdentity spell, String authorNote) implements Entry {
         @Override public RuleIdentity target() { return spell; }
     }
-    public sealed interface FieldValue permits TextValue, IntegerValue, IdentityValue, BooleanValue, GrantValue, PrerequisiteValue, GrowthGrantValue { }
+    public record MonsterActionEntry(EntryIdentity identity, MonsterActionProfile actionProfile, String authorNote) implements Entry {
+        @Override public RuleIdentity target() { return identity.rule(); }
+    }
+    public sealed interface FieldValue permits TextValue, IntegerValue, IdentityValue, BooleanValue, GrantValue, PrerequisiteValue, GrowthGrantValue, MonsterStatBlockValue, MonsterActionProfileValue { }
+    public record MonsterStatBlockValue(MonsterStatBlock value) implements FieldValue { }
+    public record MonsterActionProfileValue(MonsterActionProfile value) implements FieldValue { }
     public record TextValue(String value) implements FieldValue { }
     public record IntegerValue(int value) implements FieldValue { }
     public record IdentityValue(RuleIdentity value) implements FieldValue { }
@@ -233,7 +273,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -309,6 +349,9 @@ public final class Schema2CompositionKernel {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalEnvironment(EnvironmentDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalMonster(MonsterDefinition definition, boolean enabled) implements FinalRule {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalEntry(Entry entry, boolean enabled) { }
@@ -768,7 +811,7 @@ public final class Schema2CompositionKernel {
                 Entry value = row.value;
                 Field reference = referenceField(value.identity());
                 checkReference(pack, value.identity().rule(), value.identity().rule().ruleType(), objects, row.location.child("identity").child("rule"));
-                if (value instanceof ClassLevelEntry) continue;
+                if (value instanceof ClassLevelEntry || value instanceof MonsterActionEntry) continue;
                 if (value instanceof ProficiencyGrantEntry grant)
                     checkGrantReference(pack, grant.grant(), objects, row.location.child("grant"));
                 else if (value instanceof GrowthProficiencyGrantEntry grant)
@@ -1121,6 +1164,10 @@ public final class Schema2CompositionKernel {
     private static Definition definition(Object input, Location source) {
         Map<String, Object> initial = object(input, source);
         RuleIdentity identity = ruleIdentity(required(initial, "identity", source), source.child("identity"));
+        if (identity.ruleType().equals("adventure.monster")) {
+            var row=shape(input,Set.of("identity","display_name","description","source_page","stat_block"),Set.of("author_note"),source);
+            return new MonsterDefinition(identity,text(row.get("display_name"),120,source.child("display_name")),text(row.get("description"),1000,source.child("description")),sourcePage(identity.ruleType(),row.get("source_page"),source.child("source_page")),Schema2MonsterCodec.statBlock(row.get("stat_block"),source.child("stat_block")),row.containsKey("author_note")?text(row.get("author_note"),1000,source.child("author_note")):null);
+        }
         if (executionType(identity.ruleType())) return executionDefinition(input, identity, source);
         if (newAdvancementType(identity.ruleType()))
             return advancementDefinition(input, identity, source);
@@ -1294,7 +1341,7 @@ public final class Schema2CompositionKernel {
             throw fail("S2_TYPE",Stage.AUTHOR,"Ordinary melee profiles require physical damage",source);
         return result;
     }
-    private static boolean booleanAtom(Object value, Location source) {
+    static boolean booleanAtom(Object value, Location source) {
         if (!(value instanceof Boolean result)) throw fail("S2_TYPE", Stage.AUTHOR, "Expected boolean", source);
         return result;
     }
@@ -1328,8 +1375,8 @@ public final class Schema2CompositionKernel {
                 integer(row.get("selection_level"), 1, 20, source.child("selection_level")), note);
         if (identity.ruleType().equals("character.proficiency")) {
             String ability = row.containsKey("ability_key") ? abilityKey(row.get("ability_key"), source.child("ability_key")) : null;
-            if ((category == ProficiencyCategory.SKILL) != (ability != null))
-                throw fail("S2_TYPE", Stage.AUTHOR, "Only skill proficiencies declare an ability", source);
+            if ((category == ProficiencyCategory.SKILL || category == ProficiencyCategory.SAVING_THROW) != (ability != null))
+                throw fail("S2_TYPE", Stage.AUTHOR, "Skill and saving throw proficiencies require an ability", source);
             return new ProficiencyDefinition(identity, name, description, page, category, ability, note);
         }
         FeatureExecution mode = featureExecution(identity.ruleType(), row.get("execution_mode"), source.child("execution_mode"));
@@ -1427,7 +1474,7 @@ public final class Schema2CompositionKernel {
         return result;
     }
 
-    private static <T extends Enum<T>> T enumValue(Class<T> type, Object value, Location source) {
+    static <T extends Enum<T>> T enumValue(Class<T> type, Object value, Location source) {
         try { return Enum.valueOf(type, string(value, source)); }
         catch (IllegalArgumentException invalid) { throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported " + type.getSimpleName(), source); }
     }
@@ -1481,6 +1528,7 @@ public final class Schema2CompositionKernel {
         Field reference = referenceField(entry);
         Map<String, Object> row = shape(input, Set.of("identity", reference.key()), Set.of("author_note"), source);
         String note = row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null;
+        if (reference == Field.ACTION_PROFILE) return new MonsterActionEntry(entry,Schema2MonsterCodec.actionProfile(row.get("action_profile"),source.child("action_profile")),note);
         if (reference == Field.GRANT) return new ProficiencyGrantEntry(entry, grant(row.get("grant"), source.child("grant")), note);
         if (reference == Field.GROWTH_GRANT) return new GrowthProficiencyGrantEntry(entry, growthGrant(row.get("growth_grant"), source.child("growth_grant")), note);
         RuleIdentity target = typedReference(row.get(reference.key()), referenceType(reference), source.child(reference.key()));
@@ -1514,6 +1562,8 @@ public final class Schema2CompositionKernel {
         }
         Object value = row.get("value");
         FieldValue typed = switch (field) {
+            case STAT_BLOCK -> new MonsterStatBlockValue(Schema2MonsterCodec.statBlock(value,source.child("value")));
+            case ACTION_PROFILE -> new MonsterActionProfileValue(Schema2MonsterCodec.actionProfile(value,source.child("value")));
             case DISPLAY_NAME -> new TextValue(text(value, 120, source.child("value")));
             case DESCRIPTION, AUTHOR_NOTE -> new TextValue(text(value, 1000, source.child("value")));
             case CATEGORY -> new TextValue(((RuleIdentity) target).ruleType().equals("character.tool")
@@ -1571,11 +1621,12 @@ public final class Schema2CompositionKernel {
         boolean catalog = Set.of("catalog.language_set", "catalog.tool_set", "catalog.proficiency_set").contains(rule.ruleType());
         boolean progression = rule.ruleType().equals("character.class_progression");
         boolean spellbook = rule.ruleType().equals("character.wizard_spellcasting");
-        if (!catalog && !sourceType(rule.ruleType()) && !progression && !spellbook)
+        boolean monster=rule.ruleType().equals("adventure.monster");
+        if (!catalog && !sourceType(rule.ruleType()) && !progression && !spellbook && !monster)
             throw fail("S2_TYPE", Stage.AUTHOR, "Entry owner requires a catalog set or character source", source.child("rule").child("rule_type"));
         String collection = string(row.get("collection_key"), source.child("collection_key"));
         if (!(progression ? Set.of("levels", "starting_proficiencies", "multiclass_proficiencies").contains(collection)
-                : collection.equals(spellbook ? "spells" : catalog ? "members" : "proficiency_grants")))
+                : collection.equals(monster ? "actions" : spellbook ? "spells" : catalog ? "members" : "proficiency_grants")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unknown collection key for this owner type", source.child("collection_key"));
         String owner = moduleKey(row.get("module_key"), source.child("module_key"));
         String key = identifier(row.get("entry_key"), "[a-z][a-z0-9_]{0,63}", source.child("entry_key"));
@@ -1589,7 +1640,7 @@ public final class Schema2CompositionKernel {
         String type = string(row.get("rule_type"), source.child("rule_type"));
         if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
                 "character.class_progression", "character.resource", "character.subclass", "character.feature",
-                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type) && !sourceType(type))
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
         String prefix = switch (type) {
@@ -1608,6 +1659,7 @@ public final class Schema2CompositionKernel {
             case "character.movement" -> "movement";
             case "character.spellcasting", "character.wizard_spellcasting" -> "spellcasting";
             case "adventure.environment" -> "environment";
+            case "adventure.monster" -> "monster";
             case "adventure.spell" -> "spell";
             case "adventure.health" -> "health";
             case "adventure.vital_effect" -> "vital_effect";
@@ -1627,6 +1679,7 @@ public final class Schema2CompositionKernel {
             case "adventure.spell" -> integer(input, 114, 187, source);
             case "character.wizard_spellcasting" -> integer(input, 52, 53, source);
             case "adventure.environment" -> integer(input, 0, 0, source);
+            case "adventure.monster" -> integer(input, 258, 403, source);
             case "character.spellcasting" -> integer(input, 16, 17, source);
             case "adventure.health" -> integer(input, 98, 98, source);
             case "adventure.vital_effect" -> integer(input, 96, 99, source);
@@ -1671,6 +1724,7 @@ public final class Schema2CompositionKernel {
             case "catalog.tool_set" -> Field.TOOL;
             case "catalog.proficiency_set" -> Field.PROFICIENCY;
             case "character.wizard_spellcasting" -> Field.SPELL;
+            case "adventure.monster" -> Field.ACTION_PROFILE;
             case "character.class_progression" -> identity.collectionKey().equals("levels") ? Field.LEVEL : Field.GROWTH_GRANT;
             default -> {
                 if (sourceType(identity.rule().ruleType())) yield Field.GRANT;
@@ -1702,7 +1756,7 @@ public final class Schema2CompositionKernel {
 
     private static boolean tracedCharacterType(String type) {
         return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
-                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -1714,7 +1768,7 @@ public final class Schema2CompositionKernel {
         if (previous != null) throw fail("S2_DUPLICATE_IDENTITY", Stage.AUTHOR, "Duplicate declaration identity", previous, location);
     }
 
-    private static Map<String, Object> shape(Object input, Set<String> required, Set<String> optional, Location source) {
+    static Map<String, Object> shape(Object input, Set<String> required, Set<String> optional, Location source) {
         Map<String, Object> row = object(input, source);
         for (String field : row.keySet()) {
             if (!required.contains(field) && !optional.contains(field)) throw fail("S2_SHAPE", Stage.AUTHOR, "Unknown field", source.child(field));
@@ -1727,30 +1781,30 @@ public final class Schema2CompositionKernel {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> object(Object input, Location source) {
+    static Map<String, Object> object(Object input, Location source) {
         if (!(input instanceof Map<?, ?>)) throw fail("S2_SHAPE", Stage.AUTHOR, "Expected an object", source);
         return (Map<String, Object>) input;
     }
-    private static Object required(Map<String, Object> row, String field, Location source) {
+    static Object required(Map<String, Object> row, String field, Location source) {
         if (!row.containsKey(field) || row.get(field) == Schema2StrictJson.NullValue.INSTANCE) throw fail("S2_SHAPE", Stage.AUTHOR, "Missing or null required field", source.child(field));
         return row.get(field);
     }
-    private static List<?> array(Object input, Location source) {
+    static List<?> array(Object input, Location source) {
         if (!(input instanceof List<?> rows)) throw fail("S2_SHAPE", Stage.AUTHOR, "Expected an array", source);
         return rows;
     }
-    private static String string(Object input, Location source) {
+    static String string(Object input, Location source) {
         if (!(input instanceof String value)) throw fail("S2_TYPE", Stage.AUTHOR, "Expected an exact string", source);
         return value;
     }
-    private static String identifier(Object input, String regex, Location source) {
+    static String identifier(Object input, String regex, Location source) {
         String value = string(input, source);
         if (!value.matches(regex)) throw fail("S2_TYPE", Stage.AUTHOR, "Malformed exact ASCII identifier", source);
         return value;
     }
     private static String moduleKey(Object input, Location source) { return identifier(input, "[a-z][a-z0-9_]{0,63}", source); }
     private static String version(Object input, Location source) { return identifier(input, "[A-Za-z0-9][A-Za-z0-9._-]{0,63}", source); }
-    private static int integer(Object input, int minimum, int maximum, Location source) {
+    static int integer(Object input, int minimum, int maximum, Location source) {
         if (!(input instanceof Integer value) || value < minimum || value > maximum) throw fail("S2_TYPE", Stage.AUTHOR, "Expected an integer in the field range", source);
         return value;
     }
@@ -1764,7 +1818,7 @@ public final class Schema2CompositionKernel {
         try { return ToolCategory.valueOf(value); }
         catch (IllegalArgumentException error) { throw fail("S2_TYPE", Stage.AUTHOR, "Unknown tool category", source); }
     }
-    private static String text(Object input, int maximum, Location source) {
+    static String text(Object input, int maximum, Location source) {
         String value = string(input, source);
         boolean nonBlank = false;
         for (int i = 0; i < value.length();) {
@@ -2126,6 +2180,11 @@ public final class Schema2CompositionKernel {
             if (!(object.identity instanceof EntryIdentity identity)) continue;
             MutableObject owner = objects.get(identity.rule());
             Field reference = referenceField(identity);
+            if(reference==Field.ACTION_PROFILE) {
+                if(owner==null || enabled(object)&&!enabled(owner)) throw fail("S2_REFERENCE_MISSING",Stage.FINAL,"Enabled monster action requires its enabled stat block",object.source);
+                Schema2MonsterCodec.actionProfile(Schema2MonsterCodec.actionProfileJson(((MonsterActionProfileValue)object.fields.get(Field.ACTION_PROFILE).value()).value()),object.source);
+                continue;
+            }
             if (reference == Field.LEVEL) {
                 if (owner == null) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Growth level owner is missing", object.source);
                 int level = ((IntegerValue) object.fields.get(Field.LEVEL).value()).value();
@@ -2208,6 +2267,7 @@ public final class Schema2CompositionKernel {
         if (identity instanceof EntryIdentity entry) return entry.collectionKey().equals("levels")
                 ? List.of(Field.LEVEL, Field.ASI_AVAILABLE, Field.AUTHOR_NOTE) : List.of(referenceField(entry), Field.AUTHOR_NOTE);
         String type = ((RuleIdentity) identity).ruleType();
+        if(type.equals("adventure.monster")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.STAT_BLOCK,Field.AUTHOR_NOTE);
         if (type.equals("character.language") || type.equals("character.tool")) {
             return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.CATEGORY, Field.SOURCE_PAGE, Field.AUTHOR_NOTE);
         }
@@ -2291,7 +2351,8 @@ public final class Schema2CompositionKernel {
     }
     private static Map<Field, FieldState> entryFields(Entry value) {
         Map<Field, FieldState> result = new LinkedHashMap<>();
-        if (value instanceof ClassLevelEntry level) {
+        if(value instanceof MonsterActionEntry action) result.put(Field.ACTION_PROFILE,present(new MonsterActionProfileValue(action.actionProfile())));
+        else if (value instanceof ClassLevelEntry level) {
             result.put(Field.LEVEL, present(new IntegerValue(level.level())));
             result.put(Field.ASI_AVAILABLE, present(new BooleanValue(level.asiAvailable())));
         } else result.put(referenceField(value.identity()), present(value instanceof ProficiencyGrantEntry grant
@@ -2330,6 +2391,7 @@ public final class Schema2CompositionKernel {
             if (definition instanceof SpellcastingDefinition value) return new FinalSpellcasting(value, enabled);
             if (definition instanceof WizardSpellcastingDefinition value) return new FinalWizardSpellcasting(value, enabled);
             if (definition instanceof EnvironmentDefinition value) return new FinalEnvironment(value, enabled);
+            if (definition instanceof MonsterDefinition value) return new FinalMonster(value, enabled);
             if (definition instanceof HealthDefinition value) return new FinalHealth(value, enabled);
             if (definition instanceof VitalEffectDefinition value) return new FinalVitalEffect(value, enabled);
             return new FinalProficiencySet((ProficiencySetDefinition) definition, enabled);
@@ -2372,6 +2434,7 @@ public final class Schema2CompositionKernel {
     }
     private static Entry finalEntry(EntryIdentity identity, Map<Field, FieldState> fields) {
         Field reference = referenceField(identity);
+        if(reference==Field.ACTION_PROFILE) return new MonsterActionEntry(identity,((MonsterActionProfileValue)fields.get(Field.ACTION_PROFILE).value()).value(),noteField(fields));
         if (reference == Field.LEVEL) return new ClassLevelEntry(identity, ((IntegerValue) fields.get(Field.LEVEL).value()).value(),
                 ((BooleanValue) fields.get(Field.ASI_AVAILABLE).value()).value(), noteField(fields));
         if (reference == Field.GROWTH_GRANT) return new GrowthProficiencyGrantEntry(identity, ((GrowthGrantValue) fields.get(Field.GROWTH_GRANT).value()).value(), noteField(fields));
@@ -2462,6 +2525,8 @@ public final class Schema2CompositionKernel {
             result.put("kind", item.kind().name()); result.put("armor_class", item.armorClass()); result.put("strength_minimum", item.strengthMinimum());
             result.put("stealth_disadvantage", item.stealthDisadvantage()); result.put("hands", item.hands()); if (item.proficiency() != null) result.put("proficiency", identityJson(item.proficiency()));
             if (item.stealthSkill() != null) result.put("stealth_skill", identityJson(item.stealthSkill()));
+        } else if(value instanceof MonsterDefinition monster) {
+            result.put("description",monster.description());result.put("source_page",monster.sourcePage());result.put("stat_block",Schema2MonsterCodec.statBlockJson(monster.statBlock()));
         } else if (value instanceof SpellDefinition spell) {
             result.put("description",spell.description()); result.put("source_page",spell.sourcePage()); result.put("algorithm",spell.algorithm());
         } else if (value instanceof SpellcastingDefinition casting) {
@@ -2508,6 +2573,7 @@ public final class Schema2CompositionKernel {
         else if (value instanceof ProficiencyMemberEntry member) result.put("proficiency", identityJson(member.proficiency()));
         else if (value instanceof GrowthProficiencyGrantEntry grant) result.put("growth_grant", growthGrantJson(grant.grant()));
         else if (value instanceof SpellbookEntry member) result.put("spell",identityJson(member.spell()));
+        else if(value instanceof MonsterActionEntry action) result.put("action_profile",Schema2MonsterCodec.actionProfileJson(action.actionProfile()));
         else result.put(value instanceof LanguageEntry ? "language" : "tool", identityJson(value.target()));
         if (value.authorNote() != null) result.put("author_note", value.authorNote());
         return result;
@@ -2527,7 +2593,7 @@ public final class Schema2CompositionKernel {
         return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
     }
     private static boolean newAdvancementType(String type) {
-        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),
@@ -2547,6 +2613,8 @@ public final class Schema2CompositionKernel {
         return result;
     }
     private static Object valueJson(FieldValue value) {
+        if(value instanceof MonsterStatBlockValue monster) return Schema2MonsterCodec.statBlockJson(monster.value());
+        if(value instanceof MonsterActionProfileValue action) return Schema2MonsterCodec.actionProfileJson(action.value());
         if (value instanceof TextValue text) return text.value();
         if (value instanceof IntegerValue integer) return integer.value();
         if (value instanceof IdentityValue identity) return identityJson(identity.value());
@@ -2569,7 +2637,7 @@ public final class Schema2CompositionKernel {
                         "load_index", step.loadIndex(), "author_location", json("raw_zip_sha256", step.authorLocation().rawZipSha256(),
                                 "path", step.authorLocation().path(), "pointer", step.authorLocation().pointer()), "origin", step.origin())).toList());
     }
-    private static Schema2Exception fail(String code, Stage stage, String message, Location... locations) {
+    static Schema2Exception fail(String code, Stage stage, String message, Location... locations) {
         return new Schema2Exception(new Diagnostic(code, stage, message, List.of(locations)));
     }
 }

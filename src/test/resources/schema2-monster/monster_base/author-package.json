@@ -1,0 +1,31 @@
+{
+  "author_schema_version": 2,
+  "module_key": "monster_base",
+  "release_version": "1",
+  "package_display_name": "Finite original Hell Hound, Mummy and Commoner stat blocks",
+  "role": "extension",
+  "dependencies": [
+    {
+      "module_key": "growth_base",
+      "supported_versions": [
+        "1"
+      ]
+    }
+  ],
+  "compatible_combinations": [
+    {
+      "growth_base": "1"
+    }
+  ],
+  "load_order_constraints": [],
+  "files": [
+    {
+      "kind": "definitions",
+      "path": "monsters.json"
+    },
+    {
+      "kind": "entries",
+      "path": "actions.json"
+    }
+  ]
+}

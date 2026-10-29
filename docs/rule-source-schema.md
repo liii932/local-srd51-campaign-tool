@@ -6,7 +6,8 @@
 `V003__schema2-source-ledger.sql`、`V004__schema2-character-grant-source.sql`、
 `V005__schema2-advancement-source.sql`、`V006__schema2-check-source.sql`、
 `V007__schema2-equipment-health-source.sql`、`V008__schema2-combat-source.sql`、
-`V009__schema2-spell-source.sql` 与 `V010__schema2-wizard-environment-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个连续编号。
+`V009__schema2-spell-source.sql`、`V010__schema2-wizard-environment-source.sql` 与
+`V011__schema2-monster-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个连续编号。
 运行 V001—V018、RELEASED v1、旧默认发布及现有 JNDI 合同保持不变。
 
 本合同提供离线 schema 源、批准元数据、窄权限模板和独立只读账本核验器。
@@ -37,17 +38,21 @@
 
 ## 表与列
 
-来源 42 张表均为 InnoDB（包含独立账本）；schema 2 共 35 张，其中三个制品/接受/控制账本表、32 张类型化作者材料表，定义见
+来源 53 张表均为 InnoDB（包含独立账本）；schema 2 共 46 张，其中三个制品/接受/控制账本表、43 张类型化作者材料表，定义见
 [schema 2 账本](rules/schema-2-source-ledger.md)。职业进阶与资源保存完整 class 引用、有限 profile、
 最高支持等级、准确采用范围和执行模式；稳定等级、起始/多职业来源槽、子职业、特性、专长、
 有界熟练目录及休息声明分别保存。能力前提使用带组/备选序号的子行，显式存在标记区分省略和空前提。
 定义与操作保留原包作者序号，不能替换为最终组合值。检定、装备、健康算法和直接健康效果的
 完整字段、引用、负修正及清空约束见[作者来源合同](rules/schema-2-foundation-authoring.md)。
-来源 V001—V010 与运行 V001—V038 共 48 份迁移源。四类定义的准确镜像及类型化角色事实
+来源 V001—V011 与运行 V001—V040 共 51 份迁移源。四类定义的准确镜像及类型化角色事实
 见[运行快照](rules/schema-2-runtime-snapshot.md)和[角色事实存储](rules/schema-2-character-fact-storage.md)；
 实际单角色 INTERNAL 命令与历史语义见[角色基础合同](rules/schema-2-character-foundations.md)；
 [战斗作者](rules/schema-2-combat-authoring.md)与[有限施法作者](rules/schema-2-spell-authoring.md)
-分别保存准确声明、引用和修改，包含法师学习名单与明确为 DM 家规的固定抗魔环境，实际执行见各自运行合同；来源批准本身不授予执行或完整基础资格。
+分别保存准确声明、引用和修改，包含法师学习名单与明确为 DM 家规的固定抗魔环境。
+[有限怪物合同](rules/schema-2-monster-breath.md)另通过 V011 的十一张材料表保存怪物／动作、
+原子修改、stat block、save／skill／defense／condition／language／trait 子行和 action profile；
+防御保留准确适用 gate，复合原子无 JSON 袋。实际执行见各自运行合同；
+来源批准本身不授予执行或完整基础资格。
 下表和角色目录计数属于原有 schema 1 域。
 源本地 ID、安装代次与计数使用有符号 BIGINT；只有发布根 `id` 自增。
 FK 只指向源内同一发布，全部 UPDATE/DELETE RESTRICT，不级联，不引用运行 schema。
@@ -111,13 +116,13 @@ PARTITION 事实的 observed 摘要恒 NULL，COMPLETE 恒非 NULL。当前事�
 ## 账号与验收
 
 管理员分别审核 `database/grants/rule-source-{app,agent,installer,accepter,migrator}.sql`；文件不创建
-账号或设置密码。app/agent 只对 42 个准确源表 SELECT，没有 schema 通配或写权限；普通只读
+账号或设置密码。app/agent 只对 53 个准确源表 SELECT，没有 schema 通配或写权限；普通只读
 核验不能借此声明取得源提交查证屏障。installer 只获明确列级根 INSERT/UPDATE、语言/工具内容
 写权、事实/分区 INSERT、S 两计数列 UPDATE，不能写账本、状态/发布时间、根身份、永久事实
 或 S 身份。独立 migrator 仅源 schema 所需 CREATE/CREATE TEMPORARY TABLES/ALTER/INDEX/REFERENCES/TRIGGER/DML，
 没有全局权限、账号管理或 GRANT OPTION；不把其能力传给 Web/installer/accepter。
 schema 2 安装与独立验收使用不同写权限；accepter 不能插入制品，installer 不能插入验收。
-两者在 S 上的锁读能力及准确列级权限见 schema 2 账本合同。32 张作者材料表的准确列级 INSERT
+两者在 S 上的锁读能力及准确列级权限见 schema 2 账本合同。43 张作者材料表的准确列级 INSERT
 只授予 installer；accepter/app/agent 只有 SELECT。作者定义、完整引用与类型化操作和准确原包
 同事务写入，完整 reader 与全部原 ZIP 逐列核对，包含未选中包；不通过独立权限补写旧事实。
 
@@ -136,7 +141,7 @@ migrator 模板使用 `dnd\_tool\_rules`；管理员先读取 `@@GLOBAL.partial_
 另行账号授权验收。迁移前必须确认默认库精确为 `dnd_tool_rules`、无既有对象且前序历史一致，
 不能以默认库未知或可改名目标试跑。DDL 可能隐式提交，中途失败立即维护阻断，不 IF NOT EXISTS
 跳过、不盲重跑、不补造账本。迁移前逐版核对准确前序账本、严格 SQL mode 与新增对象不存在，
-执行后核对当前完整对象集；现行合计 42 张表、126 个触发器。既有历史保持原样；
+执行后核对当前完整对象集；现行合计 53 张表、159 个触发器。既有历史保持原样；
 V006/V007 前向增加检定、装备与健康的五张类型化材料表及十五个触发器，检定操作复用成长修改表。
 战斗与施法的类型化材料范围分别见上述作者合同，均纳入当前完整对象审计。
 材料迁移保留已有制品与接受事实，不要求旧账本为空；新领域原包缺少对应类型化行时完整 reader

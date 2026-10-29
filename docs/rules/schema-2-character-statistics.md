@@ -68,9 +68,10 @@
 同一属性在整个前提至多出现一次。空 `all_of` 明确表示没有属性前提；空组、未知字段、重复
 属性或越界阈值拒绝。该有界结构只表达已有成长／专长的属性门槛，不提供任意条件执行语言。
 
-`character.proficiency` 声明 `category=SKILL|ARMOR|WEAPON`，仅 SKILL 必需 `ability_key`；
+`character.proficiency` 声明 `category=SKILL|SAVING_THROW|ARMOR|WEAPON`，
+SKILL 与 SAVING_THROW 必需六属性之一的准确 `ability_key`，其余类别禁止该字段；
 工具直接使用已有 `character.tool` 身份。`catalog.proficiency_set` 声明
-`category=SKILL|ARMOR|WEAPON|TOOL` 和 `minimum_enabled_members`，其 `members` 条目以
+`category=SKILL|SAVING_THROW|ARMOR|WEAPON|TOOL` 和 `minimum_enabled_members`，其 `members` 条目以
 `proficiency` 引用同类别的真实启用候选。集合按不同完整身份计数，跨模组同键不合并。
 
 成长声明的 `starting_proficiencies`／`multiclass_proficiencies` 集合以稳定槽身份保存
@@ -78,6 +79,10 @@
 `{"kind":"CHOICE","candidates":完整集合身份,"count":1}`，数量为 1—16。
 初始四类来源的语言／工具 `proficiency_grants` 合同保持独立。新授予原子和属性前提分别使用
 类型化值及有序子行存储，不能把对象编码成文本字段。
+`SAVING_THROW` 使用同一真实成长授予／来源事实；当前角色内容由初始职业 FIXED 槽授予，
+不因多职业自动取得新职业的完整起始 save 熟练。实际普通豁免消费者由
+[有限怪物合同](schema-2-monster-breath.md)接入，按准确属性只加一次 PB；
+单角色基础检定入口仍不因作者类别新增而开放普通 save 命令。
 
 ## 组合、来源与运行投影
 

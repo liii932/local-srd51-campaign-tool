@@ -99,7 +99,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V038 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V040 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -262,7 +262,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V038 完整运行清单及来源 V001—V010（两链共 48 份迁移源）。
+并核对 V001—V040 完整运行清单及来源 V001—V011（两链共 51 份迁移源）。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -370,7 +370,7 @@ mvn '-Dtest=Schema2CheckCompositionTest,Schema2EquipmentHealthCompositionTest,Jd
 已实现的成长/休息验证继续使用下节入口。
 
 WAR 包含严格作者/组合和真实来源读取类；来源 SQL、离线安装器、作者包及测试向量排除。
-来源 V001—V010 的 42 张表、126 个触发器及 32 张类型化材料表须在另行授权的隔离 MySQL
+来源 V001—V011 的 53 张表、159 个触发器及 43 张类型化材料表须在另行授权的隔离 MySQL
 实例验收；代理和静态结构测试不能替代真实 CHECK、FK、权限、锁或持久化事实。
 
 ## Schema 2 角色成长、资源与休息验证
@@ -402,7 +402,7 @@ mvn '-Dtest=JdbcSchema2CheckSnapshotTest,JdbcSchema2EquipmentHealthSnapshotTest,
 核对封闭输入/结果、有效骰模式、完整装备健康前后状态、有序原骰、追加读回、直接恢复、
 孤儿与类型化行缺失、结构/邻接/预算限制及整笔回滚；这些测试保存已经准备的事实，不执行新业务。
 
-运行链为 V001—V038，来源保持 V001—V010，共 48 份迁移源。WAR 须包含镜像/事实仓储及
+运行链为 V001—V040，来源为 V001—V011，共 51 份迁移源。WAR 须包含镜像/事实仓储及
 全部运行迁移，排除来源 SQL、离线写入工具、测试向量和真实存档。Check/Equipment/Health
 消费者、请求幂等和 RuntimeService 命令使用下节验证；仓储测试本身只作为存储事实的证据。
 现有成长/休息测试保护新增字段的中性保留，DRAFT、Host、archive 2 和安装门保持。
@@ -467,7 +467,7 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V038 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V040 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 
@@ -528,7 +528,61 @@ mvn '-Dtest=Schema2WizardRuntimeServiceTest,Schema2ExplorationRuntimeServiceTest
 定向测试，验证法术书、成本和时间的中性保留。代理 JDBC 与静态 SQL 不替代真实 MySQL 约束、权限、
 并发和持久化验收。
 
-当前批准链为运行 V001—V038 与来源 V001—V010，共 48 份迁移源；来源为 42 张表、126 个触发器，
-其中 schema 2 为三个账本表与 32 张类型化作者材料表。WAR 须包含施法／场景消费者、类型化仓储和
+当前批准链为运行 V001—V040 与来源 V001—V011，共 51 份迁移源；来源为 53 张表、159 个触发器，
+其中 schema 2 为三个账本表与 43 张类型化作者材料表。WAR 须包含施法／场景消费者、类型化仓储和
 运行 V035—V038，排除来源 V009/V010、离线写入工具、作者包与测试向量。
 这些命令描述可重复验证方法，不表示真实数据库或完整发布门已验收。
+
+## Schema 2 有限怪物与多目标豁免伤害验证
+
+[有限怪物合同](rules/schema-2-monster-breath.md)的作者、来源与镜像先选：
+
+```bash
+mvn '-Dtest=Schema2MonsterCompositionTest,JdbcSchema2MonsterSourceTest,JdbcSchema2MonsterSnapshotTest,Schema2MonsterSchemaTest' test
+```
+
+真实批次服务和共同 owner 按改动选取怪物规则／运行测试，并补选：
+
+```bash
+mvn '-DargLine=-Xmx256m' '-Dtest=Schema2MonsterBreathRulesTest,Schema2MonsterBreathRuntimeServiceTest,Schema2MonsterBreathRuntimeSchemaTest,SchemaMigrationsTest,RuleSchemaMigrationsTest' test
+mvn '-Dtest=Schema2CombatRuntimeServiceTest,Schema2SpellRuntimeServiceTest,Schema2ExplorationRuntimeServiceTest,Schema2ReadySpellRulesTest,Schema2ReactionSpellRulesTest,JdbcSchema2CombatRuntimeRepositoryTest,Schema2SceneRuntimeSchemaTest' test
+```
+
+作者和存储测试核对 `stat_block`／`action_profile` 完整复合原子、准确 action 条目、启用、
+覆盖前后值、save 熟练真实来源、防御适用 gate、原 ZIP 与全部类型化行。旧字段或声明
+没有默认执行语义；BLOCKED_METADATA 和其他未支持动作必须拒绝消费。
+
+规则和真实服务测试使用明确初始状态及独立手算结果，经过实际准备／快照、角色、场景、
+怪物部署和真实命令到仓储读回，覆盖八方向完整点格 roster、敌友／免疫目标、一次共享
+6d6、稳定 target ordinal、逐目标真实 DEX／Bless、自然 1／20、奇数半伤、易伤／免疫、
+temp HP 全吸收、零 HP／即死／倒地掉物、全部 APPLY 后强制结束及统一 CON cut。
+公共设计原 PFE／Cutting Words golden 保留目标地位；它们未有消费者时，不能用假贡献
+冒充本轮可执行验收。after-batch Ready 必须来自准确怪物动作完成事实，不能伪造攻击或施法。
+[独立 JSON oracle](../src/test/resources/schema2-monster/breath-runtime-golden.json)固定真实一级
+角色／Bless／Ready 和 Hell Hound／Mummy 的输入、骰流、四包期望与恢复不变量；测试读取
+这些手算期望，不能用生产算法输出更新它。先攻／前置动作的随机消费与吐息的 13／14 骰分开计量。
+
+分别保存真实根命令产生的 raw PENDING 和真实 Ready 产生的 OPEN／CLOSED 窗口，再在
+来源不可用、骰源零调用的目标中直接恢复，核全部怪物、角色子历史、原骰、source／holder、
+完整 T、checks／packets／obligations 与唯一父继续点。恢复后仅执行准确剩余后缀，
+不能重付 action、重掷 raw、再次伤害、复活 ENDED Bless 或隐式 PASS。
+
+事务用例在完整预检、末尾目标／角色子事件、末尾效果、batch 子行和 accepted 写入各边界
+注入故障，区分新根全回滚与已提交 raw 前缀保留；同键重放、同键异意图、stale 继续、
+容量不足、缺失／多余／孤儿行和 UNKNOWN 原操作查证分别观察。recharge 必须来自后续
+本人真实 turn START，短／长休恢复须由真实有限怪物休息 owner 产生，GET／恢复均不抽骰或补时间。
+
+全链为运行 V001—V040、来源 V001—V011，共 51 份迁移源；来源 53 表、159 触发器，
+其中 schema 2 有三个账本表和 43 张类型化作者材料表。WAR 包含怪物／批次消费者、
+类型化仓储及运行 V039/V040；排除来源 V011、离线写入能力、作者包、独立 oracle 与测试向量。
+JDBC 代理和静态 SQL 不替代真实 MySQL、权限／锁并发、完整文件、Host、技术 END／清理、
+部署或跨域发布门；本节是验证方法，不缓存历史测试计数或宣称迁移已执行。
+
+另行授权并安装后，在准确运行 schema 以只读身份执行
+[怪物／吐息核验](../database/verify/schema2-monster-breath.sql)，并与
+[场景核验](../database/verify/schema2-combat-runtime.sql)组合使用。inventory 查询列出表、
+触发器和 FK 可见性；异常查询核完整头计数、连续 ordinal、release 时空间证明、共享骰和、
+save／packet／防御／专注引用与算术、休息及其结束引用，正常应无异常行。脚本只读且不修复。
+`Schema2MonsterBreathRuntimeSchemaTest` 对批准链、持久 DDL 前空场景门、精确复合 FK、
+不可变触发器、闭合枚举、NULL 联合分支、无窗口 raw 继续及窄授权作源码合同检查；
+它不执行上述 SQL，也不证明真实 MySQL 已通过。

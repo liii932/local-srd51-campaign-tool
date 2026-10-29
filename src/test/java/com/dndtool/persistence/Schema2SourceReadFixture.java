@@ -88,6 +88,7 @@ public class Schema2SourceReadFixture {
         rows.put("artifact", new ArrayList<>());
         rows.put("acceptance", new ArrayList<>());
         for (String table : List.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_combat_change", "rule_schema2_health", "rule_schema2_vital_effect", "rule_schema2_combat", "rule_schema2_weapon_attack", "rule_schema2_movement", "rule_schema2_spell", "rule_schema2_spellcasting", "rule_schema2_spell_change", "rule_schema2_wizard_spellcasting", "rule_schema2_environment", "rule_schema2_spellbook_member", "rule_schema2_wizard_change")) rows.put(table, new ArrayList<>());
+        for(String table:Schema2MonsterSourceFixtureRows.TABLES)rows.put(table,new ArrayList<>());
         long total = 0;
         for (int index = 0; index < artifacts.size(); index++) {
             var artifact = artifacts.get(index);
@@ -130,6 +131,7 @@ public class Schema2SourceReadFixture {
                 boolean entry = target.get("kind").getAsString().equals("entry");
                 JsonObject owner = entry ? target.getAsJsonObject("rule") : target;
                 String ruleType = owner.get("rule_type").getAsString();
+                if(ruleType.equals("adventure.monster")){Schema2MonsterSourceFixtureRows.seed(rows,artifact,kind,index,value,owner);continue;}
                 if(Set.of("character.wizard_spellcasting","adventure.environment").contains(ruleType)) {
                     seedWizardMaterial(artifact,kind,index,value,owner,ruleType);continue;
                 }
@@ -400,7 +402,7 @@ public class Schema2SourceReadFixture {
             case "setQueryTimeout" -> { assertEquals(5, args[0]); timeout[0] = true; yield null; }
             case "setMaxRows" -> {
                 maximum[0] = (int) args[0];
-                assertEquals(table.equals("ledger") ? RuleSchemaMigrations.expectations().size() + 1 : table.equals("artifact") || table.equals("acceptance") ? 17
+                assertEquals(Schema2MonsterSourceFixtureRows.TABLES.contains(table)?159745:table.equals("ledger") ? RuleSchemaMigrations.expectations().size() + 1 : table.equals("artifact") || table.equals("acceptance") ? 17
                         : Set.of("rule_schema2_character_source", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_health", "rule_schema2_vital_effect", "rule_schema2_combat", "rule_schema2_weapon_attack", "rule_schema2_movement", "rule_schema2_spell", "rule_schema2_spellcasting", "rule_schema2_wizard_spellcasting", "rule_schema2_environment").contains(table) ? 4097 : Set.of("rule_schema2_proficiency_grant", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_spellbook_member").contains(table) ? 8193
                         : Set.of("rule_schema2_character_change", "rule_schema2_advancement_change", "rule_schema2_execution_change", "rule_schema2_combat_change", "rule_schema2_spell_change", "rule_schema2_wizard_change").contains(table) ? 65537 : table.equals("rule_schema2_ability_requirement") ? 30721 : 2, maximum[0]);
                 yield null;
@@ -457,6 +459,7 @@ public class Schema2SourceReadFixture {
     void assertResourcesClosed() { resources.forEach(resource -> assertTrue(resource.closed)); }
 
     private static String table(String sql) {
+        for(String table:Schema2MonsterSourceFixtureRows.TABLES)if(sql.contains(" FROM "+table+" ORDER BY "))return table;
         for (String table : List.of("rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change", "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change", "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_combat_change", "rule_schema2_health", "rule_schema2_vital_effect", "rule_schema2_combat", "rule_schema2_weapon_attack", "rule_schema2_movement", "rule_schema2_spell", "rule_schema2_spellcasting", "rule_schema2_spell_change", "rule_schema2_wizard_spellcasting", "rule_schema2_environment", "rule_schema2_spellbook_member", "rule_schema2_wizard_change"))
             if (sql.contains(" FROM " + table + " ORDER BY artifact_module_key, release_version, author_index")) return table;
         return switch (sql.replaceAll("\\s+", " ").trim()) {

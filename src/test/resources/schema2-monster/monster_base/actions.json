@@ -1,0 +1,150 @@
+[
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "bite"
+    },
+    "action_profile": {
+      "display_name": "Bite",
+      "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) piercing damage plus 7 (2d6) fire damage.",
+      "source_page": 322,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "fire_breath"
+    },
+    "action_profile": {
+      "display_name": "Fire Breath",
+      "description": "The hound exhales fire in a 15-foot cone. Each creature in that area must make a DC 12 Dexterity saving throw, taking 21 (6d6) fire damage on a failed save, or half as much damage on a successful one.",
+      "source_page": 322,
+      "mode": "SAVE_DAMAGE_BATCH_V1",
+      "mechanism": "HELL_HOUND_FIRE_BREATH_V1",
+      "save_policy": {
+        "ability_key": "ability.dexterity",
+        "dc_mode": "FIXED_DC",
+        "dc": 12,
+        "fail_outcome": "FULL",
+        "success_outcome": "HALF"
+      },
+      "damage_profile": {
+        "dice_count": 6,
+        "dice_sides": 6,
+        "damage_type": "FIRE",
+        "delivery": "OTHER_DELIVERY",
+        "ability_modifier": "NO_ABILITY_MODIFIER"
+      },
+      "area": {
+        "shape": "CONE",
+        "length_feet": 15,
+        "origin_policy": "EXCLUDE_ORIGIN"
+      },
+      "recharge": {
+        "dice_sides": 6,
+        "minimum_roll": 5,
+        "turn_start": true,
+        "short_rest": true,
+        "long_rest": true
+      }
+    },
+    "author_note": "Recharge 5–6; action and recharge are separate real spends."
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.mummy"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "multiattack"
+    },
+    "action_profile": {
+      "display_name": "Multiattack",
+      "description": "The mummy can use its Dreadful Glare and makes one attack with its rotting fist.",
+      "source_page": 333,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.mummy"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "rotting_fist"
+    },
+    "action_profile": {
+      "display_name": "Rotting Fist",
+      "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) bludgeoning damage plus 10 (3d6) necrotic damage. If the target is a creature, it must succeed on a DC 12 Constitution saving throw or be cursed with mummy rot. The cursed target cannot regain hit points, and its hit point maximum decreases by 10 (3d6) for every 24 hours that elapse. If the curse reduces its hit point maximum to 0, it dies and its body turns to dust. The curse lasts until removed by the remove curse spell or other magic.",
+      "source_page": 333,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.mummy"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "dreadful_glare"
+    },
+    "action_profile": {
+      "display_name": "Dreadful Glare",
+      "description": "The mummy targets one creature it can see within 60 feet of it. If the target can see the mummy, it must succeed on a DC 11 Wisdom saving throw against this magic or become frightened until the end of the mummy’s next turn. If it fails by 5 or more, it is also paralyzed for the same duration. A successful save grants immunity to the Dreadful Glare of all mummies (not mummy lords) for the next 24 hours.",
+      "source_page": 334,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "monster_base",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.commoner"
+      },
+      "collection_key": "actions",
+      "module_key": "monster_base",
+      "entry_key": "club"
+    },
+    "action_profile": {
+      "display_name": "Club",
+      "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+      "source_page": 398,
+      "mode": "BLOCKED_METADATA"
+    }
+  }
+]
