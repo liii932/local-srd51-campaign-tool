@@ -279,6 +279,11 @@ mvn '-Dtest=BuiltinModuleReleaseRegistryTest,BuiltinModuleHashManifestTest' test
 `CampaignArchiveCapabilityBoundaryTest` 及受影响消费者的拒绝回归，再按第 2 节判断是否需要全量验证；
 生产代码变化还须按第 6 节审计 WAR。这些纯测试无需启用 MySQL 集成测试。
 
+完整运行链的数量、顺序、脚本名和批准摘要由 `SchemaMigrationsTest` 集中核验；独立来源链由
+`RuleSchemaMigrationsTest` 集中核验。领域测试检查自身迁移及其前置合同，不复制其他领域的整链
+总数，也不假定自己的迁移永远位于链尾。删除重复检查点不删除已应用迁移、RELEASED 规则、
+现有业务行为或独立失败路径的测试。
+
 - V001—V018 是不可修改的迁移历史；V011 的角色 DRAFT 目录、V012 的一级创建 schema/profile、
   V013 的升级/生命骰 schema/profile、V014 的职业特性/恢复矩阵、V015 的多职业/ASI/专长框架、
   V016 的初始熟练基线、V017 的 format 2 状态来源及 V018 的多职业施法贡献由清单摘要、精确计数、
@@ -447,11 +452,13 @@ python3 -B src/test/resources/schema2-grants/expected/initial-plan-fingerprint.p
 计划指纹 oracle 仅使用标准库、既有独立规则摘要及手写的来源、槽、选择和授予事实；
 不调用生产计划器或指纹实现，其固定摘要由准备测试直接断言。
 
-迁移清单变化同时选择 `SchemaMigrationsTest`、`RuleSchemaMigrationsTest`、
-`ToolCatalogSchemaTest`、`V011CompleteCharacterCatalogDraftTest` 与 schema 诊断测试；
+迁移清单变化选择两条链的中央清单测试及相关 schema 诊断测试；涉及工具分区或角色目录合同
+时，再加入 `ToolCatalogSchemaTest` 或 `V011CompleteCharacterCatalogDraftTest`。
 PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像及链路测试。
-`python3 -B tools/rule-packages/tests/verify-language-jdbc-test.py` 只测试隔离验收脚本的
-拓扑、清单和授权编排，不启动 MySQL，也不替代另行授权的真实数据库验收。
+`python3 -B tools/rule-packages/tests/verify-language-jdbc-test.py` 使用明确有界的代表材料测试
+隔离验收脚本的原样 SQL、身份、默认数据库和授权编排，并独立验证未审查迁移链的入口拒绝；
+它不启动 MySQL，也不替代另行授权的真实数据库验收。代表材料不是完整可执行迁移链，测试
+通过不表示固定验收 profile 已接受当前全部迁移；profile 和结构／权限审计范围须一并复核。
 候选 WAR 必须包含共同 Session、初始准备服务/仓储及 V025/V026，排除测试工具和来源 SQL。
 
 ## 5. Web 与安全测试

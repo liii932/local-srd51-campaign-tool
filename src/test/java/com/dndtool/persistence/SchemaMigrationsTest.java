@@ -64,43 +64,43 @@ class SchemaMigrationsTest {
                 SchemaMigrations.V010_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(10),
-                SchemaMigrations.V011_VERSION,
-                SchemaMigrations.V011_SCRIPT_NAME,
+                11,
+                "V011__complete_character_catalog_draft.sql",
                 SchemaMigrations.V011_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(11),
-                SchemaMigrations.V012_VERSION,
-                SchemaMigrations.V012_SCRIPT_NAME,
+                12,
+                "V012__level_one_character_creation.sql",
                 SchemaMigrations.V012_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(12),
-                SchemaMigrations.V013_VERSION,
-                SchemaMigrations.V013_SCRIPT_NAME,
+                13,
+                "V013__level_advancement_hit_dice.sql",
                 SchemaMigrations.V013_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(13),
-                SchemaMigrations.V014_VERSION,
-                SchemaMigrations.V014_SCRIPT_NAME,
+                14,
+                "V014__class_feature_lifecycle.sql",
                 SchemaMigrations.V014_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(14),
-                SchemaMigrations.V015_VERSION,
-                SchemaMigrations.V015_SCRIPT_NAME,
+                15,
+                "V015__multiclass_asi_feat_draft.sql",
                 SchemaMigrations.V015_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(15),
-                SchemaMigrations.V016_VERSION,
-                SchemaMigrations.V016_SCRIPT_NAME,
+                16,
+                "V016__starting_proficiency_baseline_draft.sql",
                 SchemaMigrations.V016_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(16),
-                SchemaMigrations.V017_VERSION,
-                SchemaMigrations.V017_SCRIPT_NAME,
+                17,
+                "V017__character_archive_v2_origin.sql",
                 SchemaMigrations.V017_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(17),
-                SchemaMigrations.V018_VERSION,
-                SchemaMigrations.V018_SCRIPT_NAME,
+                18,
+                "V018__multiclass_spell_slot_foundation.sql",
                 SchemaMigrations.V018_APPROVED_SHA256);
         assertExpectation(
                 expectations.get(18),

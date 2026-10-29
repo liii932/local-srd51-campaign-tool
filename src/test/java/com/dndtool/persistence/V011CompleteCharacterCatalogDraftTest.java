@@ -97,37 +97,6 @@ class V011CompleteCharacterCatalogDraftTest {
         }
     }
 
-    @Test
-    void approvedManifestPreservesV011ThroughV018AsForwardOnlyHistory() throws Exception {
-        var expectations = SchemaMigrations.loadExpectations();
-
-        assertEquals(40, expectations.size());
-        assertEquals(11, expectations.get(10).version());
-        assertEquals("V011__complete_character_catalog_draft.sql",
-                expectations.get(10).scriptName());
-        assertEquals(12, expectations.get(11).version());
-        assertEquals("V012__level_one_character_creation.sql",
-                expectations.get(11).scriptName());
-        assertEquals(13, expectations.get(12).version());
-        assertEquals("V013__level_advancement_hit_dice.sql",
-                expectations.get(12).scriptName());
-        assertEquals(14, expectations.get(13).version());
-        assertEquals("V014__class_feature_lifecycle.sql",
-                expectations.get(13).scriptName());
-        assertEquals(15, expectations.get(14).version());
-        assertEquals("V015__multiclass_asi_feat_draft.sql",
-                expectations.get(14).scriptName());
-        assertEquals(16, expectations.get(15).version());
-        assertEquals("V016__starting_proficiency_baseline_draft.sql",
-                expectations.get(15).scriptName());
-        assertEquals(17, expectations.get(16).version());
-        assertEquals("V017__character_archive_v2_origin.sql",
-                expectations.get(16).scriptName());
-        assertEquals(18, expectations.get(17).version());
-        assertEquals("V018__multiclass_spell_slot_foundation.sql",
-                expectations.get(17).scriptName());
-    }
-
     private static int countType(Set<String> identities, String type) {
         String prefix = type + "\u0000";
         return (int) identities.stream().filter(identity -> identity.startsWith(prefix)).count();

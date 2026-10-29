@@ -35,7 +35,6 @@ class RuleSchemaMigrationsTest {
                     .indexOf("-- CHECKSUM-SCOPE-END")).contains("'" + migration.scriptSha256() + "'"));
         }
         assertThrows(UnsupportedOperationException.class, () -> chain.clear());
-        assertEquals(40, SchemaMigrations.loadExpectations().size());
         assertNull(getClass().getResource("/database/rules/migration/" + SOURCE.getFileName()));
         assertNull(getClass().getResource("/db/migration/" + SOURCE.getFileName()));
     }
