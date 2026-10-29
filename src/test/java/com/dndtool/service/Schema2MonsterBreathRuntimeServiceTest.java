@@ -98,6 +98,31 @@ class Schema2MonsterBreathRuntimeServiceTest {
         Save before=f.service.read(f.combat);int rolls=f.rolls,writes=f.runtime.writes;assertEquals("S2_COMBAT_STALE_CHARACTER",f.service.execute(stale).code());assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);assertEquals(before,f.service.read(f.combat));assertTrue(recharge(f));assertTrue(f.actor(H).actionAvailable());assertEquals(Status.REJECTED,f.service.execute(f.request(Command.breath(H,new com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity(HELL_HOUND,"actions","monster_base","bite"),0))).status());assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);
     }
 
+    @Test void historicalReadsBoundSnapshotWorkByRosterAndRevalidatePhysicalMaterialOnEveryRead()throws Exception {
+        var f=fixture(true,false);start(f,true);
+        int[] snapshots={0};
+        // Material reads the retained snapshot, then plan validation independently rebuilds it again.
+        // Count those complete reconstructions, excluding the receipt's global snapshot-identity scan.
+        int expectedSnapshotReads=2*f.members.size();
+        f.runtime.beforeQuery=sql->{if(sql.contains(" FROM s2_runtime_snapshot s JOIN s2_runtime_identity "))snapshots[0]++;};
+        Save first=f.service.read(f.combat);
+        assertEquals(expectedSnapshotReads,snapshots[0]);
+        for(int turn=0;turn<4;turn++)f.commit(Command.action(Kind.END_TURN,f.battle.activeActor()));
+        int rolls=f.rolls,writes=f.runtime.writes;snapshots[0]=0;
+        Save later=f.service.read(f.combat);
+        assertEquals(first.combat().events().size()+4,later.combat().events().size());
+        assertEquals(expectedSnapshotReads,snapshots[0],"Historical events must not each reload the complete rules snapshot");
+        snapshots[0]=0;
+        assertEquals(later,f.service.read(f.combat));
+        assertEquals(expectedSnapshotReads,snapshots[0],"A new read must independently verify every member's retained material");
+        // Alter the last member's retained provenance after successful reads through this same service instance.
+        f.runtime.rows("s2_runtime_chain_step").getLast().put("raw_zip_sha256","0".repeat(64).getBytes(StandardCharsets.US_ASCII));
+        f.runtime.saveCommitted();snapshots[0]=0;
+        assertThrows(SQLException.class,()->f.service.read(f.combat));
+        assertTrue(snapshots[0]>0&&snapshots[0]<=expectedSnapshotReads,"Corrupt material must be physically reread within the roster budget");
+        assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);
+    }
+
     @Test void ordinaryWeaponAttacksUpdateTheRealMonsterHealthOwnerAndApplyTheActualDeliveryDefense()throws Exception {
         var f=fixture(true,false);start(f,false);f.commit(Command.action(Kind.BEGIN_ATTACK,f.a));f.nextRolls.addAll(List.of(15,4));f.commit(Command.attack(f.a,H,f.items.get(f.a)));assertEquals(39,monster(f,H).hitPoints());assertFalse(monster(f,H).dead());assertEquals(45,monster(f,I).hitPoints());
         f.commit(Command.action(Kind.END_TURN,f.a));f.commit(Command.action(Kind.BEGIN_ATTACK,f.b));f.nextRolls.addAll(List.of(15,4));f.commit(Command.attack(f.b,M,f.items.get(f.b)));assertEquals(55,monster(f,M).hitPoints());assertTrue(f.nextRolls.isEmpty());assertEquals(9,f.character(f.a).hitPoints());assertEquals(9,f.character(f.b).hitPoints());
