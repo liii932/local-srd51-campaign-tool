@@ -1,12 +1,18 @@
 # 数据库
 
-应用使用 MySQL 8.0、InnoDB、JDBC 与 Tomcat JNDI DataSource。数据库 schema 是权威持久化状态，应用不会从 Session、本地文件或 JVM 缓存重建业务数据。
+当前实现使用 MySQL 8.0、InnoDB、JDBC 与 Tomcat JNDI DataSource。现行 schema 是权威持久化状态，应用不会从 Session、本地临时材料或 JVM 缓存重建业务数据。
 
-当前正式业务仍把规则目录和运行状态放在 `dnd_tool_se` 单一 schema。新 v2 目标使用独立
-来源领域表、启动准备视图和导入期持久化完整运行快照；角色、事件、版本和幂等结果仍只以
-运行数据库为权威。现有语言与工具目录分区尚未提供全规则或战役运行资格。职责见
-[规则存储与版本](design/v2/rule-storage-and-versioning.md)，现状与前向采用边界见
-[规则数据库分离](rule-database-separation.md)。
+当前正式业务仍把规则目录和运行状态放在 `dnd_tool_se` 单一 schema；INTERNAL 采用独立
+来源与运行快照链。新 v2 选择每次打开私有 SQLite 工作库，来源 MySQL 仅承担准确原包、
+安装/接受账本及可重建索引；工作库内统一规则/链、角色、历史、幂等和生命周期。应用按
+已审核固定 SQL 模块建空库，不把模组 JSON 编译为任意表结构。完整 JSON 是保存点投影，
+不会与活动库并行写入。专门的替代采用计划及 SQLite/文件故障验证见
+[规则存储与版本](design/v2/rule-storage-and-versioning.md)、[采用边界](design/v2/adoption-boundaries.md)。
+
+上述目标没有修改现行 JNDI、账号、环境变量或迁移清单。SQLite schema 有独立初始化/验证
+协议，不重放 MySQL V001—V042 或篡改已应用账本。外部来源迁移仍需独立维护授权；未来
+新建应用私有空工作库是受控产品生命周期，不能因此授予现行 MySQL 应用账号 DDL 权限。
+实际退役旧配置/读取器须在完整替换与明确真实数据处置后进行，不保留仅为跨版本兼容的双写。
 
 ## 迁移合同
 

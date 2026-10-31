@@ -210,10 +210,10 @@ Service 在共同事务内读取准确历史、校验规则与全部版本、预
 PENDING raw 和 after-batch Ready 机会必须由真实生产命令产生后保存，手工拼接 paused
 对象或仅 writer/reader 自洽往返不能充当完整恢复证据。
 
-物理清理的入向闭包包含怪物部署／current/history/action-use → batch/source/action →
+完整保存/恢复须覆盖的引用闭包包含怪物部署／current/history/action-use → batch/source/action →
 candidate/target/check/shared roll/packet/obligation → flow/window/Ready/effect → 角色因果子事件
 与规则快照，并包含 monster rest／完成操作／时间子事件引用；死亡、源结束或 batch COMPLETE 均不授权删除历史。完整 FINAL 文件、
-独立读回后的 B 清理、全域恢复映射与容量验收仍按[保存与恢复目标](../design/v2/save-and-recovery.md)
+发布/接受后的私有运行目录清理、全域恢复映射与容量验收仍按[保存与恢复目标](../design/v2/save-and-recovery.md)
 单独采用，不能把局部仓储恢复写成完整战役存档或授权删除工作集。
 
 ## 独立验证边界
@@ -251,4 +251,4 @@ candidate/target/check/shared roll/packet/obligation → flow/window/Ready/effec
 强制结束先于共同 CON、失败批量结束、after-batch Ready、recharge、pending 直接恢复、
 缺行／孤儿／坏引用拒绝、末尾角色／效果／accepted 写失败回滚及 UNKNOWN 原操作查证。
 JDBC 代理、静态 SQL、测试内容包和局部保存不代替真实 MySQL、安装接受、Host、
-完整文件、技术 END／B 清理、部署或跨域发布门。
+完整文件、技术 END／运行目录清理、部署或跨域发布门。
