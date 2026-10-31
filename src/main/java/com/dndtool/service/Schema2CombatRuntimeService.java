@@ -358,6 +358,8 @@ public final class Schema2CombatRuntimeService {
         out.writeBoolean(cast!=null);if(cast==null)return;
         ruleIdentity(out,cast.castingRule());ruleIdentity(out,cast.spell());out.writeInt(cast.targets().size());
         for(UUID target:cast.targets())id(out,target);id(out,cast.materialItemId());out.writeInt(cast.slotLevel());id(out,cast.targetCastFrameKey());
+        // Retain every pre-area request byte. The new branch has no legacy empty-target form.
+        if(cast.coneDirection()!=null){text(out,"S2_SPELL_CONE_DIRECTION_V1");out.writeInt(cast.coneDirection());}
     }
     private static void entryIdentity(DataOutputStream out,com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity identity)throws IOException {
         ruleIdentity(out,identity.rule());text(out,identity.collectionKey());text(out,identity.moduleKey());text(out,identity.entryKey());

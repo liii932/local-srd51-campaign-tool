@@ -15,7 +15,7 @@ final class JdbcSchema2MonsterBreathRows {
             "s2_combat_monster", "s2_combat_monster_action", "s2_combat_save_damage_batch",
             "s2_combat_breath_candidate", "s2_combat_breath_target", "s2_combat_breath_die",
             "s2_combat_breath_check", "s2_combat_breath_packet", "s2_combat_breath_defense",
-            "s2_combat_breath_concentration", "s2_combat_monster_rest_input", "s2_combat_monster_rest");
+            "s2_combat_breath_concentration", "s2_combat_monster_rest_input", "s2_combat_monster_rest", "s2_combat_spell_damage_source");
     @FunctionalInterface interface Source { List<Map<String,Object>> rows(String table, String order, int maximum) throws SQLException; }
     record CommandParts(List<MonsterDeployment> deployments, BreathInput breath, MonsterRestInput rest) { }
     record StateParts(List<MonsterInstance> monsters, List<SaveDamageBatch> batches, List<MonsterRest> rests) { }
@@ -65,6 +65,7 @@ final class JdbcSchema2MonsterBreathRows {
         var packets=source.rows(TABLES.get(9),"batch_index, packet_index",8192);
         var defenses=source.rows(TABLES.get(10),"batch_index, packet_index, defense_index",65536);
         var obligations=source.rows(TABLES.get(11),"batch_index, obligation_index",8192);
+        var spellSources=source.rows(TABLES.get(14),"batch_index",128);
         for(var r:source.rows(TABLES.get(4),"batch_index",128)) {
             int index=batches.size(); ordinal(r,"batch_index",index);
             List<AreaCandidate> area=new ArrayList<>(); List<CreatureRef> selected=new ArrayList<>(); List<Integer> rolled=new ArrayList<>();
@@ -99,8 +100,11 @@ final class JdbcSchema2MonsterBreathRows {
             UUID roll=nullableId(r,"shared_roll_key"); require(roll!=null||rolled.isEmpty()&&r.get("raw_total")==null&&r.get("effective_total")==null);
             SharedDamageRoll shared=roll==null?null:new SharedDamageRoll(roll,rolled,n(r,"raw_total"),n(r,"effective_total"));
             var proof=new TargetSetProof(text(r,"space_policy"),number(r,"roster_version"),new Position(n(r,"origin_x"),n(r,"origin_y")),n(r,"direction"),area,selected);
-            batches.add(new SaveDamageBatch(id(r,"batch_key"),id(r,"frame_key"),id(r,"source_id"),entry(r,"action"),id(r,"release_operation_id"),number(r,"released_turn_number"),
-                    proof,en(BatchStatus.class,r,"batch_status"),shared,savedChecks,savedPackets,savedObligations));
+            var matches=spellSources.stream().filter(v->{try{return n(v,"batch_index")==index;}catch(SQLException failure){throw new IllegalArgumentException(failure);}}).toList();require(matches.size()<=1);
+            SpellDamageSource spellSource=null;
+            if(!matches.isEmpty()) {var v=matches.getFirst();spellSource=new SpellDamageSource(id(v,"cast_frame_key"),rule(v,"spell"),n(v,"slot_level"),n(v,"ability_modifier"),n(v,"proficiency_bonus"));}
+            batches.add(new SaveDamageBatch(id(r,"batch_key"),id(r,"frame_key"),id(r,"source_id"),nullableEntry(r,"action"),id(r,"release_operation_id"),number(r,"released_turn_number"),
+                    proof,en(BatchStatus.class,r,"batch_status"),shared,savedChecks,savedPackets,savedObligations,spellSource));
         }
         List<MonsterRest> rests=new ArrayList<>();
         for(var r:source.rows(TABLES.get(13),"rest_index",128)) {ordinal(r,"rest_index",rests.size());rests.add(new MonsterRest(id(r,"rest_key"),id(r,"monster_id"),en(MonsterRestKind.class,r,"rest_kind"),number(r,"started_at_second"),number(r,"completes_at_second"),en(MonsterRestStatus.class,r,"rest_status"),nullableId(r,"finished_operation_id")));}
@@ -121,7 +125,8 @@ final class JdbcSchema2MonsterBreathRows {
                     "released_turn_number",batch.releasedTurnNumber(),"space_policy",ascii(proof.policy()),"roster_version",proof.rosterVersion(),"origin_x",proof.origin().x(),"origin_y",proof.origin().y(),"direction",proof.direction(),
                     "batch_status",ascii(batch.status()),"shared_roll_key",nullableBytes(roll==null?null:roll.rollKey()),"raw_total",roll==null?null:roll.rawTotal(),"effective_total",roll==null?null:roll.effectiveTotal(),
                     "candidate_count",proof.candidates().size(),"target_count",proof.targets().size(),"die_count",roll==null?0:roll.dice().size(),"check_count",batch.checks().size(),"packet_count",batch.packets().size(),"obligation_count",batch.concentrationObligations().size());
-            entry(root,"action",batch.action());add(out,TABLES.get(4),root);
+            nullableEntry(root,"action",batch.action());add(out,TABLES.get(4),root);
+            if(batch.spellSource()!=null) {var source=batch.spellSource();var r=batch(combat,sequence,phase,bi,"cast_frame_key",bytes(source.castFrameKey()),"slot_level",source.slotLevel(),"ability_modifier",source.abilityModifier(),"proficiency_bonus",source.proficiencyBonus());rule(r,"spell",source.spell());add(out,TABLES.get(14),r);}
             for(int i=0;i<proof.candidates().size();i++) {var c=proof.candidates().get(i);var r=batch(combat,sequence,phase,bi,"candidate_index",i,"x",c.position().x(),"y",c.position().y(),"included",bit(c.included()),"reason",ascii(c.reason()));creature(r,c.creature());add(out,TABLES.get(5),r);}
             for(int i=0;i<proof.targets().size();i++) {var r=batch(combat,sequence,phase,bi,"target_index",i);creature(r,proof.targets().get(i));add(out,TABLES.get(6),r);}
             if(roll!=null)for(int i=0;i<roll.dice().size();i++)add(out,TABLES.get(7),batch(combat,sequence,phase,bi,"die_index",i,"die_value",roll.dice().get(i)));
@@ -157,9 +162,15 @@ final class JdbcSchema2MonsterBreathRows {
         }
         Set<UUID> batchKeys=new HashSet<>(),rollKeys=new HashSet<>(),packetKeys=new HashSet<>();require(state.saveDamageBatches().size()<=128);
         for(var batch:state.saveDamageBatches()) {
-            require(batch.batchKey()!=null&&batch.batchKey().version()==4&&batchKeys.add(batch.batchKey())&&validAction(batch.action())&&batch.releasedTurnNumber()>=1
-                    &&batch.releaseOperationId()!=null&&batch.releaseOperationId().version()==4&&batch.status()!=null
-                    &&state.monsters().stream().anyMatch(m->m.monsterId().equals(batch.sourceId())&&m.monster().equals(batch.action().rule())));
+            require(batch.batchKey()!=null&&batch.batchKey().version()==4&&batchKeys.add(batch.batchKey())&&batch.releasedTurnNumber()>=1
+                    &&batch.releaseOperationId()!=null&&batch.releaseOperationId().version()==4&&batch.status()!=null);
+            if(batch.spellSource()==null)require(validAction(batch.action())&&state.monsters().stream().anyMatch(m->m.monsterId().equals(batch.sourceId())&&m.monster().equals(batch.action().rule())));
+            else {
+                var source=batch.spellSource();require(batch.action()==null&&validRule(source.spell(),"adventure.spell")&&source.slotLevel()>=1&&source.slotLevel()<=3&&source.abilityModifier()>=-5&&source.abilityModifier()<=10&&source.proficiencyBonus()>=2&&source.proficiencyBonus()<=3);
+                var casts=state.flows().stream().flatMap(f->f.casts().stream()).filter(c->c.frameKey().equals(source.castFrameKey())).toList();require(casts.size()==1);
+                var cast=casts.getFirst();require(cast.actorId().equals(batch.sourceId())&&characters.contains(batch.sourceId())&&cast.spell().equals(source.spell())&&cast.slotLevel()==source.slotLevel()
+                        &&Objects.equals(cast.coneDirection(),batch.targetProof().direction()));
+            }
             List<Frame> frames=state.flows().stream().flatMap(f->f.frames().stream()).filter(f->f.frameKey().equals(batch.frameKey())).toList();
             require(frames.size()==1&&frames.getFirst().kind()==FrameKind.SAVE_DAMAGE&&frames.getFirst().ownerKey().equals(batch.batchKey()));
             var proof=batch.targetProof();require(proof!=null&&proof.policy()!=null&&proof.policy().matches("[A-Z][A-Z0-9_]{0,63}")&&proof.rosterVersion()>=0&&proof.rosterVersion()<=state.version()
@@ -174,7 +185,7 @@ final class JdbcSchema2MonsterBreathRows {
             require(included.equals(proof.targets()));
             if(batch.status()==BatchStatus.NO_TARGETS) require(proof.targets().isEmpty()&&batch.sharedRoll()==null&&batch.checks().isEmpty()&&batch.packets().isEmpty()&&batch.concentrationObligations().isEmpty());
             else {
-                var roll=batch.sharedRoll();require(!proof.targets().isEmpty()&&roll!=null&&roll.rollKey()!=null&&rollKeys.add(roll.rollKey())&&roll.dice().size()==6
+                var roll=batch.sharedRoll();require(!proof.targets().isEmpty()&&roll!=null&&roll.rollKey()!=null&&rollKeys.add(roll.rollKey())&&roll.dice().size()==batch.diceCount()
                         &&roll.dice().stream().allMatch(v->v!=null&&v>=1&&v<=6)&&roll.rawTotal()==roll.dice().stream().mapToInt(Integer::intValue).sum()&&roll.effectiveTotal()==roll.rawTotal());
                 if(batch.status()==BatchStatus.ROLLED)require(batch.checks().isEmpty()&&batch.packets().isEmpty()&&batch.concentrationObligations().isEmpty());
                 else validateCompleted(batch,packetKeys);
@@ -186,8 +197,8 @@ final class JdbcSchema2MonsterBreathRows {
     private static void validateCompleted(SaveDamageBatch batch,Set<UUID> packetKeys)throws SQLException {
         var targets=batch.targetProof().targets();require(batch.packets().size()==targets.size()&&batch.checks().size()>=targets.size()&&batch.checks().size()<=2*targets.size());
         for(var c:batch.checks()) {
-            require(c.targetOrdinal()>=0&&c.targetOrdinal()<targets.size()&&Set.of("BREATH_DEX","CONCENTRATION_CON").contains(c.purpose())
-                    &&c.abilityKey().equals(c.purpose().equals("BREATH_DEX")?"ability.dexterity":"ability.constitution")&&c.mode()!=null
+            require(c.targetOrdinal()>=0&&c.targetOrdinal()<targets.size()&&Set.of(batch.spellSource()==null?"BREATH_DEX":"SPELL_DEX","CONCENTRATION_CON").contains(c.purpose())
+                    &&c.abilityKey().equals(c.purpose().equals("CONCENTRATION_CON")?"ability.constitution":"ability.dexterity")&&c.mode()!=null
                     &&c.abilityModifier()>=-5&&c.abilityModifier()<=10&&c.proficiencyBonus()>=0&&c.proficiencyBonus()<=6&&c.difficultyClass()>=0&&c.difficultyClass()<=32767
                     &&(c.blessingEffectKey()==null?c.blessingD4()==null:c.blessingD4()!=null&&c.blessingD4()>=1&&c.blessingD4()<=4));
             if(c.mode()==CheckMode.AUTO_FAILURE)require(c.firstD20()==null&&c.secondD20()==null&&!c.success());
@@ -201,7 +212,7 @@ final class JdbcSchema2MonsterBreathRows {
         for(int i=0;i<targets.size();i++) {
             var p=batch.packets().get(i);require(p.targetOrdinal()==i&&p.packetKey()!=null&&packetKeys.add(p.packetKey())&&p.sharedRollKey().equals(batch.sharedRoll().rollKey())
                     &&p.saveCheckIndex()>=0&&p.saveCheckIndex()<batch.checks().size());
-            var save=batch.checks().get(p.saveCheckIndex());require(save.purpose().equals("BREATH_DEX")&&save.targetOrdinal()==i&&save.difficultyClass()==12);
+            var save=batch.checks().get(p.saveCheckIndex());require(save.purpose().equals(batch.spellSource()==null?"BREATH_DEX":"SPELL_DEX")&&save.targetOrdinal()==i&&save.difficultyClass()==batch.difficultyClass());
             require(p.maximumHitPoints()>=1&&p.maximumHitPoints()<=65535&&p.beforeHitPoints()>=0&&p.beforeHitPoints()<=p.maximumHitPoints()&&p.beforeTemporaryHitPoints()>=0&&p.beforeTemporaryHitPoints()<=65535&&p.defenses().size()<=32);
             Set<String> kinds=new HashSet<>();for(var d:p.defenses()){require(d.source()!=null&&Set.of("IMMUNITY","RESISTANCE","VULNERABILITY").contains(d.kind()));kinds.add(d.kind());}
             int damage=save.success()?batch.sharedRoll().effectiveTotal()/2:batch.sharedRoll().effectiveTotal();
@@ -226,6 +237,13 @@ final class JdbcSchema2MonsterBreathRows {
     private static CreatureRef creature(Map<String,Object> r)throws SQLException{return new CreatureRef(en(CreatureKind.class,r,"creature_kind"),id(r,"creature_id"));}
     private static void creature(Map<String,Object> r,CreatureRef c){r.putAll(row("creature_kind",ascii(c.kind()),"creature_id",bytes(c.creatureId())));}
     private static EntryIdentity entry(Map<String,Object> r,String p)throws SQLException{return new EntryIdentity(rule(r,p+"_rule"),text(r,p+"_collection"),text(r,p+"_module"),text(r,p+"_key"));}
+    private static EntryIdentity nullableEntry(Map<String,Object> r,String p)throws SQLException {
+        if(r.get(p+"_rule_module")!=null)return entry(r,p);
+        for(String suffix:List.of("_rule_type","_rule_key","_collection","_module","_key"))require(r.get(p+suffix)==null);return null;
+    }
+    private static void nullableEntry(Map<String,Object> r,String p,EntryIdentity e) {
+        if(e!=null)entry(r,p,e);else for(String suffix:List.of("_rule_module","_rule_type","_rule_key","_collection","_module","_key"))r.put(p+suffix,null);
+    }
     private static void entry(Map<String,Object> r,String p,EntryIdentity e){rule(r,p+"_rule",e.rule());r.putAll(row(p+"_collection",ascii(e.collectionKey()),p+"_module",ascii(e.moduleKey()),p+"_key",ascii(e.entryKey())));}
     private static RuleIdentity rule(Map<String,Object> r,String p)throws SQLException{return new RuleIdentity(text(r,p+"_module"),text(r,p+"_type"),text(r,p+"_key"));}
     private static void rule(Map<String,Object> r,String p,RuleIdentity id){r.putAll(row(p+"_module",ascii(id.moduleKey()),p+"_type",ascii(id.ruleType()),p+"_key",ascii(id.ruleKey())));}

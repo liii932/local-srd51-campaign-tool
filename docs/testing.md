@@ -99,7 +99,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
-3. V001—V041 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
+3. V001—V042 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
 4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
@@ -262,7 +262,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
 权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V041 完整运行清单及来源 V001—V011（两链共 52 份迁移源）。
+并核对 V001—V042 完整运行清单及来源 V001—V012（两链共 54 份迁移源）。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -375,7 +375,7 @@ mvn '-Dtest=Schema2CheckCompositionTest,Schema2EquipmentHealthCompositionTest,Jd
 已实现的成长/休息验证继续使用下节入口。
 
 WAR 包含严格作者/组合和真实来源读取类；来源 SQL、离线安装器、作者包及测试向量排除。
-来源 V001—V011 的 53 张表、159 个触发器及 43 张类型化材料表须在另行授权的隔离 MySQL
+来源 V001—V012 的 53 张表、159 个触发器及 43 张类型化材料表须在另行授权的隔离 MySQL
 实例验收；代理和静态结构测试不能替代真实 CHECK、FK、权限、锁或持久化事实。
 
 ## Schema 2 角色成长、资源与休息验证
@@ -407,7 +407,7 @@ mvn '-Dtest=JdbcSchema2CheckSnapshotTest,JdbcSchema2EquipmentHealthSnapshotTest,
 核对封闭输入/结果、有效骰模式、完整装备健康前后状态、有序原骰、追加读回、直接恢复、
 孤儿与类型化行缺失、结构/邻接/预算限制及整笔回滚；这些测试保存已经准备的事实，不执行新业务。
 
-运行链为 V001—V041，来源为 V001—V011，共 52 份迁移源。WAR 须包含镜像/事实仓储及
+运行链为 V001—V042，来源为 V001—V012，共 54 份迁移源。WAR 须包含镜像/事实仓储及
 全部运行迁移，排除来源 SQL、离线写入工具、测试向量和真实存档。Check/Equipment/Health
 消费者、请求幂等和 RuntimeService 命令使用下节验证；仓储测试本身只作为存储事实的证据。
 现有成长/休息测试保护新增字段的中性保留，DRAFT、Host、archive 2 和安装门保持。
@@ -474,7 +474,7 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V041 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V042 资源；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 
@@ -535,7 +535,7 @@ mvn '-Dtest=Schema2WizardRuntimeServiceTest,Schema2ExplorationRuntimeServiceTest
 定向测试，验证法术书、成本和时间的中性保留。代理 JDBC 与静态 SQL 不替代真实 MySQL 约束、权限、
 并发和持久化验收。
 
-当前批准链为运行 V001—V041 与来源 V001—V011，共 52 份迁移源；来源为 53 张表、159 个触发器，
+当前批准链为运行 V001—V042 与来源 V001—V012，共 54 份迁移源；来源为 53 张表、159 个触发器，
 其中 schema 2 为三个账本表与 43 张类型化作者材料表。WAR 须包含施法／场景消费者、类型化仓储和
 运行 V035—V038，排除来源 V009/V010、离线写入工具、作者包与测试向量。
 这些命令描述可重复验证方法，不表示真实数据库或完整发布门已验收。
@@ -579,7 +579,7 @@ temp HP 全吸收、零 HP／即死／倒地掉物、全部 APPLY 后强制结�
 容量不足、缺失／多余／孤儿行和 UNKNOWN 原操作查证分别观察。recharge 必须来自后续
 本人真实 turn START，短／长休恢复须由真实有限怪物休息 owner 产生，GET／恢复均不抽骰或补时间。
 
-全链为运行 V001—V041、来源 V001—V011，共 52 份迁移源；来源 53 表、159 触发器，
+全链为运行 V001—V042、来源 V001—V012，共 54 份迁移源；来源 53 表、159 触发器，
 其中 schema 2 有三个账本表和 43 张类型化作者材料表。WAR 包含怪物／批次消费者、
 类型化仓储及运行 V039/V040；排除来源 V011、离线写入能力、作者包、独立 oracle 与测试向量。
 JDBC 代理和静态 SQL 不替代真实 MySQL、权限／锁并发、完整文件、Host、技术 END／清理、
@@ -594,7 +594,7 @@ save／packet／防御／专注引用与算术、休息及其结束引用，正�
 不可变触发器、闭合枚举、NULL 联合分支、无窗口 raw 继续及窄授权作源码合同检查；
 它不执行上述 SQL，也不证明真实 MySQL 已通过。
 
-## Schema 2 法师特殊恢复验证
+## Schema 2 法师特殊恢复与法术共享伤害验证
 
 [奥术回想](rules/schema-2-arcane-recovery.md)的无数据库定向命令：
 
@@ -605,6 +605,19 @@ mvn '-DargLine=-Xmx256m' '-Dtest=Schema2ArcaneRecoveryRulesTest,Schema2ArcaneRec
 验证真实短休完成、每日时钟边界、各环缺额与合计额度、拒绝旧 BLOCKED、幂等/版本、
 准备/学习保留每日事实、类型化读回/直接恢复，以及晚写失败与 UNKNOWN 查证。
 
-真实 MySQL 的 CHECK/FK/触发器、权限和锁语义须另行授权验收，JDBC 代理与静态 SQL 检查不能代替。
-WAR 须包含新增恢复规则、类型化角色仓储及运行 V041，排除测试向量、离线工具、参考文件与本地 Agent 工作区。
-完整规则仍为 DRAFT，内部通过不开放 Host、完整文件或发布。
+[法术共享伤害](rules/schema-2-spell-save-damage.md)的无数据库定向命令：
+
+```bash
+mvn '-DargLine=-Xmx256m' '-Dtest=Schema2SpellSaveDamageCompositionTest,Schema2SpellSaveDamageSourceTest,Schema2SpellSaveDamageSchemaTest,Schema2SpellSaveDamageRequestDigestTest,Schema2SpellSaveDamageRuntimeServiceTest' test
+```
+
+独立作者向量与手算结果覆盖真实 Wizard 授权/位数/组件、混合生物完整目标、共享原骰、逐目标
+豁免/防御、健康与专注、反制不退款、伤害后 Ready、已付父施法失能、直接恢复、坏物理来源、
+事务回滚与未知提交。旧元数据、Sculpt、地面物品、活动抗魔和未支持的嵌套对象风险保持明确拒绝。
+状态域与旧非范围请求摘要使用独立固定期望，不能仅验证 writer/reader 自洽。
+
+共用动作、场景、角色与批次消费变化时，按具体差量加入既有施法、反应/Ready、怪物吐息、
+角色仓储及迁移/发布边界测试；已通过且输入未变化的结果按本文规则复用。真实 MySQL 的
+CHECK/FK/触发器、权限和锁语义须另行授权验收，JDBC 代理与静态 SQL 检查不能代替。
+WAR 须包含新增规则/消费者、类型化仓储及运行 V041/V042；来源 V012、测试向量、离线工具、
+参考文件与本地 Agent 工作区必须排除。完整规则仍为 DRAFT，内部通过不开放 Host、完整文件或发布。

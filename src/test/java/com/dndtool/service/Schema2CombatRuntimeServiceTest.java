@@ -199,21 +199,30 @@ class Schema2CombatRuntimeServiceTest {
             this(initialize,packages,choices,CLASS);
         }
         Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices,RuleIdentity startingClass) throws Exception {
+            this(initialize,packages,choices,startingClass,Map.of(),Map.of());
+        }
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices,RuleIdentity startingClass,
+                Map<UUID,RuleIdentity> characterClasses,Map<UUID,JdbcSchema2CharacterRuntimeRepository.GrowthChoices> characterChoices) throws Exception {
+            this(initialize,packages,choices,startingClass,characterClasses,characterChoices,List.of());
+        }
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices,RuleIdentity startingClass,
+                Map<UUID,RuleIdentity> characterClasses,Map<UUID,JdbcSchema2CharacterRuntimeRepository.GrowthChoices> characterChoices,List<UUID> additionalCharacters) throws Exception {
             var artifacts=Schema2GrantFixtures.artifacts(packages);
             material=ProductionSchema2Projection.compose(artifacts); binding=Schema2RulesBinding.from(material);
             source=new Schema2SourceReadFixture(artifacts);
             int ordinal=0;
-            for(UUID character:List.of(a,b)) {
+            var participants=new ArrayList<>(List.of(a,b));participants.addAll(additionalCharacters);
+            for(UUID character:participants) {
                 ordinal++; Identity identity=new Identity(stable(ordinal,1),stable(ordinal,2)); UUID preparation=stable(ordinal,3);
                 members.add(new Member(character,identity,preparation));
                 var selection=new Schema2InitialProficiencyRules.Request(new Schema2InitialProficiencyRules.Sources(
-                        new RuleIdentity(BASE,"character.race","race.human"),null,new RuleIdentity(BASE,"character.background","background.guard"),startingClass),Map.of());
+                        new RuleIdentity(BASE,"character.race","race.human"),null,new RuleIdentity(BASE,"character.background","background.guard"),characterClasses.getOrDefault(character,startingClass)),Map.of());
                 var prepared=new Schema2InitializationPreparationService(source.dataSource()).prepare(new Schema2InitializationPreparationService.Request(
                         preparation,identity,campaign,character,source.selections(),null,selection));
                 var transfer=new Schema2SnapshotTransferService(source.dataSource(),runtime.dataSource()).transferPrepared(prepared);
                 assertEquals(Schema2SnapshotTransferService.Status.COMMITTED,transfer.status(),transfer.code());
                 if(initialize) {
-                    var initial=new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED",null,0,null,null,null,choices);
+                    var initial=new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED",null,0,null,null,null,characterChoices.getOrDefault(character,choices));
                     var created=characterService.execute(new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),identity,campaign,character,preparation,binding,-1,initial,fullAbilities()));
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,created.status(),created.code());
                     UUID item=stable(ordinal,4); items.put(character,item);

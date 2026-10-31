@@ -6,8 +6,8 @@
 `V003__schema2-source-ledger.sql`、`V004__schema2-character-grant-source.sql`、
 `V005__schema2-advancement-source.sql`、`V006__schema2-check-source.sql`、
 `V007__schema2-equipment-health-source.sql`、`V008__schema2-combat-source.sql`、
-`V009__schema2-spell-source.sql`、`V010__schema2-wizard-environment-source.sql` 与
-`V011__schema2-monster-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个连续编号。
+`V009__schema2-spell-source.sql`、`V010__schema2-wizard-environment-source.sql`、
+`V011__schema2-monster-source.sql` 与 `V012__schema2-spell-save-damage-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个连续编号。
 运行 V001—V018、RELEASED v1、旧默认发布及现有 JNDI 合同保持不变。
 
 本合同提供离线 schema 源、批准元数据、窄权限模板和独立只读账本核验器。
@@ -44,7 +44,7 @@
 有界熟练目录及休息声明分别保存。能力前提使用带组/备选序号的子行，显式存在标记区分省略和空前提。
 定义与操作保留原包作者序号，不能替换为最终组合值。检定、装备、健康算法和直接健康效果的
 完整字段、引用、负修正及清空约束见[作者来源合同](rules/schema-2-foundation-authoring.md)。
-来源 V001—V011 与运行 V001—V041 共 52 份迁移源。四类定义的准确镜像及类型化角色事实
+来源 V001—V012 与运行 V001—V042 共 54 份迁移源。四类定义的准确镜像及类型化角色事实
 见[运行快照](rules/schema-2-runtime-snapshot.md)和[角色事实存储](rules/schema-2-character-fact-storage.md)；
 实际单角色 INTERNAL 命令与历史语义见[角色基础合同](rules/schema-2-character-foundations.md)；
 [战斗作者](rules/schema-2-combat-authoring.md)与[有限施法作者](rules/schema-2-spell-authoring.md)

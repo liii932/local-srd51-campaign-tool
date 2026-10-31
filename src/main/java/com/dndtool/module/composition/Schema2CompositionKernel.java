@@ -2011,6 +2011,7 @@ public final class Schema2CompositionKernel {
             Map.entry("SRD_2014_CURE_WOUNDS_V1",new SpellMetadata(1,132,false)),
             Map.entry("SRD_2014_SHIELD_V1",new SpellMetadata(1,179,true)),
             Map.entry("SRD_2014_COUNTERSPELL_V1",new SpellMetadata(3,131,true)),
+            Map.entry("SRD_2014_BURNING_HANDS_V1",new SpellMetadata(1,123,true)),
             Map.entry("SRD_2014_ALARM_METADATA_V1",new SpellMetadata(1,114,true)),
             Map.entry("SRD_2014_BURNING_HANDS_METADATA_V1",new SpellMetadata(1,123,true)),
             Map.entry("SRD_2014_CHARM_PERSON_METADATA_V1",new SpellMetadata(1,124,true)),

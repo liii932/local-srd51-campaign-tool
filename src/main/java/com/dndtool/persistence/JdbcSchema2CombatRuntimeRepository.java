@@ -159,7 +159,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
         List<Map<String,Object>> casts = indexed(data,"s2_combat_cast_command",combat,sequence,"command_index",1,r -> r);
         List<UUID> targets = indexed(data,"s2_combat_cast_command_target",combat,sequence,"target_index",MAX_COMBATANTS,r -> id(r,"target_id"));
         CastInput cast = null;
-        if (!casts.isEmpty()) { var r=casts.getFirst(); require(targets.size()==integer(r,"target_count")); cast=new CastInput(rule(r,"casting"),rule(r,"spell"),targets,nullableId(r,"material_item_id"),integer(r,"slot_level"),nullableId(r,"target_cast_frame_key")); }
+        if (!casts.isEmpty()) { var r=casts.getFirst(); require(targets.size()==integer(r,"target_count")); cast=new CastInput(rule(r,"casting"),rule(r,"spell"),targets,nullableId(r,"material_item_id"),integer(r,"slot_level"),nullableId(r,"target_cast_frame_key"),nullableInteger(r,"cone_direction")); }
         else require(targets.isEmpty());
         var readyRows=scoped(data,"s2_combat_ready_input",combat,sequence,"COMMAND","ready_index",1);
         ReadyInput ready=readyRows.isEmpty()?null:readReadyInput(data,combat,sequence,"COMMAND",readyRows.getFirst());
@@ -224,7 +224,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
                 for(var t:flowRows(data,"s2_combat_cast_target",combat,sequence,phase,flow,"cast_index, target_index",MAX_HISTORY_CHILD_ROWS)) if(integer(t,"cast_index")==cast) targets.add(id(t,"target_id"));
                 for(var d:flowRows(data,"s2_combat_cast_die",combat,sequence,phase,flow,"cast_index, die_index",MAX_HISTORY_CHILD_ROWS)) if(integer(d,"cast_index")==cast) dice.add(integer(d,"die_value"));
                 require(targets.size()==integer(r,"target_count") && dice.size()==integer(r,"healing_die_count"));
-                casts.add(new CastAttempt(id(r,"frame_key"),id(r,"actor_id"),rule(r,"casting"),rule(r,"spell"),targets,rule(r,"slot"),integer(r,"slot_level"),nullableId(r,"material_item_id"),dice,signed(r,"healing_modifier"),integer(r,"requested_healing"),integer(r,"applied_healing"),nullableId(r,"effect_key"),en(CastStatus.class,r,"cast_status"),nullableId(r,"target_cast_frame_key"),nullableId(r,"ready_key")));
+                casts.add(new CastAttempt(id(r,"frame_key"),id(r,"actor_id"),rule(r,"casting"),rule(r,"spell"),targets,rule(r,"slot"),integer(r,"slot_level"),nullableId(r,"material_item_id"),dice,signed(r,"healing_modifier"),integer(r,"requested_healing"),integer(r,"applied_healing"),nullableId(r,"effect_key"),en(CastStatus.class,r,"cast_status"),nullableId(r,"target_cast_frame_key"),nullableId(r,"ready_key"),nullableInteger(r,"cone_direction")));
             }
             List<SavingThrowAttempt> saves = new ArrayList<>();
             for(var r:flowRows(data,"s2_combat_saving_throw",combat,sequence,phase,flow,"save_index",1024)) saves.add(new SavingThrowAttempt(id(r,"frame_key"),id(r,"subject_id"),ascii(r,"save_kind"),nullableAscii(r,"ability_key"),integer(r,"d20"),signed(r,"ability_modifier"),integer(r,"proficiency_bonus"),nullableId(r,"blessing_effect_key"),nullableInteger(r,"blessing_d4"),integer(r,"difficulty_class"),signed(r,"total"),bool(r,"success")));
@@ -294,7 +294,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
         UUID combat=event.after().combatId();long sequence=event.after().version()+1;Command c=event.command();
         add(result,"s2_combat_event",base(combat,sequence,"operation_id",bytes(event.operationId()),"request_digest",a(event.requestDigest()),"command_kind",a(c.kind()),"actor_id",b(c.actorId()),"target_id",b(c.targetId()),"item_id",b(c.itemId()),"flow_key",b(c.flowKey()),"leaf_key",b(c.leafKey()),"window_key",b(c.windowKey()),"opportunity_key",b(c.opportunityKey()),"ready_key",b(c.readyKey()),"zone_key",b(c.zoneKey()),"seconds",c.seconds()));
         if(c.castInput()!=null) {
-            CastInput cast=c.castInput(); Map<String,Object> r=base(combat,sequence,"command_index",0,"material_item_id",b(cast.materialItemId()),"target_count",cast.targets().size(),"slot_level",cast.slotLevel(),"target_cast_frame_key",b(cast.targetCastFrameKey()));
+            CastInput cast=c.castInput(); Map<String,Object> r=base(combat,sequence,"command_index",0,"material_item_id",b(cast.materialItemId()),"target_count",cast.targets().size(),"slot_level",cast.slotLevel(),"target_cast_frame_key",b(cast.targetCastFrameKey()),"cone_direction",cast.coneDirection());
             ruleColumns(r,"casting",cast.castingRule());ruleColumns(r,"spell",cast.spell());add(result,"s2_combat_cast_command",r);
             for(int i=0;i<cast.targets().size();i++)add(result,"s2_combat_cast_command_target",base(combat,sequence,"target_index",i,"target_id",bytes(cast.targets().get(i))));
         }
@@ -339,7 +339,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
             for(int ai=0;ai<f.attacks().size();ai++){AttackAttempt t=f.attacks().get(ai);add(out,"s2_combat_attack",flow(combat,sequence,phase,fi,"attack_index",ai,"frame_key",bytes(t.frameKey()),"actor_id",bytes(t.actorId()),"target_id",bytes(t.targetId()),"item_id",bytes(t.itemId()),"sequence_key",b(t.sequenceKey()),"attack_ordinal",t.attackOrdinal(),"opportunity_attack",bit(t.opportunityAttack()),"first_d20",t.firstD20(),"second_d20",t.secondD20(),"selected_d20",t.selectedD20(),"ability_modifier",t.abilityModifier(),"proficiency_bonus",t.proficiencyBonus(),"armor_class",t.armorClass(),"advantage",bit(t.advantage()),"disadvantage",bit(t.disadvantage()),"critical",bit(t.critical()),"hit",bit(t.hit()),"damage_amount",t.damageAmount(),"blessing_effect_key",b(t.blessingEffectKey()),"blessing_d4",t.blessingD4(),"attack_status",a(t.status()),"initial_hit",bit(t.initialHit()),"final_armor_class",t.finalArmorClass()));
                 for(int i=0;i<t.damageDice().size();i++)add(out,"s2_combat_attack_die",flow(combat,sequence,phase,fi,"attack_index",ai,"die_index",i,"die_value",t.damageDice().get(i)));}
             for(int ci=0;ci<f.casts().size();ci++) {
-                CastAttempt cast=f.casts().get(ci); Map<String,Object> r=flow(combat,sequence,phase,fi,"cast_index",ci,"frame_key",bytes(cast.frameKey()),"actor_id",bytes(cast.actorId()),"slot_level",cast.slotLevel(),"material_item_id",b(cast.materialItemId()),"healing_modifier",cast.healingModifier(),"requested_healing",cast.requestedHealing(),"applied_healing",cast.appliedHealing(),"effect_key",b(cast.effectKey()),"target_count",cast.targets().size(),"healing_die_count",cast.healingDice().size(),"cast_status",a(cast.status()),"target_cast_frame_key",b(cast.targetCastFrameKey()),"ready_key",b(cast.readyKey()));
+                CastAttempt cast=f.casts().get(ci); Map<String,Object> r=flow(combat,sequence,phase,fi,"cast_index",ci,"frame_key",bytes(cast.frameKey()),"actor_id",bytes(cast.actorId()),"slot_level",cast.slotLevel(),"material_item_id",b(cast.materialItemId()),"healing_modifier",cast.healingModifier(),"requested_healing",cast.requestedHealing(),"applied_healing",cast.appliedHealing(),"effect_key",b(cast.effectKey()),"target_count",cast.targets().size(),"healing_die_count",cast.healingDice().size(),"cast_status",a(cast.status()),"target_cast_frame_key",b(cast.targetCastFrameKey()),"ready_key",b(cast.readyKey()),"cone_direction",cast.coneDirection());
                 ruleColumns(r,"casting",cast.castingRule());ruleColumns(r,"spell",cast.spell());ruleColumns(r,"slot",cast.slotResource());add(out,"s2_combat_cast",r);
                 for(int ti=0;ti<cast.targets().size();ti++)add(out,"s2_combat_cast_target",flow(combat,sequence,phase,fi,"cast_index",ci,"target_index",ti,"target_id",bytes(cast.targets().get(ti))));
                 for(int di=0;di<cast.healingDice().size();di++)add(out,"s2_combat_cast_die",flow(combat,sequence,phase,fi,"cast_index",ci,"die_index",di,"die_value",cast.healingDice().get(di)));
@@ -396,9 +396,9 @@ public final class JdbcSchema2CombatRuntimeRepository {
             else {
                 require(old.actorId().equals(cast.actorId())&&old.castingRule().equals(cast.castingRule())&&old.spell().equals(cast.spell())&&old.targets().equals(cast.targets())
                         &&old.slotResource().equals(cast.slotResource())&&old.slotLevel()==cast.slotLevel()&&Objects.equals(old.materialItemId(),cast.materialItemId())
-                        &&old.healingModifier()==cast.healingModifier()&&Objects.equals(old.targetCastFrameKey(),cast.targetCastFrameKey())&&Objects.equals(old.readyKey(),cast.readyKey()));
-                if(old.status()==CastStatus.RESOLVED||old.status()==CastStatus.COUNTERED)require(old.equals(cast));
-                else require(cast.status()==old.status()||cast.status()==CastStatus.RESOLVED||cast.status()==CastStatus.COUNTERED||old.status()==CastStatus.PENDING&&cast.status()==CastStatus.HELD);
+                        &&old.healingModifier()==cast.healingModifier()&&Objects.equals(old.targetCastFrameKey(),cast.targetCastFrameKey())&&Objects.equals(old.readyKey(),cast.readyKey())&&Objects.equals(old.coneDirection(),cast.coneDirection()));
+                if(old.status()==CastStatus.RESOLVED||old.status()==CastStatus.COUNTERED||old.status()==CastStatus.INTERRUPTED)require(old.equals(cast));
+                else require(cast.status()==old.status()||cast.status()==CastStatus.RESOLVED||cast.status()==CastStatus.COUNTERED||old.status()==CastStatus.PENDING&&(cast.status()==CastStatus.HELD||cast.coneDirection()!=null&&cast.status()==CastStatus.INTERRUPTED));
             }
             if(!cast.healingDice().isEmpty()&&(old==null||old.healingDice().isEmpty()))completedHealing.add(cast);
         }
@@ -479,7 +479,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
             for(CastAttempt cast:f.casts()) {
                 require(frames.containsKey(cast.frameKey()) && frames.get(cast.frameKey()).kind()==FrameKind.CAST && castFrames.add(cast.frameKey()) && members.contains(cast.actorId())
                         && castingType(cast.castingRule()) && ruleType(cast.spell(),"adventure.spell") && ruleType(cast.slotResource(),"character.resource")
-                        && cast.slotLevel()>=1 && cast.slotLevel()<=9 && !cast.targets().isEmpty() && cast.targets().size()<=MAX_COMBATANTS
+                        && cast.slotLevel()>=1 && cast.slotLevel()<=9 && (cast.coneDirection()==null?!cast.targets().isEmpty():cast.targets().isEmpty()&&cast.coneDirection()>=0&&cast.coneDirection()<8&&cast.readyKey()==null) && cast.targets().size()<=MAX_COMBATANTS
                         && new HashSet<>(cast.targets()).size()==cast.targets().size() && members.containsAll(cast.targets())
                         && cast.healingDice().size()<=20 && cast.healingDice().stream().allMatch(d->d!=null&&d>=1&&d<=12)
                         && cast.status()!=null && cast.healingModifier()>=-5 && cast.healingModifier()<=10 && cast.requestedHealing()>=0 && cast.requestedHealing()<=65535
@@ -570,14 +570,14 @@ public final class JdbcSchema2CombatRuntimeRepository {
     }
     private static void validateCastInput(CastInput input)throws SQLException {
         require(castingType(input.castingRule())&&ruleType(input.spell(),"adventure.spell")&&input.slotLevel()>=1&&input.slotLevel()<=9
-                &&!input.targets().isEmpty()&&input.targets().size()<=MAX_COMBATANTS&&new HashSet<>(input.targets()).size()==input.targets().size());
+                &&(input.coneDirection()==null?!input.targets().isEmpty():input.targets().isEmpty()&&input.coneDirection()>=0&&input.coneDirection()<8)&&input.targets().size()<=MAX_COMBATANTS&&new HashSet<>(input.targets()).size()==input.targets().size());
         for(UUID target:input.targets())uuid(target);if(input.materialItemId()!=null)uuid(input.materialItemId());if(input.targetCastFrameKey()!=null)uuid(input.targetCastFrameKey());
     }
     private static boolean castingType(RuleIdentity rule){return ruleType(rule,"character.spellcasting")||ruleType(rule,"character.wizard_spellcasting");}
     private static void validateReadyInput(ReadyInput input)throws SQLException {
         require(input.trigger()!=null&&input.trigger().kind()!=null&&input.responseKind()!=null&&input.path().size()<=64);
         if(input.trigger().subjectId()!=null)uuid(input.trigger().subjectId());if(input.targetId()!=null)uuid(input.targetId());if(input.itemId()!=null)uuid(input.itemId());
-        require((input.spell()!=null)==(input.responseKind()==ReadyResponseKind.SPELL));if(input.spell()!=null)validateCastInput(input.spell());
+        require((input.spell()!=null)==(input.responseKind()==ReadyResponseKind.SPELL));if(input.spell()!=null){validateCastInput(input.spell());require(input.spell().coneDirection()==null);}
     }
     private static void validateOption(ReactionOption option)throws SQLException {
         require(option!=null&&option.kind()!=null);

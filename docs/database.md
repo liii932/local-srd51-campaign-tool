@@ -24,7 +24,7 @@
 V019 建立永久运行身份登记、不可变快照头和类型化语言镜像；V020 追加空工具镜像表。它们不复制旧
 规则目录或创建战役，当前 Repository 只接受 DRAFT PARTITION。身份、调用方事务、授权
 与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。应用迁移清单预期
-V001—V041；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
+V001—V042；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
 V021 追加 schema 2 INTERNAL 类型化组合、最终规则、完整覆盖链、永久守卫与操作收据；
 来源读取和原子转存合同见[来源到运行快照](rules/schema-2-runtime-snapshot.md)，增量授权见
 [schema 2 运行权限](../database/grants/schema2-runtime-snapshot.sql)。迁移和授权文件不表示已执行。
@@ -68,8 +68,10 @@ action profile 及字段链复合值的类型化子行。V040 保存真实怪物
 计数、引用和算术异常；与场景核验组合运行，不改写数据或自动修复历史。
 
 V041 为[奥术回想](rules/schema-2-arcane-recovery.md)追加有界恢复选择、事件计数与法术书每日事实；
-新增选择子表继续使用准确父事件外键、不可变事实及调用方事务。对应授权和只读核验见
-[最小授权](../database/grants/schema2-arcane-recovery.sql)与[只读核验](../database/verify/schema2-arcane-recovery.sql)，不由应用启动执行。
+V042 为[法术来源共享伤害](rules/schema-2-spell-save-damage.md)追加方向与真实 cast 来源明细，并前向扩展
+既有法术/批次约束。新增子表继续使用准确父事件外键、不可变事实及调用方事务。
+对应授权和只读核验分别见 `schema2-arcane-recovery.sql`、`schema2-spell-save-damage.sql`
+在 `database/grants/` 与 `database/verify/` 下的同名文件，不由应用启动执行。
 
 这些源文件不证明迁移、授权或真实数据库验收已经完成。
 同 run 的唯一角色约束维持当前内部时钟所有权，不开放完整战役初始化或多角色生命周期。
@@ -80,7 +82,7 @@ V022 不推测旧 DRAFT 的授予来源；若已经有一级创建快照，预�
 [授予权限](../database/grants/character-proficiency-grants.sql)与规则快照权限分别审核和应用。
 
 独立 `RULES` 链位于 `database/rules/migration/`，目标为 `dnd_tool_rules.rule_schema_meta`，
-本链包括 V001—V011，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
+本链包括 V001—V012，SQL 不进入 WAR；其固定批准元数据与只读 verifier 独立于运行链。
 V005 保存成长、资源、休息和类型化条目/前提/修改材料，V006/V007 保存
 [检定、装备与健康作者来源](rules/schema-2-foundation-authoring.md)，V008 保存三类战斗作者定义和原子修改，
 V009/V010 保存法术、施法配置、Wizard 学习名单、固定环境与修改的类型化作者材料；
@@ -95,7 +97,7 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 来源存储不放宽完整基础包与非空 add-on 的安装资格门，也不授予完整职业升级或发布资格。
 结构、源账号权限及隔离验收边界见[离线规则源 schema](rule-source-schema.md)和
 [schema 2 来源账本](rules/schema-2-source-ledger.md)。新增 SQL 与权限文件不表示已经在数据库执行。
-运行 V001—V041 与来源 V001—V011 共 52 份迁移源。作者来源、运行镜像与真实角色命令/历史
+运行 V001—V042 与来源 V001—V012 共 54 份迁移源。作者来源、运行镜像与真实角色命令/历史
 分别按各自合同核验；该 INTERNAL 接入不开放完整战役，不建立第二个 JNDI，
 也不执行外部迁移或授权。
 
@@ -112,7 +114,7 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 | 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
 | 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
 | 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
-| 独立 disposable 实例 | V001—V041 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
+| 独立 disposable 实例 | V001—V042 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
 | 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
 
 运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源

@@ -176,6 +176,10 @@ public final class SchemaMigrations {
     static final String V041_SCRIPT_NAME = "V041__schema2-arcane-recovery.sql";
     static final String V041_APPROVED_SHA256 = "3de32aff220aadec90836612ef207c43bb6675b3e3e59cc5e81a2ca3ab7c1a71";
 
+    static final int V042_VERSION = 42;
+    static final String V042_SCRIPT_NAME = "V042__schema2-spell-save-damage.sql";
+    static final String V042_APPROVED_SHA256 = "192321005586c993faa0bc8832d28a2dfb44e6674a47fb1db8406e284be12e8f";
+
     private static final String RESOURCE_DIRECTORY = "/db/migration/";
     private static final String SCOPE_BEGIN = "-- CHECKSUM-SCOPE-BEGIN";
     private static final String SCOPE_END = "-- CHECKSUM-SCOPE-END";
@@ -225,7 +229,8 @@ public final class SchemaMigrations {
             new Definition(V038_VERSION, V038_SCRIPT_NAME, V038_APPROVED_SHA256),
             new Definition(V039_VERSION, V039_SCRIPT_NAME, V039_APPROVED_SHA256),
             new Definition(V040_VERSION, V040_SCRIPT_NAME, V040_APPROVED_SHA256),
-            new Definition(V041_VERSION, V041_SCRIPT_NAME, V041_APPROVED_SHA256));
+            new Definition(V041_VERSION, V041_SCRIPT_NAME, V041_APPROVED_SHA256),
+            new Definition(V042_VERSION, V042_SCRIPT_NAME, V042_APPROVED_SHA256));
 
     private SchemaMigrations() {
     }

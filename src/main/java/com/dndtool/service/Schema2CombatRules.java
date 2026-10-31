@@ -32,7 +32,13 @@ public final class Schema2CombatRules {
         public Battle before() { return before; }
         public Command command() { return command; }
         public int requiredSuffixEvents() {
-            return command.kind()==Kind.BEGIN_MONSTER_REST?1:Schema2SaveDamageRules.handles(before,command)?(command.kind()==Kind.MONSTER_BREATH?1:0)+new Schema2ActionFlowRules(new Schema2CombatRules()).batchAfterCost(roster,before,command.actorId()):Schema2ActionFlowRules.handles(command.kind())?new Schema2ActionFlowRules(new Schema2CombatRules()).mandatorySuffix(roster,before,command):0;
+            if(command.kind()==Kind.BEGIN_MONSTER_REST)return 1;
+            var actions=new Schema2ActionFlowRules(new Schema2CombatRules());
+            if(Schema2SaveDamageRules.handles(before,command)) {
+                var batch=before==null?null:before.saveDamageBatches().stream().filter(v->v.frameKey().equals(command.leafKey())).findFirst().orElse(null);
+                return (command.kind()==Kind.MONSTER_BREATH?1:0)+(batch!=null&&batch.spellSource()!=null?actions.spellBatchAfterCost(roster,before,command.actorId()):actions.batchAfterCost(roster,before,command.actorId()));
+            }
+            return Schema2ActionFlowRules.handles(command.kind())?actions.mandatorySuffix(roster,before,command):0;
         }
         public Set<UUID> possibleHealthTargets() {
             if(Schema2SaveDamageRules.handles(before,command)||Schema2ActionFlowRules.handles(command.kind())||Schema2MonsterRestRules.handles(command.kind())||worldCommand(command.kind())||command.kind()==Kind.END_COMBAT)return Set.copyOf(roster.keySet());
@@ -493,9 +499,14 @@ public final class Schema2CombatRules {
             } else {
                 var profiles=source.material().projection().rules().stream().filter(FinalWizardSpellcasting.class::isInstance).map(FinalWizardSpellcasting.class::cast).filter(r->r.enabled()&&r.identity().equals(cast.castingRule())).toList();
                 if(profiles.size()!=1)throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");var profile=profiles.getFirst().definition();
-                if(!(Schema2SpellRules.SHIELD.equals(algorithm)&&cast.slotLevel()==1&&cast.slotResource().equals(profile.slotResource())||Schema2SpellRules.COUNTERSPELL.equals(algorithm)&&cast.slotLevel()==3&&cast.slotResource().equals(profile.rank3SlotResource())))throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+                boolean burning=Schema2SpellRules.BURNING_HANDS.equals(algorithm);
+                if(!(Schema2SpellRules.SHIELD.equals(algorithm)&&cast.slotLevel()==1&&cast.slotResource().equals(profile.slotResource())||Schema2SpellRules.COUNTERSPELL.equals(algorithm)&&cast.slotLevel()==3&&cast.slotResource().equals(profile.rank3SlotResource())
+                        ||burning&&cast.slotLevel()>=1&&cast.slotLevel()<=3&&cast.slotResource().equals(Schema2SpellRules.slotResource(profile,cast.slotLevel()))))throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+                if(burning)Schema2SpellRules.requireEvocationScope(source);
             }
+            if((cast.coneDirection()!=null)!=Schema2SpellRules.BURNING_HANDS.equals(algorithm))throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
         }
+        for(var batch:battle.saveDamageBatches())if(batch.spellSource()!=null)Schema2SaveDamageRules.validateSpellSource(roster,battle,batch);
         for(OngoingEffect effect:battle.ongoingEffects()) {
             Context source=roster.get(effect.casterId());var spells=source.material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).filter(r->r.enabled()&&r.identity().equals(effect.spell())&&Schema2SpellRules.BLESS.equals(r.definition().algorithm())).toList();
             if(spells.size()!=1||battle.flows().stream().flatMap(f->f.casts().stream()).noneMatch(c->Objects.equals(c.effectKey(),effect.effectKey())&&c.targets().equals(effect.targets()))||effect.startedAtSecond()>Schema2SpellRules.second(source.character())||effect.status()==EffectStatus.ACTIVE&&(effect.expiresAtSecond()<=Schema2SpellRules.second(source.character())||source.character().hitPoints()==0||source.character().health().dead()))throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
