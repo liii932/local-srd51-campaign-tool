@@ -15,7 +15,7 @@ canonical/archive 目标为 `2/2`，发布状态保持 DRAFT。它不是所有�
 
 | 主题 | 文档 | 职责 |
 |---|---|---|
-| SRD 条款与覆盖目标 | [本地原文索引](../../references/srd-5.1/README.md)、[完整规则目标](../../rules/srd-5.1-complete.md) | 条款查阅与项目覆盖边界，不代表实现或发布 |
+| SRD 条款与覆盖目标 | [本地原文索引](../../references/srd-5.1/README.md)、[完整规则目标](../../rules/srd-5.1-complete.md)、[机制覆盖矩阵](../../rules/srd-5.1-coverage.md) | 按机制族分别核对数据、执行及状态/恢复，局部支持不代表全域实现或发布 |
 | 产品范围与用户流程 | [产品说明](../../product.md) | 当前行为、v2 目标和暂缓范围 |
 | 模组公共接口与组合范围 | [模组接口基线](module-interface-baseline.md) | 身份、作者输入、覆盖、支持资格、生命周期及存档绑定的统一目标 |
 | schema 2 作者包到组合结果 | [最小组合链路验证](schema-2-composition-validation.md) | 有限严格读取与纯组合内核、完整作者输入、最终字段和覆盖链的独立向量；内部可测与完整基础模组接纳分别判断 |

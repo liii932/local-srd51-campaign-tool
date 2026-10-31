@@ -41,7 +41,7 @@ public final class Schema2WizardSpellbookRules {
             learned.add(new LearnedSpell(spell,level));
         }
         learned.sort(Comparator.comparingInt(LearnedSpell::acquiredAtClassLevel).thenComparing(LearnedSpell::spell,ORDER));
-        SpellbookState book=new SpellbookState(input.castingRule(),level,learned,prepared,marker,markerSecond);
+        SpellbookState book=new SpellbookState(input.castingRule(),level,learned,prepared,marker,markerSecond,old==null?null:old.lastArcaneRecoveryDay());
         State after=JdbcSchema2CharacterRuntimeRepository.withSpellbook(before,before.version()+1,book);
         if(preparationMinutes>0) {
             RestState r=after.rest(); if(r.minute()>Schema2CharacterRestRules.MAX_MINUTE-preparationMinutes)throw invalid("S2_CHARACTER_TIME");
@@ -57,6 +57,7 @@ public final class Schema2WizardSpellbookRules {
     }
     public void validateState(ProductionSchema2Projection material,State state) {
         SpellbookState book=state.spellbook(); if(book==null)return;
+        new Schema2ArcaneRecoveryRules().validateState(material,state);
         WizardSpellcastingDefinition p=profile(material,state,book.castingRule());
         if(book.learnedThroughLevel()>state.level() || book.learnedThroughLevel()<state.level()-1)throw invalid("S2_SPELLBOOK_STATE");
         for(int level=1;level<=book.learnedThroughLevel();level++) {

@@ -469,6 +469,11 @@ public final class Schema2CharacterRuntimeService {
             }
             out.writeInt(request.initialAbilities().size());
             for (var entry : request.initialAbilities().entrySet()) { text(out, entry.getKey()); out.writeInt(entry.getValue()); }
+            if (rest != null && !rest.recoveredSpellSlots().isEmpty()) {
+                text(out, "SRD_2014_WIZARD_ARCANE_RECOVERY_V1");
+                out.writeInt(rest.recoveredSpellSlots().size());
+                for (var entry : rest.recoveredSpellSlots().entrySet()) { out.writeInt(entry.getKey()); out.writeInt(entry.getValue()); }
+            }
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException | NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }

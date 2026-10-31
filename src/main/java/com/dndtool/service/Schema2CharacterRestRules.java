@@ -103,6 +103,7 @@ public final class Schema2CharacterRestRules {
             default -> throw invalid("S2_REST_COMMAND");
         }
         State after = copy(before, hp, dice, resources, next);
+        if (command.kind().equals("REST_COMPLETED")) after = new Schema2ArcaneRecoveryRules().afterShortRest(material, before, after, command);
         growth.validateState(material, after); validateState(material, after); return after;
     }
 
@@ -114,6 +115,7 @@ public final class Schema2CharacterRestRules {
                 || clock.lastLongRestEndMinute() != null && (clock.lastLongRestEndMinute() < 480 || clock.lastLongRestEndMinute() > clock.minute()
                     || clock.lastLongRestEndMinute() == clock.minute() && clock.lastLongRestEndSecond() > clock.second()))
             throw invalid("S2_REST_STATE");
+        new Schema2ArcaneRecoveryRules().validateState(material, state);
         RestAttempt active = clock.active();
         if (active == null) return;
         if (!definition(material).identity().equals(active.rule()) || active.startMinute() < 0 || active.startMinute() > clock.minute()

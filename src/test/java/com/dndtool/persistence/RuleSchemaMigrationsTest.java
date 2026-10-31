@@ -16,10 +16,10 @@ class RuleSchemaMigrationsTest {
     @Test
     void independentApprovedChainMatchesExactlyTheOfflineSources() throws Exception {
         var chain = RuleSchemaMigrations.expectations();
-        assertEquals(11,chain.size());
-        assertEquals(11,chain.getLast().version());
-        assertEquals("V011__schema2-monster-source.sql",chain.getLast().scriptName());
-        assertEquals("fc939ad72e2495b60db8a710bc03c12a8c2c47d3c0e560a394d337c9a05cf6c2",chain.getLast().scriptSha256());
+        assertEquals(12,chain.size());
+        assertEquals(12,chain.getLast().version());
+        assertEquals("V012__schema2-spell-save-damage-source.sql",chain.getLast().scriptName());
+        assertEquals("441d112dc778b0c06ed3e39beab81958aa7af17f328459dd3c3f1768f4b7806f",chain.getLast().scriptSha256());
         try (var files = Files.list(SOURCE.getParent())) {
             assertEquals(chain.stream().map(RuleSchemaMigrations.Expectation::scriptName).sorted().toList(),
                     files.map(path -> path.getFileName().toString()).sorted().toList());

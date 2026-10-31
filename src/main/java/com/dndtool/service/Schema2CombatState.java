@@ -28,7 +28,7 @@ public final class Schema2CombatState {
     public enum ReactionKind { OPPORTUNITY_ATTACK, SHIELD, COUNTERSPELL, READY_RELEASE }
     public enum TriggerKind { MOVEMENT_LEAVE_REACH_BEFORE, ATTACK_HIT_BEFORE_DAMAGE, CAST_BEFORE_COMPLETION,
         CREATURE_ENTER_CELL_AFTER, ATTACK_COMPLETED, CAST_COMPLETED, MONSTER_ACTION_COMPLETED }
-    public enum CastStatus { PENDING, HELD, RESOLVED, COUNTERED }
+    public enum CastStatus { PENDING, HELD, RESOLVED, COUNTERED, INTERRUPTED }
     public enum AttackStatus { HIT_PENDING_DAMAGE, RESOLVED }
     public enum ReadyResponseKind { ATTACK, MOVE, SPELL }
     public enum ReadyStatus { PREPARING, ARMED, RELEASED, EXPIRED, LOST }
@@ -126,12 +126,15 @@ public final class Schema2CombatState {
     }
     /** The client chooses a declared spell and complete bounded target set; availability, cost and dice stay server-owned. */
     public record CastInput(RuleIdentity castingRule, RuleIdentity spell, List<UUID> targets, UUID materialItemId,
-            int slotLevel, UUID targetCastFrameKey) {
+            int slotLevel, UUID targetCastFrameKey, Integer coneDirection) {
+        public CastInput(RuleIdentity castingRule, RuleIdentity spell, List<UUID> targets, UUID materialItemId,
+                int slotLevel, UUID targetCastFrameKey) { this(castingRule,spell,targets,materialItemId,slotLevel,targetCastFrameKey,null); }
         public CastInput(RuleIdentity castingRule, RuleIdentity spell, List<UUID> targets, UUID materialItemId) {
             this(castingRule,spell,targets,materialItemId,1,null);
         }
         public CastInput {
-            if (castingRule == null || spell == null || targets == null || targets.isEmpty() || targets.size() > 3)
+            if (castingRule == null || spell == null || targets == null || targets.size() > 3
+                    || (coneDirection==null?targets.isEmpty():!targets.isEmpty()||coneDirection<0||coneDirection>=8))
                 throw invalid("S2_SPELL_COMMAND");
             if(slotLevel<1 || slotLevel>9)throw invalid("S2_SPELL_COMMAND");
             targets = List.copyOf(targets);
@@ -146,7 +149,13 @@ public final class Schema2CombatState {
     public record CastAttempt(UUID frameKey, UUID actorId, RuleIdentity castingRule, RuleIdentity spell,
             List<UUID> targets, RuleIdentity slotResource, int slotLevel, UUID materialItemId,
             List<Integer> healingDice, int healingModifier, int requestedHealing, int appliedHealing, UUID effectKey,
-            CastStatus status, UUID targetCastFrameKey, UUID readyKey) {
+            CastStatus status, UUID targetCastFrameKey, UUID readyKey, Integer coneDirection) {
+        public CastAttempt(UUID frameKey, UUID actorId, RuleIdentity castingRule, RuleIdentity spell,
+                List<UUID> targets, RuleIdentity slotResource, int slotLevel, UUID materialItemId,
+                List<Integer> healingDice, int healingModifier, int requestedHealing, int appliedHealing, UUID effectKey,
+                CastStatus status, UUID targetCastFrameKey, UUID readyKey) {
+            this(frameKey,actorId,castingRule,spell,targets,slotResource,slotLevel,materialItemId,healingDice,healingModifier,requestedHealing,appliedHealing,effectKey,status,targetCastFrameKey,readyKey,null);
+        }
         public CastAttempt(UUID frameKey, UUID actorId, RuleIdentity castingRule, RuleIdentity spell,
                 List<UUID> targets, RuleIdentity slotResource, int slotLevel, UUID materialItemId,
                 List<Integer> healingDice, int healingModifier, int requestedHealing, int appliedHealing, UUID effectKey) {
@@ -300,10 +309,23 @@ public final class Schema2CombatState {
     }
     public record ConcentrationDamageObligation(int targetOrdinal, UUID holderSourceKey, UUID packetKey,
             int damageAmount, int difficultyClass, ConcentrationDamageStatus status, Integer checkIndex) { }
+    /** A real spell producer, distinct from a monster action. Its DC contributions are retained facts. */
+    public record SpellDamageSource(UUID castFrameKey, RuleIdentity spell, int slotLevel, int abilityModifier, int proficiencyBonus) {
+        public int diceCount() { return slotLevel+2; }
+        public int difficultyClass() { return 8+abilityModifier+proficiencyBonus; }
+    }
     public record SaveDamageBatch(UUID batchKey, UUID frameKey, UUID sourceId, EntryIdentity action,
             UUID releaseOperationId, long releasedTurnNumber, TargetSetProof targetProof,
             BatchStatus status, SharedDamageRoll sharedRoll, List<BatchCheck> checks,
-            List<DamagePacket> packets, List<ConcentrationDamageObligation> concentrationObligations) {
+            List<DamagePacket> packets, List<ConcentrationDamageObligation> concentrationObligations, SpellDamageSource spellSource) {
+        public SaveDamageBatch(UUID batchKey, UUID frameKey, UUID sourceId, EntryIdentity action,
+                UUID releaseOperationId, long releasedTurnNumber, TargetSetProof targetProof,
+                BatchStatus status, SharedDamageRoll sharedRoll, List<BatchCheck> checks,
+                List<DamagePacket> packets, List<ConcentrationDamageObligation> concentrationObligations) {
+            this(batchKey,frameKey,sourceId,action,releaseOperationId,releasedTurnNumber,targetProof,status,sharedRoll,checks,packets,concentrationObligations,null);
+        }
+        public int diceCount() { return spellSource==null?6:spellSource.diceCount(); }
+        public int difficultyClass() { return spellSource==null?12:spellSource.difficultyClass(); }
         public SaveDamageBatch { checks=List.copyOf(checks);packets=List.copyOf(packets);concentrationObligations=List.copyOf(concentrationObligations); }
     }
     public record Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status,

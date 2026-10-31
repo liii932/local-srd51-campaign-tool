@@ -23,7 +23,8 @@ public final class RuleSchemaMigrations {
             new Expectation(SCHEMA_ROLE, 8, "V008__schema2-combat-source.sql", "eb0bf9e4675cfed03ec5e5e57f026b57e6bd3409edf98eaf6a9e6e680485cfe2"),
             new Expectation(SCHEMA_ROLE, 9, "V009__schema2-spell-source.sql", "7ffe0707112cf3051d0a80c346360be5e4f933f8046830321fd3ac4f68196cfc"),
             new Expectation(SCHEMA_ROLE, 10, "V010__schema2-wizard-environment-source.sql", "3386950595e0c24eade84c6b9b1c38145ffe8aefcb786b6cc66f663ebd2c3d74"),
-            new Expectation(SCHEMA_ROLE, 11, "V011__schema2-monster-source.sql", "fc939ad72e2495b60db8a710bc03c12a8c2c47d3c0e560a394d337c9a05cf6c2"));
+            new Expectation(SCHEMA_ROLE, 11, "V011__schema2-monster-source.sql", "fc939ad72e2495b60db8a710bc03c12a8c2c47d3c0e560a394d337c9a05cf6c2"),
+            new Expectation(SCHEMA_ROLE, 12, "V012__schema2-spell-save-damage-source.sql", "441d112dc778b0c06ed3e39beab81958aa7af17f328459dd3c3f1768f4b7806f"));
 
     private RuleSchemaMigrations() {
     }

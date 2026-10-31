@@ -1414,7 +1414,7 @@ public final class Schema2CompositionKernel {
 
     private static Set<String> executionAlgorithms(FeatureExecution mode) {
         return switch (mode) {
-            case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1", "SRD_2014_WIZARD_SPELLCASTING_V1");
+            case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1", "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1");
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
             case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
         };
@@ -2011,6 +2011,7 @@ public final class Schema2CompositionKernel {
             Map.entry("SRD_2014_CURE_WOUNDS_V1",new SpellMetadata(1,132,false)),
             Map.entry("SRD_2014_SHIELD_V1",new SpellMetadata(1,179,true)),
             Map.entry("SRD_2014_COUNTERSPELL_V1",new SpellMetadata(3,131,true)),
+            Map.entry("SRD_2014_BURNING_HANDS_V1",new SpellMetadata(1,123,true)),
             Map.entry("SRD_2014_ALARM_METADATA_V1",new SpellMetadata(1,114,true)),
             Map.entry("SRD_2014_BURNING_HANDS_METADATA_V1",new SpellMetadata(1,123,true)),
             Map.entry("SRD_2014_CHARM_PERSON_METADATA_V1",new SpellMetadata(1,124,true)),
@@ -2097,7 +2098,7 @@ public final class Schema2CompositionKernel {
         if(!Set.of("SRD_2014_WIZARD_ARCANE_RECOVERY_V1","SRD_2014_EVOCATION_SAVANT_V1","SRD_2014_SCULPT_SPELLS_V1").contains(algorithm))return;
         boolean recovery=algorithm.equals("SRD_2014_WIZARD_ARCANE_RECOVERY_V1");
         var owner=objects.get(d.owner());RuleIdentity ownerClass=d.owner();
-        if(owner==null || d.kind()!=FeatureKind.FEATURE || d.executionMode()!=FeatureExecution.BLOCKED || d.level()!=(recovery?1:2)
+        if(owner==null || d.kind()!=FeatureKind.FEATURE || !(d.executionMode()==FeatureExecution.BLOCKED||recovery&&d.executionMode()==FeatureExecution.AUTOMATIC) || d.level()!=(recovery?1:2)
                 || !d.owner().ruleType().equals(recovery?"character.class":"character.subclass"))
             throw fail("S2_TYPE",Stage.FINAL,"Wizard auxiliary feature has the wrong acquisition contract",source);
         if(!recovery) {

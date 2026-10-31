@@ -2,7 +2,7 @@
 
 ## 采用范围与真实资格
 
-`Schema2CombatRuntimeService` 在同一 INTERNAL 场景中执行 Bless、Cure Wounds、Shield、Counterspell、
+`Schema2CombatRuntimeService` 在同一 INTERNAL 场景中执行 Bless、Cure Wounds、Shield、Counterspell、有限 Burning Hands、
 Ready attack／move／spell、固定环境抗魔区域及战外持续效果。规则来自[施法作者合同](schema-2-spell-authoring.md)
 定义的准确组合与镜像，角色资格来自实际成长、装备、学习和准备记录。共同事务、版本及正常可见
 平面方格的前提见[战斗合同](schema-2-combat.md)。这些内部能力不开放完整 base、Host 或 archive format 2。
@@ -17,7 +17,8 @@ Wizard 准备列表须来自已学法术，数量不超过 `max(1, INT 调整值
 实际完成的长休允许改变列表。准备耗时按所选法术每环至少一分钟计入角色时钟，记录已使用的长休标记。
 法术位复用 `character.resource`，按等级分别取得一至三环位并由长休恢复。不会创建可独立修改的 slot 副本。
 知识名单中的其他法术只提供封闭元数据，执行仍明确拒绝；名单存在不等于法术能力已实现。
-Arcane Recovery、Evocation Savant、Sculpt Spells 保留真实获得事实，但当前不能执行其恢复、抄录或塑形能力。
+[Arcane Recovery](schema-2-arcane-recovery.md)使用独立的真实短休消费者；只有准确 AUTOMATIC 声明可恢复。
+Evocation Savant、Sculpt Spells 保留真实获得事实，其抄录和塑形能力仍不执行。
 
 ## 施法与反应
 
@@ -25,14 +26,16 @@ Arcane Recovery、Evocation Savant、Sculpt Spells 保留真实获得事实，�
 |---|---|
 | `CAST` Bless | 一次 action、一个一级位；V/S/M，实际持有 profile 指定圣徽；选择 1—3 个三十尺内角色，建立一个专注来源及其全部目标应用。 |
 | `CAST` Cure Wounds | 一次 action、一个一级位；V/S，至少一只空手；五尺内一个角色；服务器掷 1d8，加 WIS 调整值及生命门徒的三点，受目标 HP 上限约束。 |
+| `CAST` Burning Hands | 仅[有限法术共享伤害合同](schema-2-spell-save-damage.md)允许的双手空闲、无对象/抗魔风险及未获得 Sculpt Spells 的活动战斗分支；方向由有限选择提供，实际目标由服务器完整枚举；真实一至三环位分别共享 3d6/4d6/5d6，DEX 半伤与后继进入共同批次。 |
 | `DECLARE_SHIELD` | 在命中已确定、伤害尚未掷骰的窗口内，由受击且已准备该法术的 Wizard 消费 reaction 和合法法术位；AC 加五，持续至本人下回合开始。保留原命中事实，使用原攻击骰重新判断最终命中；不能重掷攻击。 |
 | `DECLARE_COUNTERSPELL` | 对六十尺内可见施法的真实 `CAST_BEFORE_COMPLETION` 窗口，消费 reaction 和三环位。被反制的声明仍保留已支付成本；反制本身可产生嵌套反制窗口。当前真实法术位范围内按 SRD 自动反制，不宣称已接入四环以上施法。 |
 | `END_CONCENTRATION` | 在没有待继续动作流的边界主动结束本人唯一专注，不消费 action，可在他人回合执行。 |
 
 不熟练护甲的禁止施法由装备事实决定。当前要求正常发声和可用手部，不支持沉默、特殊组件、组件袋、
 抄录、仪式、多职业或其他未知施法机制。Shield 的 Magic Missile 免伤分支仍没有真实伤害 producer；
-Magic Missile 元数据不能触发该分支。本合同的施法目标目前为真实角色；
-[有限怪物吐息](schema-2-monster-breath.md)接入怪物身份与伤害，不自动开放向怪物施放法术。
+Magic Missile 元数据不能触发该分支。Bless/Cure Wounds 等定向法术仍限定真实角色；
+[Burning Hands](schema-2-spell-save-damage.md)仅在自己的完整区域合同内接纳已部署角色和怪物，
+[有限怪物吐息](schema-2-monster-breath.md)不自动开放其他向怪物施放的法术。
 
 完整规则、目标、组件、资源、乐观版本和强制继续容量先于 RNG 与写入验证。每次施法声明只支付一次，
 反制或被打断不退款。暂停窗口使用同一 frame graph：选择帧、反应子帧与父帧关系明确保存；CLOSED 窗口

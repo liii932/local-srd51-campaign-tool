@@ -8,10 +8,12 @@ import org.junit.jupiter.api.Test;
 
 class SchemaMigrationsTest {
     @Test
-    void packagedMigrationChainContainsApprovedV001ThroughV040() throws Exception {
+    void packagedMigrationChainContainsApprovedV001ThroughV042() throws Exception {
         List<SchemaMigrations.Expectation> expectations = SchemaMigrations.loadExpectations();
 
-        assertEquals(40, expectations.size());
+        assertEquals(42, expectations.size());
+        assertEquals("V041__schema2-arcane-recovery.sql", expectations.get(40).scriptName());
+        assertEquals("V042__schema2-spell-save-damage.sql", expectations.get(41).scriptName());
         assertExpectation(
                 expectations.get(0),
                 SchemaMigrations.V001_VERSION,

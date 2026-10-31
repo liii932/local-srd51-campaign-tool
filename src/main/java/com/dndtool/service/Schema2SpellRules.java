@@ -14,6 +14,7 @@ import static com.dndtool.service.Schema2CombatState.*;
 public final class Schema2SpellRules {
     public static final String CASTING_ALGORITHM = "LIFE_DOMAIN_LEVEL1_V1";
     public static final String BLESS = "SRD_2014_BLESS_V1", CURE_WOUNDS = "SRD_2014_CURE_WOUNDS_V1", SHIELD="SRD_2014_SHIELD_V1", COUNTERSPELL="SRD_2014_COUNTERSPELL_V1";
+    public static final String BURNING_HANDS="SRD_2014_BURNING_HANDS_V1";
     public static final int MAX_ONGOING_EFFECTS = 128;
     public static final class Prepared {
         private final SpellcastingDefinition casting;
@@ -57,16 +58,17 @@ public final class Schema2SpellRules {
             if(feature.identity().equals(required)) {
                 if(feature.executionMode()!=FeatureExecution.AUTOMATIC || !Set.of(CASTING_ALGORITHM,"SRD_2014_WIZARD_SPELLCASTING_V1").contains(feature.executionAlgorithm()))throw invalid(code);
             } else {
-                if(wizard.isEmpty() || feature.executionMode()!=FeatureExecution.BLOCKED)throw invalid(code);
+                if(wizard.isEmpty())throw invalid(code);
                 var profile=wizard.getFirst().definition();
                 if(feature.executionAlgorithm().equals("SRD_2014_WIZARD_ARCANE_RECOVERY_V1")) {
-                    if(!feature.owner().equals(profile.ownerClass()) || feature.level()!=1)throw invalid(code);
+                    if(!feature.owner().equals(profile.ownerClass()) || feature.level()!=1
+                            ||!Set.of(FeatureExecution.BLOCKED,FeatureExecution.AUTOMATIC).contains(feature.executionMode()))throw invalid(code);
                 } else if(Set.of("SRD_2014_EVOCATION_SAVANT_V1","SRD_2014_SCULPT_SPELLS_V1").contains(feature.executionAlgorithm())) {
                     var subclasses=material.projection().rules().stream().filter(FinalSubclass.class::isInstance).map(FinalSubclass.class::cast).filter(r->r.enabled()&&r.identity().equals(feature.owner())&&r.definition().ownerClass().equals(profile.ownerClass())&&r.definition().selectionLevel()==2).toList();
-                    if(feature.level()!=2 || subclasses.size()!=1 || state.subclasses().stream().noneMatch(r->r.characterClass().equals(profile.ownerClass())&&r.subclass().equals(feature.owner())&&r.acquiredAtClassLevel()==2))throw invalid(code);
+                    if(feature.executionMode()!=FeatureExecution.BLOCKED || feature.level()!=2 || subclasses.size()!=1 || state.subclasses().stream().noneMatch(r->r.characterClass().equals(profile.ownerClass())&&r.subclass().equals(feature.owner())&&r.acquiredAtClassLevel()==2))throw invalid(code);
                 } else throw invalid(code);
-                // Recovery and spellbook copying do not run during this scene. Sculpt Spells only modifies evocation saving throws;
-                // the finite wizard executable set consists exclusively of abjuration Shield and Counterspell.
+                // Recovery and copying have their own consumers. Evocation effects additionally reject
+                // acquired Sculpt Spells until its target-choice consumer is adopted.
             }
         }
     }
@@ -96,7 +98,7 @@ public final class Schema2SpellRules {
         State caster=context.character(); requireSupportedFeatures(context.material(),caster,"S2_SPELL_EFFECT_UNSUPPORTED");
         Schema2OngoingEffectRules.requireCastingAllowed(roster,battle,actor);
         if(input.castingRule().ruleType().equals("character.wizard_spellcasting"))return prepareWizard(roster,battle,actor,input,reaction);
-        if(reaction || input.slotLevel()!=1 || input.targetCastFrameKey()!=null)throw invalid("S2_SPELL_UNAVAILABLE");
+        if(reaction || input.slotLevel()!=1 || input.targetCastFrameKey()!=null || input.coneDirection()!=null)throw invalid("S2_SPELL_UNAVAILABLE");
         var profiles=context.material().projection().rules().stream().filter(FinalSpellcasting.class::isInstance)
                 .map(FinalSpellcasting.class::cast).filter(p -> p.enabled() && p.identity().equals(input.castingRule())).toList();
         if (profiles.size()!=1 || !owns(profiles.getFirst().definition(),caster)) throw invalid("S2_SPELL_CASTER_UNSUPPORTED");
@@ -145,20 +147,28 @@ public final class Schema2SpellRules {
         if(profiles.size()!=1)throw invalid("S2_SPELL_CASTER_UNSUPPORTED");
         var profile=profiles.getFirst().definition();
         var spells=context.material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).filter(s->s.enabled()&&s.identity().equals(input.spell())).toList();
-        if(spells.size()!=1 || !Set.of(SHIELD,COUNTERSPELL).contains(spells.getFirst().definition().algorithm()) || !reaction)throw invalid("S2_SPELL_UNAVAILABLE");
+        if(spells.size()!=1)throw invalid("S2_SPELL_UNAVAILABLE");
+        String algorithm=spells.getFirst().definition().algorithm();boolean burning=BURNING_HANDS.equals(algorithm);
+        if(!(burning?!reaction:reaction&&Set.of(SHIELD,COUNTERSPELL).contains(algorithm)))throw invalid("S2_SPELL_UNAVAILABLE");
         var book=caster.spellbook();
         if(book==null || !book.castingRule().equals(input.castingRule()) || book.learnedThroughLevel()!=caster.level()
                 || book.learned().stream().noneMatch(s->s.spell().equals(input.spell())) || !book.prepared().contains(input.spell()))throw invalid("S2_SPELL_UNAVAILABLE");
         boolean shield=SHIELD.equals(spells.getFirst().definition().algorithm());
-        if(input.slotLevel()!=(shield?1:3) || !shield&&caster.level()<5)throw invalid("S2_SPELL_SLOT_UNAVAILABLE");
-        RuleIdentity resource=shield?profile.slotResource():profile.rank3SlotResource();
+        if(burning?(input.slotLevel()>3||input.slotLevel()>1&&caster.level()<2*input.slotLevel()-1):input.slotLevel()!=(shield?1:3)||!shield&&caster.level()<5)throw invalid("S2_SPELL_SLOT_UNAVAILABLE");
+        RuleIdentity resource=burning?slotResource(profile,input.slotLevel()):shield?profile.slotResource():profile.rank3SlotResource();
         var resources=caster.resources().stream().filter(r->r.identity().equals(resource)).toList();
         if(resources.size()!=1 || resources.getFirst().unlimited() || resources.getFirst().current()<1)throw invalid("S2_SPELL_SLOT_UNAVAILABLE");
         if(caster.hitPoints()==0 || caster.health().dead())throw invalid("S2_COMBAT_ACTOR_INACTIVE");
         if(new Schema2CharacterEquipmentRules().derive(context.material(),caster).castingForbidden())throw invalid("S2_SPELL_ARMOR");
         boolean free=caster.equipment().stream().noneMatch(i->i.location().equals("BOTH_HANDS")) && (caster.equipment().stream().noneMatch(i->i.location().equals("MAIN_HAND"))||caster.equipment().stream().noneMatch(i->i.location().equals("OFF_HAND")));
         if(!free || input.materialItemId()!=null)throw invalid("S2_SPELL_COMPONENT");
-        if(shield) {
+        if(burning) {
+            if(caster.equipment().stream().anyMatch(i->Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(i.location())))throw invalid("S2_SPELL_COMPONENT");
+            if(input.coneDirection()==null || !input.targets().isEmpty() || input.targetCastFrameKey()!=null)throw invalid("S2_SPELL_TARGET");
+            requireEvocationScope(context);
+            Schema2SaveDamageRules.prepareSpell(roster,battle,actor,input);
+        } else if(input.coneDirection()!=null)throw invalid("S2_SPELL_TARGET");
+        else if(shield) {
             if(!input.targets().equals(List.of(actor)) || input.targetCastFrameKey()!=null)throw invalid("S2_SPELL_TARGET");
         } else {
             CastAttempt target=findCast(battle,input.targetCastFrameKey());
@@ -166,6 +176,13 @@ public final class Schema2SpellRules {
         }
         if(caster.version()>=JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS-1)throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
         return new Prepared(input.castingRule(),resource,profile.abilityKey(),spells.getFirst().definition(),input,caster,0,false);
+    }
+    static RuleIdentity slotResource(WizardSpellcastingDefinition p,int level) {
+        return switch(level) {case 1->p.slotResource();case 2->p.rank2SlotResource();case 3->p.rank3SlotResource();default->throw invalid("S2_SPELL_SLOT_UNAVAILABLE");};
+    }
+    static void requireEvocationScope(Context context) {
+        for(var acquired:context.character().features())if(context.material().projection().rules().stream().anyMatch(r->r instanceof FinalFeature f&&f.enabled()&&f.identity().equals(acquired.feature())&&"SRD_2014_SCULPT_SPELLS_V1".equals(f.definition().executionAlgorithm())))
+            throw invalid("S2_SPELL_SCULPT_UNSUPPORTED");
     }
     public List<ReactionOption> reactionOptions(Map<UUID,Context> roster,Battle battle,UUID actor,ReactionKind kind,UUID targetCast) {
         Context c=roster.get(actor);List<ReactionOption> result=new ArrayList<>();

@@ -60,7 +60,11 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         }
         public static final RestState INITIAL = new RestState(0, null, null);
     }
-    public record RestInput(String restKind, String activity, long minutes, int hitDieSides, Map<Integer, Integer> recoveredHitDice) {
+    public record RestInput(String restKind, String activity, long minutes, int hitDieSides,
+            Map<Integer, Integer> recoveredHitDice, Map<Integer, Integer> recoveredSpellSlots) {
+        public RestInput(String restKind, String activity, long minutes, int hitDieSides, Map<Integer, Integer> recoveredHitDice) {
+            this(restKind, activity, minutes, hitDieSides, recoveredHitDice, Map.of());
+        }
         public RestInput {
             boolean valid = (restKind == null || restKind.equals("SHORT_REST") || restKind.equals("LONG_REST"))
                     && (activity == null || Set.of("SLEEP", "LIGHT", "STRENUOUS", "NONE").contains(activity))
@@ -72,19 +76,34 @@ public final class JdbcSchema2CharacterRuntimeRepository {
             }
             if (!valid || total > 20) throw new IllegalArgumentException("S2_CHARACTER_REST_INPUT");
             recoveredHitDice = Collections.unmodifiableMap(recovered);
+            if (recoveredSpellSlots == null || recoveredSpellSlots.size() > 5)
+                throw new IllegalArgumentException("S2_ARCANE_RECOVERY_CHOICE");
+            var slots = new TreeMap<Integer, Integer>();
+            for (var entry : recoveredSpellSlots.entrySet()) {
+                if (entry.getKey() == null || entry.getKey() < 1 || entry.getKey() > 5
+                        || entry.getValue() == null || entry.getValue() < 1 || entry.getValue() > 4)
+                    throw new IllegalArgumentException("S2_ARCANE_RECOVERY_CHOICE");
+                slots.put(entry.getKey(), entry.getValue());
+            }
+            recoveredSpellSlots = Collections.unmodifiableMap(slots);
         }
     }
     public record LearnedSpell(RuleIdentity spell, int acquiredAtClassLevel) {
         public LearnedSpell { if (!validRule(spell,"adventure.spell") || acquiredAtClassLevel<1 || acquiredAtClassLevel>5) throw new IllegalArgumentException("S2_SPELLBOOK_STATE"); }
     }
     public record SpellbookState(RuleIdentity castingRule, int learnedThroughLevel, List<LearnedSpell> learned,
-            List<RuleIdentity> prepared, Long preparedAtRestMinute, Integer preparedAtRestSecond) {
+            List<RuleIdentity> prepared, Long preparedAtRestMinute, Integer preparedAtRestSecond, Long lastArcaneRecoveryDay) {
+        public SpellbookState(RuleIdentity castingRule, int learnedThroughLevel, List<LearnedSpell> learned,
+                List<RuleIdentity> prepared, Long preparedAtRestMinute, Integer preparedAtRestSecond) {
+            this(castingRule, learnedThroughLevel, learned, prepared, preparedAtRestMinute, preparedAtRestSecond, null);
+        }
         public SpellbookState {
             if (!validRule(castingRule,"character.wizard_spellcasting") || learnedThroughLevel<1 || learnedThroughLevel>5
                     || learned==null || learned.size()>14 || learned.stream().anyMatch(Objects::isNull)
                     || prepared==null || prepared.size()>15 || prepared.stream().anyMatch(r->!validRule(r,"adventure.spell"))
                     || (preparedAtRestMinute==null)!=(preparedAtRestSecond==null)
-                    || preparedAtRestMinute!=null&&(preparedAtRestMinute<0 || preparedAtRestSecond<0 || preparedAtRestSecond>59))
+                    || preparedAtRestMinute!=null&&(preparedAtRestMinute<0 || preparedAtRestSecond<0 || preparedAtRestSecond>59)
+                    || lastArcaneRecoveryDay!=null&&(lastArcaneRecoveryDay<0 || lastArcaneRecoveryDay>1_000_000_000L/1440))
                 throw new IllegalArgumentException("S2_SPELLBOOK_STATE");
             learned=List.copyOf(learned); prepared=List.copyOf(prepared);
             if (learned.size()!=4+2*learnedThroughLevel || new HashSet<>(learned.stream().map(LearnedSpell::spell).toList()).size()!=learned.size()
@@ -263,6 +282,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                     case "REST_ENDED" -> restInput.restKind() == null && restInput.activity() == null && restInput.minutes() == 0 && restInput.hitDieSides() == 0 && restInput.recoveredHitDice().isEmpty();
                     default -> false;
                 };
+                if (restInput != null && !"REST_COMPLETED".equals(kind)) valid &= restInput.recoveredSpellSlots().isEmpty();
             } else valid &= restInput == null;
             if ("CHECK_RESOLVED".equals(kind)) valid = resource == null && amount == 0 && recoveryTrigger == null && hpChoice == null
                     && targetClass == null && GrowthChoices.EMPTY.equals(growthChoices) && restInput == null && checkInput != null;
@@ -317,7 +337,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
             return new Root(new Identity(id(row, "run_id"), id(row, "snapshot_id")), id(row, "campaign_id"), characterId, id(row, "preparation_operation_id"));
         });
         if (roots.isEmpty()) {
-            for (String table : List.of("s2_character_event", "s2_character_event_state", "s2_character_event_resource", "s2_character_event_class", "s2_character_event_hit_die", "s2_character_event_subclass", "s2_character_event_feature", "s2_character_event_feat", "s2_character_event_proficiency", "s2_character_command_ability", "s2_character_command_proficiency", "s2_character_command_hit_die", "s2_character_check", "s2_character_event_equipment", "s2_character_equipment_command", "s2_character_health_event", "s2_character_health_die", "s2_character_combat_input", "s2_character_event_learned_spell", "s2_character_event_prepared_spell", "s2_character_spellbook_command", "s2_character_spellbook_choice"))
+            for (String table : List.of("s2_character_event", "s2_character_event_state", "s2_character_event_resource", "s2_character_event_class", "s2_character_event_hit_die", "s2_character_event_subclass", "s2_character_event_feature", "s2_character_event_feat", "s2_character_event_proficiency", "s2_character_command_ability", "s2_character_command_proficiency", "s2_character_command_hit_die", "s2_character_arcane_recovery_choice", "s2_character_check", "s2_character_event_equipment", "s2_character_equipment_command", "s2_character_health_event", "s2_character_health_die", "s2_character_combat_input", "s2_character_event_learned_spell", "s2_character_event_prepared_spell", "s2_character_spellbook_command", "s2_character_spellbook_choice"))
                 require(query(connection, table, "character_id", bytes(characterId), "event_sequence", 1, row -> true).isEmpty());
             return null;
         }
@@ -328,7 +348,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
             headers.add(new Header(id(row, "operation_id"), ascii(row, "request_digest", 64), ascii(row, "event_kind", 32),
                     nullableRule(row, "resource"), number(row, "resource_amount"), nullableAscii(row, "recovery_trigger", 16), nullableAscii(row, "hp_choice", 64),
                     nullableRule(row, "target_class"), nullableRule(row, "chosen_subclass"), nullableRule(row, "chosen_feat"), integer(row, "ability_choice_count"), integer(row, "proficiency_choice_count"), nullableAscii(row, "rest_kind", 16), nullableAscii(row, "rest_activity", 16), number(row, "rest_minutes"), integer(row, "rest_hit_die_sides"), integer(row, "recovered_hit_die_count"),
-                    row.getObject("hit_die_roll") == null ? null : integer(row, "hit_die_roll")));
+                    row.getObject("hit_die_roll") == null ? null : integer(row, "hit_die_roll"), integer(row, "arcane_recovery_choice_count")));
             return true;
         });
         require(!headers.isEmpty());
@@ -390,6 +410,13 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         query(connection, "s2_character_command_hit_die", "character_id", bytes(characterId), "event_sequence, pool_index", MAX_EVENTS * 4, row -> {
             long sequence = eventSequence(row, headers.size()); var recovered = recoveredDice.computeIfAbsent(sequence, ignored -> new LinkedHashMap<>());
             require(integer(row, "pool_index") == recovered.size() && recovered.size() < 4 && recovered.putIfAbsent(integer(row, "sides"), integer(row, "recovered_value")) == null); return true;
+        });
+        Map<Long, Map<Integer, Integer>> recoveredSlots = new HashMap<>();
+        query(connection, "s2_character_arcane_recovery_choice", "character_id", bytes(characterId), "event_sequence, slot_rank", MAX_EVENTS * 5, row -> {
+            long sequence = eventSequence(row, headers.size());
+            var recovered = recoveredSlots.computeIfAbsent(sequence, ignored -> new LinkedHashMap<>());
+            require(recovered.size() < 5 && recovered.putIfAbsent(integer(row, "slot_rank"), integer(row, "recovered_value")) == null);
+            return true;
         });
         var classes = readChildren(connection, characterId, "class", "class_index", MAX_CLASSES, headers.size(), row -> new ClassLevel(rule(row, "class"), integer(row, "class_level")));
         var dice = readChildren(connection, characterId, "hit_die", "pool_index", MAX_HIT_DICE_POOLS, headers.size(), row -> new HitDicePool(integer(row, "sides"), integer(row, "current_value"), integer(row, "maximum_value")));
@@ -460,11 +487,14 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                 require(canonical.equals(chosen) && new ArrayList<>(growth.abilityIncreases().keySet()).equals(new ArrayList<>(increases.keySet())));
                 Map<Integer, Integer> recovered = recoveredDice.remove(index + 1L); if (recovered == null) recovered = Map.of();
                 require(recovered.size() == header.recoveredDice);
+                Map<Integer, Integer> slots = recoveredSlots.remove(index + 1L); if (slots == null) slots = Map.of();
+                require(slots.size() == header.recoveredSlots);
                 RestInput input = null;
                 if (restKind(header.kind)) {
-                    input = new RestInput(header.restKind, header.activity, header.minutes, header.dieSides, recovered);
+                    input = new RestInput(header.restKind, header.activity, header.minutes, header.dieSides, recovered, slots);
                     require(new ArrayList<>(input.recoveredHitDice().keySet()).equals(new ArrayList<>(recovered.keySet())));
-                } else require(header.restKind == null && header.activity == null && header.minutes == 0 && header.dieSides == 0 && recovered.isEmpty());
+                    require(new ArrayList<>(input.recoveredSpellSlots().keySet()).equals(new ArrayList<>(slots.keySet())));
+                } else require(header.restKind == null && header.activity == null && header.minutes == 0 && header.dieSides == 0 && recovered.isEmpty() && slots.isEmpty());
                 CheckFacts check = checks.remove(index + 1L);
                 require("CHECK_RESOLVED".equals(header.kind) == (check != null));
                 EquipmentInput equipmentInput = equipmentCommands.remove(index + 1L); HealthFacts health = healthEvents.remove(index + 1L);
@@ -475,7 +505,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                 events.add(new Event(header.operation, header.digest, command, header.roll, before, after, check == null ? null : check.result(), health == null ? null : health.result()));
             } catch (IllegalArgumentException malformed) { throw new SQLException("S2_CHARACTER_RUNTIME_CORRUPT", malformed); }
         }
-        require(states.isEmpty() && abilityChoices.isEmpty() && proficiencyChoices.isEmpty() && recoveredDice.isEmpty() && checks.isEmpty() && equipmentCommands.isEmpty() && healthEvents.isEmpty() && combatInputs.isEmpty() && spellbookCommands.isEmpty());
+        require(states.isEmpty() && abilityChoices.isEmpty() && proficiencyChoices.isEmpty() && recoveredDice.isEmpty() && recoveredSlots.isEmpty() && checks.isEmpty() && equipmentCommands.isEmpty() && healthEvents.isEmpty() && combatInputs.isEmpty() && spellbookCommands.isEmpty());
         History history = new History(events.getLast().after(), events); validate(history); return history;
     }
 
@@ -556,7 +586,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         require(used + perEvent * additionalEvents <= MAX_HISTORY_CHILD_ROWS);
     }
     private static long stateRows(State state) { return 1L + state.classes().size() + state.hitDicePools().size() + state.subclasses().size() + state.features().size() + state.feats().size() + state.proficiencies().size() + state.resources().size() + state.equipment().size() + (state.spellbook()==null?0:state.spellbook().learned().size()+state.spellbook().prepared().size()); }
-    private static long commandRows(Command command) { return command.growthChoices().abilityIncreases().size() + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum() + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size()) + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1) + (command.healthInput() == null ? 0 : 1 + MAX_HEALTH_DICE) + (command.combatInput() == null ? 0 : 1) + (command.spellbookInput()==null?0:1+command.spellbookInput().learned().size()+command.spellbookInput().prepared().size()); }
+    private static long commandRows(Command command) { return command.growthChoices().abilityIncreases().size() + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum() + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size() + command.restInput().recoveredSpellSlots().size()) + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1) + (command.healthInput() == null ? 0 : 1 + MAX_HEALTH_DICE) + (command.combatInput() == null ? 0 : 1) + (command.spellbookInput()==null?0:1+command.spellbookInput().learned().size()+command.spellbookInput().prepared().size()); }
     private static long eventRows(Event event) { return commandRows(event.command()) - (event.healthResult() == null ? 0 : MAX_HEALTH_DICE - event.healthResult().dice().size()); }
     public static void validate(History history) throws SQLException {
         require(history != null && !history.events().isEmpty() && history.events().size() <= MAX_EVENTS);
@@ -586,11 +616,23 @@ public final class JdbcSchema2CharacterRuntimeRepository {
             validateState(before); require(!event.kind().equals("INITIALIZED") && root(before).equals(root(after)) && before.characterClass().equals(after.characterClass()) && after.version() == before.version() + 1);
             if (!equipmentKind(event.kind()) && !Set.of("COMBAT_DAMAGE_APPLIED","COMBAT_ENVIRONMENT_HEALTH").contains(event.kind())) require(before.equipment().equals(after.equipment()));
             if (!healthKind(event.kind()) && !Set.of("TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT").contains(event.kind())) require(before.health().equals(after.health()));
-            if (!spellbookKind(event.kind())) require(Objects.equals(before.spellbook(),after.spellbook()));
+            boolean arcaneRecovery = command.restInput() != null && !command.restInput().recoveredSpellSlots().isEmpty();
+            if (arcaneRecovery) {
+                require(event.kind().equals("REST_COMPLETED") && before.spellbook() != null && after.spellbook() != null
+                        && before.rest().active() != null && before.rest().active().kind().equals("SHORT_REST")
+                        && before.rest().active().phase().equals("IN_PROGRESS") && !before.rest().active().interrupted()
+                        && before.rest().minute() - before.rest().active().startMinute() >= 60
+                        && after.rest().active() != null && after.rest().active().phase().equals("SPENDING_HIT_DICE"));
+                long day = before.rest().minute() / 1440;
+                require(!Objects.equals(before.spellbook().lastArcaneRecoveryDay(), day)
+                        && Objects.equals(after.spellbook().lastArcaneRecoveryDay(), day)
+                        && before.spellbook().equals(withArcaneRecoveryDay(after.spellbook(), before.spellbook().lastArcaneRecoveryDay())));
+            } else if (!spellbookKind(event.kind())) require(Objects.equals(before.spellbook(),after.spellbook()));
             if (spellbookKind(event.kind())) {
                 require(event.hitDieRoll()==null && before.rest().active()==null && after.spellbook()!=null
                         && sameCore(before,withSpellbook(after,after.version(),before.spellbook())) && before.hitPoints()==after.hitPoints()
-                        && sameRestExceptMinute(before.rest(),after.rest()) && after.rest().minute()>=before.rest().minute());
+                        && sameRestExceptMinute(before.rest(),after.rest()) && after.rest().minute()>=before.rest().minute()
+                        && Objects.equals(before.spellbook()==null?null:before.spellbook().lastArcaneRecoveryDay(), after.spellbook().lastArcaneRecoveryDay()));
             } else if (advancement(event.kind())) {
                 require(before.rest().equals(after.rest()));
                 require(after.level() == before.level() + 1 && after.features().containsAll(before.features()) && after.feats().containsAll(before.feats()) && after.subclasses().containsAll(before.subclasses()) && after.proficiencies().containsAll(before.proficiencies()));
@@ -656,11 +698,16 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         RuleIdentity casting=nullableRule(row,"spellbook_casting");
         if(casting==null) {
             require(row.getObject("spellbook_learned_level")==null && row.getObject("spellbook_prepared_rest_minute")==null
-                    && row.getObject("spellbook_prepared_rest_second")==null && learned.isEmpty() && prepared.isEmpty());return null;
+                    && row.getObject("spellbook_prepared_rest_second")==null && row.getObject("arcane_recovery_day")==null && learned.isEmpty() && prepared.isEmpty());return null;
         }
         return new SpellbookState(casting,integer(row,"spellbook_learned_level"),learned,prepared,
                 row.getObject("spellbook_prepared_rest_minute")==null?null:number(row,"spellbook_prepared_rest_minute"),
-                row.getObject("spellbook_prepared_rest_second")==null?null:integer(row,"spellbook_prepared_rest_second"));
+                row.getObject("spellbook_prepared_rest_second")==null?null:integer(row,"spellbook_prepared_rest_second"),
+                row.getObject("arcane_recovery_day")==null?null:number(row,"arcane_recovery_day"));
+    }
+    public static SpellbookState withArcaneRecoveryDay(SpellbookState book, Long day) {
+        return new SpellbookState(book.castingRule(), book.learnedThroughLevel(), book.learned(), book.prepared(),
+                book.preparedAtRestMinute(), book.preparedAtRestSecond(), day);
     }
     private static boolean sameRestExceptMinute(RestState before, RestState after) {
         return before.second()==after.second() && Objects.equals(before.lastLongRestEndMinute(), after.lastLongRestEndMinute())
@@ -680,6 +727,8 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         require(validRule(state.characterClass(), "character.class"));
         require(state.health() != null && state.equipment().size() <= MAX_EQUIPMENT);
         RestState rest = state.rest(); require(rest != null && rest.minute() >= 0 && rest.minute() <= 1000000000L && (rest.lastLongRestEndMinute() == null || rest.lastLongRestEndMinute() >= 0 && rest.lastLongRestEndMinute() <= rest.minute()));
+        require(state.spellbook() == null || state.spellbook().lastArcaneRecoveryDay() == null
+                || state.spellbook().lastArcaneRecoveryDay() <= rest.minute() / 1440);
         if (rest.active() != null) {
             RestAttempt attempt = rest.active(); require(validRule(attempt.rule(), "adventure.rest") && Set.of("SHORT_REST", "LONG_REST").contains(attempt.kind()) && attempt.startMinute() >= 0 && attempt.startMinute() <= rest.minute()
                     && attempt.hitPointsAtStart() >= 0 && attempt.hitPointsAtStart() <= 65535 && attempt.sleepMinutes() >= 0 && attempt.lightMinutes() >= 0 && attempt.strenuousMinutes() >= 0
@@ -738,8 +787,11 @@ public final class JdbcSchema2CharacterRuntimeRepository {
         List<Object> values = new ArrayList<>(List.of(bytes(state.characterId()), state.version() + 1, bytes(event.operationId()), ascii(event.requestDigest()), ascii(event.kind())));
         values.addAll(ruleValues(command.resource())); values.add(command.amount()); values.add(command.recoveryTrigger() == null ? null : ascii(command.recoveryTrigger())); values.add(command.hpChoice() == null ? null : ascii(command.hpChoice()));
         values.addAll(ruleValues(command.targetClass())); values.addAll(ruleValues(growth.subclass())); values.addAll(ruleValues(growth.feat())); values.add(growth.abilityIncreases().size()); values.add((int) growth.proficiencyChoices().values().stream().mapToLong(List::size).sum()); RestInput input = command.restInput();
-        Collections.addAll(values, input == null || input.restKind() == null ? null : ascii(input.restKind()), input == null || input.activity() == null ? null : ascii(input.activity()), input == null ? 0L : input.minutes(), input == null ? 0 : input.hitDieSides(), input == null ? 0 : input.recoveredHitDice().size(), event.hitDieRoll());
-        insert(connection, "s2_character_event", "character_id, event_sequence, operation_id, request_digest, event_kind, resource_module, resource_type, resource_key, resource_amount, recovery_trigger, hp_choice, target_class_module, target_class_type, target_class_key, chosen_subclass_module, chosen_subclass_type, chosen_subclass_key, chosen_feat_module, chosen_feat_type, chosen_feat_key, ability_choice_count, proficiency_choice_count, rest_kind, rest_activity, rest_minutes, rest_hit_die_sides, recovered_hit_die_count, hit_die_roll", values.toArray());
+        Collections.addAll(values, input == null || input.restKind() == null ? null : ascii(input.restKind()), input == null || input.activity() == null ? null : ascii(input.activity()), input == null ? 0L : input.minutes(), input == null ? 0 : input.hitDieSides(), input == null ? 0 : input.recoveredHitDice().size(), event.hitDieRoll(), input == null ? 0 : input.recoveredSpellSlots().size());
+        insert(connection, "s2_character_event", "character_id, event_sequence, operation_id, request_digest, event_kind, resource_module, resource_type, resource_key, resource_amount, recovery_trigger, hp_choice, target_class_module, target_class_type, target_class_key, chosen_subclass_module, chosen_subclass_type, chosen_subclass_key, chosen_feat_module, chosen_feat_type, chosen_feat_key, ability_choice_count, proficiency_choice_count, rest_kind, rest_activity, rest_minutes, rest_hit_die_sides, recovered_hit_die_count, hit_die_roll, arcane_recovery_choice_count", values.toArray());
+        if (input != null) for (var choice : input.recoveredSpellSlots().entrySet())
+            insert(connection, "s2_character_arcane_recovery_choice", "character_id, event_sequence, slot_rank, recovered_value",
+                    bytes(state.characterId()), state.version() + 1, choice.getKey(), choice.getValue());
         if(command.spellbookInput()!=null) {
             SpellbookInput book=command.spellbookInput();values=new ArrayList<>(List.of(bytes(state.characterId()),state.version()+1));values.addAll(ruleValues(book.castingRule()));Collections.addAll(values,book.learned().size(),book.prepared().size());
             insert(connection,"s2_character_spellbook_command","character_id, event_sequence, casting_module, casting_type, casting_key, learned_count, prepared_count",values.toArray());
@@ -803,8 +855,8 @@ public final class JdbcSchema2CharacterRuntimeRepository {
                 attempt == null || attempt.lastActivity() == null ? null : ascii(attempt.lastActivity()), attempt == null ? null : attempt.consecutiveStrenuousMinutes(), attempt == null ? null : attempt.interrupted() ? 1 : 0);
         HealthState health = state.health(); Collections.addAll(values, state.equipment().size(), health.temporaryHitPoints(), health.deathSuccesses(), health.deathFailures(), health.stable() ? 1 : 0, health.dead() ? 1 : 0, health.stableRecoveryMinute(), rest.second(), rest.lastLongRestEndSecond(), health.stableRecoverySecond());
         SpellbookState book=state.spellbook(); values.addAll(ruleValues(book==null?null:book.castingRule()));
-        Collections.addAll(values,book==null?null:book.learnedThroughLevel(),book==null?0:book.learned().size(),book==null?0:book.prepared().size(),book==null?null:book.preparedAtRestMinute(),book==null?null:book.preparedAtRestSecond());
-        insert(connection, "s2_character_event_state", "character_id, event_sequence, phase, class_module, class_type, class_key, strength, dexterity, constitution, intelligence, wisdom, charisma, total_level, proficiency_bonus, hit_points, maximum_hit_points, row_version, resource_count, class_count, hit_die_count, subclass_count, feature_count, feat_count, proficiency_count, minute, last_long_rest_end_minute, rest_module, rest_type, rest_key, rest_kind, rest_start_minute, rest_start_hit_points, sleep_minutes, light_minutes, strenuous_minutes, rest_phase, last_activity, consecutive_strenuous_minutes, interrupted, equipment_count, temporary_hit_points, death_successes, death_failures, stable, dead, stable_recovery_minute, rest_second, last_long_rest_end_second, stable_recovery_second, spellbook_casting_module, spellbook_casting_type, spellbook_casting_key, spellbook_learned_level, learned_spell_count, prepared_spell_count, spellbook_prepared_rest_minute, spellbook_prepared_rest_second", values.toArray());
+        Collections.addAll(values,book==null?null:book.learnedThroughLevel(),book==null?0:book.learned().size(),book==null?0:book.prepared().size(),book==null?null:book.preparedAtRestMinute(),book==null?null:book.preparedAtRestSecond(),book==null?null:book.lastArcaneRecoveryDay());
+        insert(connection, "s2_character_event_state", "character_id, event_sequence, phase, class_module, class_type, class_key, strength, dexterity, constitution, intelligence, wisdom, charisma, total_level, proficiency_bonus, hit_points, maximum_hit_points, row_version, resource_count, class_count, hit_die_count, subclass_count, feature_count, feat_count, proficiency_count, minute, last_long_rest_end_minute, rest_module, rest_type, rest_key, rest_kind, rest_start_minute, rest_start_hit_points, sleep_minutes, light_minutes, strenuous_minutes, rest_phase, last_activity, consecutive_strenuous_minutes, interrupted, equipment_count, temporary_hit_points, death_successes, death_failures, stable, dead, stable_recovery_minute, rest_second, last_long_rest_end_second, stable_recovery_second, spellbook_casting_module, spellbook_casting_type, spellbook_casting_key, spellbook_learned_level, learned_spell_count, prepared_spell_count, spellbook_prepared_rest_minute, spellbook_prepared_rest_second, arcane_recovery_day", values.toArray());
         int i = 0;
         if(book!=null) {
             for(LearnedSpell value:book.learned()) {values=childValues(state,sequence,phase,i++);values.addAll(ruleValues(value.spell()));values.add(value.acquiredAtClassLevel());
@@ -921,7 +973,7 @@ public final class JdbcSchema2CharacterRuntimeRepository {
     private static void require(boolean valid) throws SQLException { if (!valid) throw corrupt(); }
     private static SQLException corrupt() { return new SQLException("S2_CHARACTER_RUNTIME_CORRUPT"); }
     private record StateKey(long sequence, String phase) { }
-    private record Header(UUID operation, String digest, String kind, RuleIdentity resource, long amount, String trigger, String hp, RuleIdentity targetClass, RuleIdentity subclass, RuleIdentity feat, int abilities, int proficiencies, String restKind, String activity, long minutes, int dieSides, int recoveredDice, Integer roll) { }
+    private record Header(UUID operation, String digest, String kind, RuleIdentity resource, long amount, String trigger, String hp, RuleIdentity targetClass, RuleIdentity subclass, RuleIdentity feat, int abilities, int proficiencies, String restKind, String activity, long minutes, int dieSides, int recoveredDice, Integer roll, int recoveredSlots) { }
     private record ChoiceTarget(com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity slot, RuleIdentity target) { }
     private record CheckFacts(CheckInput input, CheckResult result) { }
     private record HealthFacts(HealthInput input, HealthResult result) { }

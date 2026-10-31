@@ -23,6 +23,9 @@ final class Schema2ActionFlowRules {
     static boolean handles(Kind k) { return continuation(k)||Set.of(Kind.ATTACK,Kind.MOVE,Kind.CAST,Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL).contains(k); }
     void prepare(Map<UUID,Context> roster,Battle b,Command c) {
         require(c.actorId()!=null && c.deployments().isEmpty() && c.tieBreakOrder().isEmpty() && c.zoneInput()==null && c.zoneKey()==null && c.healthInput()==null && c.seconds()==0 && c.monsterDeployments().isEmpty() && c.breathInput()==null && c.monsterRestInput()==null,"S2_COMBAT_COMMAND");
+        if(b.activeFlow()!=null)for(CastAttempt cast:b.activeFlow().casts())if(cast.status()==CastStatus.PENDING&&cast.coneDirection()!=null
+                &&areaInterruption(roster,b,cast)==null&&b.saveDamageBatches().stream().noneMatch(v->v.spellSource()!=null&&v.spellSource().castFrameKey().equals(cast.frameKey())))
+            Schema2SaveDamageRules.prepareSpell(roster,b,cast.actorId(),new CastInput(cast.castingRule(),cast.spell(),List.of(),null,cast.slotLevel(),null,cast.coneDirection()));
         if(continuation(c.kind())) {
             Flow f=b.activeFlow(); require(f!=null&&f.flowKey().equals(c.flowKey())&&Objects.equals(f.leafFrameKey(),c.leafKey()),"ACTION_FLOW_TARGET_MISMATCH");
             Frame leaf=frame(f,c.leafKey());Window w=window(f,c.windowKey());
@@ -66,7 +69,7 @@ final class Schema2ActionFlowRules {
                 require(b.readyPreparations().stream().noneMatch(v->v.actorId().equals(c.actorId())&&Set.of(ReadyStatus.PREPARING,ReadyStatus.ARMED).contains(v.status())),"S2_READY_ALREADY_ARMED");
                 if(c.kind()==Kind.READY_ATTACK) {require(r.responseKind()==ReadyResponseKind.ATTACK&&r.spell()==null&&r.path().isEmpty()&&r.targetId()!=null&&r.itemId()!=null,"S2_READY_COMMAND");require(!c.actorId().equals(r.targetId())&&actor(b,c.actorId()).side()!=actor(b,r.targetId()).side(),"S2_COMBAT_TARGET");combat.weapon(roster.get(c.actorId()),r.itemId());prepareTargetHealth(roster,b,r.targetId());}
                 if(c.kind()==Kind.READY_MOVE) {require(r.responseKind()==ReadyResponseKind.MOVE&&r.spell()==null&&r.targetId()==null&&r.itemId()==null,"S2_READY_COMMAND");prepareMove(roster,b,c.actorId(),r.path(),true);}
-                if(c.kind()==Kind.READY_SPELL) {require(r.responseKind()==ReadyResponseKind.SPELL&&r.spell()!=null&&r.targetId()==null&&r.itemId()==null&&r.path().isEmpty(),"S2_READY_COMMAND");spells.prepare(roster,b,c.actorId(),r.spell());}
+                if(c.kind()==Kind.READY_SPELL) {require(r.responseKind()==ReadyResponseKind.SPELL&&r.spell()!=null&&r.targetId()==null&&r.itemId()==null&&r.path().isEmpty(),"S2_READY_COMMAND");require(r.spell().coneDirection()==null,"S2_SPELL_READY_AREA_UNSUPPORTED");spells.prepare(roster,b,c.actorId(),r.spell());}
             }
             default -> throw invalid("S2_COMBAT_COMMAND");
         }
@@ -81,6 +84,11 @@ final class Schema2ActionFlowRules {
         Work w=new Work(operation,roster,b,dice);if(!w.open(frame,TriggerKind.MONSTER_ACTION_COMPLETED,source,null,null,0,0))w.finish(frame,Stage.SAVE_DAMAGE_COMPLETED);
         return new Resolution(w.snapshot(),w.changes,List.of(),w.facts);
     }
+    Resolution afterSpellBatch(UUID operation,Map<UUID,Context> roster,Battle b,SaveDamageBatch batch,Roller dice) {
+        Work w=new Work(operation,roster,b,dice);w.finishSpellBatch(batch);
+        return new Resolution(w.snapshot(),w.changes,List.of(),w.facts);
+    }
+    int spellBatchAfterCost(Map<UUID,Context> roster,Battle b,UUID source) {return readyCost(roster,b,TriggerKind.CAST_COMPLETED,source,null);}
     private void prepareAttack(Map<UUID,Context> roster,Battle b,UUID source,UUID target,UUID item) {
         Combatant a=actor(b,source),t=actor(b,target);require(!source.equals(target)&&a.side()!=t.side(),"S2_COMBAT_TARGET");active(roster.get(source).character());
         WeaponAttackDefinition w=combat.weapon(roster.get(source),item);require(a.position().distanceFeet(t.position())<=w.reachFeet(),"S2_COMBAT_OUT_OF_REACH");
@@ -194,6 +202,7 @@ final class Schema2ActionFlowRules {
                     AttackAttempt attack=flow.attacks().stream().filter(v->v.frameKey().equals(frame.frameKey())).findFirst().orElseThrow();result+=readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,attack.actorId(),null);
                 } else if(frame.kind()==FrameKind.CAST&&frame.stage()!=Stage.READY_TRIGGER_AFTER) {
                     CastAttempt cast=flow.casts().stream().filter(v->v.frameKey().equals(frame.frameKey())).findFirst().orElseThrow();result+=readyCost(roster,b,TriggerKind.CAST_COMPLETED,cast.actorId(),null);
+                    if(cast.coneDirection()!=null&&cast.status()==CastStatus.PENDING)result++;
                 } else if(frame.kind()==FrameKind.MOVEMENT) {
                     Movement move=flow.movements().stream().filter(v->v.movementKey().equals(frame.ownerKey())).findFirst().orElseThrow();result+=movementCost(roster,b,flow,frame.frameKey(),move.actorId(),move.path().subList(move.cursor(),move.path().size()),move.cursor());
                 }
@@ -203,7 +212,7 @@ final class Schema2ActionFlowRules {
         }
         if(command.kind()==Kind.MOVE)result+=movementCost(roster,b,null,null,command.actorId(),command.path(),0);
         else if(command.kind()==Kind.ATTACK)result+=windowCost(shieldCandidates(roster,b,command.targetId()))+readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,command.actorId(),null);
-        else if(command.kind()==Kind.CAST||command.kind()==Kind.READY_SPELL)result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null);
+        else if(command.kind()==Kind.CAST||command.kind()==Kind.READY_SPELL)result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null)+(command.castInput()!=null&&command.castInput().coneDirection()!=null?1:0);
         else if(command.kind()==Kind.DECLARE_OPPORTUNITY_ATTACK) {
             Window w=window(flow,command.windowKey());result+=windowCost(shieldCandidates(roster,b,w.trigger().subjectId()))+readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,command.actorId(),null);
         } else if(command.kind()==Kind.DECLARE_SHIELD||command.kind()==Kind.DECLARE_COUNTERSPELL)result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null);
@@ -352,7 +361,7 @@ final class Schema2ActionFlowRules {
             State paid=spells.spend(prepared);change(new HealthChange(subject,prepared.caster(),paid,id,0,false,null,false,false,0,prepared.slotResource(),1,false));
             if(invocation==Invocation.ROOT&&b.status()==Status.ACTIVE)spendAction(subject);
             if(prepared.concentration()||readyKey!=null)endConcentration(subject,"REPLACED_BY_CONCENTRATION");
-            casts.add(new CastAttempt(id,subject,prepared.castingIdentity(),input.spell(),input.targets(),prepared.slotResource(),input.slotLevel(),input.materialItemId(),List.of(),prepared.concentration()?0:prepared.healingModifier(),0,0,null,CastStatus.PENDING,input.targetCastFrameKey(),readyKey));
+            casts.add(new CastAttempt(id,subject,prepared.castingIdentity(),input.spell(),input.targets(),prepared.slotResource(),input.slotLevel(),input.materialItemId(),List.of(),prepared.concentration()?0:prepared.healingModifier(),0,0,null,CastStatus.PENDING,input.targetCastFrameKey(),readyKey,input.coneDirection()));
             if(readyKey!=null) {ReadyPreparation r=Schema2ActionFlowRules.ready(b,readyKey);ready(new ReadyPreparation(r.readyKey(),r.actorId(),r.declaredTurnNumber(),r.expiresAtTurnNumber(),r.input(),r.status(),id,null));holder(new ConcentrationHolder(subject,ConcentrationKind.READY_SPELL,readyKey));}
             if(open(id,TriggerKind.CAST_BEFORE_COMPLETION,subject,null,null,0,0))return;completeCast(id,false);
         }
@@ -363,7 +372,7 @@ final class Schema2ActionFlowRules {
             b=rebuild(b,b.combatants(),all,b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.version());
         }
         CastAttempt castResult(CastAttempt c,CastStatus status,List<Integer> healing,int requested,int applied,UUID effect) {
-            return new CastAttempt(c.frameKey(),c.actorId(),c.castingRule(),c.spell(),c.targets(),c.slotResource(),c.slotLevel(),c.materialItemId(),healing,c.healingModifier(),requested,applied,effect,status,c.targetCastFrameKey(),c.readyKey());
+            return new CastAttempt(c.frameKey(),c.actorId(),c.castingRule(),c.spell(),c.targets(),c.slotResource(),c.slotLevel(),c.materialItemId(),healing,c.healingModifier(),requested,applied,effect,status,c.targetCastFrameKey(),c.readyKey(),c.coneDirection());
         }
         String algorithm(CastAttempt c) {return roster.get(c.actorId()).material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).filter(s->s.enabled()&&s.identity().equals(c.spell())).findFirst().orElseThrow(()->invalid("S2_SPELL_UNAVAILABLE")).definition().algorithm();}
         void completeCast(UUID id,boolean release) {
@@ -379,9 +388,30 @@ final class Schema2ActionFlowRules {
                 ReadyPreparation r=Schema2ActionFlowRules.ready(b,c.readyKey());
                 if(r.status()==ReadyStatus.PREPARING) {cast(castResult(c,CastStatus.HELD,List.of(),0,0,null));ready(new ReadyPreparation(r.readyKey(),r.actorId(),r.declaredTurnNumber(),r.expiresAtTurnNumber(),r.input(),ReadyStatus.ARMED,r.heldCastFrameKey(),null));}
                 else cast(castResult(c,CastStatus.RESOLVED,List.of(),0,0,null));
-            } else applySpell(c,release?id:id);
+            } else if(Schema2SpellRules.BURNING_HANDS.equals(algorithm(c))) {
+                String interrupted=areaInterruption(roster,snapshot(),c);
+                if(interrupted==null) {beginSpellBatch(c);return;}
+                cast(castResult(c,CastStatus.INTERRUPTED,List.of(),0,0,null));facts.add(new CombatFact("CAST_INTERRUPTED",c.actorId(),c.frameKey(),interrupted));
+            }
+            else applySpell(c,release?id:id);
             if(release)return;
             if(open(id,TriggerKind.CAST_COMPLETED,c.actorId(),null,null,0,0))return;finish(id,Stage.CAST_RESOLVED);
+        }
+        void beginSpellBatch(CastAttempt cast) {
+            UUID frame=next("spell-save-damage");
+            SaveDamageBatch batch=Schema2SaveDamageRules.rollSpell(operation,roster,snapshot(),cast,frame,dice);
+            addFrame(FrameKind.SAVE_DAMAGE,frame,cast.frameKey(),Invocation.CONTINUATION,Stage.SAVE_DAMAGE_ROLLED);
+            set(new Frame(frame,cast.frameKey(),FrameKind.SAVE_DAMAGE,batch.batchKey(),Invocation.CONTINUATION,
+                    batch.status()==BatchStatus.NO_TARGETS?FrameStatus.RUNNABLE:FrameStatus.PENDING,Stage.SAVE_DAMAGE_ROLLED,null,null));
+            List<SaveDamageBatch> batches=new ArrayList<>(b.saveDamageBatches());batches.add(batch);b=Schema2MonsterRules.with(b,b.monsters(),batches);
+            facts.add(new CombatFact("SPELL_SAVE_DAMAGE_RELEASED",cast.actorId(),batch.batchKey(),batch.status()==BatchStatus.NO_TARGETS?"NO_TARGETS":null));
+            if(batch.status()==BatchStatus.NO_TARGETS)finishSpellBatch(batch);
+        }
+        void finishSpellBatch(SaveDamageBatch batch) {
+            stage(batch.frameKey(),FrameStatus.TERMINAL,Stage.SAVE_DAMAGE_COMPLETED,null,null);
+            CastAttempt cast=cast(batch.spellSource().castFrameKey());cast(castResult(cast,CastStatus.RESOLVED,List.of(),0,0,null));
+            leaf=cast.frameKey();stage(cast.frameKey(),FrameStatus.RUNNABLE,Stage.CAST_RESOLVED,null,null);
+            if(!open(cast.frameKey(),TriggerKind.CAST_COMPLETED,cast.actorId(),null,null,0,0))finish(cast.frameKey(),Stage.CAST_RESOLVED);
         }
         void applySpell(CastAttempt c,UUID resultFrame) {
             String algorithm=algorithm(c);List<Integer> healing=new ArrayList<>();int requested=0,applied=0;UUID effect=null;
@@ -508,6 +538,10 @@ final class Schema2ActionFlowRules {
         return opportunity.options().stream().filter(o->o.kind()==kind).filter(o->kind==ReactionKind.OPPORTUNITY_ATTACK?Objects.equals(o.itemId(),command.itemId())&&command.castInput()==null&&command.readyKey()==null:kind==ReactionKind.READY_RELEASE?Objects.equals(o.readyKey(),command.readyKey())&&command.itemId()==null&&command.castInput()==null:command.castInput()!=null&&command.itemId()==null&&command.readyKey()==null&&o.castingRule().equals(command.castInput().castingRule())&&o.spell().equals(command.castInput().spell())&&o.slotLevel()==command.castInput().slotLevel()).findFirst().orElse(null);
     }
     private static boolean matches(ReadyTrigger ready,TriggerFact fact) {return ready.kind()==fact.kind()&&ready.subjectId().equals(fact.subjectId())&&(ready.position()==null||ready.position().equals(fact.position()));}
+    private static String areaInterruption(Map<UUID,Context> roster,Battle b,CastAttempt cast) {
+        if(cast.coneDirection()==null)return null;
+        var state=roster.get(cast.actorId()).character();return state.hitPoints()==0||state.health().dead()?"CASTER_INCAPACITATED":null;
+    }
     private static UUID ownerActor(Flow f,Frame owner) {return switch(owner.kind()) {case ATTACK->f.attacks().stream().filter(a->a.frameKey().equals(owner.frameKey())).findFirst().orElseThrow().actorId();case CAST->f.casts().stream().filter(a->a.frameKey().equals(owner.frameKey())).findFirst().orElseThrow().actorId();case MOVEMENT->f.movements().stream().filter(a->a.movementKey().equals(owner.ownerKey())).findFirst().orElseThrow().actorId();default->throw invalid("ACTION_FLOW_TARGET_MISMATCH");};}
     private static Frame frame(Flow f,UUID id) {return f.frames().stream().filter(v->v.frameKey().equals(id)).findFirst().orElseThrow(()->invalid("ACTION_FLOW_TARGET_MISMATCH"));}
     private static Window window(Flow f,UUID id) {return f.windows().stream().filter(v->v.windowKey().equals(id)).findFirst().orElseThrow(()->invalid("ACTION_FLOW_TARGET_MISMATCH"));}
