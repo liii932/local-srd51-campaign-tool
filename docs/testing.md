@@ -10,7 +10,11 @@
 mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 ```
 
-根据变更覆盖正常行为、边界值、Unicode 码点/NFC、非法冻结数据、旧版本、幂等冲突、事务失败与禁止部分写入。重命名批次还应覆盖受影响的 Servlet 注册、反射字符串、页面资源和脚本引用。
+根据变更覆盖正常行为、边界值、Unicode 码点/NFC、非法冻结数据、过期 `row_version`、幂等冲突、事务失败与禁止部分写入。重命名批次还应覆盖受影响的 Servlet 注册、反射字符串、页面资源和脚本引用。
+
+原型验收只针对当前应用版本：验证当前格式的完整往返及不支持格式的明确拒绝，不要求旧存档
+仍可导入。设计替换时同步改写或移除只固定旧模型的测试，保留当前有效的安全、事务和失败路径
+覆盖；既有测试通过或历史批准不能单独证明该设计应继续保留。
 
 纯文档或 skill 变化只检查内容、链接和格式，不运行 Maven；只确认生产代码可编译时使用 `mvn compile`。定向 `test` 已含前置编译阶段，不需要机械重复 `compile`。保留无匹配测试的失败行为，不用 `failIfNoTests=false` 或 `surefire.failIfNoSpecifiedTests=false` 隐藏选错测试。
 
@@ -281,18 +285,18 @@ mvn '-Dtest=BuiltinModuleReleaseRegistryTest,BuiltinModuleHashManifestTest' test
 
 完整运行链的数量、顺序、脚本名和批准摘要由 `SchemaMigrationsTest` 集中核验；独立来源链由
 `RuleSchemaMigrationsTest` 集中核验。领域测试检查自身迁移及其前置合同，不复制其他领域的整链
-总数，也不假定自己的迁移永远位于链尾。删除重复检查点不删除已应用迁移、RELEASED 规则、
-现有业务行为或独立失败路径的测试。
+总数，也不假定自己的迁移永远位于链尾。普通去重仍需保留当前有效行为和独立失败路径的覆盖；
+采用新模型时则按新支持范围协调替换测试，不为保留历史断言而强制保留旧代码。
 
-- V001—V018 是不可修改的迁移历史；V011 的角色 DRAFT 目录、V012 的一级创建 schema/profile、
+- 当前迁移链中 V001—V018 的文件与账本必须匹配；V011 的角色 DRAFT 目录、V012 的一级创建 schema/profile、
   V013 的升级/生命骰 schema/profile、V014 的职业特性/恢复矩阵、V015 的多职业/ASI/专长框架、
   V016 的初始熟练基线、V017 的 format 2 状态来源及 V018 的多职业施法贡献由清单摘要、精确计数、
   关系、profile 语法和 canonical-v2 负例测试保护。
-- `ImmutableLegacyMigrationContractTest` 固定 V001—V010 历史；
+- 当前 `ImmutableLegacyMigrationContractTest` 固定 V001—V010 的现有清单；采用新的初始化链时须连同清单和验证器一起调整，不把测试类名视为永久产品要求；
   `DeferredPublicSurfaceExclusionTest` 只保护永久延期的公开访问面，不再禁止新增 Host 规则领域。
 - 规则测试覆盖未知/重复/未发布数据、稳定键引用、范围、NFC、UTF-8 无符号排序、精确小数、规范字节流与内容摘要。
-- `RELEASED` 模组不可变，战役冻结值、实际目录摘要、发布摘要和应用清单必须一致，否则失败关闭。
-- V011—V018 文件及其中已持久化身份受历史测试保护，但完整规则族仍为 DRAFT：后续前向迁移可以协调改变未发布目录、运行模型、canonical/archive 投影和对应测试，不要求为被替代的 DRAFT 行为保留兼容层。
+- 当前支持的模组，其战役冻结值、实际目录摘要、发布摘要和应用清单必须一致，否则失败关闭；这不要求后续版本保留同一模组或读取器。
+- 目录、运行模型、canonical/archive 投影和对应测试可协调替换，不要求为旧 RELEASED 或 DRAFT 行为保留兼容层；保留数据库或重建的外部边界见[数据库合同](database.md#迁移合同)。
 - archive format 2 的严格往返测试应随各领域渐进建立；只有跨领域发布候选才固定摘要、激活格式、切换默认发布版并运行完整发布门矩阵。
 
 一级创建的定向验证包括 `LevelOneRuleProfileTest`、`LevelOneCharacterRulesTest`、

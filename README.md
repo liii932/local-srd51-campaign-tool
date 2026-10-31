@@ -5,6 +5,9 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 角色、冒险、战斗、法术、装备、怪物和状态规则，同时保留可持久化、可审计、可恢复的单 DM
 操作闭环。
 
+项目处于原型阶段，只保证当前应用版本的运行，不承诺跨版本延续战役或读取旧存档。
+设计可按当前需求和验证结果修订，现有实现不构成永久兼容基线；范围见[产品说明](./docs/product.md)。
+
 > 当前实现仍是纯本机的冻结简化 v1，并未完成全部 SRD 5.1 功能。正式入口仅为
 > `http://127.0.0.1:8080`；局域网/公网、HTTPS、玩家账号、`/display`、
 > `/api/public/*` 和公开数据投影不属于当前产品目标。
@@ -82,9 +85,11 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 完整范围、自动化边界和兼容原则见[完整 SRD 5.1 覆盖目标](./docs/rules/srd-5.1-complete.md)。
 本文所列目标不是对当前版本已完成功能的声明。
 
-[产品说明](./docs/product.md)区分当前行为和 v2 使用流程；[v2 设计基线](./docs/design/v2/README.md)
-记录[模组接口与组合](./docs/design/v2/module-interface-baseline.md)、领域关系表、完整运行快照、
-战役工作集、自动保存和可靠结束等目标及采用边界。
+[产品说明](./docs/product.md)区分当前行为和 v2 使用流程；[v2 设计导航](./docs/design/v2/README.md)
+记录[模组接口与组合](./docs/design/v2/module-interface-baseline.md)、[私有运行存储](./docs/design/v2/rule-storage-and-versioning.md)、
+[完整战役文件](./docs/design/v2/save-and-recovery.md)及[生命周期](./docs/design/v2/runtime-and-transactions.md)。
+当前选用每次打开独占 SQLite 运行空间、完整 JSON 保存与同版残留显式恢复；代码仍使用
+MySQL，替换与故障验证尚未实现。
 具体机制的设计与采用按[机制接入责任清单](./docs/design/v2/mechanism-integration-checklist.md)逐项核对。
 设计进入项目文档不表示功能已实现或完整规则已发布。
 
@@ -97,7 +102,8 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - HTTPS Connector、证书、CA 和防火墙入站配置；
 - 玩家账号、角色所有权、邀请码、聊天、投票和外部写入；
 - `/display`、`/api/public/*`、公开身份、公开配置、公开投影和公开事件；
-- WebSocket、推送、脚本插件、动态 DDL 和 JSON 数据库列。
+- WebSocket、推送、脚本插件、模组/用户提供的任意 DDL 和 JSON 数据库属性袋。
+  目标运行空间仅由应用按受控模块执行固定 SQL 建表，不开放模组自定义表结构。
 
 完整范围与边界见[架构文档](./docs/architecture.md)。
 
@@ -243,7 +249,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [多职业共享法术位 v2](./docs/rules/multiclass-spell-slots-v2.md) | DRAFT 职业贡献、共享位上限与未完成边界 |
 | [Archive format 2 角色投影](./docs/rules/archive-format-2-character-state.md) | DRAFT 稳定事件闭包、严格 codec 与恢复来源 |
 | [配置](./docs/configuration.md) | JNDI、数据库凭据与 loopback Connector |
-| [数据库](./docs/database.md) | 迁移不可变性、账号职责与稳定合同 |
+| [数据库](./docs/database.md) | 当前迁移链、保留数据库或重建的边界与账号职责 |
 | [安全](./docs/security.md) | 请求边界、权威输入、最小权限与秘密处理 |
 | [测试](./docs/testing.md) | 定向测试、完整验证、集成测试和 WAR 审计 |
 | [公开仓库发布检查清单](./docs/public-release-checklist.md) | 私有迁移仓库公开前的内容审计与 GitHub 设置确认 |

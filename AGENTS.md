@@ -2,6 +2,14 @@
 
 These instructions apply to automated contributors working in this repository. Communicate clearly, preserve user work, and distinguish guidance from actions that change files or external systems.
 
+## Prototype design and compatibility
+
+- This project is a prototype. Support the current application version; old saves and continuity across application versions are not acceptance requirements. Do not retain legacy readers, adapters, fallback models or upgrade paths solely for historical compatibility.
+- Treat documented designs as current choices that can be revised when requirements or evidence change. A design being recorded, approved, implemented or called a baseline does not make it permanent. Explain the affected assumptions and choose the model that fits the current task, rather than preserving it only because it already exists.
+- Distinguish observed implementation from the chosen target. Update affected contracts, code and tests together when adopting a replacement; a documentation change alone does not implement it. Complete runtime and file lifecycle integration against the chosen design, not as a prerequisite for reconsidering that design.
+- Preserve consistency within a supported run: authoritative state, rule interpretation, identity, digests, transactions and recovery must agree. This does not require retaining the same model or save format in the next application version.
+- Dropping legacy compatibility does not authorize deleting real data. Database migration, reset, deployment and external writes still require their own explicit authorization and target boundaries.
+
 ## Start from repository evidence
 
 1. Use this root file as the repository instructions. If its complete, current contents are already injected into context, do not read it again; otherwise read it from the repository root.
@@ -24,17 +32,17 @@ These instructions apply to automated contributors working in this repository. C
 
 - [docs/agent-context.md](docs/agent-context.md): compact orientation and pointers; it does not override the authorities below.
 - [docs/product.md](docs/product.md): product purpose, current behavior, v2 target workflow and deferred scope.
-- [docs/design/v2/README.md](docs/design/v2/README.md): recorded v2 target decisions and adoption boundaries, not implementation, deployment or release evidence. Project design belongs here rather than in ignored Agent workspaces.
+- [docs/design/v2/README.md](docs/design/v2/README.md): current, revisable v2 design choices and adoption boundaries, not implementation, deployment or release evidence. Project design belongs here rather than in ignored Agent workspaces.
 - [docs/architecture.md](docs/architecture.md): product scope, components, trust and transaction boundaries.
 - [docs/references/srd-5.1/README.md](docs/references/srd-5.1/README.md): local SRD 5.1 source index. For original rule text, search the page-based Markdown and read only relevant pages; check ambiguous text or tables against the [local PDF](docs/references/srd-5.1.pdf). Use the official online source only when the local PDF is missing or damaged, or the task explicitly requires official-source verification; rebuild missing derived text from the local PDF. These references do not replace project implementation contracts or executable rule packages.
-- [docs/rules/srd-5.1.md](docs/rules/srd-5.1.md): frozen v1 stable keys, algorithms, ranges and canonical encoding.
-- `src/main/resources/db/migration/`: approved, forward-only schema and seed history.
+- [docs/rules/srd-5.1.md](docs/rules/srd-5.1.md): keys, algorithms, ranges and canonical encoding for the currently implemented v1; not a promise to keep supporting it in future application versions.
+- `src/main/resources/db/migration/`: current runtime schema and seed migration artifacts; reconcile them with actual database history before any external change.
 - [docs/database.md](docs/database.md): migration and account responsibilities.
 - [docs/testing.md](docs/testing.md): repeatable verification methods.
 - [docs/deployment.md](docs/deployment.md): build, rollback, deployment and HTTP acceptance.
 
 If these sources conflict, compare the relevant migration, frozen rules and current code. Do not silently persist data under an invented interpretation.
-Distinguish current behavior from a target design before treating a difference as a conflict. Record adoption gaps explicitly; do not reopen an established v2 decision merely because its implementation is absent. Local design notes are provenance hints, not a competing authority or proof of historical approval.
+Distinguish current behavior from a target design before treating a difference as a conflict. Record adoption gaps explicitly and reassess a design against current requirements when relevant; neither implementation absence nor historical approval settles that assessment. Local design notes are provenance hints, not a competing authority or proof of historical approval.
 
 ## Local command environment
 
@@ -59,18 +67,18 @@ Distinguish current behavior from a target design before treating a difference a
 
 ## Stable contracts
 
-- Never edit, merge, rename or rerun an applied migration. V001—V018 are immutable history; add the next forward-only `V###` migration for an approved schema change.
-- Preserve the `RELEASED` `dnd5e2014_srd51_se_v1`, its canonical/archive format values, algorithm keys, field keys, event/effect types and persisted digest domains.
-- Existing DRAFT migration files and persisted identifiers remain immutable history, but an unpublished DRAFT is not a compatibility promise. Its catalog, runtime model, APIs, canonical/archive projection and tests may evolve cohesively through reviewed forward migrations until the cross-domain release candidate; do not add compatibility shims for obsolete DRAFT behavior unless an acceptance criterion identifies real data that must survive.
-- Keep `dnd5e2014_srd51_se` DRAFT, keep the legacy release as the new-campaign default and do not activate/freeze archive format 2 until the complete character, equipment/adventure, combat/condition, spell and monster/magic-item domains pass the cross-domain release gate.
+- When retaining an existing database, preserve its applied migration history and use a forward migration; never edit checksums to hide a mismatch. A prototype schema replacement may instead use a new initialization path and an explicitly authorized reset/rebuild. Coordinate its code, manifests, tests and documentation; no fixed historical migration range dictates the future schema design.
+- While a rule release is supported by the current version, its identity, canonical/archive values, algorithms, fields, event/effect types and digests must agree across readers, writers and runtime. Future versions may replace or remove that release and its readers without preserving old saves.
+- Catalogs, runtime models, APIs, canonical/archive projections and tests may evolve cohesively. Reject unsupported old formats clearly; do not silently reinterpret them or add compatibility shims unless the user explicitly requires particular data to survive.
+- The legacy default, complete-rule DRAFT state and archive-format gates describe the current implementation. Change them only with the corresponding supported behavior and verification; do not present a design or partial mechanism as complete runtime support.
 - Preserve `com.dndtool`, Maven coordinates, `jdbc/DndToolSE` and existing environment-variable contracts unless a dedicated migration plan explicitly changes them.
 - Keep database credentials, Connector/J secrets, certificates, Tomcat external configuration, logs, backups and real save data outside Git and WAR.
 
 ## Implementation workflow
 
 1. Write or update focused tests for normal behavior, boundaries, malformed frozen data, stale versions/idempotency, transaction failure and forbidden partial writes as applicable.
-2. Make the smallest cohesive production change. Reuse existing services, repositories, event sequencing, error mapping and security filters.
-3. Treat compatibility as scoped work, not the default priority: protect RELEASED/persisted contracts, but prefer completing and integrating the current DRAFT model over preserving superseded DRAFT behavior.
+2. Make a cohesive production change that satisfies the current goal. Reuse services, repositories and shared boundaries when they still fit; replace obsolete abstractions and their callers together when they do not.
+3. Verify the current supported model and its rejection boundaries. Retain historical compatibility only for an explicit user requirement, not because a release, persisted identifier or test existed before.
 4. Keep Servlet/API parsing, service validation, persistence and module-catalog responsibilities separated.
 5. Default to the smallest sufficient set of related tests, selected from changed behavior, callers and shared contracts; use `mvn '-Dtest=RelatedTest,OtherRelatedTest' test`. Documentation/skill-only changes need no Maven run; compilation-only checks use `mvn compile`. Run full suites only when explicitly requested, required by the current release/deployment/merge checkpoint, or justified by cross-cutting impact that targeted tests cannot cover. Explain that reason before execution; decide whether `clean` is necessary separately. Follow `docs/testing.md` for packaging, result reuse and reporting.
 6. When production code or packaged resources change, audit the WAR for byte size, SHA-256, entry count, required assets and forbidden/sensitive files. Review configuration/resource diffs for embedded secrets.
@@ -79,10 +87,10 @@ Distinguish current behavior from a target design before treating a difference a
 ## Public repository content
 
 - Write public documentation as current contracts and repeatable procedures. Do not preserve migration timelines, dated acceptance claims, local IP addresses, certificate failures, terminal transcripts or machine-specific paths as project guidance.
-- Replace obsolete descriptions rather than append a version-by-version narrative. Keep historical version details only when needed to explain an active compatibility boundary, immutable persisted contract or required migration procedure; use Git history for superseded designs, implementation attempts and change chronology. Keep current behavior and target design explicit without turning project documentation into a changelog. This does not authorize changing applied migrations or frozen contracts.
+- Replace obsolete descriptions rather than append a version-by-version narrative. Keep historical version details only when needed to explain current supported behavior, an explicitly required compatibility boundary or a database transition procedure; use Git history for superseded designs, implementation attempts and change chronology. Keep current behavior and target design explicit without turning project documentation into a changelog. Editing guidance does not authorize external database changes.
 - Keep community entry files at the repository root. Put durable documentation under `docs/`, verification SQL under `database/verify/`, account grants under `database/grants/`, integration-test setup under `database/test/`, external configuration examples under `config/` and reusable maintenance tools under `tools/`.
 - Do not move result captures, logs, table dumps, temporary recovery scripts or obsolete planning backups into `legacy`, `archive` or compatibility directories. Extract durable rules first, then delete material with no long-term value.
-- Use conventional root filenames; use lowercase ASCII kebab-case for documentation, scripts, helper SQL and directories; use responsibility-based PascalCase names for Java types. Applied Flyway filenames are exempt and immutable.
+- Use conventional root filenames; use lowercase ASCII kebab-case for documentation, scripts, helper SQL and directories; use responsibility-based PascalCase names for Java types. Keep applied Flyway filenames unchanged when retaining their database history.
 - Treat code renames as domain changes: check destination conflicts and atomically update filenames, type names, imports, tests, registrations, reflection strings, configuration and documentation. Do not mechanically remove `Stage` from persisted operation names, digest domains or migration references.
 - GitHub Issues and Milestones are the durable home for unfinished public work. Before deleting an unchecked todo, identify its remaining items and confirm that they are completed, obsolete, deferred by current scope or transferred to GitHub; never claim an external transfer without evidence.
 - A normal deletion removes a file only from the current tree, not from reachable Git history. If credentials, private data or other material requiring historical removal is found, stop and request a dedicated incident and history-rewrite plan.

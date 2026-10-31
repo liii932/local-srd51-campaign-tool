@@ -10,8 +10,9 @@ description: Use first when starting any task, resuming work, or recovering cont
 ## 1. 恢复最小证据
 
 - 遵守根目录 [AGENTS.md](../../../AGENTS.md)。完整、当前的内容若已注入就复用，不再次读取；压缩摘要不算完整内容，文件变动后需重读。
+- 原型设计与版本支持范围按根合同及[产品说明](../../../docs/product.md#原型阶段的版本范围)定位，不在 skill 中另立兼容政策。
 - 协作遵循根 [Agent collaboration](../../../AGENTS.md#agent-collaboration)：主Agent规划、按实际依赖和写入边界划分任务并交子Agent执行，数量与串并行按需决定；子Agent明确使用 `gpt-6.1-sol` / `xhigh`。作者自检后由主Agent整合并亲审实际差量、合同与证据，发现缺陷退回修正；额外非作者交叉审不是主审前置门。
-- 使用 `use-local-tool-paths` 选择工具；保持同一 Git 实现。不要重新扫描机器找工具，也不要默认读取被忽略的 `.pi/` 本地 harness。
+- 使用 `use-local-tool-paths` 选择工具；保持同一 Git 实现。不要重新扫描机器找工具。
 - 先取 Git 清单，不输出整个仓库的补丁、不联网：
 
 ```bash
@@ -40,6 +41,6 @@ git remote -v
 ## 3. 验证与维护
 
 - 验证方法按 [docs/testing.md](../../../docs/testing.md) 选择：默认仅运行本次行为及调用方相关测试；纯文档/skill 不运行 Maven，纯编译使用 `mvn compile`。仅在用户要求、当前发布检查点明确要求或有证据表明定向覆盖不足时运行全量，`clean` 单独判断；保留必要的 WAR 审计。旧报告不能证明本次通过。
-- 正常本地 harness 状态、规划、校验和测试无需额外审批，平台执行权限仍按实际配置生效。审核实际 diff 和内容；未明确要求时不为文档或常规编辑生成基线 hash、不反复全量 hash 校验。既定 canonical/persisted digest、安全信任边界及构建发布 WAR hash 检查沿用根规则。
+- 正常本地 harness 状态、规划、校验和测试无需额外审批，平台执行权限仍按实际配置生效。审核实际 diff 和内容；未明确要求时不为文档或常规编辑生成基线 hash、不反复全量 hash 校验。当前 canonical/persisted digest、安全信任边界及构建发布 WAR hash 检查沿用根规则。
 - Git/GitHub、数据库、部署与浏览器写入沿用 `AGENTS.md` 的独立授权边界；加载 skill 不授权任何外部操作。
 - 代码入口重命名或合同变更时，同步修正地图并核对路径。地图只维护稳定入口，不复制规则正文，不记录分支进度、Issue 状态、测试计数或“已部署”结论。
