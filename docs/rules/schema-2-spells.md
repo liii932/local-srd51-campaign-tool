@@ -17,7 +17,8 @@ Wizard 准备列表须来自已学法术，数量不超过 `max(1, INT 调整值
 实际完成的长休允许改变列表。准备耗时按所选法术每环至少一分钟计入角色时钟，记录已使用的长休标记。
 法术位复用 `character.resource`，按等级分别取得一至三环位并由长休恢复。不会创建可独立修改的 slot 副本。
 知识名单中的其他法术只提供封闭元数据，执行仍明确拒绝；名单存在不等于法术能力已实现。
-Arcane Recovery、Evocation Savant、Sculpt Spells 保留真实获得事实，但当前不能执行其恢复、抄录或塑形能力。
+[Arcane Recovery](schema-2-arcane-recovery.md)使用独立的真实短休消费者；只有准确 AUTOMATIC 声明可恢复。
+Evocation Savant、Sculpt Spells 保留真实获得事实，其抄录和塑形能力仍不执行。
 
 ## 施法与反应
 

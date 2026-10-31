@@ -44,7 +44,7 @@
 有界熟练目录及休息声明分别保存。能力前提使用带组/备选序号的子行，显式存在标记区分省略和空前提。
 定义与操作保留原包作者序号，不能替换为最终组合值。检定、装备、健康算法和直接健康效果的
 完整字段、引用、负修正及清空约束见[作者来源合同](rules/schema-2-foundation-authoring.md)。
-来源 V001—V011 与运行 V001—V040 共 51 份迁移源。四类定义的准确镜像及类型化角色事实
+来源 V001—V011 与运行 V001—V041 共 52 份迁移源。四类定义的准确镜像及类型化角色事实
 见[运行快照](rules/schema-2-runtime-snapshot.md)和[角色事实存储](rules/schema-2-character-fact-storage.md)；
 实际单角色 INTERNAL 命令与历史语义见[角色基础合同](rules/schema-2-character-foundations.md)；
 [战斗作者](rules/schema-2-combat-authoring.md)与[有限施法作者](rules/schema-2-spell-authoring.md)

@@ -57,13 +57,14 @@ public final class Schema2SpellRules {
             if(feature.identity().equals(required)) {
                 if(feature.executionMode()!=FeatureExecution.AUTOMATIC || !Set.of(CASTING_ALGORITHM,"SRD_2014_WIZARD_SPELLCASTING_V1").contains(feature.executionAlgorithm()))throw invalid(code);
             } else {
-                if(wizard.isEmpty() || feature.executionMode()!=FeatureExecution.BLOCKED)throw invalid(code);
+                if(wizard.isEmpty())throw invalid(code);
                 var profile=wizard.getFirst().definition();
                 if(feature.executionAlgorithm().equals("SRD_2014_WIZARD_ARCANE_RECOVERY_V1")) {
-                    if(!feature.owner().equals(profile.ownerClass()) || feature.level()!=1)throw invalid(code);
+                    if(!feature.owner().equals(profile.ownerClass()) || feature.level()!=1
+                            ||!Set.of(FeatureExecution.BLOCKED,FeatureExecution.AUTOMATIC).contains(feature.executionMode()))throw invalid(code);
                 } else if(Set.of("SRD_2014_EVOCATION_SAVANT_V1","SRD_2014_SCULPT_SPELLS_V1").contains(feature.executionAlgorithm())) {
                     var subclasses=material.projection().rules().stream().filter(FinalSubclass.class::isInstance).map(FinalSubclass.class::cast).filter(r->r.enabled()&&r.identity().equals(feature.owner())&&r.definition().ownerClass().equals(profile.ownerClass())&&r.definition().selectionLevel()==2).toList();
-                    if(feature.level()!=2 || subclasses.size()!=1 || state.subclasses().stream().noneMatch(r->r.characterClass().equals(profile.ownerClass())&&r.subclass().equals(feature.owner())&&r.acquiredAtClassLevel()==2))throw invalid(code);
+                    if(feature.executionMode()!=FeatureExecution.BLOCKED || feature.level()!=2 || subclasses.size()!=1 || state.subclasses().stream().noneMatch(r->r.characterClass().equals(profile.ownerClass())&&r.subclass().equals(feature.owner())&&r.acquiredAtClassLevel()==2))throw invalid(code);
                 } else throw invalid(code);
                 // Recovery and spellbook copying do not run during this scene. Sculpt Spells only modifies evocation saving throws;
                 // the finite wizard executable set consists exclusively of abjuration Shield and Counterspell.
