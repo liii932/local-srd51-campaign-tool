@@ -51,12 +51,7 @@ public final class Schema2CharacterRuntimeService {
 
     private final DataSource runtime;
     private final IntUnaryOperator dice;
-    private final Schema2CharacterProgressionRules rules = new Schema2CharacterProgressionRules();
-    private final Schema2CharacterRestRules rests = new Schema2CharacterRestRules();
-    private final Schema2CharacterCheckRules checks = new Schema2CharacterCheckRules();
-    private final Schema2CharacterEquipmentRules equipment = new Schema2CharacterEquipmentRules();
-    private final Schema2WizardSpellbookRules spellbooks = new Schema2WizardSpellbookRules();
-    private final Schema2CharacterHealthRules health = new Schema2CharacterHealthRules();
+    private final CampaignDomainEngine domain = new CampaignDomainEngine();
     private final JdbcSchema2CharacterRuntimeRepository characters = new JdbcSchema2CharacterRuntimeRepository();
     private final JdbcSchema2RuntimeSnapshotRepository snapshots = new JdbcSchema2RuntimeSnapshotRepository();
     private final JdbcSchema2InitialPlanRepository initialPlans = new JdbcSchema2InitialPlanRepository();
@@ -102,45 +97,8 @@ public final class Schema2CharacterRuntimeService {
                 if (history.events().size() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS)
                     throw rejected("S2_CHARACTER_CAPACITY");
             }
-            State before = history == null ? null : history.current();
-            health.requireCommand(before, request.command());
-            Integer roll = null;
-            CheckResult checkResult = null;
-            HealthResult healthResult = null;
-            State after;
-            if (Schema2CharacterHealthRules.handles(request.command())) {
-                var prepared = health.prepare(material.projection(), before, request.command());
-                checkCapacity(history, prepared.capacityState(), request.command());
-                List<Integer> drawn = new ArrayList<>();
-                for (int i = 0; i < prepared.diceCount(); i++) drawn.add(dice.applyAsInt(prepared.diceSides()));
-                Integer deathD20 = prepared.deathSave() ? dice.applyAsInt(20) : null;
-                Integer recoveryD4 = prepared.needsRecoveryD4(deathD20) ? dice.applyAsInt(4) : null;
-                var resolution = health.resolve(prepared, drawn, deathD20, recoveryD4);
-                healthResult = resolution.result(); after = resolution.state();
-            } else if (request.command().kind().equals("CHECK_RESOLVED")) {
-                var prepared = checks.prepare(material.projection(), before, request.command());
-                checkCapacity(history, prepared.capacityState(), request.command());
-                int firstD20 = dice.applyAsInt(20);
-                Integer secondD20 = prepared.secondDieRequired() ? dice.applyAsInt(20) : null;
-                checkResult = checks.resolve(prepared, firstD20, secondD20);
-                after = prepared.capacityState();
-            } else if (isAdvancement(request.command())) {
-                var prepared = prepareAdvance(material, before, request.command());
-                checkCapacity(history, prepared.capacityState(), request.command());
-                if (request.command().hpChoice().equals("SERVER_ROLL")) roll = dice.applyAsInt(prepared.hitDieSides());
-                after = rules.advance(material.projection(), prepared, roll);
-            } else if (request.command().kind().equals("HIT_DIE_SPENT")) {
-                // A deterministic minimum result proves the full transition and capacity before
-                // calling the random source. Only the actual result is retained in the event.
-                State capacity = health.afterRest(before, rests.apply(material.projection(), before, request.command(), 1), request.command());
-                checkCapacity(history, capacity, request.command());
-                roll = dice.applyAsInt(request.command().restInput().hitDieSides());
-                after = health.afterRest(before, rests.apply(material.projection(), before, request.command(), roll), request.command());
-            } else {
-                after = calculate(material, request, before, null, null, null);
-                checkCapacity(history, after, request.command());
-            }
-            Event event = new Event(request.operationId(), request.digest(), request.command(), roll, before, after, checkResult, healthResult);
+            Event event = domain.characterEvent(material, history, request, dice);
+            State after = event.after();
             characters.append(connection, event);
             History read = characters.read(connection, request.characterId());
             List<Event> expected = new ArrayList<>(history == null ? List.of() : history.events()); expected.add(event);
@@ -257,80 +215,7 @@ public final class Schema2CharacterRuntimeService {
     }
 
     void validateHistory(Material material, History history) throws SQLException {
-        try {
-            JdbcSchema2CharacterRuntimeRepository.validate(history);
-            for (Event event : history.events()) {
-                State after = event.after(); rules.validateState(material.projection(), after); rests.validateState(material.projection(), after);
-                equipment.validateState(material.projection(), after); health.validateState(after); spellbooks.validateState(material.projection(),after);
-                Request request = new Request(event.operationId(), after.identity(), after.campaignId(), after.characterId(),
-                        after.preparationOperationId(), Schema2RulesBinding.from(material.projection()),
-                        event.before() == null ? -1 : event.before().version(), event.command(),
-                        event.before() == null ? after.abilities() : Map.of());
-                if (!request.digest().equals(event.requestDigest())
-                        || !after.equals(JdbcSchema2CharacterRuntimeRepository.combatKind(event.kind())
-                            ? Schema2CombatCharacterFacts.verify(material.projection(),event.before(),event.command(),event.healthResult(),event.after())
-                            : calculate(material, request, event.before(), event.hitDieRoll(), event.checkResult(), event.healthResult())))
-                    throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT");
-            }
-        } catch (IllegalArgumentException malformed) { throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT", malformed); }
-    }
-
-    private State calculate(Material material, Request request, State before, Integer roll, CheckResult checkResult, HealthResult healthResult) {
-        Command command = request.command();
-        health.requireCommand(before, command);
-        if (JdbcSchema2CharacterRuntimeRepository.combatKind(command.kind())) {
-            if (roll != null || checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-            throw rejected("S2_CHARACTER_COMBAT_OWNER_REQUIRED");
-        }
-        if (Schema2CharacterHealthRules.handles(command)) {
-            if (roll != null || checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-            return health.verify(material.projection(), before, command, healthResult);
-        }
-        if (healthResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-        if (command.kind().equals("CHECK_RESOLVED")) {
-            if (roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-            return checks.verify(material.projection(), before, command, checkResult);
-        }
-        if (checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-        if (Schema2WizardSpellbookRules.handles(command)) {
-            if (roll!=null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-            return spellbooks.apply(material.projection(),before,command);
-        }
-        if (Schema2CharacterEquipmentRules.handles(command)) {
-            if (roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-            return equipment.apply(material.projection(), before, command, request.operationId());
-        }
-        if (Schema2CharacterRestRules.handles(command))
-            return health.afterRest(before, rests.apply(material.projection(), before, command, roll), command);
-        if (!isAdvancement(command) && roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-        return switch (command.kind()) {
-            case "INITIALIZED" -> rules.initial(material.projection(), material.initial(), request.preparationOperationId(),
-                    request.initialAbilities(), command.growthChoices());
-            case "STATISTICS_ADVANCED", "CHARACTER_ADVANCED" -> rules.advance(material.projection(), prepareAdvance(material, before, command), roll);
-            case "RESOURCE_SPENT" -> rules.spend(material.projection(), before, command.resource(), command.amount());
-            case "RESOURCES_RECOVERED" -> rules.recoverResources(material.projection(), before, command.recoveryTrigger());
-            default -> throw rejected("S2_CHARACTER_COMMAND_UNSUPPORTED");
-        };
-    }
-
-    private static boolean isAdvancement(Command command) {
-        return command.kind().equals("STATISTICS_ADVANCED") || command.kind().equals("CHARACTER_ADVANCED");
-    }
-
-    private static void checkCapacity(History history, State candidate, Command command) {
-        try { JdbcSchema2CharacterRuntimeRepository.checkCandidateCapacity(history, candidate, command); }
-        catch (SQLException exhausted) { throw new IllegalArgumentException("S2_CHARACTER_CAPACITY", exhausted); }
-    }
-
-    private Schema2CharacterProgressionRules.PreparedAdvance prepareAdvance(Material material, State before, Command command) {
-        spellbooks.requireLearningCompleteBeforeAdvance(material.projection(),before);
-        var prepared = rules.prepareAdvance(material.projection(), before,
-                command.kind().equals("CHARACTER_ADVANCED") ? command.targetClass() : before.characterClass(),
-                before.level() + 1, command.hpChoice(), command.growthChoices());
-        ProgressionScope required = command.kind().equals("CHARACTER_ADVANCED")
-                ? ProgressionScope.CHARACTER_ADVANCEMENT : ProgressionScope.STATISTICS_AND_RESOURCES_ONLY;
-        if (prepared.scope() != required) throw rejected("S2_CHARACTER_ADVANCEMENT_SCOPE");
-        return prepared;
+        domain.validateCharacterHistory(material, history);
     }
 
     private Result transact(boolean inspection, UUID characterId, String digest, History restoration, Work work) {

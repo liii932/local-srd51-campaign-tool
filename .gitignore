@@ -6,6 +6,11 @@
 /.agents/skills/dnd-codex-harness/
 *.war
 *.zip
+# Runtime rule bundles are versioned with their deterministic author sources.
+!/src/main/resources/storage/rules/srd51-runtime.zip
+!/src/main/resources/storage/rules/srd51-characters.zip
+!/src/main/resources/storage/rules/srd51-magic.zip
+!/src/main/resources/storage/rules/dm-runtime-house-rules.zip
 *.7z
 *.rar
 *.tar

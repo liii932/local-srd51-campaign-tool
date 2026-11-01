@@ -110,7 +110,10 @@ final class DeferredPublicSurfaceExclusionTest {
     private static void assertNoPublicIdentifier(String source, String content) {
         Matcher snake = FORBIDDEN_PUBLIC_SNAKE.matcher(content);
         assertFalse(snake.find(), () -> source + ": " + snake.group());
-        Matcher camel = FORBIDDEN_PUBLIC_CAMEL.matcher(content);
+        // Java reflection access checks do not define a player/public product surface.
+        String domainIdentifiers = content.replaceAll(
+                "\\b(?:java\\.lang\\.reflect\\.)?Modifier\\.isPublic\\s*\\(", "modifierAccess(");
+        Matcher camel = FORBIDDEN_PUBLIC_CAMEL.matcher(domainIdentifiers);
         assertFalse(camel.find(), () -> source + ": " + camel.group());
     }
 }

@@ -14,8 +14,9 @@
 Local 5E Campaign Tool 是**单机、本地、单 DM 工具**。完整 SRD 5.1 目标扩展规则能力，
 不扩展网络或用户边界：
 
-1. 当前应用采用 Java 21、Tomcat 10.1、JSP、Servlet、JDBC 和 MySQL；v2 私有 SQLite 运行空间
-   尚待替换采用，Java/Tomcat 与本机 Web 入口保持，不改造成原生桌面程序。
+1. 当前应用采用 Java 21、Tomcat 10.1、JSP、Servlet 和 JDBC；默认保留 MySQL 简化模式，
+   `DND_STORAGE_ROOT` 显式启用私有 SQLite 当前有限运行模式。逐领域覆盖见
+   [接合表](design/v2/domain-integration.md)，Java/Tomcat 与本机 Web 入口保持。
 2. DM 只通过本机浏览器访问 `http://127.0.0.1:8080`。
 3. 产品只实现 `/host/*`、`/api/host/*` 和安全的 `/health`，根路径 `/` 转到 `/host`。
 4. LAN/公网、HTTPS、玩家账号、`/display`、`/api/public/*`、公开投影和公开事件不属于当前产品目标。
@@ -23,7 +24,8 @@ Local 5E Campaign Tool 是**单机、本地、单 DM 工具**。完整 SRD 5.1 �
 6. 主机 loopback 边界、Session、CSRF、Origin/Referer、Fetch Metadata、对象版本、`host_state_epoch` 和幂等键仍必须实现。恶意网页可以从主机浏览器尝试攻击 localhost，因此“只有本机使用”不等于可以取消 Web 安全边界。
 7. 当前 Host 使用内置不可变发布，不提供脚本扩展；v2 自定义内容仅能使用已支持机制并经
    独立安装/接受，具体边界见模组公共合同。
-8. 当前 Host 没有经过哈希验证的内置 `RELEASED` 发布版时不得创建战役；v2 初始化也须完整
+8. MySQL Host 没有经过哈希验证的内置 `RELEASED` 发布版时不得创建战役；SQLite 有限模式
+   只接受其准确内置目录，不使用完整 SRD 的 DRAFT 身份。各模型初始化都须通过该范围完整
    规则、业务与恢复资格，不能以临时空战役绕过。
 
 完整规则目标不得被用来放宽 loopback Filter、开放主机接口、建立玩家身份或增加公开读取能力。
@@ -32,7 +34,7 @@ Local 5E Campaign Tool 是**单机、本地、单 DM 工具**。完整 SRD 5.1 �
 
 ## 2. 当前实现与目标闭环
 
-当前 Host 的简化 v1 在一台 Windows 主机上已经形成以下基础闭环：
+未启用 SQLite 时，原 Host 简化 v1 的闭环为：
 
 ```text
 DM 访问 http://127.0.0.1:8080/host
@@ -63,11 +65,29 @@ DM 访问 http://127.0.0.1:8080/host
 完整 SRD 5.1 目标在相同本机边界中扩展这条链路：角色构筑、冒险资源、战斗、法术、装备、
 怪物和状态都必须进入同一套服务器权威验证、事务、事件、幂等、冻结规则与存档机制。
 局域网设备访问、HTTPS、CA 信任、玩家身份、公开数据发布和展示轮询不属于该目标闭环。
-新 v2 准备准确有序组合，按应用固定 SQL 闭包建立私有 SQLite 运行空间，在同一事务保存
-完整规则/链、业务、历史和控制；逻辑 JSON 文件发布并登记接受后才可封存清理。
+新 v2 准备准确有序组合，由应用 JSON 表结构声明计算闭包并生成确定性 SQLite 建表计划。
+同一初始化事务建立结构、静态种子、完整规则/链、业务、历史和控制；首份完整检查点接受
+后才可执行，最终逻辑 JSON 文件发布并登记封存后才可清理。结构语言及职责见
+[结构合同](design/v2/storage-schema-and-planning.md)，现行领域映射和替换入口见
+[实施路线](design/v2/storage-data-map-and-rollout.md)。
 重启残留经完整核验和查证后可显式继续、救援或精确放弃；见[完整文件](design/v2/save-and-recovery.md)
 及[模组接口](design/v2/module-interface-baseline.md)。
-这些目标尚未替换上面的现行 v1 闭环，详见[运行设计](design/v2/runtime-and-transactions.md)。
+当前以独立应用模型接合[有限 SQLite 战役运行](storage-vitality-loop.md)：
+`BundledCampaignRules` 经生产 reader/compose 加载四个有限规则包；`CampaignDomainEngine`
+在不借连接的前提下执行现有纯领域规则；`CampaignDomainData` 和严格
+`CampaignDomainCodec` 保存完整类型化聚合。`CampaignDomainRepository` 写入聚合及关系
+投影；`CampaignStorageService` 在一个 SQLite 事务中统一领域后果、根历史、revision 和
+请求结果，提交后才向页面发布。独占根锁和一个 `BEGIN IMMEDIATE` 同时接纳并提交，
+没有独立 C0 或 NOT_COMMITTED 裁定；未知 commit/rollback 阻断新写，经完整库/历史/收据
+核验后显式恢复新 epoch，不重播未持久意图。根与子事件、原骰、初始/当前状态及 pending 共同进入
+完整文件，打开和恢复直接核验事实而不重放。显式模式使用自己的服务与 epoch，关闭旧
+MySQL 读写路由；未配置时仍使用原模式。它不等同完整 SRD 或通用完整 format 2 发布。
+下述 INTERNAL MySQL 来源/快照/历史实现说明的是原服务边界；新的 SQLite 路线复用其
+纯规则消费者，不调用它们另开 MySQL 事务。schema-2 prepared 身份与历史 version 是
+保留的业务关系，本地 core run/epoch/HTTP 收据另建且不入文件。每命令 SQLite 耐久和
+INITIAL/MANUAL/FINAL 承担当前保存责任，周期 AUTO 是后续容量测量目标。
+检定分支入口 `CampaignCheckEffects` 与独立 DM-managed 自由卡入口 `CampaignManualCommands`
+的实际覆盖/验收按[接合表](design/v2/domain-integration.md)核对，不能以自由卡绕过规则角色消费者。
 
 [schema 2 内部快照链路](rules/schema-2-runtime-snapshot.md)已实现来源一致读取、类型化
 规则与覆盖链的原子转存及独立回读；它仅提供有限规则材料，不接入 Host 游戏初始化，
@@ -265,15 +285,15 @@ Tomcat 10.1 根上下文
   ├── Filter          loopback、方法、来源和响应头边界
   ├── Service         校验、事务、幂等和领域操作
   └── DAO             参数化 SQL 和确定性资源关闭
-          │ javax.sql.DataSource
-          ▼
-      MySQL 8.0
+          ├── 未配置 DND_STORAGE_ROOT → MySQL 8.0 / 原 JNDI 简化模式
+          └── 已配置 DND_STORAGE_ROOT → 私有 SQLite / 当前有限战役运行
 ```
 
 Servlet 不直接执行 SQL，Repository 不决定业务权限，JSP 不保存权威状态。现有职责包为
 `web`、`service`、`persistence`、`module` 和 `security`，不创建无内容占位类。
-`module.ModuleCatalog` 是唯一不可变规则逻辑投影，不含数据库 ID；目录仓储、规则计算和
-canonical 编码共用该模型，模型及编码不反向依赖 JDBC 存储包。
+原 MySQL 路线的 `module.ModuleCatalog` 是其不可变规则投影；新 SQLite 有限规则使用
+`ProductionSchema2Projection`，含准确成员、最终规则与完整字段链。两者不混用发布身份，
+均不从浏览器接受算法、目录数值或派生结果。
 
 `web.DatabaseDiagnosticsFactory` 负责原运行 JNDI 的延迟查找和诊断依赖装配，
 `web.DatabaseStartupListener` 与 Host 诊断 Servlet 使用同一能力；
@@ -301,10 +321,11 @@ http://127.0.0.1:8080
 |---|---|---|
 | Java 21 | 应用语言和标准库 | 当前不替换 |
 | Tomcat 10.1 | Servlet/JSP、Session、JNDI 连接池 | Servlet/JSP API 不打入 WAR |
-| MySQL 8.0 | 权威状态和事务 | 不使用 JSON 列 |
+| MySQL 8.0 | 原简化模式及来源/运行内部服务 | 保留现有迁移/账号合同 |
+| SQLite JDBC 3.50.3.0 | 当前有限战役工作库和共同事务 | 应用 JSON 结构、严格类型化聚合及独立关系投影核验 |
 | MySQL Connector/J | JDBC 驱动 | 只通过 JDBC/DataSource 使用 |
 | Gson | 主机 DTO 和存档 JSON | 不让领域对象依赖 Gson |
-| Maven | 构建和依赖锁定 | 使用固定 `clean verify` |
+| Maven | 构建和依赖锁定 | 默认定向验证；发布/部署检查点按测试合同 |
 | JUnit Jupiter | 单元与集成测试 | 仅测试依赖 |
 
 初版继续使用 Tomcat JULI 和 `java.util.logging`。暂不引入 Spring、Flyway、HikariCP、Redis、WebSocket、Testcontainers、Playwright 或表达式引擎。
@@ -376,6 +397,9 @@ Referrer-Policy: no-referrer
 ## 6. 数据设计
 
 ### 6.1 原则
+
+本节旧表清单及字段合同用于 MySQL 简化模式；SQLite 当前领域所有者、严格聚合文档与
+关系投影见[运行合同](storage-vitality-loop.md)和[领域接合表](design/v2/domain-integration.md)。
 
 - MySQL 不使用 JSON 列；
 - 不根据模组字段动态执行 DDL；
@@ -537,6 +561,10 @@ Java 使用 `MessageDigest` 计算 64 字符小写 SHA-256，并与应用随附�
 
 ### 7.1 主机页面
 
+SQLite 模式的 `/host` 进入 `/host/storage`，同一受保护操作台提供规则选择、角色卡、
+已接合领域动作、保存/结束、文件列表/下载/导入与残留处置。具体表单及限制见
+[运行合同](storage-vitality-loop.md)；以下旧页面只在未启用该模式时使用。
+
 - `/host`：当前战役总览；
 - `/host/rules`：按当前活动战役冻结发布版查询和搜索已发布规则目录；
 - `/host/campaign`：创建、暂停、恢复和归档；
@@ -558,6 +586,12 @@ Java 使用 `MessageDigest` 计算 64 字符小写 SHA-256，并与应用随附�
 不得以此为由增加 `/display` 或玩家页面。
 
 ### 7.2 主机 API
+
+SQLite 入口为 `GET /api/host/storage/state`、`download` 及同前缀受保护的
+`POST create/open/recover/characters/heal/domain/save/end/import/delete/discard`。
+`domain` 只接封闭领域命令，不能指定 SQL、物理路径或任意规则对象；准确请求摘要、
+epoch、revision 与角色/场景版本仍分别校验。文件下载是读取，上传导入不自动激活。
+下面的 rules/diagnostics 接口说明用于原 MySQL 模式。
 
 `/api/host/*` 使用专用请求/响应 DTO，不直接序列化数据库实体。GET/HEAD 只能读取，POST 才能修改。导入、导出、模式诊断和数据库诊断都属于主机能力。
 
@@ -600,14 +634,23 @@ Java 使用 `MessageDigest` 计算 64 字符小写 SHA-256，并与应用随附�
 路径及显式授权的重建。两种路径均须同步代码、清单、测试和文档，明确目标及真实数据处置，
 不修改历史摘要来掩盖不一致。选择后一路径不表示相应工具已经实现或任何重建已经执行。
 
-当前 Host 仍通过 `jdbc/DndToolSE` 使用已迁移的运行结构。规则目录与运行状态的分离目标及
+未配置 `DND_STORAGE_ROOT` 时，Host 通过 `jdbc/DndToolSE` 使用已迁移的运行结构。规则目录与运行状态的分离目标及
 加载、外键、存档、权限和回滚边界见[静态规则目录与运行数据库分离设计](rule-database-separation.md)。
-具体存储和初始化方案可按需求与验证修订；同一运行仍固定规则解释，不引入规则热重载或跨库
-分布式事务。目标记录不代表 Host 已采用新结构或数据库已经完成迁移。
+新目标按应用当前 JSON 结构在新私有库中初始化，同版残留核验已存模型、计划和真实结构，
+不重跑 DDL/seed。同一运行固定规则解释，不引入规则热重载或跨库分布式事务。
+当前可选 SQLite 已由 `StorageApplicationListener` 和 `CampaignStorageService` 装配，
+只使用 `DND_STORAGE_ROOT`，无需来源 MySQL 或新来源 JNDI。完整文件携带准确冻结
+material/链，按已验证的四包固定投影逐项核验。未来通用来源安装/接受另设配置合同，见
+[配置边界](configuration.md#v2-存储配置目标)；本地运行接合不表示真实数据库已经迁移。
 
 ## 9. 本地存档、导入与恢复
 
 ### 9.1 文件边界
+
+当前 SQLite 的完整文件和导入/打开/下载/删除/残留责任按
+[运行合同](storage-vitality-loop.md#完整文件与直接恢复)执行；它包含有限运行的全部历史、
+初始/当前事实与 pending，采用独立 `VITALITY_CAMPAIGN` 模型。下面的 released dispatcher、
+旧 archive format 1 和 MySQL 确认事务不用于该路径；通用完整 format 2 的采用门仍独立。
 
 主机导出单个 UTF-8 `campaign-save.json`，最大 16 MiB，不使用 ZIP。存档包含：
 
@@ -709,7 +752,7 @@ epoch、版本初值、权威状态和成功幂等结果必须在同一事务提
 
 ### 9.4 进程重启后的状态恢复
 
-MySQL InnoDB 表是战役权威状态；Tomcat Session、Servlet、Service 和 Repository 都不缓存
+本节描述未启用 SQLite 时的恢复。该模式中 MySQL InnoDB 表是战役权威状态；Tomcat Session、Servlet、Service 和 Repository 都不缓存
 战役、角色、物品、地图、遭遇或事件上下文。每次 `/host` GET 都重新调用只读总览 Service，
 由 Repository 取得新的连接并在单个 `REPEATABLE_READ` 事务中重建活动战役、冻结模组绑定、
 角色摘要、简单物品、地图与队伍位置、当前活动遭遇及最近最多 20 条可展示检定/消息。因此

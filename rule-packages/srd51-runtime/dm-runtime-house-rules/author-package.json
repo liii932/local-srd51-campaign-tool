@@ -1,0 +1,27 @@
+{
+  "author_schema_version": 2,
+  "module_key": "dm_runtime_house_rules",
+  "release_version": "1",
+  "package_display_name": "Current application — explicit DM house rules",
+  "role": "extension",
+  "dependencies": [
+    {
+      "module_key": "srd51_runtime",
+      "supported_versions": [
+        "1"
+      ]
+    }
+  ],
+  "compatible_combinations": [
+    {
+      "srd51_runtime": "1"
+    }
+  ],
+  "load_order_constraints": [],
+  "files": [
+    {
+      "kind": "definitions",
+      "path": "rules.json"
+    }
+  ]
+}

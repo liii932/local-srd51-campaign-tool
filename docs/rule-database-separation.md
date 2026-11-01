@@ -1,65 +1,65 @@
-# 静态规则目录与运行数据库分离
+# 静态规则材料与运行数据库分离
 
-本文说明当前存储与私有运行库替代边界。新 v2 的权威目标分别位于
-[规则存储与版本](design/v2/rule-storage-and-versioning.md)、[运行与事务](design/v2/runtime-and-transactions.md)
-及[采用边界](design/v2/adoption-boundaries.md)，这里不维护另一套启动或快照方案。
+当前显式 SQLite 路线将准确冻结规则、业务状态、全历史和本地收据放在一次打开的
+私有工作库。来源 MySQL 与原运行 MySQL 继续有独立维护/保管职责，不进入新路线业务
+事务。未设置 `DND_STORAGE_ROOT` 时仍使用原 MySQL 简化模式，默认尚未切换；当前有限
+能力与本次验收见[领域接合表](design/v2/domain-integration.md)。
 
-## 当前边界
+## 当前权威与准确来源
 
-当前 Host 仍通过 `java:comp/env/jdbc/DndToolSE` 使用 `dnd_tool_se`。`module_release`、
-`module_*`、`module_catalog_*_v2` 与战役、角色、事件、幂等表共处该 schema，运行表仍有
-本地规则外键及业务流程中的目录读取。不能只更换 Servlet loader 就宣称已完成拆分。
+| 边界 | 当前责任 |
+|---|---|
+| 四个应用内置 schema-2 原包 | `rule-packages/srd51-runtime/` 作者源和 WAR `storage/rules/` 确定性 ZIP；生产 reader/compose 建立本版有限规则材料 |
+| 私有 SQLite | 完整 `Material(members,rules,entries,chains)`、严格角色/场景/manual 聚合、独立关系投影、全根子历史/pending 与本地控制，唯一活动权威 |
+| 完整 JSON | 准确 material/完整链、初始/当前事实及全历史/未决图；四集合逐项精确比对本版已验证固定投影，不只携规则指纹，不逐次重新 compose/hash |
+| 原来源 MySQL | schema-1 分区、schema-2 原包/独立接受及类型化镜像的实际维护/读取合同；当前内置新建/打开/恢复无需连接它 |
+| 原运行 MySQL | 未启用 SQLite 的简化模式及独立内部服务；已应用迁移/账号/真实数据保持原处，不自动转换或删除 |
+| JVM/页面/缓存 | 只由已读回事实生成执行/查询视图，无权补状态或成为第二写入权威 |
 
-独立规则来源的语言与工具熟练目录表、安装事实及读取已见[来源 schema](rule-source-schema.md)、
-[离线安装](rules/offline-language-installation.md)和[来源读取](rules/source-language-reading.md)。
-来源 V001/V002 保存语言与工具目录；运行 V019 提供[语言快照分区](rules/runtime-language-snapshot.md)，
-V020 增加[工具镜像并支持双分区读写](rules/tool-catalog-partition.md)。这些是分区实现，不代表
-第二 JNDI、完整准备/执行上下文、战役快照绑定或部署已完成。
+当前关系/正文选择见[规则存储](design/v2/rule-storage-and-versioning.md)和
+[数据映射](design/v2/storage-data-map-and-rollout.md)：复杂对象采用封闭 record/enum 的
+严格 typed TEXT 聚合，资源/装备/书籍/动作/效果/怪物等关系表同事务核验，不是另一份
+独立可写余额。应用 JSON 完整声明所有物理列，作者/上传不能定义 SQL、类或路径。
 
-来源 V003 增加 [schema 2 制品与接受账本](rules/schema-2-source-ledger.md)，以独立离线流程保存
-准确原包和 DM 明确接受事实，安装与接受共用维护屏障但分别登记。它不改写已有语言/工具表，
-完整基础和尚未集成的机制仍由资格门拒绝。
+## 引用、加载与运行
 
-[schema 2 内部转存链路](rules/schema-2-runtime-snapshot.md)读取来源 V003 的准确接受事实，
-关闭来源事务后，在运行 V021/V023 中原子保存类型化组合、最终规则、完整覆盖链与操作收据。
-实际回读及后续查证只使用运行库。当前全部写入口已接入[共同业务守卫](rules/business-write-transactions.md)，
-但该有限实现尚未接入 Host 完整初始化、完整工作集或第二 JNDI，不授予完整运行资格。
+- 规则身份是原所属模组/类型/键，条目保留完整所有者/槽身份，准确版本和原/逻辑摘要
+  由组合绑定；完整链不能简化为最后有效值。
+- schema-2 prepared Identity 虽名 runId/snapshotId，作为初始/历史/因果的稳定业务键
+  进入文件；打开不重新分配。物理 core run、epoch、Host revision 和 HTTP/保存收据
+  属于新本地运行，不进文件，也不由 prepared 键获得旧连接或执行权限。
+- 新建/文件打开只读取本版内置四包并核输入，完整材料/链写本库；普通命令和保存不
+  回源。文件同样携材料，当前来源离线不阻止新建、打开、继续或同版恢复。
+- 每个命令在实例/目录独占与 `BEGIN IMMEDIATE` 下，状态/投影/根子历史/版本/接受一次
+  提交。没有独立 C0 接纳或 NOT_COMMITTED 裁定；未知阻断，recover 核真实库及全部
+  收据/历史后新 epoch，未持久接受意图不自动重试/重播。
+- 文件打开建立新物理库，直接写已验证事实，不执行历史、重掷或补授予；残留恢复
+  保留原库，只核计划/结构/事实，不补表或 seed。完整 INITIAL 检查点接受后才开放新运行。
+- INITIAL/MANUAL/FINAL 用 P0—P3，发布与数据库接受分开；END 不处理游戏 pending，准确
+  封存后清理整运行目录。周期 AUTO/玩家步骤是后续功能，不是当前耐久运行前提。
 
-## 选定目标与当前接入
+## 原 MySQL 服务与后续自定义来源
 
-| 边界 | 选定职责 | 当前差异 |
-|---|---|---|
-| 规则来源 MySQL | 准确原始 ZIP、安装/接受事实及独立迁移账本；类型化索引可重建 | 已有逐域来源表仍按当前合同严格核验；简化来源写入/读取尚未实施 |
-| 每次打开的私有 SQLite | 完整最终规则/覆盖链、全部业务/历史/幂等和生命周期控制，同一事务 | 当前仍为共享 MySQL 运行库，现有 SQL/触发器/FOR UPDATE 不能直接搬用 |
-| 逻辑 JSON 战役文件 | 保存点的全部业务投影及准确规则绑定 | 当前 format 1/内部 format 2 片段未采用完整闭包；不再设计 DB 档案 blob 双份存储 |
-| 应用内存 | 受控准备和实际读回后的执行视图，可重建 | 无权补缺失事实，执行资格仍受生命周期与提交证据限制 |
+原 Host 通过 `jdbc/DndToolSE` 使用 `dnd_tool_se` 时，规则与业务仍按既有外键/目录读取
+合同运行；原 `Schema2SourceLedger` / `JdbcSourceSchema2Repository` 完整读取来源接受/
+镜像，来源连接结束后才由内部 `Schema2SnapshotTransferService` 向 MySQL 写入有限快照。
+这些独立服务不因当前 SQLite 路线改变而省略校验或扩大 DRAFT/完整初始化资格。
 
-拓扑、结构依赖与应用固定 SQL 建表的唯一目标合同在[规则存储](design/v2/rule-storage-and-versioning.md)。
-本页不另外定义 JSON 表结构框架、JNDI 新名称或第二套生命周期。当前 `jdbc/DndToolSE`、
-环境变量、账号和 WAR 外配置保持现行合同；具体替换接入及验证列入采用计划，不能只换驱动。
+未来开放任意自定义包时，须独立交付准确原包保管、本地接受、依赖/组合/机制/发布资格
+和来源连接/索引/维护协议。来源 MySQL 可承担其持久账本，类型化索引可重建也不允许在
+旧 reader/installer 仍使用时删改不变量。未来来源资格不是当前四包运行的未实现前提。
 
-## 引用、加载与释放
+## 迁移、保管与验证
 
-- 来源 ID 不传播到业务或文件；整个战役共用新 run/snapshot 与稳定规则身份，不保留单角色
-  prepared run 作为目标结构。来源连接完整读取/验证后关闭，再进入私有运行事务，无跨库提交。
-- 规则镜像与完整链是本次固定材料；普通命令和保存不访问来源。当前 RELEASED/DRAFT 与
-  INTERNAL 资格继续按实际门核验，来源接受不能补全机制或业务恢复能力。
-- 文件直接恢复重建本地身份与规则材料，不重放历史；本地同版残留则经独占查证/全量校验
-  后显式恢复原运行与新安全代次，来源离线不破坏已经固定的完整材料。
-- 保存按[文件合同](design/v2/save-and-recovery.md)分开文件发布点和工作库接受点；END 封存后
-  关闭/隔离整个运行目录再清理，不再把跨域 SQL DELETE 图作为目标释放机制。
+原 MySQL 两条迁移和账号职责继续按[数据库](database.md)执行；保留已应用文件/checksum，
+变化用前向迁移。新 SQLite 按当前声明初始化，不重放 MySQL 编号，不为旧存档建立兼容
+升级链。真实重建/重置/删除、来源安装接受、应用部署和默认切换分别需要独立授权。
 
-## 迁移、验证与回退边界
+核对当前全部已实现用户能力和旧正式差距，不仅替换 Servlet loader 或 JDBC 驱动。
+DM-managed 自由卡/MANUAL 等独立领域不得用来任意修改 schema-2 角色。实际边界和证据见
+接合表；类/表存在、MySQL/代理测试或文档修订不能证明 SQLite/文件系统故障已验收。
 
-当前 MySQL 两条迁移链各有编号、批准和诊断，见[数据库](database.md)。保留的库不改写已应用
-文件或账本。新的私有 SQLite 使用应用当前存储模块与独立结构验证，不沿用旧 MySQL 编号，
-不为旧应用存档建立迁移链；规则源账本演进仍是独立维护操作。
-
-替代须同时完成事务/JDBC适配、类型/约束/排序、全域根与历史重映射、来源只读接合、文件
-发布/清理、配置诊断和 Host 入口。保留当前运行期间不得混用两套写入口；切换要明确真实
-数据处置，不能为通过检查自动删除旧库。目标 SQLite 的真实故障证据不能由 MySQL/代理
-测试替代，设计任务也不授权迁移、数据重建、权限调整或部署。
-
-本版只支持准确声明的模型/规则/文件；应用回退遇到不支持材料时保留并拒绝，不修改账本
-伪装兼容。采用顺序及验收统一见[采用边界](design/v2/adoption-boundaries.md)，现行备份与
-部署仍执行[备份恢复](backup-and-restore.md)和[部署指南](deployment.md)的独立检查点。
+物理备份保管完整库/journal 或采用引擎一致备份，便携恢复保管 JSON 与支持准确规则的应用。
+既有数据不自动迁移/覆盖/删除，不将备份或真实存档放 Git/WAR。配置、打包、备份与部署
+分别按[配置](configuration.md)、[测试](testing.md)、[备份恢复](backup-and-restore.md)和
+[部署](deployment.md)执行，不另创运维流程。

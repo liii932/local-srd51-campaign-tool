@@ -1,74 +1,46 @@
 # Local 5E Campaign Tool
 
 Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具，使用 Java、Tomcat
-和 MySQL 管理战役并执行 D&D 5e 2014 规则。项目目标是完整覆盖 SRD 5.1 中可公开实现的
+和 JDBC 管理战役并执行 D&D 5e 2014 规则；显式 SQLite 运行模式承接当前有限领域，
+未配置时仍使用 MySQL 简化模式。项目目标是完整覆盖 SRD 5.1 中可公开实现的
 角色、冒险、战斗、法术、装备、怪物和状态规则，同时保留可持久化、可审计、可恢复的单 DM
 操作闭环。
 
 项目处于原型阶段，只保证当前应用版本的运行，不承诺跨版本延续战役或读取旧存档。
 设计可按当前需求和验证结果修订，现有实现不构成永久兼容基线；范围见[产品说明](./docs/product.md)。
 
-> 当前实现仍是纯本机的冻结简化 v1，并未完成全部 SRD 5.1 功能。正式入口仅为
+> 当前实现包含可选 SQLite 有限运行规则与默认 MySQL 简化模式，尚未完成全部 SRD 5.1。正式入口仅为
 > `http://127.0.0.1:8080`；局域网/公网、HTTPS、玩家账号、`/display`、
 > `/api/public/*` 和公开数据投影不属于当前产品目标。
 
 ## 当前已实现
 
-- 创建、激活、归档和恢复单一活动战役；
-- 使用显式内置发布版注册表；当前默认仍是经过哈希校验的
-  `dnd5e2014_srd51_se_v1` release 1 / canonical 1 / archive 1；
-- 已为完整规则族 `dnd5e2014_srd51_se` 固定 release 1 / canonical 2 / archive 2
-  映射，但该身份仍为 `DRAFT`，不能通过正式业务入口绑定战役、执行规则或导入存档；
-- 已在该 DRAFT 身份下建立 12 职业/子职业的 236 项特性三态矩阵，以及职业资源的类型化
-  容量/休息恢复边界，并建立多职业先决条件/熟练增量、ASI 和可扩展专长状态（当前仅
-  Grappler）的 DRAFT 角色切片；V018 进一步固定十二职业的多职业施法贡献，并提供共享法术位
-  上限计算基础，但多职业施法的权威状态与升级事务集成、Grappler 战斗效果仍阻断。该内部规则基础不
-  等于发布或开放可达业务入口，完整规则族会保持 DRAFT，直到主要规则领域完成跨领域发布候选验收；
-- DRAFT 的[语言与工具熟练目录](./docs/rules/tool-catalog-partition.md)提供严格作者包、双分区离线安装、
-  来源读取与调用方事务运行镜像；仅为 PARTITION，不提供完整规则或游戏运行资格；
-- schema 2 的[生产制品](./docs/rules/schema-2-rule-artifacts.md)提供原始 ZIP 校验和独立规范摘要，
-  [离线安装与接受](./docs/rules/schema-2-installation-and-acceptance.md)分开保存制品与本地接受事实；
-  完整基础及尚未接入运行消费者的规则内容仍拒绝，安装或接受不开放新战役；
-- schema 2 的[检定、装备与健康作者来源](./docs/rules/schema-2-foundation-authoring.md)支持四类封闭定义、
-  有符号修正、严格字段清空、纯组合及来源 V006/V007 的类型化原包核对；
-  [镜像与事实存储](./docs/rules/schema-2-character-fact-storage.md)保存准确规则、完整链及类型化角色事实；
-  运行行为由下述角色基础消费者承担；
-- schema 2 的[来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md)提供只读来源复核、
-  类型化最终规则与完整覆盖链的原子保存、独立读回、操作查证和准确恢复绑定；范围为内部材料，
-  尚不创建战役或开放游戏执行；
-- DRAFT 的[角色语言／工具授予](./docs/rules/character-proficiency-grants.md)在一级创建中保留来源与槽，
-  并由角色卡和内部角色存档读取、校验及直接恢复；仍依赖旧单发布目录，尚未接通 schema 2 业务初始化；
-- schema 2 的[初始授予计划](./docs/rules/schema-2-proficiency-grants.md)将真实角色来源、稳定授予槽和
-  跨模组目标纳入严格作者输入、类型化来源及运行快照，由实际快照读回生成固定／选择授予与抑制事实；
-  仍属内部计划，不写角色工作集、不开放新运行或工具检定；
-- [共同业务事务](./docs/rules/business-write-transactions.md)覆盖现有业务写入口、调用方叶仓储及
-  schema 2 转存；初始计划可与快照及结果同事务保存和读回复核，完整初始化材料缺失时仍拒绝；
-- DRAFT 的[成长区间](./docs/rules/level-advancement-v2.md)与[资源恢复区间](./docs/rules/class-features-v2.md)
-  使用共用不可变规则模型，逐级核验 1—20 级熟练加值，资源恢复按权威魅力值求值；
-  schema 2 的[成长与资源合同](./docs/rules/schema-2-character-statistics.md)及[休息合同](./docs/rules/schema-2-character-rest.md)
-  已接作者、来源和运行镜像，提供单角色 INTERNAL 的成长、资源、标准休息与局部历史；
-  该内部链路不开放完整战役、Host 入口或持续效果执行；
-- schema 2 的[检定、装备与健康基础](./docs/rules/schema-2-character-foundations.md)在同一内部角色链上
-  保存真实检定、装备实例、护甲限制、伤害／治疗、临时 HP、死亡豁免与稳定恢复；
-  全部依据准确模组声明和服务器骰子，状态、结果及恢复材料同事务保存；
-- schema 2 的[内部战斗与动作继续](./docs/rules/schema-2-combat.md)连接同战役中冻结绑定一致、
-  同秒起点的独立 prepared 角色，提供先攻/回合、单次近战攻击、移动、机会攻击暂停/继续与准确恢复；
-  失去意识记录倒地和手持物掉落，每完整 round 沿唯一角色时钟推进六秒，完整基础包与 Host 仍未开放；
-- schema 2 的[有限施法](./docs/rules/schema-2-spells.md)提供生命领域一级 Bless／Cure Wounds，以及
-  单职业法师 1—5 级真实法术书、准备清单和法术位支持的 Shield／Counterspell；Ready 攻击、移动与
-  一动作法术复用同一反应流，成本只支付一次。Bless 的贡献、专注、到期、同强覆盖恢复与固定 DM
-  抗魔区域的独立压制原因随事实保存；战斗可转入共享时钟的有限探索并保留效果，再重新进入先攻。
-  这些能力保持 INTERNAL；完整法术目录执行、完整基础包、Host 与完整战役文件仍关闭；
-- schema 2 的[有限怪物与火焰吐息](./docs/rules/schema-2-monster-breath.md)连接类型化怪物／动作来源、
-  规则镜像和真实场景：由服务端完整点格目标产生一次共享 6d6、逐目标 DEX、同时伤害和专注后果，
-  保留动作／充能、唯一继续点、怪物防御及完整局部历史恢复。未登记动作、完整怪物目录执行、
-  通用体积／遮挡、完整文件与发布资格仍须各自消费者和验收；
-- 创建 PC/NPC，维护角色字段、职业等级、技能/豁免熟练和简单物品；
-- 执行普通、优势和劣势 d20 检定，并保存候选骰、修正、DC、结果和内部事件；
-- 通过封闭的类型化效果调整字段、授予物品、记录消息或更新合法实体位置；
-- 使用内置节点地图管理队伍位置、最小遭遇状态、参与者阵营和实体位置；
-- 导出、严格预览并整战役导入 UTF-8 JSON 存档；
-- 在 Tomcat/MySQL 重启后恢复权威状态和当前 DM 工作上下文。
+显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
+选择 `srd51-vitality@1`、`srd51-healing@1`、`srd51-runtime@1` 的准确有序组合后，可以：
+
+- 创建标准数组的有限 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史；
+- 由现有纯规则消费者执行已接入的成长/ASI/多职业、熟练、检定、装备、健康、休息与资源命令；
+- 使用有限普通战斗、移动、机会攻击、反应/继续、Bless、Cure Wounds、Shield、Counterspell、Burning Hands、法师书/准备和奥术回想；
+- 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、节点位置、简单物品、角色状态与消息根历史；
+- 在一个 SQLite 事务提交完整领域后果、历史、版本与幂等结果；保存初始及当前完整 JSON，下载/上传导入、同版重开，显式恢复或精确放弃残留。
+
+这些能力使用应用随版本交付的[四个有限 schema-2 包](./rule-packages/srd51-runtime/package-guide.md)，
+经过生产 ZIP reader、组合及完整类型化投影核验。它们不是完整 SRD `RELEASED` 发布，
+不借用旧完整规则族的 `DRAFT` 身份。Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、
+Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授予。
+准确领域覆盖、现行能力差异及剩余采用门见[领域接合表](./docs/design/v2/domain-integration.md)。
+
+未设置 `DND_STORAGE_ROOT` 时，原 MySQL 简化模式仍是启动默认，保留冻结规则
+`dnd5e2014_srd51_se_v1`、既有 Host 入口和格式 1 存档。SQLite 模式启动后关闭这些旧业务路由，
+不会双写、读取旧库补状态或在失败时回退。现有 MySQL 数据、迁移账本和外部账号必须独立保管；
+本地代码接合不表示已迁移、部署或删除真实数据。
+
+来源 MySQL 的作者包安装/接受、内部快照与规则算法测试继续具有各自责任。
+通用外部规则安装、完整 SRD 发布、完整通用 archive format 2 和跨版本存档兼容
+不由此有限应用模型自动完成。当前业务/根/接受在一个 SQLite 事务提交，未知结果显式
+恢复；每命令耐久和 INITIAL/MANUAL/FINAL 承担保存责任，周期 AUTO/轮换仍为后续目标。
+旧正式自由卡、MANUAL/SAVING_THROW、有序检定效果和简易遭遇名单/阵营的独立 DM-managed
+接合/验收按[领域接合表](./docs/design/v2/domain-integration.md)逐项核对，不能以有限规则角色替代。
 
 ## 产品目标
 
@@ -88,8 +60,12 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 [产品说明](./docs/product.md)区分当前行为和 v2 使用流程；[v2 设计导航](./docs/design/v2/README.md)
 记录[模组接口与组合](./docs/design/v2/module-interface-baseline.md)、[私有运行存储](./docs/design/v2/rule-storage-and-versioning.md)、
 [完整战役文件](./docs/design/v2/save-and-recovery.md)及[生命周期](./docs/design/v2/runtime-and-transactions.md)。
-当前选用每次打开独占 SQLite 运行空间、完整 JSON 保存与同版残留显式恢复；代码仍使用
-MySQL，替换与故障验证尚未实现。
+目标以应用随版本交付的[JSON 表结构声明](./docs/design/v2/storage-schema-and-planning.md)，
+按规则、机制、历史与未决状态闭包建立每次打开独占的 SQLite 运行空间，使用完整 JSON
+保存与同版残留显式恢复。[数据覆盖与替换路线](./docs/design/v2/storage-data-map-and-rollout.md)
+列出全部现行表组、公共接口和分步验收。当前 SQLite 已接合有限规则下的角色、冒险与战斗
+聚合及同版完整文件；逐领域采用和剩余差异以[接合表](./docs/design/v2/domain-integration.md)为准，
+完整 SRD 与通用完整 v2 发布门仍未完成。
 具体机制的设计与采用按[机制接入责任清单](./docs/design/v2/mechanism-integration-checklist.md)逐项核对。
 设计进入项目文档不表示功能已实现或完整规则已发布。
 
@@ -103,7 +79,8 @@ MySQL，替换与故障验证尚未实现。
 - 玩家账号、角色所有权、邀请码、聊天、投票和外部写入；
 - `/display`、`/api/public/*`、公开身份、公开配置、公开投影和公开事件；
 - WebSocket、推送、脚本插件、模组/用户提供的任意 DDL 和 JSON 数据库属性袋。
-  目标运行空间仅由应用按受控模块执行固定 SQL 建表，不开放模组自定义表结构。
+  目标运行空间由应用自有 JSON 声明表、列、键、约束与依赖，编译为 SQLite DDL；
+  模组作者提供规则内容，应用负责结构和执行能力。
 
 完整范围与边界见[架构文档](./docs/architecture.md)。
 
@@ -114,7 +91,7 @@ MySQL，替换与故障验证尚未实现。
 | 运行时 | Java 21 |
 | Web 容器 | Apache Tomcat 10.1，外部 WAR 部署 |
 | Web API/UI | Jakarta Servlet 6.0、JSP、原生 JavaScript |
-| 数据库 | MySQL 8.0、JDBC、Tomcat JNDI/DBCP 连接池 |
+| 数据库 | 可选私有 SQLite/JDBC；默认 MySQL 8.0/JNDI 简化模式 |
 | JSON | Gson 2.14 |
 | 构建 | Maven 3.9 |
 | 测试 | JUnit 5、可选独立 MySQL 集成测试 |
@@ -127,8 +104,8 @@ MySQL，替换与故障验证尚未实现。
        └─ Servlet / JSP / JavaScript
             └─ Service：验证、事务、幂等与规则边界
                  └─ JDBC Repository
-                      └─ Tomcat JNDI DataSource
-                           └─ MySQL 8.0
+                      ├─ 显式 DND_STORAGE_ROOT → 私有 SQLite 战役
+                      └─ 未配置 → Tomcat JNDI / MySQL 简化模式
 ```
 
 应用按职责分为 `web`、`security`、`service`、`persistence` 和 `module` 包。Servlet
@@ -140,11 +117,12 @@ MySQL，替换与故障验证尚未实现。
 - JDK 21；
 - Maven 3.9 或兼容版本；
 - Apache Tomcat 10.1；
-- MySQL 8.0；
+- 原 MySQL 模式需要 MySQL 8.0；SQLite 模式需要支持文件锁、硬链接、目录同步与 POSIX 私有权限的本地文件系统；
 - 支持现代 JavaScript 的本机浏览器。
 
 应用不提供内嵌服务器，也不能通过 `java -jar` 独立启动。Connector/J 和数据库凭据由外部
-Tomcat 配置提供，不得打包进 WAR。
+Tomcat 配置提供，不得打包进 WAR。SQLite 隔离验收使用[本地启动脚本](./docs/testing.md#v2-json-结构与文件存储的替换验收)，
+正式部署仍使用本项目唯一 WAR 部署流程。
 
 ## 构建与测试
 
@@ -168,7 +146,9 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 
 ## 数据库与部署
 
-本项目使用外部 Tomcat 根上下文部署，数据库迁移和运行权限相互分离：
+本项目使用外部 Tomcat 根上下文部署；SQLite 运行模式按[配置](./docs/configuration.md#sqlite-当前应用存储配置)
+设置 `DND_STORAGE_ROOT`，由应用建立私有工作库，无需运行 MySQL 迁移。以下步骤用于原
+MySQL 模式及其独立账号/历史保管，数据库维护和 WAR 部署分别授权：
 
 1. 使用专用 migrator 账号按顺序应用尚未执行的迁移；
 2. 使用只读验收脚本和专用只读账号核对结构；
@@ -226,7 +206,11 @@ tools/              数据库备份和独立规则哈希验证工具
 |---|---|
 | [快速开始](./docs/getting-started.md) | 环境前提、构建、配置和最小启动验收 |
 | [产品说明](./docs/product.md) | 当前行为、v2 使用流程与暂缓范围 |
+| [SQLite 当前有限战役](./docs/storage-vitality-loop.md) | 规则选择、领域运行、严格完整文件与显式恢复 |
+| [领域接合表](./docs/design/v2/domain-integration.md) | 当前实际覆盖、旧能力差异和剩余接合门 |
 | [v2 设计基线](./docs/design/v2/README.md) | 已确定的目标设计、实现差异和采用前提 |
+| [JSON 结构声明与战役建库](./docs/design/v2/storage-schema-and-planning.md) | 有限声明格式、依赖闭包、确定性计划、示例、初始化与结构恢复 |
+| [存储数据覆盖与替换路线](./docs/design/v2/storage-data-map-and-rollout.md) | 当前表组/领域/所有者映射、公共接口、配置切换、实施步骤与验收 |
 | [Agent 项目上下文](./docs/agent-context.md) | 新会话使用的精简项目地图和权威资料索引 |
 | [架构](./docs/architecture.md) | 产品范围、组件、事务与信任边界 |
 | [规则数据库分离设计](./docs/rule-database-separation.md) | 当前存储、双 schema 职责及 v2 采用边界 |

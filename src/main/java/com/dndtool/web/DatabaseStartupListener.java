@@ -27,6 +27,10 @@ public final class DatabaseStartupListener implements ServletContextListener {
     @Override
     public void contextInitialized(ServletContextEvent event) {
         ServletContext context = event.getServletContext();
+        if (StorageApplicationListener.enabled(context)) {
+            context.log("Current campaign application uses private storage readiness.");
+            return;
+        }
         DatabaseSchemaStatus status = diagnostics.get();
         context.setAttribute(STATUS_ATTRIBUTE, status);
 

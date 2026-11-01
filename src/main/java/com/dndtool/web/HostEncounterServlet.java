@@ -29,6 +29,7 @@ public final class HostEncounterServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         if (initializer != null) return;
+        if (StorageApplicationListener.skipLegacyInitialization(this)) return;
         try {
             Object resource = InitialContext.doLookup("java:comp/env/jdbc/DndToolSE");
             if (!(resource instanceof DataSource dataSource)) throw new NamingException();

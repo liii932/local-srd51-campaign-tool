@@ -1,0 +1,816 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.common"
+    },
+    "display_name": "Common",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.dwarvish"
+    },
+    "display_name": "Dwarvish",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.elvish"
+    },
+    "display_name": "Elvish",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.giant"
+    },
+    "display_name": "Giant",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.gnomish"
+    },
+    "display_name": "Gnomish",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.goblin"
+    },
+    "display_name": "Goblin",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.halfling"
+    },
+    "display_name": "Halfling",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.orc"
+    },
+    "display_name": "Orc",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "STANDARD"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.abyssal"
+    },
+    "display_name": "Abyssal",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.celestial"
+    },
+    "display_name": "Celestial",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.draconic"
+    },
+    "display_name": "Draconic",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.deep_speech"
+    },
+    "display_name": "Deep Speech",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.infernal"
+    },
+    "display_name": "Infernal",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.primordial"
+    },
+    "display_name": "Primordial",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.sylvan"
+    },
+    "display_name": "Sylvan",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.undercommon"
+    },
+    "display_name": "Undercommon",
+    "description": "SRD language catalog; exotic languages require DM permission.",
+    "source_page": 59,
+    "category": "EXOTIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "catalog.language_set",
+      "rule_key": "language_set.standard"
+    },
+    "display_name": "Standard languages",
+    "minimum_enabled_members": 8
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.smith_tools"
+    },
+    "display_name": "Smith’s tools",
+    "description": "Artisan tool proficiency; a bounded tool check requires the matching equipped tool.",
+    "source_page": 70,
+    "category": "ARTISAN"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.brewer_supplies"
+    },
+    "display_name": "Brewer’s supplies",
+    "description": "Artisan tool proficiency; a bounded tool check requires the matching equipped tool.",
+    "source_page": 70,
+    "category": "ARTISAN"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.mason_tools"
+    },
+    "display_name": "Mason’s tools",
+    "description": "Artisan tool proficiency; a bounded tool check requires the matching equipped tool.",
+    "source_page": 70,
+    "category": "ARTISAN"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "catalog.tool_set",
+      "rule_key": "tool_set.dwarven"
+    },
+    "display_name": "Dwarven artisan tools",
+    "minimum_enabled_members": 3
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.race",
+      "rule_key": "race.human"
+    },
+    "display_name": "Human (language and walking speed)",
+    "description": "Only Common, one standard language choice and 30-foot walking speed execute. Racial ability increases and other racial traits are outside this bounded application.",
+    "source_page": 5
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.race",
+      "rule_key": "race.dwarf"
+    },
+    "display_name": "Dwarf (language and artisan tool training)",
+    "description": "Only Common, Dwarvish, artisan tool choice and 25-foot walking speed execute. Racial ability increases, poison defenses and heavy-armor speed exception are unsupported metadata.",
+    "source_page": 3
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.background",
+      "rule_key": "background.acolyte"
+    },
+    "display_name": "Acolyte (language sources)",
+    "description": "Two standard language choices execute. Insight, Religion, starting equipment and Shelter of the Faithful remain descriptive; the current initial-source consumer grants only languages and tools.",
+    "source_page": 61
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.background",
+      "rule_key": "background.custom_artisan"
+    },
+    "display_name": "Custom background: artisan training",
+    "description": "A DM-authored example of customizing a background: Dwarvish and smith’s tools. Background skill and narrative feature choices are outside this bounded initial-source consumer.",
+    "source_page": 60,
+    "author_note": "This is a project-authored customization, not a claim that SRD publishes a complete Artisan background."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.acrobatics"
+    },
+    "display_name": "Acrobatics",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.dexterity",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.animal_handling"
+    },
+    "display_name": "Animal Handling",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.wisdom",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.arcana"
+    },
+    "display_name": "Arcana",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.intelligence",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.athletics"
+    },
+    "display_name": "Athletics",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.strength",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.deception"
+    },
+    "display_name": "Deception",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.charisma",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.history"
+    },
+    "display_name": "History",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.intelligence",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.insight"
+    },
+    "display_name": "Insight",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.wisdom",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.intimidation"
+    },
+    "display_name": "Intimidation",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.charisma",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.investigation"
+    },
+    "display_name": "Investigation",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.intelligence",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.medicine"
+    },
+    "display_name": "Medicine",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.wisdom",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.nature"
+    },
+    "display_name": "Nature",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.intelligence",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.perception"
+    },
+    "display_name": "Perception",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.wisdom",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.performance"
+    },
+    "display_name": "Performance",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.charisma",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.persuasion"
+    },
+    "display_name": "Persuasion",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.charisma",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.religion"
+    },
+    "display_name": "Religion",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.intelligence",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.sleight_of_hand"
+    },
+    "display_name": "Sleight Of Hand",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.dexterity",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.stealth"
+    },
+    "display_name": "Stealth",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.dexterity",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.survival"
+    },
+    "display_name": "Survival",
+    "description": "Ordinary skill proficiency. The check consumer applies the mapped ability and proficiency bonus once.",
+    "source_page": 56,
+    "category": "SKILL",
+    "ability_key": "ability.wisdom",
+    "author_note": "The schema-2 proficiency source-page field is bounded to the character chapter. Page 56 supplies advancement proficiency; the skill/ability mapping is in SRD pages 78–85."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.save.strength"
+    },
+    "display_name": "Strength saving throw",
+    "description": "Saving throw proficiency for the exact ability; actual starting save training is declared in each class source.",
+    "source_page": 56,
+    "category": "SAVING_THROW",
+    "ability_key": "ability.strength"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.save.dexterity"
+    },
+    "display_name": "Dexterity saving throw",
+    "description": "Saving throw proficiency for the exact ability; actual starting save training is declared in each class source.",
+    "source_page": 56,
+    "category": "SAVING_THROW",
+    "ability_key": "ability.dexterity"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.save.constitution"
+    },
+    "display_name": "Constitution saving throw",
+    "description": "Saving throw proficiency for the exact ability; actual starting save training is declared in each class source.",
+    "source_page": 56,
+    "category": "SAVING_THROW",
+    "ability_key": "ability.constitution"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.save.intelligence"
+    },
+    "display_name": "Intelligence saving throw",
+    "description": "Saving throw proficiency for the exact ability; actual starting save training is declared in each class source.",
+    "source_page": 56,
+    "category": "SAVING_THROW",
+    "ability_key": "ability.intelligence"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.save.wisdom"
+    },
+    "display_name": "Wisdom saving throw",
+    "description": "Saving throw proficiency for the exact ability; actual starting save training is declared in each class source.",
+    "source_page": 56,
+    "category": "SAVING_THROW",
+    "ability_key": "ability.wisdom"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.save.charisma"
+    },
+    "display_name": "Charisma saving throw",
+    "description": "Saving throw proficiency for the exact ability; actual starting save training is declared in each class source.",
+    "source_page": 56,
+    "category": "SAVING_THROW",
+    "ability_key": "ability.charisma"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.light"
+    },
+    "display_name": "Light armor proficiency",
+    "description": "Proficiency with this armor category; shield is a separate category.",
+    "source_page": 63,
+    "category": "ARMOR"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.medium"
+    },
+    "display_name": "Medium armor proficiency",
+    "description": "Proficiency with this armor category; shield is a separate category.",
+    "source_page": 63,
+    "category": "ARMOR"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.heavy"
+    },
+    "display_name": "Heavy armor proficiency",
+    "description": "Proficiency with this armor category; shield is a separate category.",
+    "source_page": 63,
+    "category": "ARMOR"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.shield"
+    },
+    "display_name": "Shield armor proficiency",
+    "description": "Proficiency with this armor category; shield is a separate category.",
+    "source_page": 63,
+    "category": "ARMOR"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.rapier"
+    },
+    "display_name": "Rapier proficiency",
+    "description": "Specific weapon proficiency selected from the supported class weapon categories.",
+    "source_page": 65,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.longsword"
+    },
+    "display_name": "Longsword proficiency",
+    "description": "Specific weapon proficiency selected from the supported class weapon categories.",
+    "source_page": 65,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.greatsword"
+    },
+    "display_name": "Greatsword proficiency",
+    "description": "Specific weapon proficiency selected from the supported class weapon categories.",
+    "source_page": 65,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.mace"
+    },
+    "display_name": "Mace proficiency",
+    "description": "Specific weapon proficiency selected from the supported class weapon categories.",
+    "source_page": 65,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.dagger"
+    },
+    "display_name": "Dagger proficiency",
+    "description": "Specific weapon proficiency selected from the supported class weapon categories.",
+    "source_page": 65,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "catalog.proficiency_set",
+      "rule_key": "proficiency_set.fighter_skills"
+    },
+    "display_name": "Fighter skill candidates",
+    "category": "SKILL",
+    "minimum_enabled_members": 8
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "catalog.proficiency_set",
+      "rule_key": "proficiency_set.cleric_skills"
+    },
+    "display_name": "Cleric skill candidates",
+    "category": "SKILL",
+    "minimum_enabled_members": 5
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "catalog.proficiency_set",
+      "rule_key": "proficiency_set.wizard_skills"
+    },
+    "display_name": "Wizard skill candidates",
+    "category": "SKILL",
+    "minimum_enabled_members": 6
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "adventure.rest",
+      "rule_key": "rest.srd2014"
+    },
+    "display_name": "Short and long rests",
+    "description": "Actual rest activity, duration, interruptions, hit dice and resource recovery.",
+    "source_page": 87,
+    "algorithm": "SRD_2014_REST_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.movement",
+      "rule_key": "movement.human"
+    },
+    "display_name": "Human walking speed",
+    "description": "Base walking speed only; special racial movement exceptions are unsupported.",
+    "source_page": 5,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.race",
+      "rule_key": "race.human"
+    },
+    "walk_speed_feet": 30,
+    "algorithm": "SRD_2014_WALKING_SPEED_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.movement",
+      "rule_key": "movement.dwarf"
+    },
+    "display_name": "Dwarf walking speed",
+    "description": "Base walking speed only; special racial movement exceptions are unsupported.",
+    "source_page": 3,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.race",
+      "rule_key": "race.dwarf"
+    },
+    "walk_speed_feet": 25,
+    "algorithm": "SRD_2014_WALKING_SPEED_V1"
+  }
+]

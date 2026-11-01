@@ -1,0 +1,969 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "display_name": "Fighter (bounded application)",
+    "description": "Current finite class source. HP, class skill/save training and the explicitly registered mechanisms execute; this is not a complete SRD class. Unimplemented class/subclass features remain catalog-only OPTION metadata and are not acquired.",
+    "source_page": 24
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class_progression",
+      "rule_key": "progression.fighter"
+    },
+    "display_name": "Fighter bounded advancement",
+    "description": "Complete bounded growth declarations for the supported level range; unsupported class feature effects remain BLOCKED.",
+    "source_page": 24,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "hit_die_sides": 10,
+    "proficiency_bonus_profile": "1-4:2,5-8:3,9-12:4,13-16:5,17-20:6",
+    "supported_maximum_level": 6,
+    "advancement_scope": "CHARACTER_ADVANCEMENT",
+    "multiclass_prerequisite": {
+      "all_of": [
+        {
+          "any_of": [
+            {
+              "ability": "ability.strength",
+              "minimum": 13
+            },
+            {
+              "ability": "ability.dexterity",
+              "minimum": 13
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.cleric"
+    },
+    "display_name": "Cleric (bounded application)",
+    "description": "Current finite class source. HP, class skill/save training and the explicitly registered mechanisms execute; this is not a complete SRD class.",
+    "source_page": 15
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class_progression",
+      "rule_key": "progression.cleric"
+    },
+    "display_name": "Cleric bounded advancement",
+    "description": "Complete bounded growth declarations for the supported level range; unsupported class feature effects remain BLOCKED.",
+    "source_page": 15,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.cleric"
+    },
+    "hit_die_sides": 8,
+    "proficiency_bonus_profile": "1-4:2,5-8:3,9-12:4,13-16:5,17-20:6",
+    "supported_maximum_level": 1,
+    "advancement_scope": "CHARACTER_ADVANCEMENT",
+    "multiclass_prerequisite": {
+      "all_of": [
+        {
+          "any_of": [
+            {
+              "ability": "ability.wisdom",
+              "minimum": 13
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "display_name": "Wizard (bounded application)",
+    "description": "Current finite class source. HP, class skill/save training and the explicitly registered mechanisms execute; this is not a complete SRD class. Unimplemented class/subclass features remain catalog-only OPTION metadata and are not acquired.",
+    "source_page": 52
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class_progression",
+      "rule_key": "progression.wizard"
+    },
+    "display_name": "Wizard bounded advancement",
+    "description": "Complete bounded growth declarations for the supported level range; unsupported class feature effects remain BLOCKED.",
+    "source_page": 52,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "hit_die_sides": 6,
+    "proficiency_bonus_profile": "1-4:2,5-8:3,9-12:4,13-16:5,17-20:6",
+    "supported_maximum_level": 5,
+    "advancement_scope": "CHARACTER_ADVANCEMENT",
+    "multiclass_prerequisite": {
+      "all_of": [
+        {
+          "any_of": [
+            {
+              "ability": "ability.intelligence",
+              "minimum": 13
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.champion"
+    },
+    "display_name": "Champion",
+    "description": "Only the explicitly listed feature algorithms execute; acquisition is distinct from feature effect execution.",
+    "source_page": 25,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "selection_level": 3
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.life"
+    },
+    "display_name": "Life Domain",
+    "description": "Only the explicitly listed feature algorithms execute; acquisition is distinct from feature effect execution.",
+    "source_page": 17,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.cleric"
+    },
+    "selection_level": 1
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.evocation"
+    },
+    "display_name": "Evocation",
+    "description": "Only the explicitly listed feature algorithms execute; acquisition is distinct from feature effect execution.",
+    "source_page": 54,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "selection_level": 2
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.fighter_fighting_style"
+    },
+    "display_name": "Fighting Style",
+    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "source_page": 24,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "level": 1,
+    "feature_kind": "OPTION",
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.fighter_second_wind"
+    },
+    "display_name": "Second Wind",
+    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "source_page": 24,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "level": 1,
+    "feature_kind": "OPTION",
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.fighter_action_surge"
+    },
+    "display_name": "Action Surge",
+    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "source_page": 25,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "level": 2,
+    "feature_kind": "OPTION",
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.fighter_extra_attack"
+    },
+    "display_name": "Extra Attack",
+    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "source_page": 25,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "level": 5,
+    "feature_kind": "OPTION",
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.champion_improved_critical"
+    },
+    "display_name": "Improved Critical",
+    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "source_page": 25,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.champion"
+    },
+    "level": 3,
+    "feature_kind": "OPTION",
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.life_domain_spellcasting"
+    },
+    "display_name": "Life domain spells and Disciple of Life",
+    "description": "Always-prepared Bless and Cure Wounds; the bounded life-domain consumer includes Disciple of Life healing and heavy armor is declared in this class’s initial training.",
+    "source_page": 17,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.life"
+    },
+    "level": 1,
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "LIFE_DOMAIN_LEVEL1_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.wizard_spellcasting"
+    },
+    "display_name": "Wizard Spellcasting",
+    "description": "Bounded spellbook, learning, preparation and supported first- through third-rank slot resources.",
+    "source_page": 53,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "level": 1,
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_WIZARD_SPELLCASTING_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.fighter.second_wind"
+    },
+    "display_name": "Fighter Second_Wind",
+    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "source_page": 24,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "maximum_profile": "1-20:1",
+    "recovery_profile": "1-20:SHORT_REST",
+    "execution_mode": "AUTOMATIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.fighter.action_surge"
+    },
+    "display_name": "Fighter Action_Surge",
+    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "source_page": 25,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.fighter"
+    },
+    "maximum_profile": "2-16:1,17-20:2",
+    "recovery_profile": "1-20:SHORT_REST",
+    "execution_mode": "AUTOMATIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.cleric.slot1"
+    },
+    "display_name": "Cleric Slot1",
+    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "source_page": 15,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.cleric"
+    },
+    "maximum_profile": "1-20:2",
+    "recovery_profile": "1-20:LONG_REST",
+    "execution_mode": "AUTOMATIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.wizard.slot1"
+    },
+    "display_name": "Wizard Slot1",
+    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "source_page": 52,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "maximum_profile": "1:2,2:3,3-20:4",
+    "recovery_profile": "1-20:LONG_REST",
+    "execution_mode": "AUTOMATIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.wizard.slot2"
+    },
+    "display_name": "Wizard Slot2",
+    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "source_page": 52,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "maximum_profile": "3:2,4-20:3",
+    "recovery_profile": "1-20:LONG_REST",
+    "execution_mode": "AUTOMATIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.wizard.slot3"
+    },
+    "display_name": "Wizard Slot3",
+    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "source_page": 52,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "maximum_profile": "5:2,6-20:3",
+    "recovery_profile": "1-20:LONG_REST",
+    "execution_mode": "AUTOMATIC"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feat",
+      "rule_key": "feat.grappler"
+    },
+    "display_name": "Grappler (acquisition metadata)",
+    "description": "Strength 13 prerequisite and acquisition only; grappling feature effects are unavailable.",
+    "source_page": 58,
+    "prerequisite": {
+      "all_of": [
+        {
+          "any_of": [
+            {
+              "ability": "ability.strength",
+              "minimum": 13
+            }
+          ]
+        }
+      ]
+    },
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "display_name": "Ability checks",
+    "description": "Server-owned ordinary ability, skill and equipped-tool checks.",
+    "source_page": 77,
+    "algorithm": "SRD_2014_ABILITY_CHECK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "adventure.health",
+      "rule_key": "health.srd2014"
+    },
+    "display_name": "Hit points and death saves",
+    "description": "Registered HP, temporary HP, damage and bounded death-save mechanisms.",
+    "source_page": 98,
+    "algorithm": "SRD_2014_HEALTH_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "adventure.combat",
+      "rule_key": "combat.standard"
+    },
+    "display_name": "Ordinary combat",
+    "description": "Registered ordinary combat actions, movement, initiative and reaction continuation.",
+    "source_page": 91,
+    "algorithm": "SRD_2014_COMBAT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.leather"
+    },
+    "display_name": "Leather armor",
+    "description": "SRD armor values; armor category governs Dexterity contribution and proficiency consequences.",
+    "source_page": 64,
+    "kind": "LIGHT_ARMOR",
+    "armor_class": 11,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 0,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.light"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.scale_mail"
+    },
+    "display_name": "Scale mail",
+    "description": "SRD armor values; armor category governs Dexterity contribution and proficiency consequences.",
+    "source_page": 64,
+    "kind": "MEDIUM_ARMOR",
+    "armor_class": 14,
+    "strength_minimum": 0,
+    "stealth_disadvantage": true,
+    "hands": 0,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.medium"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "stealth_skill": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.stealth"
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.chain_mail"
+    },
+    "display_name": "Chain mail",
+    "description": "SRD armor values; armor category governs Dexterity contribution and proficiency consequences.",
+    "source_page": 64,
+    "kind": "HEAVY_ARMOR",
+    "armor_class": 16,
+    "strength_minimum": 13,
+    "stealth_disadvantage": true,
+    "hands": 0,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.heavy"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "stealth_skill": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.stealth"
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.plate"
+    },
+    "display_name": "Plate armor",
+    "description": "SRD armor values; armor category governs Dexterity contribution and proficiency consequences.",
+    "source_page": 64,
+    "kind": "HEAVY_ARMOR",
+    "armor_class": 18,
+    "strength_minimum": 15,
+    "stealth_disadvantage": true,
+    "hands": 0,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.heavy"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1",
+    "stealth_skill": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.stealth"
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.shield"
+    },
+    "display_name": "Shield",
+    "description": "SRD armor values; armor category governs Dexterity contribution and proficiency consequences.",
+    "source_page": 64,
+    "kind": "SHIELD",
+    "armor_class": 2,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.armor.shield"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.rapier"
+    },
+    "display_name": "Rapier",
+    "description": "Ordinary melee use only. Versatile two-hand damage, thrown use and other unregistered weapon properties are unavailable.",
+    "source_page": 66,
+    "kind": "WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.rapier"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.rapier"
+    },
+    "display_name": "Rapier ordinary melee attack",
+    "description": "One ordinary melee attack using the equipped weapon. Unsupported class features do not modify this profile.",
+    "source_page": 66,
+    "item": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.rapier"
+    },
+    "ability_policy": "FINESSE",
+    "dice_count": 1,
+    "dice_sides": 8,
+    "damage_type": "PIERCING",
+    "reach_feet": 5,
+    "algorithm": "SRD_2014_MELEE_WEAPON_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.longsword"
+    },
+    "display_name": "Longsword",
+    "description": "Ordinary melee use only. Versatile two-hand damage, thrown use and other unregistered weapon properties are unavailable.",
+    "source_page": 66,
+    "kind": "WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.longsword"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.longsword"
+    },
+    "display_name": "Longsword ordinary melee attack",
+    "description": "One ordinary melee attack using the equipped weapon. Unsupported class features do not modify this profile.",
+    "source_page": 66,
+    "item": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.longsword"
+    },
+    "ability_policy": "STRENGTH",
+    "dice_count": 1,
+    "dice_sides": 8,
+    "damage_type": "SLASHING",
+    "reach_feet": 5,
+    "algorithm": "SRD_2014_MELEE_WEAPON_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.greatsword"
+    },
+    "display_name": "Greatsword",
+    "description": "Ordinary melee use only. Versatile two-hand damage, thrown use and other unregistered weapon properties are unavailable.",
+    "source_page": 66,
+    "kind": "WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 2,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.greatsword"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.greatsword"
+    },
+    "display_name": "Greatsword ordinary melee attack",
+    "description": "One ordinary melee attack using the equipped weapon. Unsupported class features do not modify this profile.",
+    "source_page": 66,
+    "item": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.greatsword"
+    },
+    "ability_policy": "STRENGTH",
+    "dice_count": 2,
+    "dice_sides": 6,
+    "damage_type": "SLASHING",
+    "reach_feet": 5,
+    "algorithm": "SRD_2014_MELEE_WEAPON_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.mace"
+    },
+    "display_name": "Mace",
+    "description": "Ordinary melee use only. Versatile two-hand damage, thrown use and other unregistered weapon properties are unavailable.",
+    "source_page": 66,
+    "kind": "WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.mace"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.mace"
+    },
+    "display_name": "Mace ordinary melee attack",
+    "description": "One ordinary melee attack using the equipped weapon. Unsupported class features do not modify this profile.",
+    "source_page": 66,
+    "item": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.mace"
+    },
+    "ability_policy": "STRENGTH",
+    "dice_count": 1,
+    "dice_sides": 6,
+    "damage_type": "BLUDGEONING",
+    "reach_feet": 5,
+    "algorithm": "SRD_2014_MELEE_WEAPON_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.dagger"
+    },
+    "display_name": "Dagger",
+    "description": "Ordinary melee use only. Versatile two-hand damage, thrown use and other unregistered weapon properties are unavailable.",
+    "source_page": 66,
+    "kind": "WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.dagger"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.dagger"
+    },
+    "display_name": "Dagger ordinary melee attack",
+    "description": "One ordinary melee attack using the equipped weapon. Unsupported class features do not modify this profile.",
+    "source_page": 66,
+    "item": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.dagger"
+    },
+    "ability_policy": "FINESSE",
+    "dice_count": 1,
+    "dice_sides": 4,
+    "damage_type": "PIERCING",
+    "reach_feet": 5,
+    "algorithm": "SRD_2014_MELEE_WEAPON_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.holy_symbol"
+    },
+    "display_name": "Holy symbol",
+    "description": "A held one-hand holy symbol for the bounded Life-domain material component consumer.",
+    "source_page": 70,
+    "kind": "HOLY_SYMBOL",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.smith_tools"
+    },
+    "display_name": "Smith Tools",
+    "description": "Artisan tool item for the matching equipped-tool check; the one-hand location is this application’s preparation abstraction.",
+    "source_page": 70,
+    "kind": "TOOL",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.smith_tools"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.brewer_supplies"
+    },
+    "display_name": "Brewer Supplies",
+    "description": "Artisan tool item for the matching equipped-tool check; the one-hand location is this application’s preparation abstraction.",
+    "source_page": 70,
+    "kind": "TOOL",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.brewer_supplies"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.mason_tools"
+    },
+    "display_name": "Mason Tools",
+    "description": "Artisan tool item for the matching equipped-tool check; the one-hand location is this application’s preparation abstraction.",
+    "source_page": 70,
+    "kind": "TOOL",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.mason_tools"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  }
+]

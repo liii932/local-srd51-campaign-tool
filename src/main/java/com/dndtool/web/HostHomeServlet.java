@@ -37,6 +37,7 @@ public final class HostHomeServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         if (operations != null) return;
+        if (StorageApplicationListener.skipLegacyInitialization(this)) return;
         try {
             Object resource = InitialContext.doLookup(JNDI_NAME);
             if (!(resource instanceof DataSource dataSource)) {
@@ -54,6 +55,12 @@ public final class HostHomeServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        if (StorageApplicationListener.enabled(request.getServletContext())) {
+            response.setStatus(HttpServletResponse.SC_SEE_OTHER);
+            response.setHeader("Location", request.getContextPath() + "/host/storage");
+            response.setHeader("Cache-Control", "no-store");
+            return;
+        }
         try {
             HostOverviewService.Result result = operations.load();
             request.setAttribute(OVERVIEW_STATUS_ATTRIBUTE, result.status().name());

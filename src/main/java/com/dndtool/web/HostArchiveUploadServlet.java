@@ -43,6 +43,7 @@ public final class HostArchiveUploadServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         if (validator != null) return;
+        if (StorageApplicationListener.skipLegacyInitialization(this)) return;
         try {
             Object resource = InitialContext.doLookup(JNDI_NAME);
             if (!(resource instanceof DataSource dataSource)) {

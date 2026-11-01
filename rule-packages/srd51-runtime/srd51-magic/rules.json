@@ -1,0 +1,637 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "character.feature",
+      "rule_key": "feature.wizard_arcane_recovery"
+    },
+    "display_name": "Arcane Recovery",
+    "description": "Once per day after a short rest recover slots with combined levels at most half wizard level rounded up; no sixth-rank or higher slots.",
+    "source_page": 53,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "level": 1,
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_WIZARD_ARCANE_RECOVERY_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "character.feature",
+      "rule_key": "feature.evocation_savant"
+    },
+    "display_name": "Evocation Savant",
+    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "source_page": 54,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.evocation"
+    },
+    "level": 2,
+    "feature_kind": "OPTION",
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "character.feature",
+      "rule_key": "feature.sculpt_spells"
+    },
+    "display_name": "Sculpt Spells",
+    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "source_page": 54,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.evocation"
+    },
+    "level": 2,
+    "feature_kind": "OPTION",
+    "execution_mode": "BLOCKED",
+    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.bless"
+    },
+    "display_name": "Bless",
+    "description": "Only the registered bounded spell consumer executes; refer to its runtime preconditions and target limits.",
+    "source_page": 122,
+    "algorithm": "SRD_2014_BLESS_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.cure_wounds"
+    },
+    "display_name": "Cure Wounds",
+    "description": "Only the registered bounded spell consumer executes; refer to its runtime preconditions and target limits.",
+    "source_page": 132,
+    "algorithm": "SRD_2014_CURE_WOUNDS_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.shield"
+    },
+    "display_name": "Shield",
+    "description": "Only the registered bounded spell consumer executes; refer to its runtime preconditions and target limits.",
+    "source_page": 179,
+    "algorithm": "SRD_2014_SHIELD_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.counterspell"
+    },
+    "display_name": "Counterspell",
+    "description": "Only the registered bounded spell consumer executes; refer to its runtime preconditions and target limits.",
+    "source_page": 131,
+    "algorithm": "SRD_2014_COUNTERSPELL_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.burning_hands"
+    },
+    "display_name": "Burning Hands",
+    "description": "Only the registered bounded spell consumer executes; refer to its runtime preconditions and target limits.",
+    "source_page": 123,
+    "algorithm": "SRD_2014_BURNING_HANDS_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.alarm"
+    },
+    "display_name": "Alarm (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 114,
+    "algorithm": "SRD_2014_ALARM_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.charm_person"
+    },
+    "display_name": "Charm Person (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 124,
+    "algorithm": "SRD_2014_CHARM_PERSON_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.color_spray"
+    },
+    "display_name": "Color Spray (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 125,
+    "algorithm": "SRD_2014_COLOR_SPRAY_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.comprehend_languages"
+    },
+    "display_name": "Comprehend Languages (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 126,
+    "algorithm": "SRD_2014_COMPREHEND_LANGUAGES_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.detect_magic"
+    },
+    "display_name": "Detect Magic (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 134,
+    "algorithm": "SRD_2014_DETECT_MAGIC_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.disguise_self"
+    },
+    "display_name": "Disguise Self (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 135,
+    "algorithm": "SRD_2014_DISGUISE_SELF_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.expeditious_retreat"
+    },
+    "display_name": "Expeditious Retreat (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 141,
+    "algorithm": "SRD_2014_EXPEDITIOUS_RETREAT_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.false_life"
+    },
+    "display_name": "False Life (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 142,
+    "algorithm": "SRD_2014_FALSE_LIFE_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.feather_fall"
+    },
+    "display_name": "Feather Fall (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 142,
+    "algorithm": "SRD_2014_FEATHER_FALL_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.find_familiar"
+    },
+    "display_name": "Find Familiar (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 143,
+    "algorithm": "SRD_2014_FIND_FAMILIAR_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.fog_cloud"
+    },
+    "display_name": "Fog Cloud (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 146,
+    "algorithm": "SRD_2014_FOG_CLOUD_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.grease"
+    },
+    "display_name": "Grease (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 150,
+    "algorithm": "SRD_2014_GREASE_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.mage_armor"
+    },
+    "display_name": "Mage Armor (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 160,
+    "algorithm": "SRD_2014_MAGE_ARMOR_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.magic_missile"
+    },
+    "display_name": "Magic Missile (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 161,
+    "algorithm": "SRD_2014_MAGIC_MISSILE_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.sleep"
+    },
+    "display_name": "Sleep (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 180,
+    "algorithm": "SRD_2014_SLEEP_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.thunderwave"
+    },
+    "display_name": "Thunderwave (metadata only)",
+    "description": "Spellbook learning and preparation metadata only. Casting this spell is unavailable and fails closed.",
+    "source_page": 187,
+    "algorithm": "SRD_2014_THUNDERWAVE_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "character.spellcasting",
+      "rule_key": "spellcasting.life_domain"
+    },
+    "display_name": "Life domain level-one casting",
+    "description": "Bounded always-prepared Bless and Cure Wounds only. No general cleric preparation, cantrips or higher-level cleric casting.",
+    "source_page": 17,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.cleric"
+    },
+    "required_subclass": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subclass",
+      "rule_key": "subclass.life"
+    },
+    "required_feature": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.life_domain_spellcasting"
+    },
+    "slot_resource": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.cleric.slot1"
+    },
+    "bless": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.bless"
+    },
+    "cure_wounds": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.cure_wounds"
+    },
+    "material_item": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.holy_symbol"
+    },
+    "ability_key": "ability.wisdom",
+    "algorithm": "LIFE_DOMAIN_LEVEL1_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "character.wizard_spellcasting",
+      "rule_key": "spellcasting.wizard"
+    },
+    "display_name": "Wizard spellbook and preparation",
+    "description": "Six initial first-level spells, two learned per wizard level, bounded preparation and supported casting. Metadata-only spells remain unavailable to cast.",
+    "source_page": 53,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "required_feature": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.wizard_spellcasting"
+    },
+    "slot_resource": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.wizard.slot1"
+    },
+    "rank2_slot_resource": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.wizard.slot2"
+    },
+    "rank3_slot_resource": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.resource",
+      "rule_key": "resource.wizard.slot3"
+    },
+    "ability_key": "ability.intelligence",
+    "algorithm": "SRD_2014_WIZARD_PREPARED_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.hell_hound"
+    },
+    "display_name": "Hell Hound",
+    "description": "Selected SRD stat block; only explicitly registered actions execute.",
+    "source_page": 321,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "FIEND",
+      "alignment": "lawful evil",
+      "armor_class": 15,
+      "armor_description": "natural armor",
+      "hit_points": 45,
+      "hit_dice_count": 7,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 14,
+      "walk_speed_feet": 50,
+      "abilities": {
+        "strength": 17,
+        "dexterity": 12,
+        "constitution": 14,
+        "intelligence": 6,
+        "wisdom": 13,
+        "charisma": 6
+      },
+      "saving_throws": [],
+      "skills": [
+        {
+          "skill_key": "skill.perception",
+          "bonus": 5
+        }
+      ],
+      "damage_defenses": [
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "FIRE",
+          "qualifier": "ALL"
+        }
+      ],
+      "condition_immunities": [],
+      "darkvision_feet": 60,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 15,
+      "languages": [
+        {
+          "name": "Infernal",
+          "understands": true,
+          "speaks": false
+        }
+      ],
+      "challenge_numerator": 3,
+      "challenge_denominator": 1,
+      "experience_points": 700,
+      "traits": [
+        {
+          "key": "keen_hearing_and_smell",
+          "display_name": "Keen Hearing and Smell",
+          "description": "Advantage on hearing- or smell-dependent Wisdom (Perception) checks.",
+          "scope": "PERCEPTION_HEARING_SMELL_ONLY"
+        },
+        {
+          "key": "pack_tactics",
+          "display_name": "Pack Tactics",
+          "description": "Advantage on an attack if a non-incapacitated ally is within 5 feet of the target.",
+          "scope": "ATTACK_ROLL_PACK_TACTICS_ONLY"
+        }
+      ]
+    },
+    "author_note": "Only Hell Hound Fire Breath is executable. The other action descriptions are metadata, never an attack or condition-effect implementation."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.mummy"
+    },
+    "display_name": "Mummy",
+    "description": "Selected SRD stat block; only explicitly registered actions execute.",
+    "source_page": 333,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "UNDEAD",
+      "alignment": "lawful evil",
+      "armor_class": 11,
+      "armor_description": "natural armor",
+      "hit_points": 58,
+      "hit_dice_count": 9,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 18,
+      "walk_speed_feet": 20,
+      "abilities": {
+        "strength": 16,
+        "dexterity": 8,
+        "constitution": 15,
+        "intelligence": 6,
+        "wisdom": 10,
+        "charisma": 12
+      },
+      "saving_throws": [
+        {
+          "ability_key": "ability.wisdom",
+          "bonus": 2
+        }
+      ],
+      "skills": [],
+      "damage_defenses": [
+        {
+          "kind": "VULNERABILITY",
+          "damage_type": "FIRE",
+          "qualifier": "ALL"
+        },
+        {
+          "kind": "RESISTANCE",
+          "damage_type": "BLUDGEONING",
+          "qualifier": "NONMAGICAL_ATTACKS"
+        },
+        {
+          "kind": "RESISTANCE",
+          "damage_type": "PIERCING",
+          "qualifier": "NONMAGICAL_ATTACKS"
+        },
+        {
+          "kind": "RESISTANCE",
+          "damage_type": "SLASHING",
+          "qualifier": "NONMAGICAL_ATTACKS"
+        },
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "NECROTIC",
+          "qualifier": "ALL"
+        },
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "POISON",
+          "qualifier": "ALL"
+        }
+      ],
+      "condition_immunities": [
+        "charmed",
+        "exhaustion",
+        "frightened",
+        "paralyzed",
+        "poisoned"
+      ],
+      "darkvision_feet": 60,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 10,
+      "languages": [
+        {
+          "name": "The languages it knew in life",
+          "understands": true,
+          "speaks": true
+        }
+      ],
+      "challenge_numerator": 3,
+      "challenge_denominator": 1,
+      "experience_points": 700,
+      "traits": []
+    },
+    "author_note": "Only Hell Hound Fire Breath is executable. The other action descriptions are metadata, never an attack or condition-effect implementation."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.commoner"
+    },
+    "display_name": "Commoner",
+    "description": "Selected SRD stat block; only explicitly registered actions execute.",
+    "source_page": 398,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "HUMANOID",
+      "alignment": "any alignment",
+      "armor_class": 10,
+      "armor_description": "unarmored",
+      "hit_points": 4,
+      "hit_dice_count": 1,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 0,
+      "walk_speed_feet": 30,
+      "abilities": {
+        "strength": 10,
+        "dexterity": 10,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 10
+      },
+      "saving_throws": [],
+      "skills": [],
+      "damage_defenses": [],
+      "condition_immunities": [],
+      "darkvision_feet": 0,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 10,
+      "languages": [
+        {
+          "name": "Common",
+          "understands": true,
+          "speaks": true
+        }
+      ],
+      "challenge_numerator": 0,
+      "challenge_denominator": 1,
+      "experience_points": 10,
+      "traits": []
+    },
+    "author_note": "Only Hell Hound Fire Breath is executable. The other action descriptions are metadata, never an attack or condition-effect implementation."
+  }
+]

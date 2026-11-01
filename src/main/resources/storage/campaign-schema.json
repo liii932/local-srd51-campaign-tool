@@ -1,0 +1,1507 @@
+{
+  "declarationVersion": 1,
+  "applicationModel": "srd51-vitality-1",
+  "storageModel": "sqlite-vitality-1",
+  "dialect": "sqlite-strict-1",
+  "modules": [
+    {
+      "id": "core",
+      "dependsOn": [],
+      "tables": [
+        {
+          "name": "core_control",
+          "columns": [
+            {
+              "name": "singleton",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "1"
+            },
+            {
+              "name": "run_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "campaign_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 80,
+              "ascii": false
+            },
+            {
+              "name": "revision",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "epoch",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            },
+            {
+              "name": "sealed",
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "first_saved",
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "schema_digest",
+              "type": "digest256",
+              "nullable": false
+            }
+          ],
+          "primaryKey": [
+            "singleton"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "core_storage_module",
+          "columns": [
+            {
+              "name": "ordinal",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "module_id",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 63,
+              "ascii": true
+            }
+          ],
+          "primaryKey": [
+            "ordinal"
+          ],
+          "uniqueKeys": [
+            {
+              "name": "core_module_id_unique",
+              "columns": [
+                "module_id"
+              ]
+            }
+          ],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "core_command",
+          "columns": [
+            {
+              "name": "request_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "intent",
+              "type": "digest256",
+              "nullable": false
+            },
+            {
+              "name": "kind",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 30,
+              "ascii": true
+            },
+            {
+              "name": "result_revision",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            },
+            {
+              "name": "event_sequence",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            },
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "before_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0",
+              "maximum": "65535"
+            },
+            {
+              "name": "after_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0",
+              "maximum": "65535"
+            }
+          ],
+          "primaryKey": [
+            "request_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "core_save",
+          "columns": [
+            {
+              "name": "request_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "intent",
+              "type": "digest256",
+              "nullable": false
+            },
+            {
+              "name": "file_key",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "revision",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "raw_digest",
+              "type": "digest256",
+              "nullable": false
+            },
+            {
+              "name": "byte_size",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "16777216"
+            },
+            {
+              "name": "purpose",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 10,
+              "ascii": true
+            },
+            {
+              "name": "accepted",
+              "type": "boolean",
+              "nullable": false
+            }
+          ],
+          "primaryKey": [
+            "request_id"
+          ],
+          "uniqueKeys": [
+            {
+              "name": "core_save_file_unique",
+              "columns": [
+                "file_key"
+              ]
+            }
+          ],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "core_constant",
+          "columns": [
+            {
+              "name": "kind",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 30,
+              "ascii": true
+            }
+          ],
+          "primaryKey": [
+            "kind"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": [
+        {
+          "table": "core_constant",
+          "rows": [
+            {
+              "kind": "vitality-profile-1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rules",
+      "dependsOn": [
+        "core"
+      ],
+      "tables": [
+        {
+          "name": "rules_binding",
+          "columns": [
+            {
+              "name": "ordinal",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "module_id",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 80,
+              "ascii": true
+            },
+            {
+              "name": "material_digest",
+              "type": "digest256",
+              "nullable": false
+            }
+          ],
+          "primaryKey": [
+            "ordinal"
+          ],
+          "uniqueKeys": [
+            {
+              "name": "rules_module_id_unique",
+              "columns": [
+                "module_id"
+              ]
+            }
+          ],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "rules_vitality",
+          "columns": [
+            {
+              "name": "singleton",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "1"
+            },
+            {
+              "name": "algorithm",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 40,
+              "ascii": true
+            },
+            {
+              "name": "maximum_hp_limit",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            },
+            {
+              "name": "minimum_current_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "1"
+            },
+            {
+              "name": "healing_enabled",
+              "type": "boolean",
+              "nullable": false
+            }
+          ],
+          "primaryKey": [
+            "singleton"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "characters",
+      "dependsOn": [
+        "core",
+        "rules"
+      ],
+      "tables": [
+        {
+          "name": "characters_character",
+          "columns": [
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 80,
+              "ascii": false
+            },
+            {
+              "name": "maximum_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            },
+            {
+              "name": "current_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            },
+            {
+              "name": "initial_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            },
+            {
+              "name": "created_sequence",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            }
+          ],
+          "primaryKey": [
+            "character_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [
+            {
+              "name": "characters_current_le_max",
+              "expression": {
+                "op": "le",
+                "left": {
+                  "column": "current_hp"
+                },
+                "right": {
+                  "column": "maximum_hp"
+                }
+              }
+            },
+            {
+              "name": "characters_initial_le_max",
+              "expression": {
+                "op": "le",
+                "left": {
+                  "column": "initial_hp"
+                },
+                "right": {
+                  "column": "maximum_hp"
+                }
+              }
+            }
+          ],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "history",
+      "dependsOn": [
+        "characters",
+        "core"
+      ],
+      "tables": [
+        {
+          "name": "history_event",
+          "columns": [
+            {
+              "name": "sequence",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            },
+            {
+              "name": "event_type",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 20,
+              "ascii": true
+            },
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            }
+          ],
+          "primaryKey": [
+            "sequence"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "history_character_fk",
+              "columns": [
+                "character_id"
+              ],
+              "references": {
+                "table": "characters_character",
+                "columns": [
+                  "character_id"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "history_character_index",
+              "columns": [
+                "character_id"
+              ],
+              "unique": false
+            }
+          ]
+        },
+        {
+          "name": "history_character_created",
+          "columns": [
+            {
+              "name": "sequence",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 80,
+              "ascii": false
+            },
+            {
+              "name": "maximum_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            },
+            {
+              "name": "initial_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            }
+          ],
+          "primaryKey": [
+            "sequence"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "history_created_event_fk",
+              "columns": [
+                "sequence"
+              ],
+              "references": {
+                "table": "history_event",
+                "columns": [
+                  "sequence"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [
+            {
+              "name": "history_initial_le_max",
+              "expression": {
+                "op": "le",
+                "left": {
+                  "column": "initial_hp"
+                },
+                "right": {
+                  "column": "maximum_hp"
+                }
+              }
+            }
+          ],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "health",
+      "dependsOn": [
+        "history",
+        "rules",
+        "characters"
+      ],
+      "tables": [
+        {
+          "name": "health_healing",
+          "columns": [
+            {
+              "name": "sequence",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1"
+            },
+            {
+              "name": "before_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            },
+            {
+              "name": "after_hp",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "1",
+              "maximum": "65535"
+            },
+            {
+              "name": "amount",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0",
+              "maximum": "65535"
+            },
+            {
+              "name": "applied",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0",
+              "maximum": "65535"
+            }
+          ],
+          "primaryKey": [
+            "sequence"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "health_event_fk",
+              "columns": [
+                "sequence"
+              ],
+              "references": {
+                "table": "history_event",
+                "columns": [
+                  "sequence"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [
+            {
+              "name": "health_nonnegative_change",
+              "expression": {
+                "op": "ge",
+                "left": {
+                  "column": "after_hp"
+                },
+                "right": {
+                  "column": "before_hp"
+                }
+              }
+            }
+          ],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "rules-runtime",
+      "dependsOn": [
+        "rules"
+      ],
+      "tables": [
+        {
+          "name": "rules_runtime_material",
+          "columns": [
+            {
+              "name": "singleton",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "singleton"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "characters-runtime",
+      "dependsOn": [
+        "rules-runtime"
+      ],
+      "tables": [
+        {
+          "name": "characters_runtime_character",
+          "columns": [
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 80,
+              "ascii": false
+            },
+            {
+              "name": "kind",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 3,
+              "ascii": true
+            },
+            {
+              "name": "active",
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "hit_points",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "maximum_hit_points",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "character_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "characters_runtime_character_ix_0",
+              "columns": [
+                "active"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "scenes",
+      "dependsOn": [
+        "characters-runtime"
+      ],
+      "tables": [
+        {
+          "name": "scenes_world",
+          "columns": [
+            {
+              "name": "singleton",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "singleton"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "combat",
+      "dependsOn": [
+        "scenes"
+      ],
+      "tables": [
+        {
+          "name": "combat_scene",
+          "columns": [
+            {
+              "name": "combat_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "status",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 20,
+              "ascii": true
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "combat_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "combat_scene_ix_0",
+              "columns": [
+                "status"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "history-runtime",
+      "dependsOn": [
+        "characters-runtime",
+        "combat"
+      ],
+      "tables": [
+        {
+          "name": "history_runtime_root",
+          "columns": [
+            {
+              "name": "sequence",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "operation_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "kind",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 30,
+              "ascii": true
+            },
+            {
+              "name": "subject_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "sequence"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "history_runtime_root_ix_0",
+              "columns": [
+                "subject_id"
+              ],
+              "unique": false
+            },
+            {
+              "name": "history_runtime_root_ix_1",
+              "columns": [
+                "operation_id"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "resources",
+      "dependsOn": [
+        "characters-runtime"
+      ],
+      "tables": [
+        {
+          "name": "resources_character",
+          "columns": [
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "rule_key",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 256,
+              "ascii": true
+            },
+            {
+              "name": "current",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "maximum",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "unlimited",
+              "type": "boolean",
+              "nullable": false
+            }
+          ],
+          "primaryKey": [
+            "character_id",
+            "rule_key"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "resources_character_fk_0",
+              "columns": [
+                "character_id"
+              ],
+              "references": {
+                "table": "characters_runtime_character",
+                "columns": [
+                  "character_id"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "equipment",
+      "dependsOn": [
+        "characters-runtime"
+      ],
+      "tables": [
+        {
+          "name": "equipment_instance",
+          "columns": [
+            {
+              "name": "item_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "location",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 40,
+              "ascii": true
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "item_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "equipment_instance_fk_0",
+              "columns": [
+                "character_id"
+              ],
+              "references": {
+                "table": "characters_runtime_character",
+                "columns": [
+                  "character_id"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "equipment_instance_ix_0",
+              "columns": [
+                "character_id"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "spellcasting",
+      "dependsOn": [
+        "characters-runtime",
+        "resources",
+        "equipment"
+      ],
+      "tables": [
+        {
+          "name": "spellcasting_book",
+          "columns": [
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "character_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "spellcasting_book_fk_0",
+              "columns": [
+                "character_id"
+              ],
+              "references": {
+                "table": "characters_runtime_character",
+                "columns": [
+                  "character_id"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "actions",
+      "dependsOn": [
+        "combat"
+      ],
+      "tables": [
+        {
+          "name": "actions_frame",
+          "columns": [
+            {
+              "name": "frame_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "combat_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "status",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 30,
+              "ascii": true
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "frame_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "actions_frame_fk_0",
+              "columns": [
+                "combat_id"
+              ],
+              "references": {
+                "table": "combat_scene",
+                "columns": [
+                  "combat_id"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "actions_frame_ix_0",
+              "columns": [
+                "combat_id",
+                "status"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "effects",
+      "dependsOn": [
+        "combat"
+      ],
+      "tables": [
+        {
+          "name": "effects_instance",
+          "columns": [
+            {
+              "name": "effect_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "combat_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "status",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 30,
+              "ascii": true
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "effect_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "effects_instance_fk_0",
+              "columns": [
+                "combat_id"
+              ],
+              "references": {
+                "table": "combat_scene",
+                "columns": [
+                  "combat_id"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "effects_instance_ix_0",
+              "columns": [
+                "combat_id"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "monsters",
+      "dependsOn": [
+        "combat"
+      ],
+      "tables": [
+        {
+          "name": "monsters_instance",
+          "columns": [
+            {
+              "name": "monster_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "combat_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "hit_points",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "monster_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [
+            {
+              "name": "monsters_instance_fk_0",
+              "columns": [
+                "combat_id"
+              ],
+              "references": {
+                "table": "combat_scene",
+                "columns": [
+                  "combat_id"
+                ]
+              },
+              "onDelete": "NO_ACTION",
+              "onUpdate": "NO_ACTION",
+              "deferred": false
+            }
+          ],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "monsters_instance_ix_0",
+              "columns": [
+                "combat_id"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "manual",
+      "dependsOn": [
+        "scenes",
+        "characters-runtime"
+      ],
+      "tables": [
+        {
+          "name": "manual_character",
+          "columns": [
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 80,
+              "ascii": false
+            },
+            {
+              "name": "kind",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 3,
+              "ascii": true
+            },
+            {
+              "name": "active",
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "character_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "manual_character_ix_0",
+              "columns": [
+                "active"
+              ],
+              "unique": false
+            }
+          ]
+        },
+        {
+          "name": "manual_encounter",
+          "columns": [
+            {
+              "name": "encounter_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "status",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 20,
+              "ascii": true
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "encounter_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": [
+            {
+              "name": "manual_encounter_ix_0",
+              "columns": [
+                "status"
+              ],
+              "unique": false
+            }
+          ]
+        }
+      ],
+      "seeds": []
+    },
+    {
+      "id": "runtime",
+      "dependsOn": [
+        "manual",
+        "history-runtime",
+        "spellcasting",
+        "actions",
+        "effects",
+        "monsters",
+        "health"
+      ],
+      "tables": [
+        {
+          "name": "runtime_profile",
+          "columns": [
+            {
+              "name": "profile",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 40,
+              "ascii": true
+            }
+          ],
+          "primaryKey": [
+            "profile"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": [
+        {
+          "table": "runtime_profile",
+          "rows": [
+            {
+              "profile": "srd51-campaign-domains-1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
