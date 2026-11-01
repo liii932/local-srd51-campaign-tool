@@ -36,6 +36,7 @@ public final class HostCampaignCreationServlet extends HttpServlet {
         if (campaignCreator != null) {
             return;
         }
+        if (StorageApplicationListener.skipLegacyInitialization(this)) return;
         try {
             Object resource = InitialContext.doLookup(JNDI_NAME);
             if (!(resource instanceof DataSource dataSource)) {

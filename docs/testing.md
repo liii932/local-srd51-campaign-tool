@@ -478,11 +478,125 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与 V001—V042 资源；
+- 必需的新类、JSP、JavaScript、`web.xml` 与仍保留的 V001—V042 资源；
+- SQLite 结构声明、领域引擎/严格 codec/仓储、SQLite JDBC、Host 资源，以及 `storage/rules/` 下四个准确内置 ZIP；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 
+本文前述原包排除项针对离线来源包、测试向量和作者工作目录；
+`storage/rules/{srd51-runtime,srd51-characters,srd51-magic,dm-runtime-house-rules}.zip`
+是当前显式交付的有限生产资源，必须包含且逐个验证生产 reader、许可和准确内容。
+`rule-packages/` 作者源、外部导入原包及离线安装写入工具仍不得进入 WAR。
+
 WAR 审计通过不代表已经部署。
+
+### v2 JSON 结构与文件存储的替换验收
+
+当前有限 SQLite 模型见[运行合同](storage-vitality-loop.md)，逐领域覆盖与验收映射见
+[接合表](design/v2/domain-integration.md)。结构与真实 SQLite 的定向入口是
+`StorageSchemaCatalogTest`、`SqliteSchemaTest`；业务/生命周期见 `CampaignStorageServiceTest`、
+`CampaignStorageLifecycleTest`。`BundledCampaignRulesTest` 核验真实四包、精确数字、可执行初始化
+与基础/施法预检；`CampaignDomainEngineTest` 验证无连接纯领域后果；
+`CampaignCheckEffectsTest` 验证两分支全部预检、类型化有序后果和共享事务；
+`CampaignManualIntegrationTest` 覆盖自由卡字段/职业/熟练、MANUAL/SAVING_THROW、有序后果、
+混合简易遭遇、共同回滚，以及完整文件中初始/当前事实的分别保留；
+`CampaignDomainRootValidationTest` 拒绝根历史重组、未来节点引用、物品来源/归属伪造及
+中间时钟分歧；`CampaignDomainRecoveryTest` 覆盖初始化已提交、业务提交响应未知时的
+显式恢复，以及对保留导入输入的完整核验，断言不重初始化或重播；
+`CampaignDomainsIntegrationTest`、`CampaignDomainsCombatIntegrationTest` 验证共享 SQLite 的
+完整聚合、原骰/历史/未决动作与文件重开。独立基础文件字节向量和严格读取见
+`CampaignFileVectorTest`、`CampaignCodecTest`。`CampaignStorageCrashTest` 在独立 JVM 中于 DDL、初始化提交、
+业务更新/提交和 P2 后强制中止，再由新服务实例查证恢复。真实 loopback HTTP、模块选择、
+治疗、保存结束、文件重开和重启恢复见 `StorageHttpIntegrationTest`。
+测试只写临时目录，不连接 MySQL；HTTP 测试独占本机 8080，不能与人工验证实例同时运行。
+系统临时目录也必须在 Git/WAR 树外；若环境在临时根放置 `.git` 或 `WEB-INF` 标记，
+应用会拒绝其下的运行。此时为测试 JVM 指定合格的 `-Djava.io.tmpdir=/absolute/test-temp`
+（目录须已存在），保留目录保护，不删除未知标记或改动真实仓库。
+
+```bash
+python3 rule-packages/srd51-runtime/build-bundles.py --check
+mvn '-Dtest=BundledCampaignRulesTest,CampaignDomainEngineTest,CampaignCheckEffectsTest,CampaignManualIntegrationTest,CampaignDomainRootValidationTest,CampaignDomainRecoveryTest,CampaignDomainsIntegrationTest,CampaignDomainsCombatIntegrationTest,CampaignStorageLifecycleTest,StorageSchemaCatalogTest,SqliteSchemaTest,CampaignStorageServiceTest,CampaignCodecTest,CampaignFileVectorTest,CampaignStorageCrashTest,StorageHttpIntegrationTest,StorageRequestDigestTest,HostBoundaryFilterTest,HostRequestSecurityFilterTest,HostHomeServletTest,DatabaseStartupListenerTest,ProtectedHostCommandEntryTest' test
+```
+
+人工执行同一入口（Linux/WSL、Java 21+、Maven，8080 必须空闲）：
+
+```bash
+storage_test_root="$(mktemp -d /var/tmp/dnd-storage-XXXXXX)"
+bash tools/storage/run-local.sh "$storage_test_root"
+```
+
+打开 `http://127.0.0.1:8080/host/storage`。基础验收可创建 `4/12` 角色、治疗 `5`，
+预期 `9/12`，保存结束再开后状态与历史相同；只选基础模块时治疗不可用。
+runtime 验收选择全部三个应用模块，在时间零点创建规则卡 PC/NPC 队伍，执行装备/检定/
+健康及所选施法/战斗动作；创建独立自由卡，编辑基础字段、职业等级/熟练、物品，执行
+MANUAL/SAVING_THROW 和两分支有序后果，管理混合名单/阵营、队伍/实体位置及简易遭遇。
+时间零点创建限制只适用于规则卡。分别在普通提交、反应等待与效果存续时保存，结束并重开，
+核对初始/当前卡、原骰/资源、根/子历史和唯一 pending。验证下载后上传不会自动激活，
+同 fileKey 不覆盖，受引用保存点不能删除；重启必须显式恢复，坏文件/投影不得部分激活。
+Ctrl+C 仅停止这个隔离验证实例；未 END 的运行下次启动必须显式恢复。先 END，再停止
+进程，保管需要的 `saves/*.json`，最后只删除本次明确生成的测试根。脚本不部署 WAR，
+不修改现有 Tomcat；它用测试 classpath 装配同一生产 Servlet/Filter。
+
+可选浏览器自动验收使用独立安装的 Playwright/Chromium，浏览器环境需有中文字库；
+不向 Maven 或 WAR 加浏览器依赖。
+先用上面脚本启动**全新一次性根**，再在另一终端运行：
+
+```bash
+NODE_PATH=/absolute/browser-tools/node_modules \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
+node tools/storage/browser-smoke.cjs /absolute/empty/screenshots
+```
+
+脚本拒绝已有运行、残留或保存点的根。实际表单验收场景包括基础 `4/12 → 9/12`、
+保存结束重开与只选基础时关闭治疗；runtime 规则卡 PC/NPC、地点/位置/物品/消息、
+服务器检定及成功/失败分支的 HP/物品/位置/消息后果；自由卡字段/职业等级/豁免熟练、
+MANUAL 和优势豁免、有序后果、物品归档/恢复、混合简易遭遇及队伍/实体位置；规则战斗
+回合、完整文件重开后两种卡/物品/历史/战斗一致，以及下载、删除后保留原 fileKey 导入。
+脚本输出宽屏/390px 截图、横向溢出和 JavaScript/CSP 检查结果 `browser-report.json`；
+成功时所有验证运行均已结束。
+失败保留报告与测试根供检查，不递归删除未知文件。浏览器构建必须适合所用操作系统。
+
+在同一隔离应用上继续执行装备、战斗继续与生命法术验收：
+
+```bash
+NODE_PATH=/absolute/browser-tools/node_modules \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
+node tools/storage/browser-combat-smoke.cjs /absolute/empty/combat-screenshots
+```
+
+补充脚本只接受主验收留下的已结束夹具，另建规则卡战役；通过真实表单取得/装备武器、
+触发借机攻击窗口并 PASS/继续、攻击、使用 Life Cleric 的 Cure Wounds。核对服务器原骰、
+HP 和法术位共同变化，以及 FINAL 重开后事实不变。随机先攻和命中按实际结果处理，
+不通过注入固定骰子绕过生产路径。报告、截图和完整示例存档属于测试输出，不进入 WAR。
+
+WAR 另须包含 `/storage/campaign-schema.json`、四个准确规则 ZIP、严格聚合/领域引擎、
+结构/运行服务、SQLite JDBC、Host 入口和对应静态资源；不得包含测试 launcher、真实
+db/journal、保存文件或本地根。浏览器、真实 SQLite/HTTP、纯规则及故障测试分别承担
+其实际场景责任，不能互相代替。自由卡、MANUAL/SAVING_THROW、有序检定效果和简易
+遭遇由上述当前领域测试及浏览器路径共同验收，同时核对其与 schema-2 规则卡的隔离。
+周期 AUTO/轮换是容量测量后的后续能力，当前测试按每命令耐久与显式完整保存验收。
+下列是[全域实施路线](design/v2/storage-data-map-and-rollout.md)的当前完整验收责任，
+各候选以实际执行结果判断，不从测试类或本文列表推定通过、完整 SRD 发布或平台断电耐久。
+
+- 纯计划：独立字段/结构期望覆盖 JSON 严格解析、类型/默认值/键/约束、模块和外键依赖、
+  完整未来写入足迹、确定性顺序及计划摘要。拒绝材料不得分配目录、执行 DDL 或消费 RNG。
+- 引擎：使用最终选定 SQLite JDBC 在测试专有临时目录创建真实库，验证 DDL、索引、seed、
+  规则、业务、历史和收据同事务；测试外键、STRICT、精确数值/字节/Unicode、事务所有权
+  及锁争用。不得连接真实运行目录，也不用 MySQL 成功或代理 JDBC 代替引擎证据。
+- 同版恢复：分别覆盖完整回滚空库、已提交初始化、首份检查点未完成、未知结果、错误
+  模型/计划与部分结构；断言无补表、重 seed、重掷或重复授予。独占锁与一个业务/根/接受
+  事务、未知 commit/rollback 的阻断及显式新 epoch、P0—P3、END、封存/墓碑和无来源
+  MySQL 的运行按[生命周期](design/v2/runtime-and-transactions.md)作真实中断验证；不要求独立 C0。
+- 领域接合：每个现行 owner 覆盖正常/边界/坏冻结数据/版本/幂等/共同回滚，以及
+  完整文件字段和直接恢复的独立期望。不能仅对编码器与读取器的自洽往返宣称数据无遗漏。
+- 打包与模式：当前必需项包括应用结构 JSON、编译/验证类、领域消费者、四个受控内置
+  原包和 SQLite JDBC；默认 MySQL 及旧资源仍保留，只有明确退役后才移除旧适配。拒绝其他作者原包、来源维护 SQL、
+  离线写入类、真实 DB/journal/档案、配置秘密和本地材料进入 WAR；审计字节数、SHA-256、
+  条目数、必需/禁止文件及资源内容。
+
+默认按改动及共享依赖运行定向测试。完整 Host 切换改变全部持久化和事务路径，是需要
+完整回归的检查点；真实文件系统耐久/进程中断验收独立执行，不能以单元测试通过替代。
+现行 MySQL 数据库验收仍按第 3、4 节及其独立授权边界执行。
 
 ## 7. 手工验收
 

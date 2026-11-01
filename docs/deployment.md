@@ -12,7 +12,7 @@ mvn clean verify
 
 确认最终退出码为 0、测试计数完整且出现 `BUILD SUCCESS`。候选默认为 `target/dnd-tool-se-0.1.0-SNAPSHOT.war`。
 
-记录候选的字节数、SHA-256 和 ZIP 条目数。检查必需的应用类、JSP、JavaScript、`web.xml` 和 V001—V038 资源存在；检查私钥、凭据、外部 Tomcat 配置、日志、备份、真实存档、结果捕获与本地文件名不存在。还应阅读生产资源/config 差异，文件名扫描不能代替内容审计。
+记录候选的字节数、SHA-256 和 ZIP 条目数。检查必需的应用类、JSP、JavaScript、`web.xml` 和 V001—V042 资源存在；检查私钥、凭据、外部 Tomcat 配置、日志、备份、真实存档、结果捕获与本地文件名不存在。还应阅读生产资源/config 差异，文件名扫描不能代替内容审计。
 
 ## 2. 数据库前提
 
@@ -25,10 +25,30 @@ mvn clean verify
 
 V001—V018 已应用后不可修改、合并、重命名或重跑。SQL 文件存在、迁移成功、授权成功和应用启动是四种不同证据。不要把广泛 schema 权限授给运行账号。
 
-当前候选的完整运行清单为 V001—V038；须按已安装账本，在独立迁移检查点完成尚缺的前向迁移、
-核验与最小授权，再部署候选。来源链另为 V001—V010，两链共 48 份迁移源；
+当前候选的完整运行清单为 V001—V042；须按已安装账本，在独立迁移检查点完成尚缺的前向迁移、
+核验与最小授权，再部署候选。来源链另为 V001—V012，两链共 54 份迁移源；
 来源 SQL 留在 WAR 外，来源迁移与授权按[来源 schema 合同](rule-source-schema.md)另行执行。
 内部快照、战斗及有限施法不会开放完整 base、Host 初始化或 archive format 2，也不改变默认发布版。
+
+### v2 存储替换的采用检查点
+
+JSON 结构建库已用于[有限 SQLite 战役运行](storage-vitality-loop.md)，涵盖当前有限规则下的
+角色/战斗/场景和完整历史；逐领域覆盖及剩余门见[接合表](design/v2/domain-integration.md)。
+尚未把 MySQL 启动默认切到 SQLite，也未声明完整 SRD 已发布；不能据此删除当前迁移。后续替换按
+[存储路线](design/v2/storage-data-map-and-rollout.md)交付；候选需具备全域数据/文件、
+同版恢复、锁和真实文件系统证据，WAR 必需/禁止项按[测试指南](testing.md)同步更新。
+部署仍执行本指南的停机、完整备份、候选审计、可回滚替换及验收，不另设自动切换程序。
+SQLite 候选审计须包含结构 JSON、严格 codec/领域引擎、SQLite JDBC、Host 资源及
+`storage/rules/` 四个内置原包；规则作者源保留在仓库 `rule-packages/srd51-runtime/`。
+仅在满足[本地文件系统能力](configuration.md#sqlite-当前应用存储配置)的平台配置
+`DND_STORAGE_ROOT`；当前路径不证明 Windows Tomcat 已获得 POSIX 文件系统适配。
+
+切换前明确现有 MySQL 数据保管、残留和未决操作处置，备份外部配置及需要保留的数据。
+当前可选模式按[配置合同](configuration.md#v2-存储配置目标)独立装配，不要求新来源
+JNDI 或两根变量；原 MySQL 仍是默认，旧装配退役另需完整替换和真实数据保管边界。
+来源账本维护、授权与 WAR 部署分别执行。新运行库由产品新建/打开入口初始化，启动诊断不替
+用户创建战役、补表或重建旧库。部署回退还原匹配的配置，保留新模型文件与残留，不用
+旧 WAR 重新解释它们；无跨版本自动回退数据承诺。
 
 数据库操作的原则与账号边界见[数据库文档](database.md)。当前无真实业务使用时，现有
 `dnd_tool_se` 被采纳为本地开发部署运行库，但仍须先做只读盘点、停服、完整备份，并在物理隔离、
@@ -81,8 +101,9 @@ DDL 权限。它不保存 `dnd_tool_se_migrator` 凭据；Tomcat 继续使用最
 |---|---|
 | `GET http://127.0.0.1:8080/health` | `200`、UTF-8 `text/plain`、正文 `OK` |
 | `GET /` | `302`，相对定位到 `/host` |
-| `GET /host` | `200`、安全响应头、主机 Session Cookie |
-| 主机数据库诊断 | `200` 且精确识别最新迁移/规则状态 |
+| `GET /host` | MySQL 模式返回操作台；SQLite 模式进入 `/host/storage`，均有安全响应头和主机 Session |
+| `GET /api/host/storage/state` | SQLite 模式返回当前运行/残留/文件状态；不执行恢复或业务写入 |
+| 主机数据库诊断 | 仅 MySQL 模式按其合同识别迁移/规则；SQLite 模式不据此判断就绪 |
 | 错误 Host、`localhost`、`::1` | 普通 `404` |
 | `/display`、`/api/public/*` | `404` |
 

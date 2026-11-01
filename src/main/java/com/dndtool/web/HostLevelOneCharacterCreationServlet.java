@@ -38,6 +38,7 @@ public final class HostLevelOneCharacterCreationServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         if (creator != null) return;
+        if (StorageApplicationListener.skipLegacyInitialization(this)) return;
         try {
             Object resource = InitialContext.doLookup(JNDI_NAME);
             if (!(resource instanceof DataSource dataSource)) {

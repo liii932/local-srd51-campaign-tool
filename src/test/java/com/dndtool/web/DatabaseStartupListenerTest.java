@@ -27,6 +27,8 @@ final class DatabaseStartupListenerTest {
             ServletContext context = (ServletContext) Proxy.newProxyInstance(
                     ServletContext.class.getClassLoader(), new Class<?>[] {ServletContext.class},
                     (ignored, method, arguments) -> switch (method.getName()) {
+                        case "getAttribute" -> attributes.get((String) arguments[0]);
+                        case "getInitParameter" -> "";
                         case "setAttribute" -> { attributes.put((String) arguments[0], arguments[1]); yield null; }
                         case "log" -> { log.add((String) arguments[0]); yield null; }
                         default -> throw new AssertionError("Unexpected context call: " + method.getName());
@@ -43,5 +45,20 @@ final class DatabaseStartupListenerTest {
             assertEquals(Map.of("com.dndtool.persistence.databaseSchemaStatus", status), attributes);
             assertEquals(List.of("Database readiness check finished with state " + state + "."), log);
         }
+    }
+
+    @Test
+    void privateStorageModeDoesNotRunTheLegacyDatabaseDiagnostic() {
+        List<String> log = new ArrayList<>();
+        ServletContext context = (ServletContext) Proxy.newProxyInstance(
+                ServletContext.class.getClassLoader(), new Class<?>[] {ServletContext.class},
+                (ignored, method, arguments) -> switch (method.getName()) {
+                    case "getAttribute" -> StorageApplicationListener.ENABLED_ATTRIBUTE.equals(arguments[0]) ? true : null;
+                    case "log" -> { log.add((String) arguments[0]); yield null; }
+                    default -> throw new AssertionError("Unexpected context call: " + method.getName());
+                });
+        new DatabaseStartupListener(() -> { throw new AssertionError("Legacy diagnostic must remain closed"); })
+                .contextInitialized(new ServletContextEvent(context));
+        assertEquals(List.of("Current campaign application uses private storage readiness."), log);
     }
 }

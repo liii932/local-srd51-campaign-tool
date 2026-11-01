@@ -37,6 +37,7 @@ public final class HostCharacterCreationServlet extends HttpServlet {
         if (characterCreator != null) {
             return;
         }
+        if (StorageApplicationListener.skipLegacyInitialization(this)) return;
         try {
             Object resource = InitialContext.doLookup(JNDI_NAME);
             if (!(resource instanceof DataSource dataSource)) {
