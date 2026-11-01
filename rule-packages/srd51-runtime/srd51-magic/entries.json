@@ -1,0 +1,529 @@
+[
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "shield"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.shield"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "counterspell"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.counterspell"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "burning_hands"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.burning_hands"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "alarm"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.alarm"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "charm_person"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.charm_person"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "color_spray"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.color_spray"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "comprehend_languages"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.comprehend_languages"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "detect_magic"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.detect_magic"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "disguise_self"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.disguise_self"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "expeditious_retreat"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.expeditious_retreat"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "false_life"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.false_life"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "feather_fall"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.feather_fall"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "find_familiar"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.find_familiar"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "fog_cloud"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.fog_cloud"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "grease"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.grease"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "mage_armor"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.mage_armor"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "magic_missile"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.magic_missile"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "sleep"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.sleep"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.wizard_spellcasting",
+        "rule_key": "spellcasting.wizard"
+      },
+      "collection_key": "spells",
+      "module_key": "srd51_magic",
+      "entry_key": "thunderwave"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.thunderwave"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "bite"
+    },
+    "action_profile": {
+      "display_name": "Bite",
+      "description": "Metadata only: +5 melee attack, reach 5 feet; 1d8+3 piercing and 2d6 fire damage.",
+      "source_page": 322,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "fire_breath"
+    },
+    "action_profile": {
+      "display_name": "Fire Breath",
+      "description": "Recharge 5–6. Exhale fire in a 15-foot cone; DC 12 Dexterity save, 6d6 fire damage on failure, half on success.",
+      "source_page": 322,
+      "mode": "SAVE_DAMAGE_BATCH_V1",
+      "mechanism": "HELL_HOUND_FIRE_BREATH_V1",
+      "save_policy": {
+        "ability_key": "ability.dexterity",
+        "dc_mode": "FIXED_DC",
+        "dc": 12,
+        "fail_outcome": "FULL",
+        "success_outcome": "HALF"
+      },
+      "damage_profile": {
+        "dice_count": 6,
+        "dice_sides": 6,
+        "damage_type": "FIRE",
+        "delivery": "OTHER_DELIVERY",
+        "ability_modifier": "NO_ABILITY_MODIFIER"
+      },
+      "area": {
+        "shape": "CONE",
+        "length_feet": 15,
+        "origin_policy": "EXCLUDE_ORIGIN"
+      },
+      "recharge": {
+        "dice_sides": 6,
+        "minimum_roll": 5,
+        "turn_start": true,
+        "short_rest": true,
+        "long_rest": true
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.mummy"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "multiattack"
+    },
+    "action_profile": {
+      "display_name": "Multiattack",
+      "description": "Metadata only: use Dreadful Glare and make a Rotting Fist attack.",
+      "source_page": 333,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.mummy"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "rotting_fist"
+    },
+    "action_profile": {
+      "display_name": "Rotting Fist",
+      "description": "Metadata only: +5 melee attack, reach 5 feet; 2d6+3 bludgeoning and 3d6 necrotic damage, plus a DC 12 Constitution save against mummy rot. The curse and its ongoing consequences are unavailable.",
+      "source_page": 333,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.mummy"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "dreadful_glare"
+    },
+    "action_profile": {
+      "display_name": "Dreadful Glare",
+      "description": "Metadata only: visible target within 60 feet makes a DC 11 Wisdom save. Failure frightens; failure by at least 5 also paralyzes until the end of the mummy’s next turn. Success grants 24-hour immunity to ordinary mummies’ glare.",
+      "source_page": 334,
+      "mode": "BLOCKED_METADATA"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.commoner"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "club"
+    },
+    "action_profile": {
+      "display_name": "Club",
+      "description": "Metadata only: +2 melee attack, reach 5 feet; 1d4 bludgeoning damage.",
+      "source_page": 398,
+      "mode": "BLOCKED_METADATA"
+    }
+  }
+]

@@ -1,0 +1,63 @@
+[
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "dm_runtime_house_rules",
+      "rule_type": "adventure.environment",
+      "rule_key": "environment.antimagic_zone"
+    },
+    "display_name": "DM antimagic area (house rule)",
+    "description": "Project house rule: explicit DM-authored area suppressing the finite registered magic consumers. This is not the SRD Antimagic Field spell.",
+    "source_page": 0,
+    "algorithm": "DM_ANTIMAGIC_ZONE_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "dm_runtime_house_rules",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.dm_damage"
+    },
+    "display_name": "DM direct damage",
+    "description": "Project-authored fixed direct effect selected by the DM; this is not an SRD spell, class feature or magic item.",
+    "source_page": 98,
+    "kind": "DAMAGE",
+    "dice_count": 0,
+    "dice_sides": 0,
+    "modifier": 6,
+    "algorithm": "DIRECT_VITAL_EFFECT_V1",
+    "damage_type": "BLUDGEONING"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "dm_runtime_house_rules",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.dm_healing"
+    },
+    "display_name": "DM direct healing",
+    "description": "Project-authored fixed direct effect selected by the DM; this is not an SRD spell, class feature or magic item.",
+    "source_page": 98,
+    "kind": "HEALING",
+    "dice_count": 0,
+    "dice_sides": 0,
+    "modifier": 5,
+    "algorithm": "DIRECT_VITAL_EFFECT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "dm_runtime_house_rules",
+      "rule_type": "adventure.vital_effect",
+      "rule_key": "vital_effect.dm_temporary"
+    },
+    "display_name": "DM direct temporary",
+    "description": "Project-authored fixed direct effect selected by the DM; this is not an SRD spell, class feature or magic item.",
+    "source_page": 98,
+    "kind": "TEMP_HP",
+    "dice_count": 0,
+    "dice_sides": 0,
+    "modifier": 5,
+    "algorithm": "DIRECT_VITAL_EFFECT_V1"
+  }
+]

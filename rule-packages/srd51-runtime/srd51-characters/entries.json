@@ -1,0 +1,1049 @@
+[
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_1"
+    },
+    "level": 1,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_2"
+    },
+    "level": 2,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_3"
+    },
+    "level": 3,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_4"
+    },
+    "level": 4,
+    "asi_available": true
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_5"
+    },
+    "level": 5,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_6"
+    },
+    "level": 6,
+    "asi_available": true
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "skills"
+    },
+    "growth_grant": {
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "count": 2
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_strength"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.strength"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_constitution"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.constitution"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_light"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.light"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_medium"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.medium"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_heavy"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.heavy"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_shield"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.shield"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_rapier"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.rapier"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_longsword"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.longsword"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_greatsword"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.greatsword"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_mace"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.mace"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_dagger"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.dagger"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_light"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.light"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_medium"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.medium"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_shield"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.shield"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_rapier"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.rapier"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_longsword"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.longsword"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_greatsword"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.greatsword"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_mace"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.mace"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_dagger"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.dagger"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_1"
+    },
+    "level": 1,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "skills"
+    },
+    "growth_grant": {
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.cleric_skills"
+      },
+      "count": 2
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_wisdom"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.wisdom"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_charisma"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.charisma"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_light"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.light"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_medium"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.medium"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_heavy"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.heavy"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_shield"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.shield"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_mace"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.mace"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_dagger"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.dagger"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_light"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.light"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_medium"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.medium"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_shield"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.shield"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_1"
+    },
+    "level": 1,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_2"
+    },
+    "level": 2,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_3"
+    },
+    "level": 3,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_4"
+    },
+    "level": 4,
+    "asi_available": true
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_5"
+    },
+    "level": 5,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "skills"
+    },
+    "growth_grant": {
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.wizard_skills"
+      },
+      "count": 2
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_intelligence"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.intelligence"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_wisdom"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.wisdom"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.wizard"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_dagger"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.dagger"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "life_domain_heavy_armor"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.heavy"
+      }
+    },
+    "author_note": "Only Life Domain is supported: its level-one bonus proficiency grants heavy armor even when cleric is acquired through multiclassing."
+  }
+]

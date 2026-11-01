@@ -1,0 +1,797 @@
+[
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "common"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.common"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "dwarvish"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.dwarvish"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "elvish"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.elvish"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "giant"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.giant"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "gnomish"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.gnomish"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "goblin"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.goblin"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "halfling"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.halfling"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "orc"
+    },
+    "language": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.language",
+      "rule_key": "language.orc"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.dwarven"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "smith_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.smith_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.dwarven"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "brewer_supplies"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.brewer_supplies"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.dwarven"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "mason_tools"
+    },
+    "tool": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.mason_tools"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.race",
+        "rule_key": "race.human"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "common"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.language",
+        "rule_key": "language.common"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.race",
+        "rule_key": "race.human"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "extra_language"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "count": 1
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.race",
+        "rule_key": "race.dwarf"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "common"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.language",
+        "rule_key": "language.common"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.race",
+        "rule_key": "race.dwarf"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "dwarvish"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.language",
+        "rule_key": "language.dwarvish"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.race",
+        "rule_key": "race.dwarf"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "artisan_tool"
+    },
+    "grant": {
+      "category": "TOOL",
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.tool_set",
+        "rule_key": "tool_set.dwarven"
+      },
+      "count": 1
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.background",
+        "rule_key": "background.acolyte"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "languages"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.language_set",
+        "rule_key": "language_set.standard"
+      },
+      "count": 2
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.background",
+        "rule_key": "background.custom_artisan"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "trade_language"
+    },
+    "grant": {
+      "category": "LANGUAGE",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.language",
+        "rule_key": "language.dwarvish"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.background",
+        "rule_key": "background.custom_artisan"
+      },
+      "collection_key": "proficiency_grants",
+      "module_key": "srd51_runtime",
+      "entry_key": "smith_tools"
+    },
+    "grant": {
+      "category": "TOOL",
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.tool",
+        "rule_key": "tool.smith_tools"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "acrobatics"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.acrobatics"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "animal_handling"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.animal_handling"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "athletics"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.athletics"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "history"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.history"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "insight"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.insight"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "intimidation"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.intimidation"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "perception"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.perception"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.fighter_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "survival"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.survival"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.cleric_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "history"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.history"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.cleric_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "insight"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.insight"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.cleric_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "medicine"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.medicine"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.cleric_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "persuasion"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.persuasion"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.cleric_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "religion"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.religion"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.wizard_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "arcana"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.arcana"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.wizard_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "history"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.history"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.wizard_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "insight"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.insight"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.wizard_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "investigation"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.investigation"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.wizard_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "medicine"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.medicine"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.wizard_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "religion"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.religion"
+    }
+  }
+]
