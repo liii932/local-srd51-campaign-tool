@@ -15,13 +15,17 @@ public final class StorageApplicationListener implements ServletContextListener 
     public static final String ENABLED_ATTRIBUTE = "com.dndtool.storage.enabled";
     public static final String SERVICE_ATTRIBUTE = "com.dndtool.storage.service";
     public static final String ERROR_ATTRIBUTE = "com.dndtool.storage.error";
+    private final String environmentRoot;
+
+    public StorageApplicationListener() { this(System.getenv(ROOT_PARAMETER)); }
+
+    StorageApplicationListener(String environmentRoot) { this.environmentRoot = environmentRoot; }
 
     public static boolean enabled(ServletContext context) {
         if (context == null) return false;
         Object enabled = context.getAttribute(ENABLED_ATTRIBUTE);
         if (enabled instanceof Boolean value) return value;
-        String root = configuredRoot(context);
-        return root != null && !root.isEmpty();
+        return configuredRoot(context, System.getenv(ROOT_PARAMETER)) != null;
     }
 
     public static CampaignStorageService service(ServletContext context) {
@@ -34,18 +38,22 @@ public final class StorageApplicationListener implements ServletContextListener 
         return servlet.getServletConfig() != null && enabled(servlet.getServletContext());
     }
 
-    private static String configuredRoot(ServletContext context) {
+    static String configuredRoot(ServletContext context, String environmentRoot) {
         String parameter = context.getInitParameter(ROOT_PARAMETER);
-        return parameter != null ? parameter : System.getenv(ROOT_PARAMETER);
+        return parameter != null ? parameter : environmentRoot;
     }
 
     @Override public void contextInitialized(ServletContextEvent event) {
         ServletContext context = event.getServletContext();
-        boolean enabled = enabled(context);
+        String configuredRoot = configuredRoot(context, environmentRoot);
+        boolean enabled = configuredRoot != null;
         context.setAttribute(ENABLED_ATTRIBUTE, enabled);
         if (!enabled) return;
         try {
-            Path root = Path.of(configuredRoot(context));
+            if (configuredRoot.isBlank() || configuredRoot.codePoints().anyMatch(
+                    point -> point < 0x20 || point >= 0x7f && point <= 0x9f))
+                throw new IllegalArgumentException("INVALID_STORAGE_ROOT");
+            Path root = Path.of(configuredRoot);
             String deployedRoot = context.getRealPath("/");
             if (!root.isAbsolute() || (deployedRoot != null
                     && root.normalize().startsWith(Path.of(deployedRoot).toAbsolutePath().normalize())))

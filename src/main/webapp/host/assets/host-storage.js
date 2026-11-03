@@ -11,6 +11,8 @@
     RUN_EXISTS: '已有战役，请先保存并结束当前战役。',
     RESIDUAL_RUN_EXISTS: '有未结束的战役，请先恢复。',
     RESIDUAL_RUN: '有未结束的战役，请先恢复。',
+    PREPARATION_INCOMPLETE: '本次准备尚未保存完整输入，无法恢复；请精确放弃所选残留后重新创建或打开。',
+    STORAGE_INTEGRITY: '战役材料未通过一致性核验，现有文件和运行已保留。请检查存储材料。',
     FILE_CONFLICT: '这个文件身份已经存在，或暂存材料不一致。现有文件已保留。',
     INVALID_FILE: '文件或字段未通过完整校验，请检查所选文件和输入。',
     INVALID_DOMAIN_DOCUMENT: '操作字段与当前支持的规则不符，请检查选择。',
@@ -195,6 +197,37 @@
     }
     refreshCheckBranches();
     refreshManualEffects();
+    refreshArcaneRecovery();
+  }
+  function refreshArcaneRecovery() {
+    const form = byId('domain-rest'), character = selectedCharacter(form), current = character?.state;
+    const active = current?.rest?.active, fields = byId('arcane-recovery-fields');
+    const enabled = form.elements.kind.value === 'REST_COMPLETED' && active?.kind === 'SHORT_REST' && active.phase === 'IN_PROGRESS';
+    fields.hidden = !enabled; fields.disabled = !enabled;
+    let recoverable = false;
+    for (const input of fields.querySelectorAll('[data-recover-slot]')) {
+      const resource = current?.resources?.find(resource => resource.identity.ruleKey === `resource.wizard.slot${input.dataset.recoverSlot}`);
+      const missing = resource && !resource.unlimited ? Math.max(0, Number(resource.maximum) - Number(resource.current)) : 0;
+      input.disabled = !enabled || missing === 0; input.closest('label').hidden = missing === 0;
+      input.max = String(Math.min(4, missing));
+      if (input.disabled) input.value = '0';
+      if (missing > 0) recoverable = true;
+    }
+    const day = Math.floor((Number(current?.rest?.minute || 0) * 60 + Number(current?.rest?.second || 0)) / 86400);
+    const used = current?.spellbook?.lastArcaneRecoveryDay;
+    const wizardLevel = Number(current?.classes?.find(entry => entry.characterClass.ruleKey === 'class.wizard')?.level || 0);
+    byId('arcane-recovery-status').textContent = !current?.spellbook ? '尚未建立法术书；可放弃本次收益并完成短休。'
+      : `当前为战役第 ${day} 日；${used !== null && used !== undefined && Number(used) === day ? '本日已使用奥术回想，可放弃本次收益并完成短休。'
+        : recoverable ? `本次恢复预算最多 ${Math.ceil(wizardLevel / 2)} 环级。` : '没有已消耗的法术位。'}`;
+  }
+  function arcaneRecoveryResult(event) {
+    if (!Object.keys(event?.command?.restInput?.recoveredSpellSlots || {}).length) return '';
+    const changes = (event.after.resources || []).flatMap(resource => {
+      const before = event.before.resources.find(previous => ruleValue(previous.identity) === ruleValue(resource.identity));
+      const recovered = Number(resource.current) - Number(before?.current);
+      return recovered > 0 ? [`${ruleName(resource.identity)} ${before.current} → ${resource.current}（恢复 ${recovered}）`] : [];
+    });
+    return `奥术回想：${changes.join('；')}；使用日：第 ${event.after.spellbook.lastArcaneRecoveryDay} 日`;
   }
   function refreshCheckBranches() {
     if (!domain()) return;
@@ -228,7 +261,13 @@
       text(card, 'p', `特性：${(current.features || []).map(feature => ruleName(feature.feature)).join('；') || '无'}`);
       text(card, 'p', `熟练：${(current.proficiencies || []).map(proficiency => ruleName(proficiency.target)).join('；') || '无'}`);
       if (current.rest?.active) text(card, 'p', `休息中：${current.rest.active.kind || current.rest.active.restKind} · ${current.rest.active.phase}`);
-      if (current.spellbook) text(card, 'p', `已准备法术：${current.spellbook.prepared.map(ruleName).join('、') || '无'}`);
+      if (current.spellbook) {
+        text(card, 'p', `已准备法术：${current.spellbook.prepared.map(ruleName).join('、') || '无'}`);
+        const day = current.spellbook.lastArcaneRecoveryDay;
+        text(card, 'p', day === null || day === undefined ? '奥术回想：尚未使用' : `奥术回想使用日：第 ${day} 日`);
+      }
+      const recentRecovery = character.history?.events?.findLast(event => Object.keys(event.command?.restInput?.recoveredSpellSlots || {}).length);
+      if (recentRecovery) text(card, 'p', `最近${arcaneRecoveryResult(recentRecovery)}`);
       const recentCheck = character.history?.events?.findLast(event => event.checkResult);
       if (recentCheck) { const result = recentCheck.checkResult; text(card, 'p', `最近检定：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + 熟练 ${result.proficiencyBonus} = ${result.total}，${result.success ? '成功' : '失败'}`); }
       const recentHealth = character.history?.events?.findLast(event => event.healthResult);
@@ -265,7 +304,11 @@
         }
         if (audit.message) details.push(audit.message);
         text(history, 'li', details.join('；'));
-      } else text(history, 'li', `${root.sequence}. ${operationName(root.kind)}${allPeople().some(character => character.id === root.subjectId) ? ` · ${personName(root.subjectId)}` : ''}${root.kind === 'note' ? ` · ${root.after}` : ''}`);
+      } else {
+        const event = roster().find(character => character.id === root.subjectId)?.history?.events?.find(event => event.operationId === root.operationId);
+        const recovery = arcaneRecoveryResult(event);
+        text(history, 'li', `${root.sequence}. ${operationName(root.kind)}${allPeople().some(character => character.id === root.subjectId) ? ` · ${personName(root.subjectId)}` : ''}${root.kind === 'note' ? ` · ${root.after}` : ''}${recovery ? ` · ${recovery}` : ''}`);
+      }
     }
     const world = byId('domain-world-summary'); world.replaceChildren();
     text(world, 'h3', '场景概览');
@@ -648,7 +691,9 @@
   characterForm('domain-rest', (_, values) => ({...baseCharacter(values.kind), restInput: {type: 'character.RestInput',
     restKind: values.kind === 'REST_STARTED' ? values.restKind : null, activity: values.kind === 'TIME_ADVANCED' ? values.activity : null,
     minutes: values.kind === 'TIME_ADVANCED' ? values.minutes : '0', hitDieSides: values.kind === 'HIT_DIE_SPENT' ? values.hitDieSides : '0',
-    recoveredHitDice: values.kind === 'REST_COMPLETED' && Number(values.recoverDice) > 0 ? [[values.hitDieSides, values.recoverDice]] : [], recoveredSpellSlots: []}}));
+    recoveredHitDice: values.kind === 'REST_COMPLETED' && Number(values.recoverDice) > 0 ? [[values.hitDieSides, values.recoverDice]] : [],
+    recoveredSpellSlots: values.kind === 'REST_COMPLETED' ? [1, 2, 3, 4, 5].filter(rank => Number(values[`recoverSlot${rank}`]) > 0)
+      .map(rank => [String(rank), values[`recoverSlot${rank}`]]) : []}}));
   characterForm('domain-equipment', (_, values) => {
     const acquire = values.kind === 'ITEM_ACQUIRED';
     if (!acquire && !values.itemId) throw new Error('请选择角色已有的物品。');
@@ -802,6 +847,7 @@
   });
   for (const select of document.querySelectorAll('.domain-character,.combat-actor-choice,.monster-choice')) select.addEventListener('change', refreshCharacterChoices);
   byId('check-with-effects').addEventListener('change', refreshCheckBranches);
+  byId('domain-rest').elements.kind.addEventListener('change', refreshArcaneRecovery);
   for (const select of document.querySelectorAll('.check-branch-character')) select.addEventListener('change', refreshCheckBranches);
   for (const select of document.querySelectorAll('.world-item-choice')) select.addEventListener('change', event => {
     const item = domain().items.find(item => item.id === event.currentTarget.value), form = event.currentTarget.form;

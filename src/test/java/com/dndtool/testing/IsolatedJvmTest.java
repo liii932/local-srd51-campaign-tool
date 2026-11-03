@@ -21,8 +21,8 @@ public final class IsolatedJvmTest {
                 entryPoint.getName()));
         command.addAll(Arrays.asList(arguments));
         Process child = new ProcessBuilder(command).redirectErrorStream(true).start();
-        // Cold WSL JVM startup and composition setup are test overhead, not a product latency promise.
-        boolean completed = child.waitFor(60, TimeUnit.SECONDS);
+        // This deadline includes cold WSL JVM startup and composition setup, not a product latency limit.
+        boolean completed = child.waitFor(120, TimeUnit.SECONDS);
         if (!completed) child.destroyForcibly();
         assertTrue(completed, "Isolated JVM scenario timed out: " + Arrays.toString(arguments));
         String output = new String(child.getInputStream().readAllBytes(), StandardCharsets.UTF_8);

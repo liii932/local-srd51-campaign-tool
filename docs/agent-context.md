@@ -1,7 +1,8 @@
 # Agent 项目地图
 
-只负责定位，不替代 [AGENTS.md](../AGENTS.md) 或下表的权威合同。新会话通过
-[dnd-project-start](../.agents/skills/dnd-project-start/SKILL.md) 按需读取；不要递归加载全部链接。
+只负责定位，不替代 [AGENTS.md](../AGENTS.md) 或下表的权威合同。按任务选择下表入口并按需读取，
+不要递归加载全部链接。本地可选的 `dnd-project-start` skill 只提供导航便利；项目 skill 位于
+不跟踪的 `.agents/skills/`，缺失时直接使用本地图。
 当前进度以 Git、代码、测试和经授权的外部证据为准，文件存在不证明功能发布、迁移执行或部署完成。
 
 ## 最小项目识别
@@ -46,7 +47,7 @@
 | schema 2 有限怪物、吐息、充能、休息、完整目标、共享伤害与专注 | [有限怪物合同](rules/schema-2-monster-breath.md) | `module/composition/Schema2MonsterCodec.java`；`persistence/JdbcSchema2MonsterSourceRows.java`、`JdbcSchema2MonsterSnapshotRows.java`、`JdbcSchema2MonsterBreathRows.java`；`service/Schema2CombatRuntimeService.java`、`Schema2SaveDamageRules.java`、`Schema2MonsterRestRules.java`、`Schema2CombatState.java`；来源 V011、镜像 V039、事实 V040；`Schema2MonsterBreathRulesTest` 及 Monster 组合/来源/镜像/服务/历史测试；INTERNAL 点格机制，完整 Host/base/archive 2 仍关闭 |
 | schema 2 法术来源范围豁免伤害与燃烧之手 | [法术共享伤害合同](rules/schema-2-spell-save-damage.md) | `Schema2SpellRules`、`Schema2ActionFlowRules`、`Schema2SaveDamageRules` 与场景/批次仓储；来源 V012、运行 V042；对应组合、来源/镜像、真实服务及 schema 测试；真实施法来源与怪物动作互斥，有限范围不授予其他法术执行资格 |
 | v2 多目标公共接口、体积空间、伤害骰后反应与完整保存 | [多目标豁免伤害](design/v2/multi-target-save-damage.md)，再读动作继续及持续效果协议 | 区分已采用的有限怪物合同与公共目标；原 PFE/Cutting Words golden、通用体积、完整文件和 Host 仍须各自消费者与验收 |
-| SQLite 当前有限战役、角色/冒险/战斗、完整文件与同版恢复 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md)、[测试入口](testing.md#v2-json-结构与文件存储的替换验收) | `HostStorageServlet` / `StorageApplicationListener`；`CampaignStorageService`、`CampaignDomainCommands`、`CampaignDomainEngine`、`CampaignDomainData/Codec/Validation`、`CampaignDomainRepository`；`CampaignDomainsIntegrationTest`、`CampaignDomainsCombatIntegrationTest`、`CampaignStorageLifecycleTest`、原存储/HTTP/进程故障测试；`DND_STORAGE_ROOT` 显式启用，不连接运行 MySQL |
+| SQLite 当前有限战役、角色/冒险/战斗、完整文件与同版恢复 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md)、[测试入口](testing.md#v2-json-结构与文件存储的替换验收) | `HostStorageServlet` / `StorageApplicationListener`（配置与 readiness）；`CampaignStorageService` / `ManagedCampaignFiles`（准备前缀、Windows NTFS/ACL）、`CampaignDomainCommands`、`CampaignDomainEngine`、`CampaignDomainData/Codec/Validation`、`CampaignDomainRepository`；领域、生命周期、准备、Windows/进程故障测试；`DND_STORAGE_ROOT` 显式启用，不连接运行 MySQL |
 | SQLite 检定成功/失败分支、健康/物品/位置/消息后果 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md) | `service/storage/CampaignCheckEffects.java`、`CampaignDomainCommands.java`；`CampaignCheckEffectsTest`；两分支全部预检后再骰，同根事务和完整文件，不接受任意算法 |
 | SQLite DM-managed 自由卡、基础字段、职业等级/熟练、MANUAL/SAVING_THROW 与简易遭遇名单/阵营 | [角色/历史](design/v2/character-state-and-history.md)、[领域接合表](design/v2/domain-integration.md) | `service/storage/CampaignManualData.java`、`CampaignManualCommands.java`；独立类型化领域，不转换或绕过 schema-2 角色；按实际 UI 与真实 SQLite/文件测试验收，不从类存在推定完成 |
 | 有限生产 schema 2 内置材料、初始化模板、目录与限制 | [四包作者指南](../rule-packages/srd51-runtime/package-guide.md)、[领域接合表](design/v2/domain-integration.md) | `BundledCampaignRules` 的 `projection/artifacts/rule/metadata/initialPlan/initialChoices`；作者源 `rule-packages/srd51-runtime/`，确定性 ZIP `resources/storage/rules/`；`BundledCampaignRulesTest`；不是完整 SRD RELEASED 或来源安装/接受证明 |
@@ -77,11 +78,11 @@
 | 构建、测试、WAR、部署、备份 | [测试](testing.md)；实际部署才读 [部署](deployment.md) / [备份恢复](backup-and-restore.md) | 仓库根 `pom.xml`、`config/`、`tools/`；MySQL 集成测试需独立授权与隔离目标 |
 | MySQL 测试连接目标保护 | [测试](testing.md) §3 | 测试目录 `persistence/MySqlIntegrationTestSupport.java`；`MySqlIntegrationTestSupportTest`，两入口在连接前仅允许专用测试目标 |
 | 新增完整规则领域、覆盖差距、发布门 | [机制覆盖矩阵](rules/srd-5.1-coverage.md)、[完整规则目标](rules/srd-5.1-complete.md)；[架构](architecture.md) §2—3 | 按机制族核对数据、真实执行和状态/恢复；只提升有实际消费者和证据的准确范围，不为未来领域编造类名 |
-| Agent、skill、项目导航、文档 | [AGENTS.md](../AGENTS.md)、本文 | `.agents/skills/dnd-project-start/SKILL.md`（仓库根）；不预读业务源码 |
+| Agent、skill、项目导航、文档 | [AGENTS.md](../AGENTS.md)、本文 | 先选本文相关入口；本地 `dnd-project-start` 可辅助导航；不预读业务源码 |
 
 ## 使用与维护
 
-- 按 [AGENTS.md](../AGENTS.md) 在首个任务读取 [dnd-project-start](../.agents/skills/dnd-project-start/SKILL.md)，再从本文选择相关入口；skill 负责定位，不是自动执行的启动脚本。
+- 按 [AGENTS.md](../AGENTS.md) 恢复上下文并从本文选择相关入口；本地存在 `dnd-project-start` 时可辅助定位，缺失时直接使用本文。skill 不是自动执行的启动脚本。
 - 入口变化时同步修正表中路径。规则正文、安全/事务不变量、账号职责、验证方法只在对应权威文档维护，不在 skill 中复制第二份。
 - 产品和跨领域设计通过 [v2 设计导航](design/v2/README.md) 定位相关专题；历史提案、任务状态和测试报告不能覆盖正式设计或证明已实现。
 - 分域 JSON 作者包与维护流程按任务查阅[规则制品](rules/schema-2-rule-artifacts.md)、[安装与接受](rules/schema-2-installation-and-acceptance.md)及[测试指南](testing.md)，不从本地 Agent 工作区补充合同或验证步骤。

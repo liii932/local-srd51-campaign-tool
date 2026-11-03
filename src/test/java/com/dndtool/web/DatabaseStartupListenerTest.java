@@ -27,8 +27,8 @@ final class DatabaseStartupListenerTest {
             ServletContext context = (ServletContext) Proxy.newProxyInstance(
                     ServletContext.class.getClassLoader(), new Class<?>[] {ServletContext.class},
                     (ignored, method, arguments) -> switch (method.getName()) {
-                        case "getAttribute" -> attributes.get((String) arguments[0]);
-                        case "getInitParameter" -> "";
+                        case "getAttribute" -> StorageApplicationListener.ENABLED_ATTRIBUTE.equals(arguments[0])
+                                ? false : attributes.get((String) arguments[0]);
                         case "setAttribute" -> { attributes.put((String) arguments[0], arguments[1]); yield null; }
                         case "log" -> { log.add((String) arguments[0]); yield null; }
                         default -> throw new AssertionError("Unexpected context call: " + method.getName());

@@ -28,13 +28,14 @@ public final class CampaignStorageService implements AutoCloseable {
     public record SaveResult(String fileKey, long revision, String sha256) { }
     public record ImportResult(String fileKey, String name, long eventTail, String sha256) { }
     public record SavedCampaign(String fileKey, String name, long eventTail) { }
-    public enum Boundary { AFTER_DDL, AFTER_INIT_COMMIT, AFTER_CHARACTER_UPDATE, AFTER_BUSINESS_COMMIT,
+    public enum Boundary { AFTER_PREPARATION_DIRECTORY, AFTER_PREPARATION_LOCK, AFTER_INPUT_STAGING_CREATE, DURING_INPUT_WRITE, AFTER_INPUT_LINK, AFTER_INPUT_WRITE,
+                           AFTER_ALLOCATION_STAGING_CREATE, DURING_ALLOCATION_WRITE, AFTER_ALLOCATION_LINK, AFTER_ALLOCATION_WRITE, AFTER_PREPARATION_PUBLISH, AFTER_DATABASE_PREPARATION, AFTER_DDL, AFTER_INIT_COMMIT, AFTER_CHARACTER_UPDATE, AFTER_BUSINESS_COMMIT,
                            AFTER_P0, AFTER_TEMP, AFTER_P2, BEFORE_P3_COMMIT, AFTER_P3_COMMIT,
                            AFTER_IMPORT_TEMP, AFTER_IMPORT_PUBLISH, AFTER_DISCARD_ISOLATION }
     @FunctionalInterface public interface FaultInjector { void at(Boundary boundary); }
     private static final FaultInjector NO_FAULTS = boundary -> { };
-    private static final Set<String> RUN_FILES = Set.of("run.db", "run.db-journal", "run.lock", "allocation.json", "input.json", "initialized.json", "cleanup.json");
-    private static final Set<String> DISCARD_FILES = Set.of("run.db", "run.db-journal", "run.lock", "allocation.json", "input.json", "initialized.json", "cleanup.json", "discard.json");
+    private static final Set<String> RUN_FILES = Set.of("run.db", "run.db-journal", "run.lock", "allocation.json", "input.json", "initialized.json", "database-started.json", "cleanup.json");
+    private static final Set<String> DISCARD_FILES = Set.of("run.db", "run.db-journal", "run.lock", "allocation.json", "input.json", "initialized.json", "database-started.json", "cleanup.json", "discard.json");
     private static final Set<Path> JVM_ROOT_OWNERS = ConcurrentHashMap.newKeySet();
     private record OwnedLock(FileChannel channel, FileLock lock) { }
     private final Path root, runs, saves;
@@ -47,28 +48,27 @@ public final class CampaignStorageService implements AutoCloseable {
     private Active active;
     private boolean closed;
 
-    private static final class Active {
+    private static final class Active implements AutoCloseable {
         final String runId; final Path directory, database; final FileChannel lockChannel; final FileLock lock;
         StoragePlan plan; String blocked; Snapshot initialInput;
         Active(String id, Path directory, FileChannel channel, FileLock lock, StoragePlan plan) {
             runId = id; this.directory = directory; database = directory.resolve("run.db"); lockChannel = channel; this.lock = lock; this.plan = plan;
         }
-        void close() throws IOException { try { lock.release(); } finally { lockChannel.close(); } }
+        public void close() throws IOException { try { lock.release(); } finally { lockChannel.close(); } }
     }
 
     public CampaignStorageService(Path root) throws IOException { this(root, NO_FAULTS); }
     public CampaignStorageService(Path root, FaultInjector faults) throws IOException {
         if (root == null || !root.isAbsolute()) throw new IOException("Managed storage root must be absolute");
+        if (ManagedCampaignFiles.windows() && root.getRoot().toString().startsWith("\\\\"))
+            throw new IOException("Managed storage requires a local Windows drive; UNC roots are unsupported");
         for (Path ancestor = root.normalize(); ancestor != null; ancestor = ancestor.getParent()) {
             if (Files.exists(ancestor.resolve(".git"), LinkOption.NOFOLLOW_LINKS) || Files.exists(ancestor.resolve("WEB-INF"), LinkOption.NOFOLLOW_LINKS)) throw new IOException("Managed storage must be outside Git and deployed application trees: " + ancestor);
         }
         this.root = root.toAbsolutePath().normalize(); this.faults = Objects.requireNonNull(faults);
-        ensureDirectory(this.root); runs = this.root.resolve("runs"); saves = this.root.resolve("saves");
+        ensureDirectory(this.root); ManagedCampaignFiles.privateDirectory(this.root); runs = this.root.resolve("runs"); saves = this.root.resolve("saves");
         ensureDirectory(runs); ensureDirectory(saves);
-        for (Path privateDirectory : List.of(this.root, runs, saves)) {
-            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(privateDirectory, LinkOption.NOFOLLOW_LINKS);
-            if (permissions.stream().anyMatch(p -> p.name().startsWith("GROUP_") || p.name().startsWith("OTHERS_"))) throw new IOException("Managed storage directories must have owner-only permissions");
-        }
+        for (Path privateDirectory : List.of(this.root, runs, saves)) ManagedCampaignFiles.privateDirectory(privateDirectory);
         OwnedLock ownership = acquireRootLock(this.root);
         instanceChannel = ownership.channel(); instanceLock = ownership.lock();
         try { catalog = StorageSchemaCatalog.bundled(); }
@@ -194,11 +194,14 @@ public final class CampaignStorageService implements AutoCloseable {
         Path original = runs.resolve(runId), isolated = runs.resolve(".discard-" + runId);
         Active locked = null;
         try {
+            Preparation preparation = findPreparation(runId);
+            if (preparation != null) { discardPreparation(preparation); return; }
             boolean originalExists = Files.exists(original, LinkOption.NOFOLLOW_LINKS), isolatedExists = Files.exists(isolated, LinkOption.NOFOLLOW_LINKS);
             if (originalExists && isolatedExists) throw new StorageException("CLEANUP_BLOCKED", "Both original and discard directories exist; neither was changed");
             if (!originalExists && !isolatedExists) throw new StorageException("RUN_NOT_FOUND", "The exact residual run does not exist");
             Path directory = originalExists ? original : isolated;
             verifyDiscardFiles(directory);
+            if (originalExists) discardAuthorization(runId, directory); // Establish ownership before creating a missing lock.
             // An empty isolated tombstone is the final interrupted unlink, never a new allocation.
             if (isolatedExists && isEmptyDirectory(directory)) { Files.delete(directory); forceDirectory(runs); return; }
             if (active != null) { locked = active; active = null; }
@@ -211,7 +214,9 @@ public final class CampaignStorageService implements AutoCloseable {
                 if (Files.exists(markerPath, LinkOption.NOFOLLOW_LINKS)) {
                     if (!Arrays.equals(readBounded(markerPath), CampaignJson.canonical(marker))) throw new StorageException("STORAGE_INTEGRITY", "Discard marker differs from the exact allocation");
                 } else { writeNewForced(markerPath, CampaignJson.canonical(marker)); forceDirectory(directory); }
-                Files.move(directory, isolated, StandardCopyOption.ATOMIC_MOVE); forceDirectory(runs); directory = isolated;
+                locked.close(); locked = null;
+                ManagedCampaignFiles.moveDirectory(directory, isolated); forceDirectory(runs); directory = isolated;
+                locked = lockRun(runId, directory, null);
                 faults.at(Boundary.AFTER_DISCARD_ISOLATION);
             } else {
                 marker = CampaignJson.read(readBounded(markerPath));
@@ -219,7 +224,7 @@ public final class CampaignStorageService implements AutoCloseable {
                 verifyDiscardProgress(runId, directory, marker);
             }
             verifyDiscardFiles(directory); // Inspect every entry before removing any run material.
-            for (String name : List.of("run.db-journal", "run.db", "initialized.json", "cleanup.json", "input.json", "allocation.json")) {
+            for (String name : List.of("run.db-journal", "run.db", "initialized.json", "database-started.json", "cleanup.json", "input.json", "allocation.json")) {
                 Path file = directory.resolve(name);
                 if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) { rejectUnsafeFile(file, false); Files.delete(file); }
             }
@@ -267,7 +272,7 @@ public final class CampaignStorageService implements AutoCloseable {
         }
         // The deletion order removes runtime material before input, and allocation last.
         // A marker on its own cannot authorize removal of an unrelated live database.
-        for (String file : List.of("run.db-journal", "run.db", "initialized.json", "cleanup.json"))
+        for (String file : List.of("run.db-journal", "run.db", "initialized.json", "database-started.json", "cleanup.json"))
             if (Files.exists(directory.resolve(file), LinkOption.NOFOLLOW_LINKS)) throw new StorageException("STORAGE_INTEGRITY", "Discard progress does not match the authorized deletion order");
         if (input) throw new StorageException("STORAGE_INTEGRITY", "Discard allocation disappeared before its input");
         if (allocated) {
@@ -294,29 +299,171 @@ public final class CampaignStorageService implements AutoCloseable {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory)) { return !stream.iterator().hasNext(); }
     }
 
+    private static final Set<String> PREPARATION_FILES = Set.of("run.lock", "input.part", "input.json", "allocation.part", "allocation.json");
+    private record Preparation(String runId, String inputDigest, String planDigest, int inputLength, Path directory) { }
+
+    private static Preparation preparation(Path path) {
+        String[] pieces = path.getFileName().toString().substring(".prepare-".length()).split("_", -1);
+        if (pieces.length != 4 || !pieces[1].matches("[0-9a-f]{64}") || !pieces[2].matches("[0-9a-f]{64}") || !pieces[3].matches("[1-9][0-9]{0,7}"))
+            throw new StorageException("STORAGE_INTEGRITY", "Unknown preparation directory identity");
+        int length = Integer.parseInt(pieces[3]);
+        if (length > CampaignJson.MAX_BYTES) throw new StorageException("STORAGE_INTEGRITY", "Preparation length exceeds budget");
+        return new Preparation(CampaignJson.uuid(pieces[0]), pieces[1], pieces[2], length, path);
+    }
+
+    private JsonObject allocation(String runId, StoragePlan plan, String inputDigest) {
+        JsonObject marker = new JsonObject(); marker.addProperty("runId", runId); marker.addProperty("applicationModel", CampaignCodec.APPLICATION_MODEL);
+        marker.addProperty("storageModel", CampaignCodec.STORAGE_MODEL); marker.addProperty("planDigest", plan.digest()); marker.addProperty("inputDigest", inputDigest);
+        JsonArray modules = new JsonArray(); plan.moduleIds().forEach(modules::add); marker.add("modules", modules); return marker;
+    }
+
     private CampaignView initialize(Snapshot input) {
         StoragePlan plan = catalog.plan(CampaignRules.roots(input.rules()));
-        // Validation, rule selection and planning above this line have no filesystem or database effects.
-        String runId = newId(); Path directory = runs.resolve(runId);
+        String runId = newId(); byte[] inputBytes = codec.encode(new Document(runId, input));
+        Path directory = runs.resolve(".prepare-" + runId + "_" + CampaignJson.sha256(inputBytes) + "_" + plan.digest() + "_" + inputBytes.length);
+        // Atomic mkdir publishes the complete ownership binding before any preparation byte or DB exists.
+        Active preparing = null;
         try {
-            createPrivateDirectory(directory); forceDirectory(runs);
-            Active allocated = lockRun(runId, plan); active = allocated; active.initialInput = input; active.blocked = "PREPARING";
-            byte[] inputBytes = codec.encode(new Document(newId(), input));
-            writeNewForced(directory.resolve("input.json"), inputBytes);
-            JsonObject marker = new JsonObject(); marker.addProperty("runId", runId); marker.addProperty("applicationModel", CampaignCodec.APPLICATION_MODEL);
-            marker.addProperty("storageModel", CampaignCodec.STORAGE_MODEL); marker.addProperty("planDigest", plan.digest()); marker.addProperty("inputDigest", CampaignJson.sha256(inputBytes));
-            JsonArray modules = new JsonArray(); plan.moduleIds().forEach(modules::add); marker.add("modules", modules);
-            writeNewForced(directory.resolve("allocation.json"), CampaignJson.canonical(marker)); forceDirectory(directory);
-            initializeDatabase(input);
-            faults.at(Boundary.AFTER_INIT_COMMIT);
-            verifyActive();
-            saveInternal(newId(), 0, "INITIAL");
-            active.blocked = null; return current();
-        } catch (IOException e) { if (active != null) active.blocked = "PREPARING"; throw io("Initialization remains available for explicit recovery", e); }
+            createPrivateDirectory(directory); forceDirectory(runs); faults.at(Boundary.AFTER_PREPARATION_DIRECTORY);
+            preparing = lockRun(runId, directory, plan); faults.at(Boundary.AFTER_PREPARATION_LOCK);
+            writePreparation(directory, "input", inputBytes, Boundary.DURING_INPUT_WRITE); faults.at(Boundary.AFTER_INPUT_WRITE);
+            writePreparation(directory, "allocation", CampaignJson.canonical(allocation(runId, plan, CampaignJson.sha256(inputBytes))), Boundary.DURING_ALLOCATION_WRITE);
+            faults.at(Boundary.AFTER_ALLOCATION_WRITE);
+            preparing.close(); preparing = null;
+            publishPreparation(preparation(directory));
+            active = lockRun(runId, plan); active.initialInput = input; active.blocked = "PREPARING";
+            faults.at(Boundary.AFTER_PREPARATION_PUBLISH);
+            initializeDatabase(input); faults.at(Boundary.AFTER_INIT_COMMIT);
+            verifyActive(); saveInternal(newId(), 0, "INITIAL"); active.blocked = null; return current();
+        } catch (IOException e) { if (active != null) active.blocked = "PREPARING"; throw io("Initialization remains available for explicit recovery or exact abandonment", e); }
         catch (RuntimeException e) { if (active != null) active.blocked = "PREPARING"; throw e; }
+        finally { if (preparing != null) try { preparing.close(); } catch (IOException e) { throw io("Cannot release preparation lock", e); } }
+    }
+
+    private void writePreparation(Path directory, String name, byte[] bytes, Boundary during) throws IOException {
+        Path partial = directory.resolve(name + ".part");
+        try (FileChannel channel = FileChannel.open(partial, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS), ManagedCampaignFiles.privateAttribute(partial, false))) {
+            faults.at(name.equals("input") ? Boundary.AFTER_INPUT_STAGING_CREATE : Boundary.AFTER_ALLOCATION_STAGING_CREATE);
+            int split = bytes.length / 2; ByteBuffer first = ByteBuffer.wrap(bytes, 0, split);
+            while (first.hasRemaining()) channel.write(first); channel.force(true); faults.at(during);
+            ByteBuffer remainder = ByteBuffer.wrap(bytes, split, bytes.length - split);
+            while (remainder.hasRemaining()) channel.write(remainder); channel.force(true);
+        }
+        if (!Arrays.equals(readBounded(partial), bytes)) throw new IOException("Preparation write differs");
+        Files.createLink(directory.resolve(name + ".json"), partial); forceDirectory(directory);
+        faults.at(name.equals("input") ? Boundary.AFTER_INPUT_LINK : Boundary.AFTER_ALLOCATION_LINK);
+        Files.delete(partial); forceDirectory(directory);
+    }
+
+    private void verifyPreparation(Preparation prep) throws IOException {
+        ManagedCampaignFiles.privateDirectory(prep.directory());
+        try (DirectoryStream<Path> entries = Files.newDirectoryStream(prep.directory())) {
+            for (Path entry : entries) {
+                if (!PREPARATION_FILES.contains(entry.getFileName().toString())) throw new StorageException("CLEANUP_BLOCKED", "Unknown material in pre-database preparation");
+                rejectUnsafeFile(entry, false);
+                if (Files.size(entry) > CampaignJson.MAX_BYTES) throw new StorageException("STORAGE_INTEGRITY", "Preparation entry exceeds budget");
+                if (entry.getFileName().toString().equals("run.lock") && Files.size(entry) != 0) throw new StorageException("STORAGE_INTEGRITY", "Preparation lock contains unknown material");
+            }
+        }
+        byte[] full = null;
+        Path input = prep.directory().resolve("input.json"), partial = prep.directory().resolve("input.part");
+        if (Files.exists(input, LinkOption.NOFOLLOW_LINKS)) { full = readBounded(input); validatePreparationInput(prep, full); }
+        if (Files.exists(partial, LinkOption.NOFOLLOW_LINKS)) {
+            byte[] bytes = readPreparationPartial(partial);
+            if (bytes.length > prep.inputLength()) throw new StorageException("STORAGE_INTEGRITY", "Preparation input is oversized");
+            if (full != null && !prefix(bytes, full)) throw new StorageException("STORAGE_INTEGRITY", "Staged input differs from its complete input");
+            if (bytes.length == prep.inputLength()) { validatePreparationInput(prep, bytes); full = bytes; }
+            else {
+                JsonObject complete = null;
+                try { complete = CampaignJson.read(bytes); } catch (StorageException incomplete) { /* Reserved partial bytes are not an accepted document. */ }
+                if (complete != null) validatePreparationInput(prep, bytes);
+                byte[] header = ("{\"applicationModel\":\"" + CampaignCodec.APPLICATION_MODEL + "\",").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                if (!prefix(Arrays.copyOf(bytes, Math.min(bytes.length, header.length)), header)) throw new StorageException("STORAGE_INTEGRITY", "Staged input does not belong to this preparation protocol");
+            }
+        }
+        for (String name : List.of("allocation.json", "allocation.part")) {
+            Path path = prep.directory().resolve(name);
+            if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) continue;
+            if (full == null) throw new StorageException("STORAGE_INTEGRITY", "Allocation exists before a complete bound input");
+            Snapshot snapshot = codec.decode(full).snapshot(); StoragePlan plan = catalog.plan(CampaignRules.roots(snapshot.rules()));
+            byte[] expected = CampaignJson.canonical(allocation(prep.runId(), plan, prep.inputDigest()));
+            byte[] actual = readPreparationPartial(path);
+            if (!(name.endsWith(".part") ? prefix(actual, expected) : Arrays.equals(actual, expected))) throw new StorageException("STORAGE_INTEGRITY", "Allocation differs from its preparation binding");
+        }
+    }
+
+    private static byte[] readPreparationPartial(Path path) throws IOException {
+        rejectUnsafeFile(path, false);
+        if (Files.size(path) == 0) return new byte[0];
+        return readBounded(path);
+    }
+    private static boolean prefix(byte[] candidate, byte[] expected) {
+        return candidate.length <= expected.length && Arrays.equals(candidate, Arrays.copyOf(expected, candidate.length));
+    }
+    private Snapshot validatePreparationInput(Preparation prep, byte[] bytes) {
+        if (bytes.length != prep.inputLength() || !CampaignJson.sha256(bytes).equals(prep.inputDigest())) throw new StorageException("STORAGE_INTEGRITY", "Preparation input digest differs");
+        Document document = codec.decode(bytes);
+        if (!document.fileKey().equals(prep.runId())) throw new StorageException("STORAGE_INTEGRITY", "Preparation input identity differs");
+        StoragePlan plan = catalog.plan(CampaignRules.roots(document.snapshot().rules()));
+        if (!plan.digest().equals(prep.planDigest())) throw new StorageException("STORAGE_INTEGRITY", "Preparation plan identity differs");
+        return document.snapshot();
+    }
+    private void publishPreparation(Preparation prep) throws IOException {
+        verifyPreparation(prep);
+        Path input = prep.directory().resolve("input.json"), partial = prep.directory().resolve("input.part");
+        if (!Files.exists(input, LinkOption.NOFOLLOW_LINKS)) {
+            if (!Files.exists(partial, LinkOption.NOFOLLOW_LINKS) || Files.size(partial) != prep.inputLength())
+                throw new StorageException("PREPARATION_INCOMPLETE", "Original input was interrupted; explicitly abandon this exact preparation");
+            validatePreparationInput(prep, readBounded(partial)); Files.createLink(input, partial); forceDirectory(prep.directory());
+        }
+        Snapshot snapshot = validatePreparationInput(prep, readBounded(input));
+        StoragePlan plan = catalog.plan(CampaignRules.roots(snapshot.rules()));
+        Path marker = prep.directory().resolve("allocation.json"), markerPartial = prep.directory().resolve("allocation.part");
+        byte[] expected = CampaignJson.canonical(allocation(prep.runId(), plan, prep.inputDigest()));
+        if (!Files.exists(marker, LinkOption.NOFOLLOW_LINKS)) {
+            if (Files.exists(markerPartial, LinkOption.NOFOLLOW_LINKS)) { // Exact prefix was verified before any mutation.
+                byte[] bytes = readPreparationPartial(markerPartial);
+                try (FileChannel c = FileChannel.open(markerPartial, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
+                    c.position(bytes.length); ByteBuffer rest = ByteBuffer.wrap(expected, bytes.length, expected.length - bytes.length);
+                    while (rest.hasRemaining()) c.write(rest); c.force(true);
+                }
+                Files.createLink(marker, markerPartial); forceDirectory(prep.directory());
+            } else writePreparation(prep.directory(), "allocation", expected, Boundary.DURING_ALLOCATION_WRITE);
+        }
+        verifyPreparation(prep);
+        Files.deleteIfExists(partial); Files.deleteIfExists(markerPartial); forceDirectory(prep.directory());
+        ManagedCampaignFiles.moveDirectory(prep.directory(), runs.resolve(prep.runId())); forceDirectory(runs);
+    }
+
+    private Preparation findPreparation(String runId) throws IOException {
+        Preparation found = null;
+        try (DirectoryStream<Path> entries = Files.newDirectoryStream(runs, ".prepare-" + runId + "_*")) {
+            for (Path entry : entries) { if (found != null) throw new StorageException("STORAGE_INTEGRITY", "Multiple preparations claim one run"); found = preparation(entry); }
+        }
+        if (found != null) for (String name : List.of(runId, ".cleanup-" + runId, ".discard-" + runId))
+            if (Files.exists(runs.resolve(name), LinkOption.NOFOLLOW_LINKS)) throw new StorageException("STORAGE_INTEGRITY", "Published, preparing or cleanup run identities conflict");
+        return found;
+    }
+
+    private void discardPreparation(Preparation prep) throws IOException {
+        verifyPreparation(prep);
+        try (Active ownership = lockRun(prep.runId(), prep.directory(), null)) {
+            verifyPreparation(prep);
+            // Fixed pre-DB slots only. No recursion; the directory binding survives every interrupted unlink.
+            for (String name : List.of("allocation.part", "allocation.json", "input.part", "input.json")) Files.deleteIfExists(prep.directory().resolve(name));
+            forceDirectory(prep.directory());
+        }
+        Files.deleteIfExists(prep.directory().resolve("run.lock")); Files.delete(prep.directory()); forceDirectory(runs);
     }
 
     private void initializeDatabase(Snapshot input) {
+        try {
+            Path started = active.directory.resolve("database-started.json");
+            if (!Files.exists(started, LinkOption.NOFOLLOW_LINKS)) {
+                writeNewForced(started, CampaignJson.canonical(allocation(active.runId, active.plan, CampaignJson.sha256(readBounded(active.directory.resolve("input.json"))))));
+                forceDirectory(active.directory); faults.at(Boundary.AFTER_DATABASE_PREPARATION);
+            }
+        } catch (IOException e) { throw io("Database preparation did not complete", e); }
         transaction(c -> {
             active.plan.create(c); faults.at(Boundary.AFTER_DDL);
             repository.initialize(c, new Control(active.runId, input.campaignId(), input.name(), 0, nextEpoch(0), false, false, active.plan.digest()), active.plan.moduleIds(), input);
@@ -611,6 +758,12 @@ public final class CampaignStorageService implements AutoCloseable {
         ensureOpen(); CampaignJson.uuid(runId);
         if (active != null && (!active.runId.equals(runId) || active.blocked == null)) throw new StorageException("RUN_EXISTS", "Another run already owns this Host");
         try {
+            Preparation preparation = findPreparation(runId);
+            if (preparation != null) {
+                verifyPreparation(preparation);
+                try (Active ownership = lockRun(runId, preparation.directory(), null)) { verifyPreparation(preparation); }
+                publishPreparation(preparation);
+            }
             Path directory = runs.resolve(runId);
             if (Files.exists(runs.resolve(".discard-" + runId), LinkOption.NOFOLLOW_LINKS)
                     || Files.exists(directory.resolve("discard.json"), LinkOption.NOFOLLOW_LINKS)) throw new StorageException("RUN_DISCARDED", "Explicit abandonment is pending; continue the exact discard operation");
@@ -635,8 +788,11 @@ public final class CampaignStorageService implements AutoCloseable {
             if (!plan.digest().equals(CampaignJson.string(marker, "planDigest")) || !plan.moduleIds().equals(markedModules)) throw new StorageException("STORAGE_INTEGRITY", "Residual plan binding differs");
             if (active == null) active = lockRun(runId, plan);
             active.plan = plan; active.initialInput = original; active.blocked = "RESTART";
-            if (!Files.exists(active.database, LinkOption.NOFOLLOW_LINKS)) throw new StorageException("STORAGE_INTEGRITY", "Residual database is missing; the original input cannot replace committed progress");
-            else {
+            if (!Files.exists(active.database, LinkOption.NOFOLLOW_LINKS)) {
+                if (Files.exists(directory.resolve("database-started.json"), LinkOption.NOFOLLOW_LINKS) || Files.exists(directory.resolve("initialized.json"), LinkOption.NOFOLLOW_LINKS))
+                    throw new StorageException("STORAGE_INTEGRITY", "Residual database is missing after database preparation; committed progress cannot be replaced");
+                initializeDatabase(original);
+            } else {
                 rejectUnsafeFile(active.database, false);
                 boolean empty;
                 try (Connection c = connect(active.database); Statement s = c.createStatement(); ResultSet r = s.executeQuery("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")) { r.next(); empty = r.getLong(1) == 0; }
@@ -715,9 +871,12 @@ public final class CampaignStorageService implements AutoCloseable {
             if (!Files.exists(cleanup, LinkOption.NOFOLLOW_LINKS)) { writeNewForced(cleanup, CampaignJson.canonical(tombstone)); forceDirectory(sealed.directory); }
             else if (!Arrays.equals(readBounded(cleanup), CampaignJson.canonical(tombstone))) throw new StorageException("STORAGE_INTEGRITY", "Cleanup marker differs from the exact final receipt");
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(sealed.directory)) {
-                for (Path path : stream) if (!RUN_FILES.contains(path.getFileName().toString())) throw new StorageException("CLEANUP_BLOCKED", "Unknown file prevents exact sealed-run cleanup");
+                for (Path path : stream) {
+                    if (!RUN_FILES.contains(path.getFileName().toString())) throw new StorageException("CLEANUP_BLOCKED", "Unknown file prevents exact sealed-run cleanup");
+                    rejectUnsafeFile(path, false);
+                }
             }
-            for (String name : List.of("run.db-journal", "input.json", "allocation.json", "initialized.json", "run.db")) {
+            for (String name : List.of("run.db-journal", "input.json", "allocation.json", "initialized.json", "database-started.json", "run.db")) {
                 Path path = sealed.directory.resolve(name);
                 if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) { rejectUnsafeFile(path, false); Files.delete(path); }
             }
@@ -725,7 +884,7 @@ public final class CampaignStorageService implements AutoCloseable {
             Files.delete(sealed.directory.resolve("run.lock"));
             Path tombstoneDirectory = runs.resolve(".cleanup-" + sealed.runId);
             if (Files.exists(tombstoneDirectory, LinkOption.NOFOLLOW_LINKS)) throw new StorageException("CLEANUP_BLOCKED", "Cleanup destination already exists");
-            Files.move(sealed.directory, tombstoneDirectory, StandardCopyOption.ATOMIC_MOVE); forceDirectory(runs);
+            ManagedCampaignFiles.moveDirectory(sealed.directory, tombstoneDirectory); forceDirectory(runs);
             Files.delete(tombstoneDirectory.resolve("cleanup.json")); Files.delete(tombstoneDirectory); forceDirectory(runs);
         } catch (IOException | SQLException | RuntimeException e) {
             if (active != null) active.blocked = "CLEANUP";
@@ -757,10 +916,13 @@ public final class CampaignStorageService implements AutoCloseable {
             }
         }
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory)) {
-            for (Path file : stream) if (!RUN_FILES.contains(file.getFileName().toString())) throw new StorageException("CLEANUP_BLOCKED", "Unknown file prevents exact sealed-run cleanup");
+            for (Path file : stream) {
+                if (!RUN_FILES.contains(file.getFileName().toString())) throw new StorageException("CLEANUP_BLOCKED", "Unknown file prevents exact sealed-run cleanup");
+                rejectUnsafeFile(file, false);
+            }
         }
         // The forced cleanup marker is written only after the accepted FINAL receipt and independent artifact verification.
-        for (String name : List.of("run.db-journal", "input.json", "allocation.json", "initialized.json", "run.db")) {
+        for (String name : List.of("run.db-journal", "input.json", "allocation.json", "initialized.json", "database-started.json", "run.db")) {
             Path path = directory.resolve(name);
             if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) { rejectUnsafeFile(path, false); Files.delete(path); }
         }
@@ -769,7 +931,7 @@ public final class CampaignStorageService implements AutoCloseable {
         Path tombstoneDirectory = runs.resolve(".cleanup-" + runId);
         if (!directory.equals(tombstoneDirectory)) {
             if (Files.exists(tombstoneDirectory, LinkOption.NOFOLLOW_LINKS)) throw new StorageException("CLEANUP_BLOCKED", "Cleanup destination already exists");
-            Files.move(directory, tombstoneDirectory, StandardCopyOption.ATOMIC_MOVE); forceDirectory(runs);
+            ManagedCampaignFiles.moveDirectory(directory, tombstoneDirectory); forceDirectory(runs);
         }
         Files.delete(tombstoneDirectory.resolve("cleanup.json")); Files.delete(tombstoneDirectory); forceDirectory(runs);
         Snapshot s = finalDocument.snapshot(); Map<String, Long> versions = new HashMap<>();
@@ -808,10 +970,16 @@ public final class CampaignStorageService implements AutoCloseable {
 
     private Connection connect(Path database) throws SQLException { return connect(database, false); }
     private Connection connect(Path database, boolean creating) throws SQLException {
-        try { rejectUnsafeFile(database, creating); }
+        try {
+            rejectUnsafeFile(database, creating);
+            rejectUnsafeFile(database.resolveSibling(database.getFileName() + "-journal"), true);
+            for (String unsupported : List.of("-wal", "-shm")) if (Files.exists(database.resolveSibling(database.getFileName() + unsupported), LinkOption.NOFOLLOW_LINKS))
+                throw new IOException("Unexpected SQLite sidecar");
+        }
         catch (IOException e) { throw new SQLException("Unsafe SQLite database path", e); }
         Connection c = DriverManager.getConnection("jdbc:sqlite:" + database.toUri() + "?mode=" + (creating ? "rwc" : "rw"));
         try (Statement s = c.createStatement()) {
+            try { rejectUnsafeFile(database, false); } catch (IOException e) { throw new SQLException("Database privacy readback failed", e); }
             s.execute("PRAGMA busy_timeout=5000");
             try (ResultSet r = s.executeQuery("PRAGMA encoding")) { if (!r.next() || !"UTF-8".equals(r.getString(1))) throw new SQLException("SQLite UTF-8 encoding is required"); }
             try (ResultSet r = s.executeQuery("PRAGMA journal_mode=DELETE")) { if (!r.next() || !"delete".equalsIgnoreCase(r.getString(1))) throw new SQLException("SQLite rollback journal mode unavailable"); }
@@ -841,10 +1009,11 @@ public final class CampaignStorageService implements AutoCloseable {
         return lockRun(runId, runs.resolve(runId), plan);
     }
     private Active lockRun(String runId, Path directory, StoragePlan plan) throws IOException {
-        rejectUnsafeDirectory(directory);
+        ManagedCampaignFiles.privateDirectory(directory);
         Path lockPath = directory.resolve("run.lock"); rejectUnsafeFile(lockPath, true);
-        FileChannel channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        FileChannel channel = FileChannel.open(lockPath, Set.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS), ManagedCampaignFiles.privateAttribute(lockPath, false));
         try {
+            rejectUnsafeFile(lockPath, false);
             FileLock lock;
             try { lock = channel.tryLock(); }
             catch (OverlappingFileLockException e) { throw new StorageException("RUN_LOCKED", "Residual run has another owner", e); }
@@ -862,7 +1031,8 @@ public final class CampaignStorageService implements AutoCloseable {
         FileChannel channel = null; FileLock lock = null;
         try {
             Path path = root.resolve("instance.lock"); rejectUnsafeFile(path, true);
-            channel = FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            channel = FileChannel.open(path, Set.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS), ManagedCampaignFiles.privateAttribute(path, false));
+            rejectUnsafeFile(path, false);
             try { lock = channel.tryLock(); }
             catch (OverlappingFileLockException e) { throw new StorageException("INSTANCE_LOCKED", "The managed storage root already has an owner", e); }
             if (lock == null) throw new StorageException("INSTANCE_LOCKED", "The managed storage root already has an owner");
@@ -884,10 +1054,11 @@ public final class CampaignStorageService implements AutoCloseable {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(runs)) {
             for (Path path : stream) {
                 rejectUnsafeDirectory(path); String name = path.getFileName().toString();
-                String id = name.startsWith(".cleanup-") ? name.substring(9) : name.startsWith(".discard-") ? name.substring(9) : name; CampaignJson.uuid(id);
+                String id = name.startsWith(".prepare-") ? preparation(path).runId() : name.startsWith(".cleanup-") ? name.substring(9) : name.startsWith(".discard-") ? name.substring(9) : name; CampaignJson.uuid(id);
                 if (active == null || !active.runId.equals(id)) ids.add(id);
             }
         }
+        if (new HashSet<>(ids).size() != ids.size()) throw new StorageException("STORAGE_INTEGRITY", "Multiple residual entries claim one run");
         Collections.sort(ids); return List.copyOf(ids);
     }
     private List<String> saveFiles() throws IOException {
@@ -923,32 +1094,16 @@ public final class CampaignStorageService implements AutoCloseable {
     }
     private static void writeNewForced(Path path, byte[] bytes) throws IOException {
         rejectUnsafeFile(path, true);
-        try (FileChannel c = FileChannel.open(path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
+        try (FileChannel c = FileChannel.open(path, Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS), ManagedCampaignFiles.privateAttribute(path, false))) {
             ByteBuffer buffer = ByteBuffer.wrap(bytes); while (buffer.hasRemaining()) c.write(buffer); c.force(true);
         }
+        rejectUnsafeFile(path, false);
     }
-    private static void ensureDirectory(Path path) throws IOException {
-        Path absolute = path.toAbsolutePath().normalize();
-        for (Path ancestor = absolute; ancestor != null; ancestor = ancestor.getParent()) if (Files.isSymbolicLink(ancestor)) throw new IOException("Symbolic link in managed directory path");
-        if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
-            Path parent = path.getParent(); if (parent != null) ensureDirectory(parent); createPrivateDirectory(path);
-        }
-        rejectUnsafeDirectory(path);
-    }
-    private static void createPrivateDirectory(Path path) throws IOException {
-        try { Files.createDirectory(path, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"))); }
-        catch (UnsupportedOperationException e) { throw new IOException("A private owner-only managed directory is required", e); }
-    }
-    private static void rejectUnsafeDirectory(Path path) throws IOException {
-        if (Files.isSymbolicLink(path) || !Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Managed directory missing or unsafe");
-    }
-    private static void rejectUnsafeFile(Path path, boolean allowMissing) throws IOException {
-        if (Files.isSymbolicLink(path) || (Files.exists(path, LinkOption.NOFOLLOW_LINKS) && !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) || (!allowMissing && !Files.exists(path, LinkOption.NOFOLLOW_LINKS))) throw new IOException("Managed file missing or unsafe");
-        Path parent = path.getParent(); if (parent != null) rejectUnsafeDirectory(parent);
-    }
-    private static void forceDirectory(Path directory) throws IOException {
-        try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) { channel.force(true); }
-    }
+    private static void ensureDirectory(Path path) throws IOException { ManagedCampaignFiles.ensureDirectory(path); }
+    private static void createPrivateDirectory(Path path) throws IOException { ManagedCampaignFiles.createDirectory(path); }
+    private static void rejectUnsafeDirectory(Path path) throws IOException { ManagedCampaignFiles.directory(path); }
+    private static void rejectUnsafeFile(Path path, boolean allowMissing) throws IOException { ManagedCampaignFiles.file(path, allowMissing); }
+    private static void forceDirectory(Path directory) throws IOException { ManagedCampaignFiles.forceDirectory(directory); }
     private static String newId() { return UUID.randomUUID().toString(); }
     private static long nextEpoch(long prior) {
         long epoch; SecureRandom random = new SecureRandom();
