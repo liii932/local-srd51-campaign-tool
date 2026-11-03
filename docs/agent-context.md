@@ -1,7 +1,8 @@
 # Agent 项目地图
 
-只负责定位，不替代 [AGENTS.md](../AGENTS.md) 或下表的权威合同。新会话通过
-[dnd-project-start](../.agents/skills/dnd-project-start/SKILL.md) 按需读取；不要递归加载全部链接。
+只负责定位，不替代 [AGENTS.md](../AGENTS.md) 或下表的权威合同。按任务选择下表入口并按需读取，
+不要递归加载全部链接。本地可选的 `dnd-project-start` skill 只提供导航便利；项目 skill 位于
+不跟踪的 `.agents/skills/`，缺失时直接使用本地图。
 当前进度以 Git、代码、测试和经授权的外部证据为准，文件存在不证明功能发布、迁移执行或部署完成。
 
 ## 最小项目识别
@@ -77,11 +78,11 @@
 | 构建、测试、WAR、部署、备份 | [测试](testing.md)；实际部署才读 [部署](deployment.md) / [备份恢复](backup-and-restore.md) | 仓库根 `pom.xml`、`config/`、`tools/`；MySQL 集成测试需独立授权与隔离目标 |
 | MySQL 测试连接目标保护 | [测试](testing.md) §3 | 测试目录 `persistence/MySqlIntegrationTestSupport.java`；`MySqlIntegrationTestSupportTest`，两入口在连接前仅允许专用测试目标 |
 | 新增完整规则领域、覆盖差距、发布门 | [机制覆盖矩阵](rules/srd-5.1-coverage.md)、[完整规则目标](rules/srd-5.1-complete.md)；[架构](architecture.md) §2—3 | 按机制族核对数据、真实执行和状态/恢复；只提升有实际消费者和证据的准确范围，不为未来领域编造类名 |
-| Agent、skill、项目导航、文档 | [AGENTS.md](../AGENTS.md)、本文 | `.agents/skills/dnd-project-start/SKILL.md`（仓库根）；不预读业务源码 |
+| Agent、skill、项目导航、文档 | [AGENTS.md](../AGENTS.md)、本文 | 先选本文相关入口；本地 `dnd-project-start` 可辅助导航；不预读业务源码 |
 
 ## 使用与维护
 
-- 按 [AGENTS.md](../AGENTS.md) 在首个任务读取 [dnd-project-start](../.agents/skills/dnd-project-start/SKILL.md)，再从本文选择相关入口；skill 负责定位，不是自动执行的启动脚本。
+- 按 [AGENTS.md](../AGENTS.md) 恢复上下文并从本文选择相关入口；本地存在 `dnd-project-start` 时可辅助定位，缺失时直接使用本文。skill 不是自动执行的启动脚本。
 - 入口变化时同步修正表中路径。规则正文、安全/事务不变量、账号职责、验证方法只在对应权威文档维护，不在 skill 中复制第二份。
 - 产品和跨领域设计通过 [v2 设计导航](design/v2/README.md) 定位相关专题；历史提案、任务状态和测试报告不能覆盖正式设计或证明已实现。
 - 分域 JSON 作者包与维护流程按任务查阅[规则制品](rules/schema-2-rule-artifacts.md)、[安装与接受](rules/schema-2-installation-and-acceptance.md)及[测试指南](testing.md)，不从本地 Agent 工作区补充合同或验证步骤。

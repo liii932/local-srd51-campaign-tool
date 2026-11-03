@@ -13,7 +13,7 @@ These instructions apply to automated contributors working in this repository. C
 ## Start from repository evidence
 
 1. Use this root file as the repository instructions. If its complete, current contents are already injected into context, do not read it again; otherwise read it from the repository root.
-2. At the first repository task in a new session or after context recovery, load the [dnd-project-start skill](.agents/skills/dnd-project-start/SKILL.md) unless its instructions are already available. It routes through [docs/agent-context.md](docs/agent-context.md); do not preload every authority listed below.
+2. At the first repository task in a new session or after context recovery, load the local `dnd-project-start` skill from `.agents/skills/dnd-project-start/SKILL.md` when it exists and its instructions are not already available. If it is absent, start directly from [docs/agent-context.md](docs/agent-context.md). Project skills are optional local navigation aids kept outside Git; do not preload every authority listed below.
 3. Inventory `git status --short --branch`, staged/unstaged names, untracked files and remotes. Before editing an affected file, inspect both its staged and unstaged diffs separately; do not dump unrelated patches merely for orientation.
 4. Treat every existing staged, unstaged or untracked change as user-owned unless repository evidence proves otherwise. Leave unrelated dirty files untouched.
 5. Read the closest production code, tests and relevant authoritative sections selected by the task map before editing. Expand only when a dependency, invariant or acceptance criterion requires it.

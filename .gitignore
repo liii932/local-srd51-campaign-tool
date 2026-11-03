@@ -1,9 +1,9 @@
 /target/
 /migr/
 /.pi/
-# Local Codex harness, kept outside Git and the WAR.
+# Local Codex configuration and project skills, kept outside Git and the WAR.
 /.codex/
-/.agents/skills/dnd-codex-harness/
+/.agents/skills/
 *.war
 *.zip
 # Runtime rule bundles are versioned with their deterministic author sources.
