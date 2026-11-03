@@ -1,38 +1,55 @@
 #!/usr/bin/env node
 'use strict';
 
-// Run only against tools/storage/run-local.sh with a disposable, newly created private root.
-// This script creates and ends fixture campaigns through the UI. It refuses existing saves/runs.
+// Run against the isolated launcher or native Windows external Tomcat, using a disposable, newly created private root.
+// Fresh mode refuses existing saves/runs; explicit resume mode verifies only its retained Arcane fixture.
 // NODE_PATH supplies an external Playwright installation; no browser packages enter the WAR.
+// DND_BROWSER_EXECUTABLE optionally selects an existing absolute Chromium/Edge executable.
 // Usage: node tools/storage/browser-smoke.cjs /absolute/empty/screenshot-directory
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { chromium } = require('playwright');
+const { createHash } = require('node:crypto');
+const { isDeepStrictEqual } = require('node:util');
+const HTTP_TIMEOUT = 120000;
 
 const ORIGIN = 'http://127.0.0.1:8080';
 const CAMPAIGN = '浏览器验收营地';
 const BASE_CAMPAIGN = '基础生命值验收';
 const FULL_CAMPAIGN = '完整领域浏览器验收';
+const ARCANE_CAMPAIGN = '奥术回想浏览器验收';
 const output = process.argv[2];
-if (process.argv.length !== 3 || !output || !path.isAbsolute(output)) {
+const resume = process.argv[3] === '--resume-arcane';
+const resumeRun = process.argv[4], resumeInput = process.argv[5];
+if ((!resume && process.argv.length !== 3) || (resume && (process.argv.length !== 6 || !/^[0-9a-f-]{36}$/.test(resumeRun || '') || !path.isAbsolute(resumeInput || ''))) || !path.isAbsolute(output || '')) {
   console.error('Usage: node tools/storage/browser-smoke.cjs /absolute/empty/screenshot-directory');
-  console.error('Target must be tools/storage/run-local.sh using a disposable, newly created root.');
+  console.error('Resume: node tools/storage/browser-smoke.cjs /absolute/empty/output --resume-arcane exact-run-id /absolute/storage/runs/exact-run-id/input.json');
+  console.error('Target must be an isolated launcher or native Windows external Tomcat using a disposable, newly created root.');
   process.exit(2);
 }
 
-const report = { origin: ORIGIN, result: 'FAILED', checks: [], screenshots: [], pageErrors: [], cspFailures: [] };
+const report = { origin: ORIGIN, mode: resume ? 'RESUME_ARCANE_AND_BASE_TAIL' : 'FRESH_FULL', result: 'FAILED', checks: [], screenshots: [], pageErrors: [], cspFailures: [], actions: [] };
 
 async function main() {
   console.log('Browser phase: opening the isolated campaign workbench');
   await fs.mkdir(output, { recursive: true });
   assert.equal((await fs.readdir(output)).length, 0, 'Screenshot output directory must be empty');
-  const browser = await chromium.launch({ headless: true });
+  const launch = { headless: true }, executable = process.env.DND_BROWSER_EXECUTABLE;
+  if (executable !== undefined) {
+    assert.ok(path.isAbsolute(executable), 'DND_BROWSER_EXECUTABLE must be an absolute file path');
+    assert.ok((await fs.stat(executable)).isFile(), 'DND_BROWSER_EXECUTABLE must identify an existing file');
+    launch.executablePath = executable;
+  }
+  const browser = await chromium.launch(launch);
+  report.browserVersion = browser.version();
   const context = await browser.newContext({ viewport: { width: 1440, height: 1050 }, locale: 'zh-CN' });
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
+  page.setDefaultNavigationTimeout(HTTP_TIMEOUT);
   let disposableConfirmed = false;
   let ownsActiveFixture = false;
+  let originalSaves = null, saveDirectory = null;
 
   page.on('pageerror', error => report.pageErrors.push(error.message));
   page.on('console', event => {
@@ -55,26 +72,40 @@ async function main() {
   };
 
   async function action(name, trigger) {
+    const started = Date.now(), timing = {action: name, postResponseMs: null, stateResponseMs: null};
+    report.actions.push(timing);
     const observed = Promise.all([
       page.waitForResponse(response => response.request().method() === 'POST'
-        && response.url() === `${ORIGIN}/api/host/storage/${name}`),
+        && response.url() === `${ORIGIN}/api/host/storage/${name}`, {timeout: HTTP_TIMEOUT}).then(response => {
+        timing.postResponseMs = Date.now() - started; timing.postStatus = response.status();
+        timing.requestId = response.request().headers()['x-request-id'];
+        const fields = new URLSearchParams(response.request().postData());
+        if (fields.has('fileKey')) timing.fileKey = fields.get('fileKey');
+        return response;
+      }),
       page.waitForResponse(response => response.request().method() === 'GET'
-        && response.url() === `${ORIGIN}/api/host/storage/state`)
-    ]).catch(error => ({ observationFailure: error }));
-    await trigger();
-    const responses = await observed;
-    if (responses.observationFailure) throw responses.observationFailure;
-    const [response, stateResponse] = responses;
-    const body = await response.json();
-    assert.equal(response.status(), 200, `${name} failed: ${JSON.stringify(body)}`);
-    assert.equal(stateResponse.status(), 200, `${name} did not refresh its session epoch`);
-    await stateResponse.finished();
-    // The UI sets its status only after parsing/rendering the refreshed GET and before clearing busy.
-    const expectedMessage = name === 'end' ? '战役已保存并结束，可以再次打开。'
-      : name === 'save' ? '战役已保存。' : name === 'import' ? '文件已核验并导入，请选择打开。'
-      : name === 'delete' ? '所选文件已删除。' : '战役已更新。';
-    await equalText('#storage-message', expectedMessage);
-    return body;
+        && response.url() === `${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT}).then(response => {
+        timing.stateResponseMs = Date.now() - started; timing.stateStatus = response.status(); return response;
+      })
+    ]).catch(error => ({observationFailure: error}));
+    try {
+      await trigger();
+      const responses = await observed;
+      if (responses.observationFailure) throw responses.observationFailure;
+      const [response, stateResponse] = responses, body = await response.json();
+      assert.equal(response.status(), 200, `${name} failed: ${JSON.stringify(body)}`);
+      assert.equal(stateResponse.status(), 200, `${name} did not refresh its session epoch`);
+      await stateResponse.finished();
+      const expectedMessage = name === 'end' ? '战役已保存并结束，可以再次打开。'
+        : name === 'save' ? '战役已保存。' : name === 'import' ? '文件已核验并导入，请选择打开。'
+        : name === 'delete' ? '所选文件已删除。' : '战役已更新。';
+      await equalText('#storage-message', expectedMessage);
+      return body;
+    } catch (error) {
+      timing.failedPhase = timing.postResponseMs === null ? `POST /${name}` : timing.stateResponseMs === null ? 'GET /state' : 'response body or UI render';
+      timing.error = error.message;
+      throw new Error(`${name} (${timing.failedPhase}): ${error.message}`);
+    } finally { timing.elapsedMs = Date.now() - started; }
   }
 
   async function screenshot(filename, width, height) {
@@ -105,16 +136,199 @@ async function main() {
     return ended.savedFile;
   }
 
+  async function currentCampaign() {
+    const response = await page.request.get(`${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT});
+    assert.equal(response.status(), 200);
+    return (await response.json()).campaign;
+  }
+
+  async function rejectRecovery(expectedChoices) {
+    const before = await currentCampaign();
+    const responses = Promise.all([
+      page.waitForResponse(response => response.request().method() === 'POST' && response.url() === `${ORIGIN}/api/host/storage/domain`, {timeout: HTTP_TIMEOUT}),
+      page.waitForResponse(response => response.request().method() === 'GET' && response.url() === `${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT})
+    ]);
+    await form('domain-rest').getByRole('button', { name: '应用休息操作', exact: true }).click();
+    const [response, refreshed] = await responses;
+    assert.equal(response.status(), 409, 'An invalid recovery must be rejected by the server');
+    assert.equal((await response.json()).code, 'DOMAIN_REJECTED');
+    const payload = JSON.parse(new URLSearchParams(response.request().postData()).get('payload'));
+    assert.deepEqual(payload.command.restInput.recoveredSpellSlots, expectedChoices, 'The real form must submit selected ranks/counts');
+    assert.equal(refreshed.status(), 200); await refreshed.finished();
+    await equalText('#storage-message', '此操作不满足当前规则或状态，请检查角色、装备、轮次与待处理行动。');
+    const after = await currentCampaign();
+    assert.deepEqual(after.domain, before.domain, 'Rejected recovery must preserve slots, day, roots and character history');
+    assert.deepEqual(after.history, before.history); assert.equal(after.revision, before.revision);
+  }
+
+
+  // The retained file is a typed campaign document; Host views use ordinary JSON records.
+  // Convert only integer fields and maps declared by these exact fixture record types.
+  const integerFields = {
+    'character.State': ['level', 'proficiencyBonus', 'hitPoints', 'maximumHitPoints', 'version'],
+    'character.ClassLevel': ['level'], 'character.FeatureState': ['acquiredAtClassLevel'],
+    'character.ProficiencyState': ['acquiredAtTotalLevel'], 'character.ResourceState': ['current', 'maximum'],
+    'character.HitDicePool': ['sides', 'current', 'maximum'],
+    'character.HealthState': ['temporaryHitPoints', 'deathSuccesses', 'deathFailures', 'stableRecoveryMinute', 'stableRecoverySecond'],
+    'character.RestState': ['minute', 'second', 'lastLongRestEndMinute', 'lastLongRestEndSecond'],
+    'character.RestAttempt': ['startMinute', 'hitPointsAtStart', 'sleepMinutes', 'lightMinutes', 'strenuousMinutes', 'consecutiveStrenuousMinutes'],
+    'character.SpellbookState': ['learnedThroughLevel', 'preparedAtRestMinute', 'preparedAtRestSecond', 'lastArcaneRecoveryDay'],
+    'character.LearnedSpell': ['acquiredAtClassLevel'], 'campaign.Root': ['sequence'],
+    'rule.RuleIdentity': [], 'rule.EntryIdentity': [], 'preparation-identity': []
+  };
+  const integer = value => {
+    if (value === null) return null;
+    assert.equal(typeof value, 'string'); assert.match(value, /^(0|-?[1-9][0-9]*)$/);
+    const number = Number(value); assert.ok(Number.isSafeInteger(number)); return number;
+  };
+  function typed(value) {
+    if (value === null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map(typed);
+    assert.ok(Object.hasOwn(integerFields, value.type), `Unexpected retained record ${value.type}`);
+    if (value.type === 'rule.RuleIdentity') assert.deepEqual(Object.keys(value).sort(), ['moduleKey', 'ruleKey', 'ruleType', 'type']);
+    const result = {};
+    for (const [key, field] of Object.entries(value)) {
+      if (key === 'type') continue;
+      if (integerFields[value.type].includes(key)) result[key] = integer(field);
+      else if (value.type === 'character.State' && key === 'abilities') {
+        assert.ok(Array.isArray(field)); assert.equal(field.length, 6);
+        const keys = field.map(pair => { assert.equal(pair.length, 2); return pair[0]; });
+        assert.deepEqual([...keys].sort(), ['charisma', 'constitution', 'dexterity', 'intelligence', 'strength', 'wisdom'].map(key => 'ability.' + key));
+        result[key] = Object.fromEntries(field.map(([ability, score]) => [ability, integer(score)]));
+      } else result[key] = typed(field);
+    }
+    return result;
+  }
+  function eventEvidence(event, retained) {
+    if (retained) {
+      assert.equal(event.type, 'character.Event'); assert.equal(event.command.type, 'character.Command');
+      assert.equal(event.after.type, 'character.State'); if (event.before !== null) assert.equal(event.before.type, 'character.State');
+      if (event.command.restInput) assert.equal(event.command.restInput.type, 'character.RestInput');
+    }
+    const choices = event.command.restInput?.recoveredSpellSlots || (retained ? [] : {});
+    const slots = retained ? Object.fromEntries(choices.map(pair => {
+      assert.equal(pair.length, 2); const rank = integer(pair[0]), count = integer(pair[1]);
+      assert.ok(rank >= 1 && rank <= 5 && count >= 1 && count <= 4); return [String(rank), count];
+    })) : choices;
+    return {operationId: event.operationId, requestDigest: event.requestDigest, kind: event.command.kind,
+      hitDieRoll: event.hitDieRoll, checkResult: event.checkResult, healthResult: event.healthResult,
+      before: retained ? typed(event.before) : event.before, after: retained ? typed(event.after) : event.after, recoveredSpellSlots: slots};
+  }
+  const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+  const completePayload = ({fileKey, integrity, ...payload}) => payload;
+  async function saveManifest(directory) {
+    const rows = [];
+    for (const name of (await fs.readdir(directory)).filter(name => name.endsWith('.json')).sort()) {
+      const bytes = await fs.readFile(path.join(directory, name)), file = JSON.parse(bytes);
+      assert.equal(name, file.fileKey + '.json');
+      rows.push({fileKey: file.fileKey, name: file.campaign.name, bytes: bytes.length, sha256: sha256(bytes)});
+    }
+    return rows;
+  }
+  async function verifyOriginalSaves() {
+    if (!originalSaves) return;
+    const after = await saveManifest(saveDirectory), byKey = new Map(after.map(file => [file.fileKey, file]));
+    for (const file of originalSaves) assert.deepEqual(byKey.get(file.fileKey), file, `Original save ${file.fileKey} changed`);
+    report.originalSavesAfter = originalSaves.map(file => byKey.get(file.fileKey));
+  }
+  async function resumeArcane() {
+    assert.equal(path.basename(resumeInput), 'input.json');
+    assert.equal(path.basename(path.dirname(resumeInput)), resumeRun);
+    const runDirectory = path.dirname(resumeInput);
+    assert.equal(path.basename(path.dirname(runDirectory)), 'runs');
+    saveDirectory = path.join(path.dirname(path.dirname(runDirectory)), 'saves');
+    const bytes = await fs.readFile(resumeInput), baseline = JSON.parse(bytes);
+    const allocation = JSON.parse(await fs.readFile(path.join(runDirectory, 'allocation.json'), 'utf8'));
+    assert.equal(allocation.runId, resumeRun); assert.equal(baseline.fileKey, resumeRun);
+    assert.equal(sha256(bytes), allocation.inputDigest); assert.equal(baseline.campaign.name, ARCANE_CAMPAIGN);
+    assert.equal(baseline.applicationModel, 'srd51-vitality-1'); assert.equal(baseline.fileKind, 'VITALITY_CAMPAIGN');
+    assert.equal(baseline.formatVersion, 1); assert.equal(baseline.campaign.eventTail, '11');
+    assert.equal(baseline.domains.type, 'campaign.State'); assert.equal(baseline.domains.characters.length, 1);
+    const character = baseline.domains.characters[0];
+    assert.equal(character.type, 'campaign.Character'); assert.equal(character.history.type, 'character.History');
+    assert.equal(character.history.current.type, 'character.State');
+    const expectedState = typed(character.history.current), expectedRoots = baseline.domains.roots.map(root => {
+      assert.equal(root.type, 'campaign.Root'); return typed(root);
+    });
+    const expectedEvents = character.history.events.map(event => eventEvidence(event, true));
+    assert.equal(expectedRoots.length, 11); assert.equal(expectedEvents.length, 11);
+    assert.deepEqual(expectedRoots.flatMap(root => root.characterOperations), expectedEvents.map(event => event.operationId));
+    assert.deepEqual(expectedEvents.map(event => event.kind), ['INITIALIZED', 'SPELLBOOK_INITIALIZED', 'RESOURCE_SPENT',
+      'REST_STARTED', 'TIME_ADVANCED', 'TIME_ADVANCED', 'REST_COMPLETED', 'REST_ENDED', 'REST_STARTED', 'TIME_ADVANCED', 'REST_COMPLETED']);
+    assert.deepEqual(expectedState.characterClass, {moduleKey: 'srd51_characters', ruleType: 'character.class', ruleKey: 'class.wizard'});
+    assert.equal(expectedState.campaignId, baseline.campaign.campaignKey);
+    const slot = expectedState.resources.find(resource => resource.identity.ruleKey === 'resource.wizard.slot1');
+    assert.deepEqual(slot.identity, {moduleKey: 'srd51_characters', ruleType: 'character.resource', ruleKey: 'resource.wizard.slot1'});
+    assert.equal(slot.current, 1); assert.equal(slot.maximum, 2); assert.equal(expectedState.spellbook.lastArcaneRecoveryDay, 0);
+    assert.deepEqual(expectedEvents[6].recoveredSpellSlots, {'1': 1}); assert.deepEqual(expectedEvents[10].recoveredSpellSlots, {});
+    originalSaves = await saveManifest(saveDirectory); report.originalSavesBefore = originalSaves;
+    const matchingSavedFiles = [];
+    for (const file of originalSaves) {
+      assert.ok([CAMPAIGN, FULL_CAMPAIGN, ARCANE_CAMPAIGN, BASE_CAMPAIGN].includes(file.name), 'Refusing unrelated saved data');
+      const saved = JSON.parse(await fs.readFile(path.join(saveDirectory, file.fileKey + '.json'), 'utf8'));
+      if (isDeepStrictEqual(completePayload(saved), completePayload(baseline))) matchingSavedFiles.push(file.fileKey);
+    }
+    assert.ok(matchingSavedFiles.length > 0, 'Retained input must match an original complete save payload');
+    report.baseline = {runId: resumeRun, campaignId: baseline.campaign.campaignKey, inputBytes: bytes.length,
+      inputSha256: sha256(bytes), matchingSavedFiles};
+    await fs.writeFile(path.join(output, 'baseline-input.json'), bytes);
+    const response = await page.request.get(`${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT});
+    assert.equal(response.status(), 200); const initial = await response.json();
+    assert.equal(initial.storage.state, 'RESIDUAL'); assert.equal(initial.campaign, null);
+    assert.deepEqual(initial.storage.residualRunIds, [resumeRun]);
+    assert.deepEqual(initial.storage.saveFiles, [], 'Residual policy must hide save choices until recovery');
+    assert.deepEqual(initial.savedCampaigns, [], 'Residual policy must hide save metadata until recovery');
+    disposableConfirmed = true;
+    await form('storage-residuals').selectOption(resumeRun);
+    await action('recover', () => form('storage-recover').getByRole('button', {name: '恢复战役', exact: true}).click());
+    ownsActiveFixture = true;
+    const recoveredResponse = await page.request.get(`${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT});
+    assert.equal(recoveredResponse.status(), 200); const recoveredView = await recoveredResponse.json();
+    assert.equal(recoveredView.storage.state, 'ACTIVE'); assert.equal(recoveredView.storage.runId, resumeRun);
+    assert.deepEqual([...recoveredView.storage.saveFiles].sort(), originalSaves.map(file => file.fileKey).sort());
+    const recovered = recoveredView.campaign, current = recovered.domain.characters[0];
+    assert.equal(recovered.campaignId, baseline.campaign.campaignKey); assert.equal(recovered.name, ARCANE_CAMPAIGN);
+    assert.equal(recovered.history.length, baseline.history.length);
+    assert.equal(current.name, character.name); assert.equal(current.kind, character.kind); assert.equal(current.active, character.active);
+    assert.deepEqual(current.state, expectedState); assert.deepEqual(current.history.current, expectedState);
+    assert.deepEqual(recovered.domain.roots, expectedRoots);
+    assert.deepEqual(current.history.events.map(event => eventEvidence(event, false)), expectedEvents);
+    report.checks.push('Explicit recovery matched exact retained input/allocation digest, original saved payloads, Wizard Slot1 1/2, use day0, all11 roots and character event facts');
+    await page.locator('[data-pane="growth"]').click();
+    await screenshot('01-recovered-arcane-wide.png', 1440, 1050);
+    await screenshot('02-recovered-arcane-mobile.png', 390, 844);
+    const freshSave = await action('save', () => form('storage-save').click());
+    assert.ok(freshSave.savedFile, 'Save must return its exact accepted file identity');
+    const freshBytes = await fs.readFile(path.join(saveDirectory, freshSave.savedFile + '.json'));
+    const freshDocument = JSON.parse(freshBytes);
+    assert.equal(freshDocument.fileKey, freshSave.savedFile);
+    assert.deepEqual(completePayload(freshDocument), completePayload(baseline), 'Fresh complete save must preserve every retained payload field');
+    report.freshSave = {fileKey: freshSave.savedFile, bytes: freshBytes.length, sha256: sha256(freshBytes), retainedPayloadEqual: true};
+    const saved = await endFixture(); report.roundTripFileKey = saved;
+    await form('storage-files').selectOption(saved);
+    await action('open', () => form('storage-open').getByRole('button', {name: '打开战役', exact: true}).click());
+    ownsActiveFixture = true;
+    const reopened = await currentCampaign();
+    assert.deepEqual(reopened.domain, recovered.domain); assert.deepEqual(reopened.history, recovered.history);
+    assert.match(await form('storage-characters').innerText(), /奥术回想使用日：第 0 日/);
+    assert.match(await form('storage-history').innerText(), /奥术回想：.*0 → 1（恢复 1）/);
+    await screenshot('03-reopened-arcane-wide.png', 1440, 1050);
+    await endFixture();
+    report.checks.push('Fresh save + END + exact-file open preserved the entire recovered Host domain/history; reopened fixture ended successfully');
+    await verifyOriginalSaves();
+  }
+
   try {
     const initial = await page.goto(`${ORIGIN}/host/storage`, { waitUntil: 'networkidle' });
     assert.equal(initial.status(), 200, 'The isolated storage page must be available');
     await visible('#storage-idle');
     await equalText('#storage-message', '创建、打开或恢复一个战役。');
+    if (resume) { await resumeArcane(); } else {
     assert.equal(await form('storage-active').isVisible(), false, 'Refusing an existing active run');
     assert.equal(await form('storage-files').locator('option').count(), 0, 'Refusing a root with saved campaigns');
     assert.equal(await form('storage-residuals').locator('option').count(), 0, 'Refusing a root with residual runs');
     assert.equal(await form('storage-create').getByRole('button', { name: '创建战役', exact: true }).isEnabled(), true,
-      'Target must be idle, using a disposable new root from tools/storage/run-local.sh');
+      'Target must be idle, using a disposable new root on the isolated launcher or native Windows external Tomcat');
     disposableConfirmed = true;
     report.checks.push('Fresh disposable root verified before the first business write');
     console.log('Browser phase: fresh private root verified; testing vitality forms');
@@ -314,9 +528,84 @@ async function main() {
     assert.equal(await form('storage-download').isVisible(), true);
     report.checks.push('Runtime UI created PC and NPC, locations, positions, items, notes, a server check and battle turn; full save reopened unchanged');
     report.checks.push('Downloaded, deleted and reimported one exact full file through protected UI');
-    console.log('Browser phase: full file reopened, downloaded, deleted and reimported; testing base-only selection');
+    console.log('Browser phase: full file reopened, downloaded, deleted and reimported; testing Arcane Recovery');
 
-    await runtime.uncheck(); await healing.uncheck();
+    await form('storage-create').locator('[name="name"]').fill(ARCANE_CAMPAIGN);
+    await action('create', () => form('storage-create').getByRole('button', { name: '创建战役', exact: true }).click());
+    ownsActiveFixture = true;
+    await page.locator('[data-pane="people"]').click();
+    await form('domain-create').locator('[name="name"]').fill('研读法师');
+    await chooseRule('#domain-create [name="classKey"]', 'class.wizard');
+    await action('domain', () => form('domain-create').getByRole('button', { name: '创建完整角色', exact: true }).click());
+    await page.locator('[data-pane="magic"]').click();
+    const book = form('domain-spellbook');
+    const spellChoices = async names => book.locator('[name="learned"] option').evaluateAll((options, names) =>
+      names.map(name => options.find(option => option.value.endsWith('/spell.' + name))?.value), names);
+    const learned = await spellChoices(['shield', 'burning_hands', 'alarm', 'charm_person', 'color_spray', 'comprehend_languages']);
+    assert.ok(learned.every(Boolean), 'Wizard book must use the actual finite rule catalog');
+    await book.locator('[name="learned"]').selectOption(learned);
+    await book.locator('[name="prepared"]').selectOption(await spellChoices(['shield', 'burning_hands']));
+    await action('domain', () => book.getByRole('button', { name: '确认法术选择', exact: true }).click());
+    await page.locator('[data-pane="growth"]').click();
+    await chooseRule('#domain-resource [name="resource"]', 'resource.wizard.slot1');
+    await form('domain-resource').locator('[name="amount"]').fill('2');
+    await action('domain', () => form('domain-resource').getByRole('button', { name: '应用资源操作', exact: true }).click());
+    const rest = form('domain-rest');
+    const restAction = async kind => {
+      await rest.locator('[name="kind"]').selectOption(kind);
+      await action('domain', () => rest.getByRole('button', { name: '应用休息操作', exact: true }).click());
+    };
+    await restAction('REST_STARTED');
+    await rest.locator('[name="minutes"]').fill('59'); await restAction('TIME_ADVANCED');
+    await rest.locator('[name="kind"]').selectOption('REST_COMPLETED');
+    await rest.locator('[name="recoverSlot1"]').fill('1');
+    await rejectRecovery([['1', '1']]);
+    await rest.locator('[name="minutes"]').fill('1'); await restAction('TIME_ADVANCED');
+    await rest.locator('[name="kind"]').selectOption('REST_COMPLETED');
+    await rest.locator('[name="recoverSlot1"]').fill('2');
+    await rejectRecovery([['1', '2']]);
+    assert.equal(await rest.locator('[name="recoverSlot1"]').getAttribute('max'), '2');
+    assert.equal(await rest.locator('[name="recoverSlot4"]').isVisible(), false);
+    assert.equal(await rest.locator('[name="recoverSlot5"]').isVisible(), false);
+    await rest.locator('[name="recoverSlot1"]').fill('1');
+    await restAction('REST_COMPLETED');
+    let wizard = (await currentCampaign()).domain.characters[0];
+    const wizardSlots = character => character.state.resources.find(resource => resource.identity.ruleKey === 'resource.wizard.slot1');
+    assert.equal(Number(wizardSlots(wizard).current), 1); assert.equal(Number(wizard.state.spellbook.lastArcaneRecoveryDay), 0);
+    assert.deepEqual(wizard.history.events.at(-1).command.restInput.recoveredSpellSlots, {'1': 1});
+    assert.match(await form('storage-characters').innerText(), /最近奥术回想：.*0 → 1（恢复 1）/);
+    assert.match(await form('storage-history').innerText(), /奥术回想：.*0 → 1（恢复 1）/);
+    await restAction('REST_ENDED'); await restAction('REST_STARTED');
+    await rest.locator('[name="minutes"]').fill('60'); await restAction('TIME_ADVANCED');
+    await rest.locator('[name="kind"]').selectOption('REST_COMPLETED'); await rest.locator('[name="recoverSlot1"]').fill('1');
+    assert.match(await form('arcane-recovery-status').innerText(), /本日已使用/);
+    await rejectRecovery([['1', '1']]);
+    await screenshot('09-arcane-recovery-wide.png', 1440, 1050);
+    await screenshot('10-arcane-recovery-mobile.png', 390, 844);
+    await rest.locator('[name="recoverSlot1"]').fill('0'); await restAction('REST_COMPLETED');
+    wizard = (await currentCampaign()).domain.characters[0];
+    assert.equal(Number(wizardSlots(wizard).current), 1); assert.equal(Number(wizard.state.spellbook.lastArcaneRecoveryDay), 0);
+    assert.deepEqual(wizard.history.events.at(-1).command.restInput.recoveredSpellSlots, {}, 'All zeros must decline without consuming another use');
+    const arcaneBefore = await currentCampaign();
+    await action('save', () => form('storage-save').click());
+    const arcaneSave = await endFixture();
+    await form('storage-files').selectOption(arcaneSave);
+    await action('open', () => form('storage-open').getByRole('button', { name: '打开战役', exact: true }).click());
+    ownsActiveFixture = true;
+    const arcaneAfter = await currentCampaign();
+    assert.deepEqual(arcaneAfter.domain, arcaneBefore.domain, 'Save, END and reopen must retain slots, use day, exact roots and child history');
+    assert.deepEqual(arcaneAfter.history, arcaneBefore.history);
+    assert.match(await form('storage-characters').innerText(), /奥术回想使用日：第 0 日/);
+    assert.match(await form('storage-history').innerText(), /奥术回想：.*0 → 1（恢复 1）/);
+    await endFixture();
+    report.checks.push('Real Wizard rest form offered only spent supported slots and submitted selected ranks/counts; incomplete rest, over-budget and daily reuse were rejected without state/history writes; empty selection declined');
+    report.checks.push('Arcane Recovery restored exactly one spent slot, displayed actual recovery/day, and Save + END + reopen preserved slots, use day and complete root/child history');
+    console.log('Browser phase: Arcane Recovery and full-file round trip verified; testing base-only selection');
+
+    }
+    const runtimeTail = page.locator('#storage-modules input[value="srd51-runtime@1"]');
+    const healingTail = page.locator('#storage-modules input[value="srd51-healing@1"]');
+    await runtimeTail.uncheck(); await healingTail.uncheck();
     await form('storage-create').locator('[name="name"]').fill(BASE_CAMPAIGN);
     await action('create', () => form('storage-create').getByRole('button', { name: '创建战役', exact: true }).click());
     ownsActiveFixture = true;
@@ -333,14 +622,16 @@ async function main() {
     assert.deepEqual(report.pageErrors, [], 'Browser JavaScript errors were observed');
     assert.deepEqual(report.cspFailures, [], 'CSP failures were observed');
     report.checks.push('All fixture runs ended through Save and End; no pageerror or CSP failures');
+    await verifyOriginalSaves();
     report.result = 'PASSED';
   } catch (error) {
     report.error = error.message;
+    if (resume) report.cleanup = 'Retained fixture and accepted outcomes preserved; no automatic retry or END on failure';
     if (disposableConfirmed) {
       await page.screenshot({ path: path.join(output, 'failure.png'), fullPage: true }).catch(() => {});
-      if (ownsActiveFixture && await form('storage-active').isVisible().catch(() => false)) {
+      if (!resume && ownsActiveFixture && await form('storage-active').isVisible().catch(() => false)) {
         const name = await form('storage-campaign-name').textContent().catch(() => '');
-        if ([CAMPAIGN, BASE_CAMPAIGN, FULL_CAMPAIGN].includes(name.trim())) {
+        if ([CAMPAIGN, BASE_CAMPAIGN, FULL_CAMPAIGN, ARCANE_CAMPAIGN].includes(name.trim())) {
           try { await endFixture(); report.cleanup = 'Fixture saved and ended through UI'; }
           catch (cleanup) { report.cleanup = `UI cleanup remains pending: ${cleanup.message}`; }
         }

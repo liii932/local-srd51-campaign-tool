@@ -1,10 +1,12 @@
 # Schema 2 有限法师奥术回想
 
-本合同属于单角色 INTERNAL 角色消费者，扩展[成长与资源](schema-2-character-statistics.md)、
+本合同定义有限角色消费者，扩展[成长与资源](schema-2-character-statistics.md)、
 [标准休息](schema-2-character-rest.md)及[有限法师](schema-2-spells.md)。依据本地
 [SRD 第 53 页 Arcane Recovery](../references/srd-5.1/pages/page-053.md)，法师完成短休时可
 每日一次选择已消耗法术位，恢复的环级合计至多为法师等级一半向上取整，不能选择六环以上。
 本实现仅支持已经具有真实法术书的单职业法师 1—5 级及其一至三环法术位。
+原 MySQL 路线保留 INTERNAL 采用边界；[SQLite 战役模式](../storage-vitality-loop.md)通过
+角色领域命令和成长与休息表单采用同一计算规则，支持完整战役文件、END 与重开。
 
 ## 作者身份与准确材料
 
@@ -34,7 +36,7 @@
 缺口，`Σ(环级 × 数量) ≤ ceil(法师等级 / 2)`。只恢复选中的缺额，不改变其他位或上限，
 没有骰子、施法、动作/反应、专注或持续效果，也不产生额外经过时间。
 
-本内部运行采用明确的战役时间日：`day = floor((minute × 60 + second) / 86400)`，初始化
+本有限运行采用明确的战役时间日：`day = floor((minute × 60 + second) / 86400)`，初始化
 时钟的第一个 24 小时为 day 0。该日由既有唯一角色时钟确定，不使用墙钟、操作者时间或
 客户端日期。非空有效选择将 `SpellbookState.lastArcaneRecoveryDay` 设为完成时的 day；
 同日再次选择拒绝，到下一日边界才重新可用。跨日短休按完成时的日计费；空选择不消费，
@@ -47,6 +49,11 @@
 → `Schema2CharacterRestRules.REST_COMPLETED` → 奥术回想计算 →
 `Schema2CharacterRuntimeService` → 同一角色根事件和完整前后状态。原有角色资源是唯一
 法术位状态，法术书保存每日使用事实，休息状态保存真实完成过程与后续生命骰窗口。
+
+SQLite Host 的调用方为 `CampaignDomainEngine`，资源、法术书、角色事件和战役根历史
+沿共同 SQLite 事务提交。网页只显示该角色已消耗的实际法师法术位，发送真实选择；全部
+为零可放弃本次收益。显示的恢复数量来自事件前后状态，使用日来自保存的法术书事实。
+界面约束不替代后端资格、预算、位数缺口和每日限制验证。
 
 V041 增加 `s2_character_arcane_recovery_choice` 的类型化环级/数量子行、根事件的准确
 `arcane_recovery_choice_count` 和前后状态的 `arcane_recovery_day`。已有状态行与事件的
@@ -71,16 +78,15 @@ V041 增加 `s2_character_arcane_recovery_choice` 的类型化环级/数量子�
 | 4—5 来源、组合、快照 | 既有类型化 feature/Wizard/resource 来源和镜像、准确覆盖链；测试经真实包的类型化来源读回、准备/快照，不仅调用内存函数。非空内容安装资格仍关闭。 |
 | 6—8 选择、时机、真实消费者 | 本文短休/日界条件与 `Schema2ArcaneRecoveryRules`，由真实 `REST_COMPLETED` 唯一消费。 |
 | 9—11 事务、幂等、所有者 | 共同业务事务和角色 Service/Repository；一次角色版本及完整前后事实，含晚写故障和 UNKNOWN 两种提交结果。 |
-| 12 保存恢复 | INTERNAL 角色历史及同准确快照的直接恢复；完整文件/战役恢复仍须完成[保存与恢复](../design/v2/save-and-recovery.md)的全域责任，不宣称 archive format 2 可用。 |
-| 13 技术 END/清理 | 不产生新的持续过程；既有未完成短休/生命骰窗口如实保存在角色历史。新选择子表引用根事件，未来完整清理须先删该子表；当前无新 END/清理入口，不以局部恢复代替完整 FINAL。 |
+| 12 保存恢复 | 原 MySQL INTERNAL 角色历史及同准确快照的直接恢复；SQLite 完整文件保留选择、位数、使用日及根/子历史，不重新发放收益；不宣称 archive format 2 可用。 |
+| 13 技术 END/清理 | 不产生新的持续过程；未完成短休/生命骰窗口如实保存。SQLite 使用共同 FINAL/封存与文件清理，MySQL INTERNAL 子表仍遵守独立迁移与清理边界。 |
 | 14 容量 | 角色预算计入全部不可变选择子行，每日事实随前后状态保存；不截断或删除历史腾空间。 |
-| 15 验证 | `Schema2ArcaneRecoveryRulesTest`、`Schema2ArcaneRecoveryRuntimeServiceTest`、`Schema2ArcaneRecoverySchemaTest`，覆盖独立数值例、边界、错模式、坏行、回放、直接恢复和故障闭包。 |
-| 16 入口 | 真实内部角色 Service；活动战斗/探索场景仍由原 owner 锁定，不能用独立短休命令绕过。没有 Host 页面/API 或客户端自由日期。 |
-| 17 合同同步 | 本合同与共享角色/施法/采用入口一起维护；本机制仅为其有限 INTERNAL 子任务。 |
+| 15 验证 | 原规则、运行服务及 schema 测试，加 `CampaignArcaneRecoveryIntegrationTest` 和浏览器主用例，覆盖边界、幂等、事务回滚、跨日与完整文件重开。 |
+| 16 入口 | SQLite 成长与休息表单及受保护的角色领域命令；原 MySQL 保留内部角色 Service。活动战斗/探索仍由原 owner 锁定，不接受客户端自由日期。 |
+| 17 合同同步 | 本合同与共享角色/施法、SQLite 运行及领域接合入口一起维护。 |
 
 真实 MySQL 迁移、CHECK/FK/触发器、账号权限和锁/连接验收是独立外部检查点。使用
 [最小授权](../../database/grants/schema2-arcane-recovery.sql)与
 [只读核验](../../database/verify/schema2-arcane-recovery.sql)；文件存在不表示已经执行。
-完整 SRD、其余恢复能力、多职业/Pact Magic、法术书实物/抄录、魔法物品、完整初始化、
-Host、完整保存/清理和发布门仍未由本机制完成。legacy RELEASED 默认及 DRAFT/archive 2
-边界保持。
+完整 SRD、其余恢复能力、多职业/Pact Magic、法术书实物/抄录、魔法物品和完整规则发布门
+仍不由本机制开放。原 MySQL legacy RELEASED 默认及 DRAFT/archive 2 边界保持。

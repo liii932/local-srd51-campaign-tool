@@ -47,6 +47,11 @@ mvn clean verify
 
 所有验证报告必须来自已结束的进程，列出实际命令、退出码、测试总数、失败、错误、跳过和最终 `BUILD SUCCESS`/失败，以及未运行范围。不要从截断或仍在运行的输出宣称成功，不将定向通过、零测试或跳过测试表述成全量通过。
 
+全量运行中断或修正局部失败后，可保留本次已完成、输入未受影响的通过报告，只补跑失败、
+未完成及修改影响的测试。逐类核对合并覆盖与跳过原因，分别报告原命令和补跑结果；不能把
+它描述成一次全量命令通过。需要更换构建目录时复制当前源码和资源，保持相对目录结构，
+在无旧产物的目录构建候选；不要复制秘密、真实数据或旧 `target`。
+
 普通 `clean verify` 不应写入业务数据库。数据库相关单元测试使用 mock、临时结构或静态 SQL 检查。
 
 ## 3. MySQL 集成测试
@@ -509,9 +514,20 @@ WAR 审计通过不代表已经部署。
 业务更新/提交和 P2 后强制中止，再由新服务实例查证恢复。真实 loopback HTTP、模块选择、
 治疗、保存结束、文件重开和重启恢复见 `StorageHttpIntegrationTest`。
 测试只写临时目录，不连接 MySQL；HTTP 测试独占本机 8080，不能与人工验证实例同时运行。
+`CampaignPreparationTest` 保护准备目录归属、部分输入/分配、完整身份不符、未知材料和
+恢复再次中断；`CampaignStorageCrashTest` 还在独立进程中覆盖创建目录、锁、零字节暂存、
+半写、硬链接发布和正式运行发布等前缀。`CampaignWindowsFilesystemTest` 只在原生
+Windows JVM 执行，核验 NTFS ACL、junction 拒绝及跨进程运行锁；Linux 跳过此类不构成
+Windows 通过。`CampaignArcaneRecoveryIntegrationTest` 覆盖短休资格、真实位数与预算、
+每日限制、法术书、幂等、晚写回滚和保存/END/重开。
+`StorageApplicationListenerTest`、`StorageReadinessTest` 验证配置优先级、显式空根失败关闭、
+实际规则/文件/运行就绪、需恢复和损坏阻断。
+
 系统临时目录也必须在 Git/WAR 树外；若环境在临时根放置 `.git` 或 `WEB-INF` 标记，
-应用会拒绝其下的运行。此时为测试 JVM 指定合格的 `-Djava.io.tmpdir=/absolute/test-temp`
-（目录须已存在），保留目录保护，不删除未知标记或改动真实仓库。
+应用会拒绝其下的运行。此时为 Maven 和测试 JVM 同时指定合格的
+`-Djava.io.tmpdir=/absolute/test-temp` 与
+`'-DargLine=-Djava.io.tmpdir=/absolute/test-temp'`（目录须已存在），保留目录保护，
+不删除未知标记或改动真实仓库。已有 `argLine` 选项须合并保留。
 
 ```bash
 python3 rule-packages/srd51-runtime/build-bundles.py --check
@@ -547,13 +563,19 @@ PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
 node tools/storage/browser-smoke.cjs /absolute/empty/screenshots
 ```
 
+默认使用与当前操作系统匹配的 Playwright Chromium。要使用已安装的 Chromium/Edge，
+可将 `DND_BROWSER_EXECUTABLE` 设为该系统下浏览器可执行文件的绝对路径；脚本先验证
+文件存在。Windows 原生 Node 必须使用 Windows 浏览器，不能指定 WSL Linux executable。
+
 脚本拒绝已有运行、残留或保存点的根。实际表单验收场景包括基础 `4/12 → 9/12`、
 保存结束重开与只选基础时关闭治疗；runtime 规则卡 PC/NPC、地点/位置/物品/消息、
 服务器检定及成功/失败分支的 HP/物品/位置/消息后果；自由卡字段/职业等级/豁免熟练、
 MANUAL 和优势豁免、有序后果、物品归档/恢复、混合简易遭遇及队伍/实体位置；规则战斗
 回合、完整文件重开后两种卡/物品/历史/战斗一致，以及下载、删除后保留原 fileKey 导入。
 脚本输出宽屏/390px 截图、横向溢出和 JavaScript/CSP 检查结果 `browser-report.json`；
-成功时所有验证运行均已结束。
+成功时所有验证运行均已结束。奥术回想场景用真实法术书、资源与休息表单选择恢复，验证
+未满短休、超预算、同日重复拒绝且无状态/历史变化，空选择可放弃，合法收益和使用日显示
+正确，保存、END 与重开后全部根/子历史及位数保持一致。
 失败保留报告与测试根供检查，不递归删除未知文件。浏览器构建必须适合所用操作系统。
 
 在同一隔离应用上继续执行装备、战斗继续与生命法术验收：
@@ -597,6 +619,78 @@ db/journal、保存文件或本地根。浏览器、真实 SQLite/HTTP、纯规�
 默认按改动及共享依赖运行定向测试。完整 Host 切换改变全部持久化和事务路径，是需要
 完整回归的检查点；真实文件系统耐久/进程中断验收独立执行，不能以单元测试通过替代。
 现行 MySQL 数据库验收仍按第 3、4 节及其独立授权边界执行。
+
+### 原生 Windows 外部 Tomcat 候选验收
+
+先完成当前候选的相关测试和 WAR 审计。使用已安装的 Tomcat 10.1、Java 21+，指定全新
+一次性 `CATALINA_BASE` 和独立空白 NTFS 存储根，两者均在 Git、WAR、现有 Tomcat 与
+真实数据之外。以下变量由操作者填入准确绝对路径，不使用真实根作为夹具：
+
+浏览器用例使用原生 Windows Node.js 和 Playwright。默认使用 Playwright 配套浏览器；
+也可将 `DND_BROWSER_EXECUTABLE` 设为已安装浏览器的准确绝对路径，并记录实际浏览器版本。
+该变量只选择测试浏览器，不改变应用配置。
+
+```powershell
+pwsh -File tools/storage/windows-tomcat-candidate.ps1 -Action Prepare `
+  -TomcatHome $tomcatHome -JavaHome $javaHome -War $candidateWar `
+  -CatalinaBase $candidateBase -StorageRoot $testStorage
+pwsh -File tools/storage/windows-tomcat-candidate.ps1 -Action Start -CatalinaBase $candidateBase
+node tools/storage/verify-war-http.cjs IDLE
+node tools/storage/browser-smoke.cjs $screenshots
+node tools/storage/browser-combat-smoke.cjs $combatScreenshots
+pwsh -File tools/storage/windows-tomcat-candidate.ps1 -Action Stop -CatalinaBase $candidateBase
+```
+
+脚本使用原生外部 Tomcat Bootstrap、真实 `ROOT.war` 和正常 context 扫描；不手动注册
+Servlet/Listener，也不读取或修改已安装实例的 setenv、ROOT、应用或数据。它复制容器
+公共配置到独立 base，生成仅当前账号可访问的配置/存储目录，固定 loopback 8080/8005；
+端口占用时拒绝，不终止其他服务或改端口。Prepare 检查空目录和路径隔离；Start/Status/Stop
+绑定准确 base、PID、进程创建时间及 executable，不以模糊进程名控制服务。
+
+Start 返回的 `STARTED` 只表示进程已启动，必须另查 `httpStatus=200` 且
+`readiness.ready=true`。HTTP 脚本验证 welcome JSP、注解发现、web.xml Filter/Session、
+静态资源、真实 SQLite 就绪、CSRF/epoch/摘要及 Host/Origin/方法边界和旧路由关闭；只发送
+必定拒绝的写请求。浏览器脚本在一次性夹具上执行被授权的实际表单业务。失败保留进程身份、
+日志与材料，用同一 base 的 Status/Stop 处置；不递归清理未知内容。
+
+主浏览器、战斗和恢复用例为 HTTP 响应与配对的状态刷新保留 120 秒等待，页面控件仍使用
+30 秒等待。报告分别记录 POST、状态刷新和整步耗时、请求身份及失败阶段；不自动重试
+可能已接受的命令。这些是验收工具的等待上限，不是应用响应时间承诺。
+
+若主浏览器在奥术回想重开阶段已留下准确的未结束运行，可在正常停止并重新启动同一
+隔离实例后接续。服务必须明确返回 `RESIDUAL`，且原 `input.json`、`allocation.json` 和
+保存文件全部保留；使用新的空证据目录：
+
+```powershell
+node tools/storage/browser-smoke.cjs $resumeEvidence --resume-arcane $runId $retainedInputFile
+```
+
+该模式只接受原主用例的准确奥术回想夹具，先核对运行身份、分配摘要、原保存载荷及
+预期历史/法术位。残留状态按合同隐藏保存列表，显式恢复后才核对 API 文件身份。
+接续会比较新保存的全部载荷（仅排除文件自身身份与完整性字段）、END/重开后的完整
+领域与历史，并完成基础模块尾段；原保存文件身份和字节必须保持一致。此前通过的主流程
+结果与新接续报告分别保留，再继续战斗用例。其他中断位置须先定位，不能借此模式跳过
+失败断言、覆盖报告或删除未知运行材料。
+
+
+正常停机与强制终止后分别重启同一 base/root，核对 `RESIDUAL` 的就绪 `503`、显式恢复后
+原事实/历史不变；可用 `node tools/storage/verify-war-http.cjs RESIDUAL` 检查恢复前边界。
+`browser-recovery-smoke.cjs prepare $evidence` 用真实表单建立 `4/12 → 9/12` 并保存准确
+run/epoch、事实/历史及所有保存文件身份/字节摘要；外部停止再启动后，用
+`browser-recovery-smoke.cjs recover $evidence` 核对显式恢复、新 epoch、旧 epoch 拒绝及
+END。正常关闭与强制终止各使用新的空证据目录，进程操作仅针对候选脚本记录的准确 PID。
+精确放弃使用 `prepare-discard` / `discard` 两段，准备后保留一次尚未生成完整保存点的治疗，重启后
+经准确 runId 确认放弃，核对已存文件完全不变。脚本只接受已知隔离夹具，拒绝证据覆盖，
+失败保留原现场；它不控制或终止进程。
+
+原生文件测试需同时覆盖
+第二实例争锁、退出后释放、准备前缀、发布冲突和未知材料；没有取得 Windows symlink
+创建权限的用例单独说明，不以跳过替代 junction/reparse 验收。离线 POSIX 工具测试仍在
+Linux/WSL 执行，不要求迁移到 Windows。
+
+记录实际 OS/JDK/Tomcat/NTFS、候选身份、用例结果和跳过原因。进程中断结果不证明物理
+断电时目录项持久；Windows 边界按[配置合同](configuration.md#sqlite-当前应用存储配置)。
+隔离验收成功仍不代表正式入口已切换；正式部署、备份和回滚只按[部署指南](deployment.md)。
 
 ## 7. 手工验收
 
@@ -738,4 +832,5 @@ mvn '-DargLine=-Xmx256m' '-Dtest=Schema2SpellSaveDamageCompositionTest,Schema2Sp
 角色仓储及迁移/发布边界测试；已通过且输入未变化的结果按本文规则复用。真实 MySQL 的
 CHECK/FK/触发器、权限和锁语义须另行授权验收，JDBC 代理与静态 SQL 检查不能代替。
 WAR 须包含新增规则/消费者、类型化仓储及运行 V041/V042；来源 V012、测试向量、离线工具、
-参考文件与本地 Agent 工作区必须排除。完整规则仍为 DRAFT，内部通过不开放 Host、完整文件或发布。
+参考文件与本地 Agent 工作区必须排除。完整规则仍为 DRAFT；这些内部测试不单独证明
+Host 或完整文件接合，当前 SQLite 采用范围与额外验收见[领域接合表](design/v2/domain-integration.md)。

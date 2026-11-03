@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Abrupt process exit, real rollback journal, new JVM ownership and explicit same-version recovery. */
@@ -19,6 +21,43 @@ class CampaignStorageCrashTest {
     private static final String COMMAND = "11111111-1111-4111-8111-111111111111";
     private static final String SAVE = "22222222-2222-4222-8222-222222222222";
     @TempDir Path temporary;
+
+    @ParameterizedTest
+    @EnumSource(value = Boundary.class, names = {"AFTER_PREPARATION_DIRECTORY", "AFTER_PREPARATION_LOCK", "AFTER_INPUT_STAGING_CREATE", "DURING_INPUT_WRITE"})
+    void killedBeforeCompleteInputRequiresExactExplicitAbandonment(Boundary boundary) throws Exception {
+        Path root = crash(boundary);
+        try (var service = new CampaignStorageService(root)) {
+            String run = onlyResidual(service);
+            assertEquals("RESIDUAL", service.status().state());
+            assertEquals("PREPARATION_INCOMPLETE", assertThrows(StorageException.class, () -> service.recover(run)).code());
+            assertEquals("RESIDUAL_RUN", assertThrows(StorageException.class, () -> service.create("other", rules())).code());
+            service.discardResidual(run);
+            assertEquals("IDLE", service.status().state());
+            assertTrue(service.status().saveFiles().isEmpty());
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Boundary.class, names = {"AFTER_INPUT_LINK", "AFTER_INPUT_WRITE", "AFTER_ALLOCATION_STAGING_CREATE", "DURING_ALLOCATION_WRITE", "AFTER_ALLOCATION_LINK", "AFTER_ALLOCATION_WRITE", "AFTER_PREPARATION_PUBLISH"})
+    void killedAfterBoundInputRecoversOnlyOriginalPreparation(Boundary boundary) throws Exception {
+        Path root = crash(boundary);
+        try (var service = new CampaignStorageService(root)) {
+            var restored = service.recover(onlyResidual(service));
+            assertEquals("林间营地", restored.name()); assertEquals(0, restored.revision());
+            assertTrue(restored.history().isEmpty()); assertEquals(1, service.status().saveFiles().size());
+            assertEquals("ACTIVE", service.status().state());
+        }
+    }
+
+    @Test void killedAfterDatabasePreparationBeforeDatabaseCreationMustNotGuessThatNoCommitExists() throws Exception {
+        Path root = crash(Boundary.AFTER_DATABASE_PREPARATION);
+        try (var service = new CampaignStorageService(root)) {
+            String run = onlyResidual(service);
+            assertEquals("STORAGE_INTEGRITY", assertThrows(StorageException.class, () -> service.recover(run)).code());
+            assertFalse(Files.exists(root.resolve("runs").resolve(run).resolve("run.db")));
+            service.discardResidual(run); assertEquals("IDLE", service.status().state());
+        }
+    }
 
     @Test void interruptedDdlRollsBackAndOnlyTheOriginalPreparationIsRetried() throws Exception {
         Path root = crash(Boundary.AFTER_DDL);
@@ -40,6 +79,19 @@ class CampaignStorageCrashTest {
             var restored = service.recover(onlyResidual(service));
             assertEquals(0, restored.revision());
             assertTrue(restored.history().isEmpty());
+            assertEquals(1, service.status().saveFiles().size());
+        }
+    }
+
+    @Test void committedInitializationWithoutCompletionMarkerStillNeverReseeds() throws Exception {
+        Path root = crash(Boundary.AFTER_INIT_COMMIT);
+        String run;
+        try (var service = new CampaignStorageService(root)) { run = onlyResidual(service); }
+        // Same persisted state as a process halt after commit and before the optional marker write.
+        Files.delete(root.resolve("runs").resolve(run).resolve("initialized.json"));
+        try (var service = noMoreDdl(root)) {
+            var restored = service.recover(run);
+            assertEquals(0, restored.revision()); assertTrue(restored.history().isEmpty());
             assertEquals(1, service.status().saveFiles().size());
         }
     }
@@ -100,7 +152,7 @@ class CampaignStorageCrashTest {
         Path output = temporary.resolve("child-output.txt");
         String classpath = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
         Process process = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "--enable-native-access=ALL-UNNAMED", "-cp", classpath,
+                "--enable-native-access=ALL-UNNAMED", "-Djava.io.tmpdir=" + System.getProperty("java.io.tmpdir"), "-cp", classpath,
                 Child.class.getName(), root.toString(), boundary.name())
                 .redirectErrorStream(true).redirectOutput(output.toFile()).start();
         try {
@@ -138,7 +190,7 @@ class CampaignStorageCrashTest {
     public static final class Child {
         public static void main(String[] args) throws Exception {
             Boundary target = Boundary.valueOf(args[1]);
-            AtomicBoolean armed = new AtomicBoolean(target == Boundary.AFTER_DDL || target == Boundary.AFTER_INIT_COMMIT);
+            AtomicBoolean armed = new AtomicBoolean(target.ordinal() <= Boundary.AFTER_INIT_COMMIT.ordinal());
             try (var service = new CampaignStorageService(Path.of(args[0]), boundary -> {
                 if (armed.get() && boundary == target) Runtime.getRuntime().halt(73);
             })) {

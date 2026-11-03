@@ -2,6 +2,7 @@ package com.dndtool.web;
 
 import com.dndtool.security.HostRequestSecurityFilter;
 import com.dndtool.service.storage.CampaignStorageService;
+import com.dndtool.service.storage.BundledCampaignRules;
 import com.dndtool.service.storage.CampaignJson;
 import com.dndtool.service.storage.StorageException;
 import com.google.gson.Gson;
@@ -42,6 +43,7 @@ public final class HostStorageServlet extends HttpServlet {
             }
             return;
         }
+        if ("/readiness".equals(action)) { readiness(request, response); return; }
         if (action == null || !Set.of("/state", "/download").contains(action)) { response.sendError(404); return; }
         try {
             if ("/download".equals(action)) { download(request, response); return; }
@@ -109,6 +111,37 @@ public final class HostStorageServlet extends HttpServlet {
 
     private static CampaignStorageService service(HttpServletRequest request) {
         return StorageApplicationListener.service(request.getServletContext());
+    }
+
+    /** Read-only deployment check; liveness alone does not establish a usable campaign store. */
+    private static void readiness(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            CampaignStorageService service = service(request);
+            JsonObject body = new JsonObject();
+            boolean ready;
+            synchronized (service) {
+                var status = service.status();
+                BundledCampaignRules.projection();
+                service.catalog();
+                service.savedCampaigns();
+                if ("ACTIVE".equals(status.state())) service.current();
+                ready = Set.of("IDLE", "ACTIVE").contains(status.state());
+                body.addProperty("status", ready ? "OK" : "ERROR");
+                body.addProperty("mode", "SQLITE");
+                body.addProperty("ready", ready);
+                body.addProperty("state", status.state());
+                if (!ready) body.addProperty("code", "BLOCKED".equals(status.state())
+                        ? "STORAGE_BLOCKED" : "STORAGE_RECOVERY_REQUIRED");
+            }
+            response.setStatus(ready ? 200 : 503);
+            response.setContentType("application/json; charset=UTF-8");
+            response.getWriter().write(JSON.toJson(body));
+        } catch (RuntimeException | LinkageError failure) {
+            response.setStatus(503);
+            response.setContentType("application/json; charset=UTF-8");
+            response.getWriter().write("{\"status\":\"ERROR\",\"mode\":\"SQLITE\",\"ready\":false,"
+                    + "\"state\":\"UNAVAILABLE\",\"code\":\"STORAGE_UNAVAILABLE\"}");
+        }
     }
 
     private static Map<String, List<String>> fields(HttpServletRequest request, String action) {

@@ -117,12 +117,15 @@ Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授�
 - JDK 21；
 - Maven 3.9 或兼容版本；
 - Apache Tomcat 10.1；
-- 原 MySQL 模式需要 MySQL 8.0；SQLite 模式需要支持文件锁、硬链接、目录同步与 POSIX 私有权限的本地文件系统；
+- SQLite 模式使用原生 Windows 本地 NTFS/私有 ACL，或 Linux/WSL 的 POSIX 私有文件系统；文件锁、硬链接及平台落盘边界见[配置](./docs/configuration.md#sqlite-当前应用存储配置)；原 MySQL 模式需要 MySQL 8.0；
 - 支持现代 JavaScript 的本机浏览器。
 
-应用不提供内嵌服务器，也不能通过 `java -jar` 独立启动。Connector/J 和数据库凭据由外部
-Tomcat 配置提供，不得打包进 WAR。SQLite 隔离验收使用[本地启动脚本](./docs/testing.md#v2-json-结构与文件存储的替换验收)，
-正式部署仍使用本项目唯一 WAR 部署流程。
+应用不提供内嵌服务器，也不能通过 `java -jar` 独立启动。Windows 正式路线为外部
+Tomcat 10.1 + WAR + 主机本地 SQLite；配置真实启动身份和私有根后，通过
+`/api/host/storage/readiness` 确认就绪，打开 `http://127.0.0.1:8080`。
+原 MySQL 模式的 Connector/J 和数据库凭据由外部 Tomcat 提供，不得打包进 WAR。
+隔离测试和真实 WAR 验收见[测试指南](./docs/testing.md#原生-windows-外部-tomcat-候选验收)，
+正式切换及日常启停遵循[部署流程](./docs/deployment.md)。
 
 ## 构建与测试
 

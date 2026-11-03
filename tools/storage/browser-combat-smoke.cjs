@@ -2,23 +2,32 @@
 'use strict';
 
 // Run after browser-smoke.cjs, against its same disposable private test application.
+// DND_BROWSER_EXECUTABLE optionally selects an existing absolute Chromium/Edge executable.
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {chromium} = require('playwright');
+const HTTP_TIMEOUT = 120000;
 const ORIGIN = 'http://127.0.0.1:8080';
 const NAME = '装备与生命法术验收';
-const KNOWN = new Set(['浏览器验收营地', '基础生命值验收', '完整领域浏览器验收']);
+const KNOWN = new Set(['浏览器验收营地', '基础生命值验收', '完整领域浏览器验收', '奥术回想浏览器验收']);
 const output = process.argv[2];
 if (process.argv.length !== 3 || !path.isAbsolute(output || '')) throw new Error('Expected one absolute empty output directory');
-const report = {result: 'FAILED', checks: [], screenshots: [], pageErrors: [], cspFailures: []};
+const report = {result: 'FAILED', checks: [], screenshots: [], pageErrors: [], cspFailures: [], actions: []};
 
 async function main() {
   console.log('Combat browser phase: opening the isolated workbench');
   await fs.mkdir(output, {recursive: true}); assert.equal((await fs.readdir(output)).length, 0);
-  const browser = await chromium.launch({headless: true});
+  const launch = {headless: true}, executable = process.env.DND_BROWSER_EXECUTABLE;
+  if (executable !== undefined) {
+    assert.ok(path.isAbsolute(executable), 'DND_BROWSER_EXECUTABLE must be an absolute file path');
+    assert.ok((await fs.stat(executable)).isFile(), 'DND_BROWSER_EXECUTABLE must identify an existing file');
+    launch.executablePath = executable;
+  }
+  const browser = await chromium.launch(launch);
+  report.browserVersion = browser.version();
   const context = await browser.newContext({viewport: {width: 1440, height: 1050}, locale: 'zh-CN'});
-  const page = await context.newPage(); page.setDefaultTimeout(30000);
+  const page = await context.newPage(); page.setDefaultTimeout(30000); page.setDefaultNavigationTimeout(HTTP_TIMEOUT);
   page.on('pageerror', error => report.pageErrors.push(error.message));
   page.on('console', event => { if (/Content Security Policy|violates.*directive|Refused to (?:load|execute|apply|connect)/i.test(event.text())) report.cspFailures.push(event.text()); });
   const form = id => page.locator('#' + id);
@@ -26,17 +35,40 @@ async function main() {
   const card = name => current.campaign.domain.characters.find(character => character.name === name);
   const battle = () => current.campaign.domain.combats.at(-1).current;
   async function action(name, trigger) {
+    const started = Date.now(), timing = {action: name, postResponseMs: null, stateResponseMs: null};
+    report.actions.push(timing);
     const observed = Promise.all([
-      page.waitForResponse(response => response.request().method() === 'POST' && response.url() === `${ORIGIN}/api/host/storage/${name}`),
-      page.waitForResponse(response => response.request().method() === 'GET' && response.url() === `${ORIGIN}/api/host/storage/state`)
-    ]);
-    await trigger(); const [accepted, refreshed] = await observed;
-    const body = await accepted.json(); assert.equal(accepted.status(), 200, `${name}: ${JSON.stringify(body)}`);
-    assert.equal(refreshed.status(), 200); await refreshed.finished();
-    const message = name === 'end' ? '战役已保存并结束，可以再次打开。' : '战役已更新。';
-    await page.waitForFunction(message => document.querySelector('#storage-message').textContent.trim() === message, message);
-    current = body; return body;
+      page.waitForResponse(response => response.request().method() === 'POST'
+        && response.url() === `${ORIGIN}/api/host/storage/${name}`, {timeout: HTTP_TIMEOUT}).then(response => {
+        timing.postResponseMs = Date.now() - started; timing.postStatus = response.status();
+        timing.requestId = response.request().headers()['x-request-id'];
+        const fields = new URLSearchParams(response.request().postData());
+        if (fields.has('fileKey')) timing.fileKey = fields.get('fileKey');
+        return response;
+      }),
+      page.waitForResponse(response => response.request().method() === 'GET'
+        && response.url() === `${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT}).then(response => {
+        timing.stateResponseMs = Date.now() - started; timing.stateStatus = response.status(); return response;
+      })
+    ]).catch(error => ({observationFailure: error}));
+    try {
+      await trigger();
+      const responses = await observed;
+      if (responses.observationFailure) throw responses.observationFailure;
+      const [response, stateResponse] = responses, body = await response.json();
+      assert.equal(response.status(), 200, `${name} failed: ${JSON.stringify(body)}`);
+      assert.equal(stateResponse.status(), 200, `${name} did not refresh its session epoch`);
+      await stateResponse.finished();
+      const expectedMessage = name === 'end' ? '战役已保存并结束，可以再次打开。' : '战役已更新。';
+      await page.waitForFunction(message => document.querySelector('#storage-message').textContent.trim() === message, expectedMessage);
+      current = body; return body;
+    } catch (error) {
+      timing.failedPhase = timing.postResponseMs === null ? `POST /${name}` : timing.stateResponseMs === null ? 'GET /state' : 'response body or UI render';
+      timing.error = error.message;
+      throw new Error(`${name} (${timing.failedPhase}): ${error.message}`);
+    } finally { timing.elapsedMs = Date.now() - started; }
   }
+
   async function chooseRule(selector, key) {
     const options = await page.locator(selector).locator('option').evaluateAll(options => options.map(option => option.value));
     const selected = options.find(value => value.endsWith('/' + key)); assert.ok(selected, `Missing selectable rule ${key}`);
@@ -76,7 +108,7 @@ async function main() {
   try {
     await page.goto(ORIGIN + '/host/storage', {waitUntil: 'networkidle'});
     await page.waitForFunction(() => document.querySelector('#storage-message').textContent.trim() === '创建、打开或恢复一个战役。');
-    const response = await context.request.get(ORIGIN + '/api/host/storage/state'); assert.equal(response.status(), 200);
+    const response = await context.request.get(ORIGIN + '/api/host/storage/state', {timeout: HTTP_TIMEOUT}); assert.equal(response.status(), 200);
     const initial = await response.json(); assert.equal(initial.storage.state, 'IDLE'); assert.equal(initial.campaign, null);
     assert.equal(initial.storage.residualRunIds.length, 0);
     assert.ok(initial.savedCampaigns.every(save => KNOWN.has(save.name)), 'Refusing saves outside the primary smoke fixture whitelist');

@@ -40,7 +40,7 @@ Java 类型名、骰子或派生结果。`CampaignStorageService` 拥有事务�
 | 规则角色与初始授予 | character-create/profile；`CampaignDomainEngine`、初始授予规则 | `characters_runtime_character` 的 InitialPlan、initial event/current/history；名字/PC-NPC/离场由根历史保存 | 标准数组、语言/工具及有限职业授予；完整当前与初始分别保存 | 准确引用、初始来源、活动状态、Unicode、文件初始前缀 |
 | 自由角色卡 | manual-create/profile/field/class/proficiency；`CampaignManualData/Commands` | `scenes_world` 中独立 manual 聚合；`manual_character` 核验身份、版本及资料投影 | 六属性、HP/AC/速度、十二职业等级、技能/豁免倍数；初始卡、当前卡和每次 typed 根历史 | 范围、总等级、NFC、版本冲突、归档、与规则角色隔离 |
 | 成长与职业 | character-command 的成长分支；角色成长/法术书规则 | 所属规则角色的完整职业、子职业、ASI/专长、授予及成长事件 | 所选机制的未来写入结构预建；按真实成长消费者写初始/前后事实 | fighter 1–6、cleric 1、wizard 1–5 的本版有限模板；非法资格失败关闭 |
-| 资源与休息 | character-command 的资源、休息、生命骰、时间、奥术回想 | 当前资源、生命骰及休息由角色聚合拥有；`resources_character` 为核验投影 | 所有角色时间同步同根提交；原骰、每日使用及已消耗资源直接恢复 | 同一时钟、恢复资格、一次消耗、容量预留、无墙钟补收益 |
+| 资源与休息 | character-command；成长与休息网页的资源、生命骰、时间及奥术回想位数选择 | 当前资源、生命骰及休息由角色聚合拥有；`resources_character` 为核验投影 | 所有角色时间同步同根提交；原骰、每日使用及已消耗资源直接恢复；空选择可放弃 | 同一时钟、恢复资格/预算/位数、每日限制、失败无部分收益、保存/END/重开 |
 | 物品与装备 | item/manual-item；character-command 的装备分支 | 简单物品归 `scenes_world`，保留来源/说明/数量/状态；装备实例归角色，`equipment_instance` 核验 | 共同角色引用与全部取得/移动/消耗事实；不按模板重新发放 | 所有者、归档、数量、护甲与施法组件读取同一装备 |
 | 检定与健康 | character-command/check-effects/manual-check；角色基础规则及手动检定算法 | 原骰、候选/选骰、DC、派生修正、HP/临时HP/死亡、效果计划与前后值在角色/根历史 | 两分支预检，实际分支后果和根/子历史一起提交，完整恢复不重掷 | 手动/属性/技能/豁免、优势劣势、HP/物品/位置/消息联动、晚写回滚 |
 | 地图与简易遭遇 | node-create/link/position、manual-party-position/encounter-* | `scenes_world` 的节点/位置/party 与简易名单；`manual_encounter` 核验投影 | 稳定节点与角色引用；结束名单仍留历史；与规则场景互斥 | PC/NPC 混合名单、阵营、加入/移出、实体定位与独立队伍节点 |
@@ -72,8 +72,9 @@ Java 类型名、骰子或派生结果。`CampaignStorageService` 拥有事务�
 | 根历史与因果 | `CampaignDomainRootValidationTest` | 节点/物品语义、历史前缀、准确子事件归属及逐根共同时间，拒绝最终值自洽但过程伪造的文件 |
 | 复杂跨领域流程 | `CampaignDomainsCombatIntegrationTest` | OA 窗口恢复后继续移动/攻击；Bless 位数与专注、怪物共享原骰、多目标 HP 一致 |
 | 完整文件和恢复 | `CampaignCodecTest`、`CampaignFileVectorTest`、`CampaignDomainRecoveryTest` | 严格字节/字段向量、初始化中断、已提交响应丢失、导入初始事实不可改写 |
-| 文件系统生命周期 | `CampaignStorageServiceTest`、`CampaignStorageLifecycleTest` | P0—P3、原意图续作、未知状态阻断、根/运行独占、导入/下载/删除/精确放弃 |
-| 应用入口 | `StorageHttpIntegrationTest`、`tools/storage/browser-smoke.cjs`、`tools/storage/browser-combat-smoke.cjs` | 真实 Servlet/CSRF/摘要/epoch、用户表单、装备/攻击/继续/生命法术结果、重开与导入导出 |
+| 文件系统生命周期 | `CampaignStorageServiceTest`、`CampaignStorageLifecycleTest`、`CampaignPreparationTest`、`CampaignStorageCrashTest`、`CampaignWindowsFilesystemTest` | P0—P3、准备前缀、原意图续作、未知材料保护、根/运行独占、NTFS ACL/reparse、导入/下载/删除/精确放弃；Windows 进程中断与断电保证分开 |
+| 奥术回想 | `CampaignArcaneRecoveryIntegrationTest`、`Schema2ArcaneRecoveryRulesTest` 与浏览器主用例 | 真实短休、位数/预算/法术书、每日使用、幂等与故障回滚，完整文件保留根/子历史与使用日 |
+| 应用入口 | `StorageHttpIntegrationTest`、`StorageApplicationListenerTest`、`StorageReadinessTest`；Windows 候选脚本、`verify-war-http.cjs` 与两个浏览器 smoke | 配置失败关闭、SQLite 实际就绪、真实 WAR 注解/JSP/Filter、CSRF/摘要/epoch、用户表单、装备/攻击/继续/生命法术结果、重开与导入导出 |
 
 本表记录当前实际接合路径和验收责任；所有列出的领域都进入同一运行、完整文件及恢复路径。
 测试类存在不等于执行结果，每次候选须由对应源码的测试、浏览器和 WAR 审计共同确认。
