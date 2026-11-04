@@ -14,16 +14,24 @@ import com.dndtool.service.storage.CampaignDomainData.Character;
 public final class CampaignDomainCommands {
     private final CampaignDomainEngine engine = new CampaignDomainEngine();
     public State apply(CampaignData.Snapshot snapshot, String action, JsonObject input, UUID operationId, String intent, IntUnaryOperator dice) {
+        return apply(snapshot, action, input, operationId, intent, dice, snapshot.domains() == null ? CampaignParticipationData.Actor.dm(null, null) : CampaignParticipationCommands.actualActor(snapshot.domains(), action, input));
+    }
+    public State apply(CampaignData.Snapshot snapshot, String action, JsonObject input, UUID operationId, String intent, IntUnaryOperator dice, CampaignParticipationData.Actor actor) {
         State before = snapshot.domains();
         if (before == null) throw new StorageException("RULE_NOT_SELECTED", "Select the current campaign runtime module");
         if (before.roots().stream().anyMatch(r -> r.operationId().equals(operationId))) throw new StorageException("IDEMPOTENCY_CONFLICT", "This business identity already belongs to retained history");
+        CampaignParticipationCommands.validateActor(before, action, input, actor);
         var material = before.material().restore();
         List<Character> characters = new ArrayList<>(before.characters());
         var combats = new ArrayList<>(before.combats()); var nodes = new ArrayList<>(before.nodes());
         var positions = new ArrayList<>(before.positions()); var items = new ArrayList<>(before.items());
-        var manual = before.manual();
+        var manual = before.manual(); var participation = before.participation();
         UUID subject = UUID.fromString(snapshot.campaignId()), combatId = null; String oldText = "", newText = "";
         switch (action) {
+            case "member-add", "member-update", "control-set", "share-set", "exploration-set" -> {
+                var result = CampaignParticipationCommands.resolve(before, action, input, operationId, UUID.fromString(snapshot.campaignId()));
+                participation = result.state(); subject = result.subjectId(); newText = CampaignDomainCodec.text(result.audit());
+            }
             case "manual-create", "manual-profile", "manual-field", "manual-class", "manual-proficiency", "manual-item", "manual-check",
                     "manual-encounter-start", "manual-encounter-members", "manual-encounter-close", "manual-party-position" -> {
                 var result=CampaignManualCommands.resolve(before,action,input,operationId,dice);
@@ -71,6 +79,11 @@ public final class CampaignDomainCommands {
                 }
                 var changed = engine.executeCampaignCharacter(material, CampaignDomainValidation.records(before), before.combats(), subject, command, operationId, dice);
                 characters = merge(characters, changed);
+            }
+            case "adjudicated-check" -> {
+                var result = CampaignAdjudicationCommands.resolve(snapshot, input, operationId, dice);
+                characters = new ArrayList<>(result.state().characters()); positions = new ArrayList<>(result.state().positions()); items = new ArrayList<>(result.state().items());
+                subject = result.subjectId(); newText = CampaignDomainCodec.text(result.audit());
             }
             case "check-effects" -> {
                 var result = CampaignCheckEffects.resolve(snapshot, input, operationId, dice);
@@ -135,10 +148,13 @@ public final class CampaignDomainCommands {
         }
         Set<UUID> oldOperations = new HashSet<>(); before.characters().forEach(c -> c.history().events().forEach(e -> oldOperations.add(e.operationId())));
         List<UUID> childOperations = characters.stream().flatMap(c -> c.history().events().stream()).map(JdbcSchema2CharacterRuntimeRepository.Event::operationId).filter(id -> !oldOperations.contains(id)).sorted(Comparator.comparing(UUID::toString)).toList();
-        List<Root> roots = new ArrayList<>(before.roots()); roots.add(new Root(roots.size() + 1L, operationId, action, subject, intent, oldText, newText, childOperations, combatId));
+        List<Root> roots = new ArrayList<>(before.roots()); roots.add(new Root(roots.size() + 1L, operationId, action, subject, intent, oldText, newText, childOperations, combatId, actor));
         characters.sort(Comparator.comparing(c -> c.id().toString())); combats.sort(Comparator.comparing(c -> c.current().combatId().toString()));
         nodes.sort(Comparator.comparing(n -> n.id().toString())); positions.sort(Comparator.comparing(p -> p.characterId().toString())); items.sort(Comparator.comparing(i -> i.id().toString()));
-        return new State(before.material(), characters, combats, nodes, positions, items, roots,manual);
+        participation = CampaignParticipationCommands.afterSceneChange(before.combats().stream().map(c -> c.current()).toList(), combats.stream().map(c -> c.current()).toList(), before.manual(), manual, participation);
+        var after = new State(before.material(), characters, combats, nodes, positions, items, roots,manual,participation);
+        CampaignParticipationCommands.validateCurrent(after);
+        return after;
     }
     private static List<Character> merge(List<Character> previous, List<CampaignDomainEngine.CharacterRecord> updated) {
         List<Character> result = new ArrayList<>();

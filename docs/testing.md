@@ -509,10 +509,9 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 
 WAR 审计通过不代表已经部署。
 
-### v2 JSON 结构与文件存储的替换验收
+### SQLite 结构、完整文件与运行验收
 
-当前有限 SQLite 模型见[运行合同](storage-vitality-loop.md)，逐领域覆盖与验收映射见
-[接合表](design/v2/domain-integration.md)。结构与真实 SQLite 的定向入口是
+当前有限 SQLite 模型见[运行合同](storage-vitality-loop.md)。结构与真实 SQLite 的定向入口是
 `StorageSchemaCatalogTest`、`SqliteSchemaTest`；业务/生命周期见 `CampaignStorageServiceTest`、
 `CampaignStorageLifecycleTest`。`BundledCampaignRulesTest` 核验真实四包、精确数字、可执行初始化
 与基础/施法预检；`CampaignDomainEngineTest` 验证无连接纯领域后果；
@@ -555,6 +554,9 @@ storage_test_root="$(mktemp -d /var/tmp/dnd-storage-XXXXXX)"
 bash tools/storage/run-local.sh "$storage_test_root"
 ```
 
+脚本依次显示环境检查、编译与依赖准备、应用启动。首次编译可能需要几分钟，Maven 阶段
+和原始错误保持可见；出现应用就绪地址后再打开浏览器。启动预备不等于运行测试。
+
 打开 `http://127.0.0.1:8080/host/storage`。基础验收可创建 `4/12` 角色、治疗 `5`，
 预期 `9/12`，保存结束再开后状态与历史相同；只选基础模块时治疗不可用。
 runtime 验收选择全部三个应用模块，在时间零点创建规则卡 PC/NPC 队伍，执行装备/检定/
@@ -569,7 +571,25 @@ Ctrl+C 仅停止这个隔离验证实例；未 END 的运行下次启动必须�
 
 可选浏览器自动验收使用独立安装的 Playwright/Chromium，浏览器环境需有中文字库；
 不向 Maven 或 WAR 加浏览器依赖。
-先用上面脚本启动**全新一次性根**，再在另一终端运行：
+聚焦短冒险体验时，先以上述启动器启用全新临时根，再执行：
+
+```bash
+NODE_PATH=/absolute/browser-tools/node_modules \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
+node tools/storage/browser-adventure-smoke.cjs /absolute/empty/adventure-evidence \
+  --fresh-root /absolute/private/test-root
+```
+
+`--fresh-root` 必须是本次启动器实际使用的可丢弃空白根，不能指向真实战役。脚本通过真实
+表单建立 PC/NPC、取得并装备武器、创建相邻地点、检定及分支后果、处理随机先攻和借机
+反应、攻击、保存结束，关闭浏览器会话后精确打开 FINAL，再继续一个回合。核对完整初始/
+当前事实、原骰、历史与旧文件字节；INITIAL、手动保存、最终保存均按返回的准确身份保留。
+同时断言每次提交的忙碌反馈、普通成功操作不重复读取整份状态、epoch 改变后刷新 Session，
+并输出动作耗时、宽屏/390px 截图和 `adventure-browser-report.json`。它只关闭浏览器会话，
+应用进程重启及残留恢复使用下方独立恢复验收；两种关闭不能混称。
+
+较广的领域覆盖使用主浏览器验收：
+先用 `tools/storage/run-local.sh` 启动**另一个全新一次性根**，再在另一终端运行：
 
 ```bash
 NODE_PATH=/absolute/browser-tools/node_modules \
@@ -705,6 +725,74 @@ Linux/WSL 执行，不要求迁移到 Windows。
 记录实际 OS/JDK/Tomcat/NTFS、候选身份、用例结果和跳过原因。进程中断结果不证明物理
 断电时目录项持久；Windows 边界按[配置合同](configuration.md#sqlite-当前应用存储配置)。
 隔离验收成功仍不代表正式入口已切换；正式部署、备份和回滚只按[部署指南](deployment.md)。
+
+### 玩家参与原型验证
+
+本原型只使用一次性私有 SQLite 根；不连接或重置真实 MySQL，不部署现有 Tomcat。
+身份/同名申请/审批轮换/单写接管/暂停/撤权、玩家裁剪与当前叶子候选、完整参与历史和
+类型化裁定、严格私有控制及可信 HTTPS 可选用以下定向集合：
+
+```bash
+mvn '-Dtest=CampaignParticipationIntegrationTest,PlayerGatewayServiceTest,PlayerParticipationAcceptanceTest,PlayerProjectionAndCandidatesTest,PlayerBoundaryFilterTest,PlayerHttpIntegrationTest' test
+```
+
+修改领域根或结构时，另外选择受影响的现有领域、codec、存储恢复及 schema 测试；不因
+有玩家页面而默认全量；正式候选仍须满足[部署完整回归门](deployment.md#1-构建候选)。
+`PlayerHttpIntegrationTest` 创建一次性带 loopback IP SAN 的证书，
+测试客户端仅信任该证书，并验证默认客户端拒绝它；需要 JDK `keytool` 及空闲 8080/8443。
+已通过集合不为收尾重复执行；打包复用本次有效证据并审计 WAR。
+`PlayerParticipationAcceptanceTest` 使用可控时钟和独立 SQLite，补查邀请轮换及准确到期、
+END 后新运行的身份/收据隔离、后来成员的共享范围、控制转交与排队命令的串行边界，
+以及真实反应窗口暂停时不代选、不追加业务事实。
+
+独立进程恢复使用 `mvn '-Dtest=PlayerProcessRecoveryIntegrationTest' test`。它在两个
+独立 JVM 间重启同一私有根，分别只信任对应临时证书，核对 RESIDUAL、Host 显式恢复与
+重新开放、原设备换取新会话和原收据只读查证；不得自动恢复写连接或重放命令。
+该用例同样占用 8080/8443，须与真实 HTTP 测试、浏览器启动器串行运行。
+若默认临时目录位于 Git/WAR 标记之下，先创建另一个私有测试目录，通过
+`-DargLine="-Djava.io.tmpdir=/absolute/private/test-temp"` 指定测试 JVM 的临时根；
+子进程继承其隔离范围，不删除标记或放宽存储路径保护。
+
+仅检查启动准备时运行 `mvn '-Dtest=PlayerLoopLauncherReadinessTest' test`。该集合不启动
+HTTP/TLS 监听、证书进程或浏览器，检查存储路径、必要资源、服务可用性及失败清理。
+临时根仍须满足前文的 Git/WAR 隔离与私有权限要求，不能因测试环境的合成标记而放宽保护。
+
+可操作原型通过下面入口启动。脚本先编译测试启动器并准备 classpath，不执行测试。
+它只绑定 loopback，自动产生临时测试证书，退出时清理
+测试容器和证书；业务根保留，须在页面 END 或下次显式恢复。
+启动器先检查路径和必要资源，确认容器及存储服务可用后才输出地址；初始化失败不报告
+启动成功，并尝试清理本次容器与临时证书，不删除传入的业务根。已有残留运行仍可进入
+Host 恢复页面，启动检查本身不恢复运行或赋予玩家写权限。
+
+```bash
+bash tools/storage/run-player-local.sh /absolute/disposable/player-store
+```
+
+DM 为 `http://127.0.0.1:8080/host/storage`，玩家为 `https://127.0.0.1:8443/player`。
+人工浏览器必须正确信任测试证书，不忽略 TLS 警告。真实 LAN 启用只按[部署指南](deployment.md#可选玩家-https-入口)。
+独立 Playwright 安装的浏览器验收在另一个终端执行，`--fresh-root` 必须准确指向本次
+启动器使用的空白可丢弃根，证据目录须为空并与该根分离：
+
+```bash
+NODE_PATH=/absolute/browser-tools/node_modules \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
+node tools/storage/browser-player-smoke.cjs /absolute/empty/player-evidence \
+  --fresh-root /absolute/disposable/player-store
+```
+
+浏览器默认使用标准证书信任。隔离自动测试可将 `DND_PLAYER_TEST_SPKI` 设置为本次启动器
+输出的准确测试证书 SPKI，只对该测试公钥例外；不得借此跳过真实设备 CA 安装。
+QR 像素核验还需独立 Python 环境中的
+`Pillow` 和 `zxing-cpp`；用 `DND_QR_DECODER_PYTHON` 指定解释器，或以 `DND_QR_DECODER_PATH`
+指定包含这两个包的临时目录。解码实际页面截图并比对本次邀请链接，不向报告输出邀请值。
+脚本不使用通用 `ignoreHTTPSErrors`；此证据只覆盖隔离原型交互。
+其单次旅程覆盖申请/批准、本人卡、合法候选、响应丢失后只读查证、明确裁定、共享撤回、
+暂停、双标签接管及结束。截图/证书/日志和临时库不入 Git/WAR。
+若前段已成功而邀请阶段中止，可用 `--resume-after-roster` 续跑；脚本先核对固定角色、
+装备、版本和空参与状态，任何检查点差异都拒绝继续，不重放已完成的建队操作。
+
+WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边界/会话/投影/候选类、
+参与/裁定领域及结构；禁止临时证书、测试启动器和任何运行凭据进入 WAR。
 
 ## 7. 手工验收
 

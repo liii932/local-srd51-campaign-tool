@@ -1,6 +1,8 @@
 # 配置
 
 运行时配置属于外部 Tomcat，不进入 WAR。仓库只提供不含秘密的示例。
+未配置 `DND_STORAGE_ROOT` 时使用 MySQL；显式提供该项时使用 SQLite，配置无效也不会
+回退到 MySQL。两种模式的配置和数据分别保管。
 
 ## JNDI DataSource
 
@@ -69,7 +71,7 @@ Windows 部署须先用 `DriveInfo.DriveType` 核对根所在盘为本机固定�
 领域事实。准确内容/限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
 切换启动模式前须保管两侧真实数据与残留，不自动搬移、转换或删除它们。
 
-## v2 存储配置目标
+## SQLite 装配与运行身份
 
 当前 SQLite 由 `StorageApplicationListener` 装配 `CampaignStorageService`；
 `DND_STORAGE_ROOT` 是此模式唯一的存储根输入，应用在根内分开管理运行与保存目录，
@@ -88,18 +90,30 @@ SQLite 驱动和受审 JSON 声明随应用打包；本地连接核验 DELETE/EX
 四个内置原包由生产 reader/compose 建立固定投影，完整文件携带准确 material/链并逐字段
 比对此投影。外部来源离线不影响当前新建、打开、运行、保存、结束或同版恢复。
 
-未来通用自定义包的来源安装/接受和只读配置须另行设计，同步代码、示例、权限与测试；
-本文不预留未实现的 JNDI 或环境变量作为当前启动合同。若后续彻底退役原 MySQL 路线，
-须先完成[领域接合](design/v2/domain-integration.md)、核实真实数据保管，再协调移除旧配置，
-不能因当前可选 SQLite 已存在就删除真实迁移、账号或数据。
+当前装配不读取外部自定义规则包或来源 JNDI。MySQL 模式的迁移、账号及真实数据仍独立
+保管，不因启用 SQLite 而自动退役或删除。
 
 迁移存储根是独立停机维护：共同保管全部残留、分配/清理材料、数据库/journal 和保存文件，
 不能改根后忽略原残留而宣称空闲；部署更新不会自动移动、转换或删除它们。
 
 ## Web Connector
 
-正式入口固定为 `http://127.0.0.1:8080`。Connector 应只绑定 `127.0.0.1`；不要为 8080 配置局域网防火墙入站规则，不要启用 AJP、反向代理、`RemoteIpValve` 或 `RemoteIpFilter`，应用也不信任 `X-Forwarded-*`。
+DM 入口固定为 `http://127.0.0.1:8080`。该 Connector 只绑定 `127.0.0.1`；不要为 8080 配置局域网防火墙入站规则，不要启用 AJP、反向代理、`RemoteIpValve` 或 `RemoteIpFilter`，应用也不信任 `X-Forwarded-*`。
 SQLite 导入使用 `application/octet-stream`，应用限制完整文件为 16 MiB；Tomcat 的
 `maxPostSize` 是表单解析限制，不替代应用的文件字节限制。
 
-LAN/公网、HTTPS、CA、动态地址、玩家账号、`/display`、`/api/public/*` 和公开投影不属于当前产品目标，也不属于当前配置。
+### 可选玩家 HTTPS 原型配置
+
+SQLite runtime 可显式设置 `DND_PLAYER_ORIGIN=https://<选定IPv4>:8443` 和
+`DND_PLAYER_BIND_ADDRESS=<同一IPv4>`。两项必须准确匹配，缺项、空值、公开/通配地址或
+错误端口失败关闭；都未设置时玩家入口关闭。当前仅支持规范私有、链路本地或 loopback
+IPv4，loopback 用于隔离验证。配置可通过 ServletContext 参数或进程环境提供，参数优先。
+无效配置会关闭玩家请求面并记录有限错误，不会让 DM 入口改绑或自动创建 Connector。
+
+这两项只配置应用请求边界，不创建网络监听。外部 Tomcat 须另外配置独立 HTTPS Connector，
+证书 SAN 与所用地址一致，玩家设备须信任颁发者。证书私钥/口令和设备信任材料保留在 WAR/Git
+外；没有忽略证书错误或 HTTP 降级入口。DM Connector 仍只绑定 `127.0.0.1:8080`。
+玩家 Connector 只接受 `/player`、限定静态资源及 `/api/player/*` 白名单；Host 路由、
+错误本地地址/Host、查询串或转发头被拒绝，写请求还必须满足准确 Origin 与 Fetch Metadata。
+启用、回退与验收按[部署](deployment.md#可选玩家-https-入口)执行；公网、`/display`、
+`/api/public/*` 和匿名投影仍不在范围内。

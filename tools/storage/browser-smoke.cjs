@@ -13,6 +13,7 @@ const { chromium } = require('playwright');
 const { createHash } = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
 const HTTP_TIMEOUT = 120000;
+const { observeStorageAction } = require('./browser-action.cjs');
 
 const ORIGIN = 'http://127.0.0.1:8080';
 const CAMPAIGN = '浏览器验收营地';
@@ -74,35 +75,11 @@ async function main() {
   async function action(name, trigger) {
     const started = Date.now(), timing = {action: name, postResponseMs: null, stateResponseMs: null};
     report.actions.push(timing);
-    const observed = Promise.all([
-      page.waitForResponse(response => response.request().method() === 'POST'
-        && response.url() === `${ORIGIN}/api/host/storage/${name}`, {timeout: HTTP_TIMEOUT}).then(response => {
-        timing.postResponseMs = Date.now() - started; timing.postStatus = response.status();
-        timing.requestId = response.request().headers()['x-request-id'];
-        const fields = new URLSearchParams(response.request().postData());
-        if (fields.has('fileKey')) timing.fileKey = fields.get('fileKey');
-        return response;
-      }),
-      page.waitForResponse(response => response.request().method() === 'GET'
-        && response.url() === `${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT}).then(response => {
-        timing.stateResponseMs = Date.now() - started; timing.stateStatus = response.status(); return response;
-      })
-    ]).catch(error => ({observationFailure: error}));
     try {
-      await trigger();
-      const responses = await observed;
-      if (responses.observationFailure) throw responses.observationFailure;
-      const [response, stateResponse] = responses, body = await response.json();
-      assert.equal(response.status(), 200, `${name} failed: ${JSON.stringify(body)}`);
-      assert.equal(stateResponse.status(), 200, `${name} did not refresh its session epoch`);
-      await stateResponse.finished();
-      const expectedMessage = name === 'end' ? '战役已保存并结束，可以再次打开。'
-        : name === 'save' ? '战役已保存。' : name === 'import' ? '文件已核验并导入，请选择打开。'
-        : name === 'delete' ? '所选文件已删除。' : '战役已更新。';
-      await equalText('#storage-message', expectedMessage);
+      const {body} = await observeStorageAction(page, name, trigger, timing, HTTP_TIMEOUT);
       return body;
     } catch (error) {
-      timing.failedPhase = timing.postResponseMs === null ? `POST /${name}` : timing.stateResponseMs === null ? 'GET /state' : 'response body or UI render';
+      timing.failedPhase = timing.postResponseMs === null ? `POST /${name}` : timing.stateRefreshRequired && timing.stateResponseMs === null ? 'GET /state' : 'response body or UI render';
       timing.error = error.message;
       throw new Error(`${name} (${timing.failedPhase}): ${error.message}`);
     } finally { timing.elapsedMs = Date.now() - started; }
@@ -155,7 +132,9 @@ async function main() {
     const payload = JSON.parse(new URLSearchParams(response.request().postData()).get('payload'));
     assert.deepEqual(payload.command.restInput.recoveredSpellSlots, expectedChoices, 'The real form must submit selected ranks/counts');
     assert.equal(refreshed.status(), 200); await refreshed.finished();
-    await equalText('#storage-message', '此操作不满足当前规则或状态，请检查角色、装备、轮次与待处理行动。');
+    await page.waitForFunction(() => document.querySelector('#storage-workspace')?.getAttribute('aria-busy') === 'false'
+      && document.querySelector('#storage-message')?.textContent.trim()
+        .startsWith('此操作不满足当前规则或状态，请检查角色、装备、轮次与待处理行动。'));
     const after = await currentCampaign();
     assert.deepEqual(after.domain, before.domain, 'Rejected recovery must preserve slots, day, roots and character history');
     assert.deepEqual(after.history, before.history); assert.equal(after.revision, before.revision);

@@ -43,9 +43,9 @@ public final class CampaignDomainData {
         }
     }
     public record Root(long sequence, UUID operationId, String kind, UUID subjectId, String intent,
-                       String before, String after, List<UUID> characterOperations, UUID combatId) {
+                       String before, String after, List<UUID> characterOperations, UUID combatId, CampaignParticipationData.Actor actor) {
         public Root {
-            if (sequence < 1 || operationId == null || subjectId == null || kind == null || intent == null || !intent.matches("[0-9a-f]{64}")) throw CampaignJson.bad("Invalid domain root");
+            if (actor == null || sequence < 1 || operationId == null || subjectId == null || kind == null || intent == null || !intent.matches("[0-9a-f]{64}")) throw CampaignJson.bad("Invalid domain root");
             CampaignJson.uuid(operationId.toString()); CampaignJson.uuid(subjectId.toString());
             CampaignJson.validString(before); CampaignJson.validString(after);
             characterOperations = List.copyOf(characterOperations);
@@ -56,13 +56,16 @@ public final class CampaignDomainData {
         public World { nodes = List.copyOf(nodes); positions = List.copyOf(positions); items = List.copyOf(items); if (manual == null) throw CampaignJson.bad("Missing manual domain"); }
     }
     public record State(Material material, List<Character> characters, List<JdbcSchema2CombatRuntimeRepository.History> combats,
-                        List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots, CampaignManualData.State manual) {
+                        List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots, CampaignManualData.State manual, CampaignParticipationData.State participation) {
+        public State(Material material, List<Character> characters, List<JdbcSchema2CombatRuntimeRepository.History> combats, List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots, CampaignManualData.State manual) {
+            this(material, characters, combats, nodes, positions, items, roots, manual, CampaignParticipationData.State.empty());
+        }
         public State(Material material, List<Character> characters, List<JdbcSchema2CombatRuntimeRepository.History> combats,
                      List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots) {
             this(material, characters, combats, nodes, positions, items, roots, CampaignManualData.State.empty());
         }
         public State {
-            if (material == null || manual == null) throw CampaignJson.bad("Missing exact rules or manual domain");
+            if (material == null || manual == null || participation == null) throw CampaignJson.bad("Missing exact rules or manual domain");
             characters = List.copyOf(characters); combats = List.copyOf(combats); nodes = List.copyOf(nodes);
             positions = List.copyOf(positions); items = List.copyOf(items); roots = List.copyOf(roots);
         }

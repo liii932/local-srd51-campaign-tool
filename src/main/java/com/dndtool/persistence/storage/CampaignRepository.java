@@ -20,6 +20,7 @@ public final class CampaignRepository {
                               long byteSize, String purpose, boolean accepted) { }
 
     public void initialize(Connection c, Control control, List<String> modules, Snapshot snapshot) throws SQLException {
+        update(c, "INSERT INTO core_player_control VALUES (1,?)", "{}");
         update(c, "INSERT INTO core_control VALUES (1,?,?,?,?,?,?,?,?)", uuid(control.runId()), uuid(control.campaignId()), control.name(), control.revision(), control.epoch(), control.sealed(), control.firstSaved(), hex(control.schemaDigest()));
         for (int i = 0; i < modules.size(); i++) update(c, "INSERT INTO core_storage_module VALUES (?,?)", (long) i, modules.get(i));
         for (int i = 0; i < snapshot.rules().size(); i++) update(c, "INSERT INTO rules_binding VALUES (?,?,?)", (long) i, snapshot.rules().get(i), hex(CampaignRules.materialDigest(snapshot.rules().get(i))));

@@ -30,6 +30,10 @@ public final class CampaignDomainCodec {
         type("rules-binding", Schema2RulesBinding.class);
         type("preparation-identity", JdbcSchema2RuntimeSnapshotRepository.Identity.class);
         register("campaign", CampaignDomainData.class);
+        register("participation", CampaignParticipationData.class);
+        register("participation-command", CampaignParticipationCommands.class);
+        register("adjudication", CampaignAdjudicationData.class);
+        register("adjudication-command", CampaignAdjudicationCommands.class);
         register("check-effects", CampaignCheckEffects.class);
         register("manual", CampaignManualData.class);
         register("manual-command", CampaignManualCommands.class);

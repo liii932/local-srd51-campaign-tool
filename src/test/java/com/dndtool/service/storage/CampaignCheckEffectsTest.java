@@ -126,7 +126,7 @@ class CampaignCheckEffectsTest {
         Audit good = result.audit(); Audit forged = new Audit(good.input(), good.characterVersions(), good.checkOperationId(), good.healthOperationId(),
                 !good.success(), good.itemBefore(), good.itemAfter(), good.positionBefore(), good.positionAfter(), good.message());
         Root altered = new Root(root.sequence(), root.operationId(), root.kind(), root.subjectId(), root.intent(), root.before(),
-                CampaignDomainCodec.text(forged), root.characterOperations(), null);
+                CampaignDomainCodec.text(forged), root.characterOperations(), null, root.actor());
         List<Root> roots = new ArrayList<>(retained.roots()); roots.set(roots.size() - 1, altered);
         State bad = new State(retained.material(), retained.characters(), retained.combats(), retained.nodes(), retained.positions(), retained.items(), roots);
         var items = items(f.snapshot.domains()); var positions = positions(f.snapshot.domains());
@@ -213,7 +213,7 @@ class CampaignCheckEffectsTest {
             var children = result.state().characters().stream().flatMap(c -> c.history().events().stream()).map(JdbcSchema2CharacterRuntimeRepository.Event::operationId)
                     .filter(id -> !old.contains(id)).sorted(Comparator.comparing(UUID::toString)).toList();
             List<Root> roots = new ArrayList<>(result.state().roots());
-            roots.add(new Root(roots.size() + 1L, operation, "check-effects", result.subjectId(), "0".repeat(64), "", CampaignDomainCodec.text(result.audit()), children, null));
+            roots.add(new Root(roots.size() + 1L, operation, "check-effects", result.subjectId(), "0".repeat(64), "", CampaignDomainCodec.text(result.audit()), children, null, CampaignParticipationData.Actor.dm(result.subjectId(), null)));
             State state = result.state(); return new State(state.material(), state.characters(), state.combats(), state.nodes(), state.positions(), state.items(), roots);
         }
     }

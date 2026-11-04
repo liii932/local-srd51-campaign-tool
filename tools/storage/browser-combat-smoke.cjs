@@ -8,6 +8,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const {chromium} = require('playwright');
 const HTTP_TIMEOUT = 120000;
+const { observeStorageAction } = require('./browser-action.cjs');
 const ORIGIN = 'http://127.0.0.1:8080';
 const NAME = '装备与生命法术验收';
 const KNOWN = new Set(['浏览器验收营地', '基础生命值验收', '完整领域浏览器验收', '奥术回想浏览器验收']);
@@ -37,33 +38,11 @@ async function main() {
   async function action(name, trigger) {
     const started = Date.now(), timing = {action: name, postResponseMs: null, stateResponseMs: null};
     report.actions.push(timing);
-    const observed = Promise.all([
-      page.waitForResponse(response => response.request().method() === 'POST'
-        && response.url() === `${ORIGIN}/api/host/storage/${name}`, {timeout: HTTP_TIMEOUT}).then(response => {
-        timing.postResponseMs = Date.now() - started; timing.postStatus = response.status();
-        timing.requestId = response.request().headers()['x-request-id'];
-        const fields = new URLSearchParams(response.request().postData());
-        if (fields.has('fileKey')) timing.fileKey = fields.get('fileKey');
-        return response;
-      }),
-      page.waitForResponse(response => response.request().method() === 'GET'
-        && response.url() === `${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT}).then(response => {
-        timing.stateResponseMs = Date.now() - started; timing.stateStatus = response.status(); return response;
-      })
-    ]).catch(error => ({observationFailure: error}));
     try {
-      await trigger();
-      const responses = await observed;
-      if (responses.observationFailure) throw responses.observationFailure;
-      const [response, stateResponse] = responses, body = await response.json();
-      assert.equal(response.status(), 200, `${name} failed: ${JSON.stringify(body)}`);
-      assert.equal(stateResponse.status(), 200, `${name} did not refresh its session epoch`);
-      await stateResponse.finished();
-      const expectedMessage = name === 'end' ? '战役已保存并结束，可以再次打开。' : '战役已更新。';
-      await page.waitForFunction(message => document.querySelector('#storage-message').textContent.trim() === message, expectedMessage);
+      const {body} = await observeStorageAction(page, name, trigger, timing, HTTP_TIMEOUT);
       current = body; return body;
     } catch (error) {
-      timing.failedPhase = timing.postResponseMs === null ? `POST /${name}` : timing.stateResponseMs === null ? 'GET /state' : 'response body or UI render';
+      timing.failedPhase = timing.postResponseMs === null ? `POST /${name}` : timing.stateRefreshRequired && timing.stateResponseMs === null ? 'GET /state' : 'response body or UI render';
       timing.error = error.message;
       throw new Error(`${name} (${timing.failedPhase}): ${error.message}`);
     } finally { timing.elapsedMs = Date.now() - started; }

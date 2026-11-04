@@ -14,6 +14,7 @@ const { chromium } = require('playwright');
 
 const ORIGIN = 'http://127.0.0.1:8080';
 const HTTP_TIMEOUT = 120000;
+const { observeStorageAction } = require('./browser-action.cjs');
 const RECOVERY_NAME = '浏览器恢复验收营地';
 const DISCARD_NAME = '浏览器精确放弃验收营地';
 const KNOWN_NAMES = new Set(['浏览器验收营地', '基础生命值验收', '完整领域浏览器验收',
@@ -125,35 +126,8 @@ async function main() {
       postRequestMs: null, stateRequestMs: null, postMs: null, stateMs: null, totalMs: null };
     report.actions.push(timing); currentAction = timing;
     const phase = value => { currentPhase = `${name}:${value}`; };
-    const observed = Promise.all([
-      page.waitForResponse(response => response.request().method() === 'POST'
-        && response.url() === `${ORIGIN}/api/host/storage/${name}`, { timeout: HTTP_TIMEOUT }).then(async response => {
-          await response.finished();
-          timing.postMs = Date.now() - timing.startedAt - (timing.postRequestMs || 0);
-          return response;
-        }),
-      page.waitForResponse(response => response.request().method() === 'GET'
-        && response.url() === `${ORIGIN}/api/host/storage/state`, { timeout: HTTP_TIMEOUT }).then(async response => {
-          await response.finished();
-          timing.stateMs = Date.now() - timing.startedAt - (timing.stateRequestMs || 0);
-          return response;
-        })
-    ]).catch(observationFailure => ({ observationFailure }));
     try {
-      phase('trigger'); await trigger();
-      phase('http-responses'); const responses = await observed;
-      if (responses.observationFailure) {
-        phase(timing.postMs === null ? 'post-response' : 'paired-state-response');
-        throw responses.observationFailure;
-      }
-      const [accepted, refreshed] = responses;
-      phase('post-body'); const body = await accepted.json();
-      assert.equal(accepted.status(), 200, `${name} failed with ${body.code || body.status}`);
-      phase('paired-state'); assert.equal(refreshed.status(), 200); await refreshed.finished();
-      phase('render');
-      await equalText('#storage-message', name === 'end' ? '战役已保存并结束，可以再次打开。'
-        : name === 'save' ? '战役已保存。' : name === 'discard' ? '所选运行已放弃，已存战役文件保留。' : '战役已更新。');
-      return { body, request: new URLSearchParams(accepted.request().postData()) };
+      return await observeStorageAction(page, name, trigger, timing, HTTP_TIMEOUT, phase);
     } catch (failure) {
       report.failingPhase = currentPhase; report.failedRequestId = timing.requestId;
       throw failure;

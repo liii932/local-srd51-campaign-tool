@@ -172,9 +172,13 @@ public final class CampaignCheckEffects {
      */
     public static void validateAudit(State retained, Root root, Audit audit, Map<UUID, Node> nodes,
             Map<UUID, Item> items, Map<UUID, Position> positions) {
-        if (root == null || audit == null || !root.kind().equals("check-effects") || !root.before().isEmpty()
+        validateAudit(retained, root, audit, nodes, items, positions, "check-effects", CampaignDomainCodec.text(audit));
+    }
+    static void validateAudit(State retained, Root root, Audit audit, Map<UUID, Node> nodes,
+            Map<UUID, Item> items, Map<UUID, Position> positions, String rootKind, String rootAfter) {
+        if (root == null || audit == null || !root.kind().equals(rootKind) || !root.before().isEmpty()
                 || root.combatId() != null || !root.subjectId().equals(audit.input().characterId())
-                || !root.after().equals(CampaignDomainCodec.text(audit)) || root.sequence() > retained.roots().size()
+                || !root.after().equals(rootAfter) || root.sequence() > retained.roots().size()
                 || !retained.roots().get(Math.toIntExact(root.sequence() - 1)).equals(root)) throw CampaignJson.bad("Invalid conditional root");
         State before = prefix(retained, Math.toIntExact(root.sequence() - 1), nodes, items, positions);
         Prepared prepared = prepare(before, audit.input(), root.operationId());
@@ -253,7 +257,7 @@ public final class CampaignCheckEffects {
                 sorted(positions.values(), p -> p.characterId().toString()), sorted(items.values(), i -> i.id().toString()), roots,manual);
     }
 
-    private static Input read(JsonObject input) {
+    static Input read(JsonObject input) {
         if (input == null) throw CampaignJson.bad("Missing conditional request");
         CampaignJson.fields(input, "characterId", "characterVersion", "command", "success", "failure");
         return new Input(UUID.fromString(CampaignJson.uuid(CampaignJson.string(input, "characterId"))), CampaignJson.integer(input, "characterVersion"),
