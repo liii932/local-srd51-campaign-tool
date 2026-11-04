@@ -16,36 +16,40 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/** Permanently excludes player/public surfaces while allowing Host-only rule growth. */
+/** Excludes anonymous publication surfaces; the private player prototype has its own boundary. */
 final class DeferredPublicSurfaceExclusionTest {
     private static final Pattern SERVLET_ROUTE =
-            Pattern.compile("urlPatterns\\s*=\\s*\"([^\"]+)\"");
+            Pattern.compile("urlPatterns\\s*=\\s*(\"[^\"]+\"|\\{[^}]+\\})");
+    private static final Pattern QUOTED_ROUTE = Pattern.compile("\"([^\"]+)\"");
+    private static final Set<String> PRIVATE_PLAYER_SERVLET_ROUTES =
+            Set.of("/player", "/player/", "/api/player/*");
     private static final Pattern DESCRIPTOR_ROUTE =
             Pattern.compile("<url-pattern>([^<]+)</url-pattern>");
     private static final Pattern FORBIDDEN_PUBLIC_IDENTIFIER = Pattern.compile(
             "(?i)(?:^|_)(?:public|publication|projection|viewer|audience|visibility)(?:_|$)");
     private static final Pattern FORBIDDEN_PUBLIC_SNAKE = Pattern.compile(
-            "(?i)\\b(?:public|publication|viewer|audience|visibility)_[a-z0-9_]*\\b"
-                    + "|\\b[a-z0-9_]+_(?:public|publication|viewer|audience|visibility)\\b");
+            "(?i)\\b(?:public|publication|viewer)_[a-z0-9_]*\\b"
+                    + "|\\b[a-z0-9_]+_(?:public|publication|viewer)\\b");
     private static final Pattern FORBIDDEN_PUBLIC_CAMEL = Pattern.compile(
             "\\b(?:isPublic|public[A-Z][A-Za-z0-9]*|publication[A-Z][A-Za-z0-9]*|"
-                    + "viewer[A-Z][A-Za-z0-9]*|audience[A-Z][A-Za-z0-9]*|"
-                    + "visibility[A-Z][A-Za-z0-9]*)\\b");
+                    + "viewer[A-Z][A-Za-z0-9]*)\\b");
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("`([a-z0-9_]+)`");
 
     @Test
-    void everyServletRouteStaysInsideHealthOrProtectedHostNamespaces() throws Exception {
+    void everyServletRouteStaysInsideHealthHostOrTheExactPrivatePlayerSurface() throws Exception {
         Set<String> routes = servletRoutes();
         assertTrue(routes.contains("/health"));
         assertTrue(routes.contains("/host"));
         for (String route : routes) {
             assertTrue(route.equals("/health") || route.equals("/host")
-                            || route.startsWith("/host/") || route.startsWith("/api/host/"),
+                            || route.startsWith("/host/") || route.startsWith("/api/host/")
+                            || PRIVATE_PLAYER_SERVLET_ROUTES.contains(route),
                     route);
             assertFalse(route.equals("/display") || route.startsWith("/display/")
                     || route.startsWith("/api/public/"), route);
         }
-        assertEquals(Set.of("/host/*", "/api/host/*"), descriptorRoutes());
+        assertTrue(routes.containsAll(PRIVATE_PLAYER_SERVLET_ROUTES));
+        assertEquals(Set.of("/*", "/host/*", "/api/host/*"), descriptorRoutes());
     }
 
     @Test
@@ -87,7 +91,10 @@ final class DeferredPublicSurfaceExclusionTest {
                     .toList()) {
                 Matcher matcher = SERVLET_ROUTE.matcher(
                         Files.readString(file, StandardCharsets.UTF_8));
-                while (matcher.find()) routes.add(matcher.group(1));
+                while (matcher.find()) {
+                    Matcher quoted = QUOTED_ROUTE.matcher(matcher.group(1));
+                    while (quoted.find()) routes.add(quoted.group(1));
+                }
             }
         }
         return Set.copyOf(routes);
@@ -113,6 +120,9 @@ final class DeferredPublicSurfaceExclusionTest {
         // Java reflection access checks do not define a player/public product surface.
         String domainIdentifiers = content.replaceAll(
                 "\\b(?:java\\.lang\\.reflect\\.)?Modifier\\.isPublic\\s*\\(", "modifierAccess(");
+        // The unauthenticated HTTPS shell contains no game projection; it only starts approval.
+        // Private member audiences/visibility are authorization facts, not publication flags.
+        domainIdentifiers = domainIdentifiers.replace("publicShellNavigation", "unauthenticatedShellNavigation");
         Matcher camel = FORBIDDEN_PUBLIC_CAMEL.matcher(domainIdentifiers);
         assertFalse(camel.find(), () -> source + ": " + camel.group());
     }

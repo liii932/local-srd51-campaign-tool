@@ -62,7 +62,7 @@ class CampaignDomainRecoveryTest {
             var rewritten = new CampaignDomainData.Character("改写过去", character.kind(), character.active(), character.initial(), character.history());
             var first = state.roots().getFirst(); var roots = new ArrayList<>(state.roots());
             roots.set(0, new Root(first.sequence(), first.operationId(), first.kind(), first.subjectId(), first.intent(), first.before(),
-                    CampaignDomainCodec.text(new Profile(character.id(), rewritten.name(), character.kind(), character.active())), first.characterOperations(), first.combatId()));
+                    CampaignDomainCodec.text(new Profile(character.id(), rewritten.name(), character.kind(), character.active())), first.characterOperations(), first.combatId(), first.actor()));
             var changed = new State(state.material(), List.of(rewritten), state.combats(), state.nodes(), state.positions(), state.items(), roots, state.manual());
             assertDoesNotThrow(() -> CampaignData.validate(new CampaignData.Snapshot(original.campaignId(), original.name(), original.rules(),
                     List.of(), roots.stream().map(CampaignDomainValidation::summary).toList(), changed)));

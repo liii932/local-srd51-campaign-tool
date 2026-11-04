@@ -2,7 +2,7 @@
 
 > 文档状态：当前实现说明与原型架构边界
 > 规则目标：完整覆盖 D&D 5e 2014 / SRD 5.1；当前 Host 默认仍使用简化 v1。
-> 运行边界：全部业务只在运行 Tomcat 的电脑上由单一 DM 操作和查看。
+> 当前运行边界：DM 管理面只供本机；SQLite 提供默认关闭的独立 HTTPS 玩家原型，LAN 设备启用仍须验收。
 
 产品流程见[产品说明](product.md)。新 v2 的领域存储、完整快照、战役工作集和保存/结束
 目标集中在 [v2 设计导航](design/v2/README.md)；其[采用边界](design/v2/adoption-boundaries.md)
@@ -11,26 +11,25 @@
 
 ## 1. 产品边界
 
-Local 5E Campaign Tool 是**单机、本地、单 DM 工具**。完整 SRD 5.1 目标扩展规则能力，
-不扩展网络或用户边界：
+Local 5E Campaign Tool 由一台主机运行、一名本机 DM 管理。默认 MySQL 模式只提供
+本机 Host；显式 SQLite 有限模式可配置独立玩家原型，分别执行以下边界：
 
 1. 当前应用采用 Java 21、Tomcat 10.1、JSP、Servlet 和 JDBC；默认保留 MySQL 简化模式，
    `DND_STORAGE_ROOT` 显式启用私有 SQLite 当前有限运行模式。逐领域覆盖见
    [接合表](design/v2/domain-integration.md)，Java/Tomcat 与本机 Web 入口保持。
 2. DM 只通过本机浏览器访问 `http://127.0.0.1:8080`。
-3. 产品只实现 `/host/*`、`/api/host/*` 和安全的 `/health`，根路径 `/` 转到 `/host`。
-4. LAN/公网、HTTPS、玩家账号、`/display`、`/api/public/*`、公开投影和公开事件不属于当前产品目标。
+3. Host 实现 `/host/*`、`/api/host/*` 和安全的 `/health`，根路径 `/` 转到 `/host`；可选玩家入口只有 `/player`、固定资源和 `/api/player/*` 白名单。
+4. 玩家原型显式配置独立 HTTPS 8443、成员审批与逐请求授权；不自动创建监听。公网、匿名展示、`/display` 和 `/api/public/*` 不在范围内。
 5. 数据库和存档不预建未使用的公开字段或 `public_*` 表；任何边界变化必须另立范围并明确结构、权限和真实数据处置。
-6. 主机 loopback 边界、Session、CSRF、Origin/Referer、Fetch Metadata、对象版本、`host_state_epoch` 和幂等键仍必须实现。恶意网页可以从主机浏览器尝试攻击 localhost，因此“只有本机使用”不等于可以取消 Web 安全边界。
+6. 主机 loopback 边界、Session、CSRF、Origin/Referer、Fetch Metadata、对象版本、运行 epoch 和幂等键仍必须实现。恶意网页可以从主机浏览器尝试攻击 localhost，因此“只有本机使用”不等于可以取消 Web 安全边界。
 7. 当前 Host 使用内置不可变发布，不提供脚本扩展；v2 自定义内容仅能使用已支持机制并经
    独立安装/接受，具体边界见模组公共合同。
 8. MySQL Host 没有经过哈希验证的内置 `RELEASED` 发布版时不得创建战役；SQLite 有限模式
    只接受其准确内置目录，不使用完整 SRD 的 DRAFT 身份。各模型初始化都须通过该范围完整
    规则、业务与恢复资格，不能以临时空战役绕过。
 
-完整规则目标不得被用来放宽 loopback Filter、开放主机接口、建立玩家身份或增加公开读取能力。
-若将来改变这些边界，必须重新确认身份、授权、网络入口、证书和公开数据投影，不能直接把
-主机接口绑定到局域网地址。
+完整规则支持本身不授予网络或玩家权限。玩家原型使用独立入口和授权，不能放宽
+loopback Filter 或把主机接口绑定到局域网地址。
 
 ## 2. 当前实现与目标闭环
 
@@ -64,7 +63,8 @@ DM 访问 http://127.0.0.1:8080/host
 
 完整 SRD 5.1 目标在相同本机边界中扩展这条链路：角色构筑、冒险资源、战斗、法术、装备、
 怪物和状态都必须进入同一套服务器权威验证、事务、事件、幂等、冻结规则与存档机制。
-局域网设备访问、HTTPS、CA 信任、玩家身份、公开数据发布和展示轮询不属于该目标闭环。
+局域网设备访问、HTTPS、证书信任、玩家身份与逐人视图另按[玩家参与](design/v2/player-participation.md)
+接合和验收，不从完整规则支持推导网络权限。
 新 v2 准备准确有序组合，由应用 JSON 表结构声明计算闭包并生成确定性 SQLite 建表计划。
 同一初始化事务建立结构、静态种子、完整规则/链、业务、历史和控制；首份完整检查点接受
 后才可执行，最终逻辑 JSON 文件发布并登记封存后才可清理。结构语言及职责见
@@ -151,6 +151,8 @@ V035/V037 保存类型化规则镜像，V036/V038 保存施法、学习/准备�
 
 ### 3.1 当前冻结 v1 已实现
 
+以下清单只描述默认 MySQL Host，不包含显式 SQLite 模式及其可选玩家入口。
+
 - 单台主机运行 Tomcat 和 MySQL；
 - 单个本机 DM 操作者，不建立玩家账号或角色所有权；
 - 同一时间最多一个活动战役，其他战役可归档；
@@ -188,26 +190,24 @@ V035/V037 保存类型化规则镜像，V036/V038 保存施法、学习/准备�
 这是目标范围，不是当前完成功能声明。每个领域只有在数据、规则、事务、存档、测试和 Host UI
 共同完成后，才可在 README 中列为已实现。
 
-### 3.3 当前产品不包含的网络与多用户能力
+### 3.3 可选局域网玩家原型
 
-以下能力不创建占位类、空表或未使用字段，也不计入当前产品完成度：
+SQLite runtime 已接合成员审批、PC 控制、共享、探索许可、逐人视图和有限动作候选。
+`CampaignParticipationCommands`、`CampaignAdjudicationCommands` 与 `PlayerGatewayService`
+经同一个 `CampaignStorageService` 串行门处理授权和业务提交。玩家只能提交当前服务器
+发出的候选，不能上传任意领域命令；自由卡仍由 DM 操作，当前玩家候选只覆盖有限规则卡动作。
+DM 对玩家文字提议可拒绝、叙事回复或执行有理由的属性检定，尚无通用裁定执行器。
 
-- 局域网 HTTPS 8443 和 Windows 防火墙入站放行；
-- 稳定 IP、稳定 DNS、证书 SAN 更新和移动设备 CA 安装；
-- `/display` 和 `/api/public/*`；
-- 匿名外部展示页面；
-- 字段公开资格、主机公开预览和持续公开选择；
-- `public_character_key`、`public_name`、`public_epoch`、公开快照版本和公开序号；
-- `character_publication`、`public_*_projection`、`public_event` 等公开配置、投影和事件表；
-- 公开快照、增量事件、游标、ETag、读取窗口和轮询；
-- 外部读取限流、公开 DTO 白名单和展示端 XSS 边界；
-- 手机、平板和其他电脑的网络验收。
+成员、控制、共享和已执行裁定属于完整业务事实；设备绑定与已发送请求关联只保存在
+当前私有 run。同一残留 run 恢复后，DM 重新开放，原有效设备可重新认证并只读查证结果；
+完整文件重开建立新 run，需要重新批准设备。两者均不恢复旧写连接或自动重发游戏命令。
+入口边界见 §11，安全与恢复分别见[安全模型](security.md)和[运行合同](storage-vitality-loop.md)。
+完整设计与剩余采用范围保留在[玩家参与](design/v2/player-participation.md)。
 
 ### 3.4 其他明确不做
 
-- 玩家账号、昵称、邀请码、加入、批准、重连令牌和设备配对；
-- PC 所有权、玩家 Session、多位独立 DM 和多套观看者视图；
-- 外部设备提交行动、聊天、投票、角色修改、导入或其他写操作；
+- 全局玩家账号、多位独立 DM、匿名旁观、聊天和投票；
+- 玩家管理存档、导入/导出完整战役、任意角色状态修改或绕过批准取得控制权；
 - 页面中的模组上传、安装、规则正文编辑、内容更新和在线下载；
 - 运行时 Java、JavaScript、SQL 或其他脚本插件；
 - 运行时动态 DDL 和 MySQL JSON 列；
@@ -307,13 +307,14 @@ Servlet 不直接执行 SQL，Repository 不决定业务权限，JSP 不保存�
 
 应用以 `ROOT.war` 部署，正式 URL 不包含 Maven 版本号。根路径 `/` 使用相对重定向到 `/host`。产品不按来源分流到 `/display`，也不映射 `/api/public/*`。
 
-所有业务页面和 API 都使用相同的正式 origin：
+所有 Host 业务页面和 API 都使用相同的正式 origin：
 
 ```text
 http://127.0.0.1:8080
 ```
 
-`localhost`、`::1`、局域网 IP、8443 和其他端口都不是入口别名。
+`localhost`、`::1`、局域网 IP、8443 和其他端口都不是 Host 入口别名。可选玩家的独立
+HTTPS origin 与路径白名单见 §11，不经过 Host 页面或 Session。
 
 ### 4.3 直接依赖
 
@@ -334,7 +335,8 @@ http://127.0.0.1:8080
 
 ### 5.1 Loopback 入口
 
-HTTP Connector 只绑定 `127.0.0.1:8080`。应用最早执行的主机边界 Filter 对 `/host/*` 和 `/api/host/*` 同时要求：
+Host HTTP Connector 只绑定 `127.0.0.1:8080`。全局首个 `PlayerBoundaryFilter` 先隔离
+Connector 和玩家路径；随后 `HostBoundaryFilter` 对 `/host/*` 和 `/api/host/*` 同时要求：
 
 ```text
 实际 TCP 对端地址 = 127.0.0.1
@@ -345,7 +347,9 @@ Host = 127.0.0.1:8080
 
 任一条件不满足时返回相同的普通 `404`，不暴露路由、方法或管理能力。只有通过入口检查后，方法错误才返回 `405`。来源判断不读取或信任 `X-Forwarded-For`、`X-Forwarded-Host`、`X-Forwarded-Proto`。初版不配置反向代理、AJP、`RemoteIpValve` 或 `RemoteIpFilter`。
 
-本机产品不需要 8443。开发期间若外部 HTTPS Connector 暂时保留，必须保持防火墙不放行且不得作为业务入口；交付前应禁用该 Connector，并验证只监听 `127.0.0.1:8080`。
+默认本机部署只启用 `127.0.0.1:8080`。显式 SQLite 模式可按 §11 配置独立玩家 HTTPS
+8443；应用不会自行创建 Connector。玩家入口启用不改变这里的 Host 地址、端口和 Filter
+条件，实际监听、证书信任及防火墙按[部署指南](deployment.md)单独核验。
 
 ### 5.2 方法、Session 和 CSRF
 
@@ -374,10 +378,11 @@ TCP 对端、端口、scheme、Host
 
 允许 origin 固定为 `http://127.0.0.1:8080`。`Origin: null`、来源不匹配、Origin/Referer 都缺少或 `Sec-Fetch-Site: cross-site` 时拒绝写入。
 
-主机 GET/HEAD 通过最小只读查询把当前活动战役的 `host_state_epoch` 刷新到 Session 和
-页面；没有活动战役时使用 `0`。读取暂时失败时仍允许主机壳和数据库诊断页面显示，但任何
-POST 必须再次读取权威 epoch，数据库不可用返回 `503`，请求值只匹配旧 Session 而不匹配
-当前活动战役时返回 `409`。因此 Session 内缓存不是 epoch 的权威来源。
+MySQL 模式的主机 GET/HEAD 通过最小只读查询把当前活动战役的 `host_state_epoch` 刷新到
+Session 和页面；没有活动战役时使用 `0`。SQLite 模式从存储服务读取自身运行 epoch，
+不查询 MySQL。读取暂时失败时仍允许主机壳显示，但 POST 必须再次读取权威 epoch；
+后端不可用返回 `503`，请求值只匹配旧 Session 而不匹配当前权威值时返回 `409`。
+因此 Session 内缓存不是 epoch 的权威来源。MySQL 数据库诊断仍只适用于该模式。
 
 ### 5.3 响应与秘密
 
@@ -437,7 +442,7 @@ Referrer-Policy: no-referrer
 | `game_event` | 战役内部连续序号、事件类型、文字和关联对象 |
 | `field_change` | 字段旧值、新值和关联事件 |
 
-产品不建立 `member`、`auth_token`、`action_request`、邀请码、设备表或任何 `public_*` 表。
+MySQL 模式不建立 `member`、`auth_token`、`action_request`、邀请码、设备表或任何 `public_*` 表。
 
 ### 6.3 战役身份
 
@@ -452,7 +457,7 @@ Referrer-Policy: no-referrer
 
 ### 6.4 角色身份与并发
 
-PC 和 NPC 都来自 `character_record`，都由本机 DM 控制，不存在玩家所有权或批准状态。
+MySQL 模式的 PC 和 NPC 都来自 `character_record`，均由本机 DM 控制，不存在玩家所有权或批准状态。
 
 | 值 | 职责 | 可变性 | 是否写入存档 |
 |---|---|---|---|
@@ -583,7 +588,7 @@ SQLite 模式的 `/host` 进入 `/host/storage`，同一受保护操作台提供
 
 完整规则将在相同 `/host/*` 边界内增加角色构筑、法术书、装备、战斗追踪、遭遇构建、
 怪物目录和规则查询页面。页面名称和路由只有在对应领域设计与测试完成时才成为稳定接口；
-不得以此为由增加 `/display` 或玩家页面。
+完整规则支持不开放 `/display`；当前可选玩家页面使用 §11 的独立边界。
 
 ### 7.2 主机 API
 
@@ -638,10 +643,11 @@ epoch、revision 与角色/场景版本仍分别校验。文件下载是读取�
 加载、外键、存档、权限和回滚边界见[静态规则目录与运行数据库分离设计](rule-database-separation.md)。
 新目标按应用当前 JSON 结构在新私有库中初始化，同版残留核验已存模型、计划和真实结构，
 不重跑 DDL/seed。同一运行固定规则解释，不引入规则热重载或跨库分布式事务。
-当前可选 SQLite 已由 `StorageApplicationListener` 和 `CampaignStorageService` 装配，
-只使用 `DND_STORAGE_ROOT`，无需来源 MySQL 或新来源 JNDI。完整文件携带准确冻结
-material/链，按已验证的四包固定投影逐项核验。未来通用来源安装/接受另设配置合同，见
-[配置边界](configuration.md#v2-存储配置目标)；本地运行接合不表示真实数据库已经迁移。
+当前可选 SQLite 由 `DND_STORAGE_ROOT` 显式选择，经 `StorageApplicationListener` 和
+`CampaignStorageService` 装配。它不读取外部自定义规则来源，不连接来源 MySQL，也不使用
+新的来源 JNDI。完整文件携带准确冻结 material/链，按内置四包固定投影逐项核验。
+具体装配边界见[配置说明](configuration.md#sqlite-装配与运行身份)；启用 SQLite 不表示
+已有 MySQL 数据已经迁移。
 
 ## 9. 本地存档、导入与恢复
 
@@ -766,6 +772,10 @@ InnoDB 和既有运维备份边界负责，应用不得自行猜测或补写部�
 
 ## 10. 验证重点
 
+下列清单核对默认 MySQL Host 及其存档合同。SQLite 的完整历史、文件与恢复另按
+[运行合同](storage-vitality-loop.md)核对，玩家入口另按[安全模型](security.md)核对，
+不能将两种模式的版本、规则发布或文件字段互相套用。
+
 - 只有精确 `http://127.0.0.1:8080` 能访问主机路由；
 - `localhost`、`::1`、局域网 IP、错误端口、错误 Host/scheme 得到相同普通 `404`；
 - 伪造 `X-Forwarded-*` 不能改变来源判断；
@@ -774,7 +784,7 @@ InnoDB 和既有运维备份边界负责，应用不得自行猜测或补写部�
 - Cookie 名称、属性、超时和主机安全响应头与设计一致；
 - 同一 `request_id` 重试只执行一次，检定只掷一次骰；
 - `event.note` 的幂等重放只返回同一根事件，不创建检定；MANUAL 不依赖事件模板且只使用冻结发布版全局效果白名单；
-- PC/NPC 没有玩家所有者和批准状态；
+- PC/NPC 由 DM 控制，没有玩家所有权或批准状态；
 - 角色改名、类型变化、归档/恢复不改变 `character_key`，复制生成新键；
 - 名称 NFC、长度、控制字符和允许重名规则正确；
 - 任一角色聚合子数据修改递增 `row_version`，旧版本返回 `409`；
@@ -802,32 +812,32 @@ InnoDB 和既有运维备份边界负责，应用不得自行猜测或补写部�
 - WAR、Git、存档和日志不包含口令、Cookie、CSRF Token 或私钥；
 - 产品不出现 `/display`、`/api/public/*`、`public_*` 表或未使用公开字段。
 
-## 11. 网络与多用户能力的变更门槛
+## 11. 可选玩家入口的运行边界
 
-LAN/公网、HTTPS、玩家账号、`/display` 和 `/api/public/*` 不属于当前产品目标。完整 SRD 5.1
-的任何实现阶段都不得顺带加入这些能力。若未来另立项目范围，至少必须重新决策：
+玩家入口仅在 `DND_STORAGE_ROOT` 和玩家配置同时存在时可用，默认 MySQL Host 不提供此能力。
+`DND_PLAYER_ORIGIN` 与 `DND_PLAYER_BIND_ADDRESS` 必须指定同一个规范 IPv4 地址和
+`https://IP:8443`；当前不接受 DNS 名称、IPv6、通配绑定、其他端口或明文 HTTP。
+地址只允许 loopback、私有或链路本地 IPv4，应用不创建监听或更改证书、系统信任和防火墙。
+配置与部署分别见[配置说明](configuration.md)和[部署指南](deployment.md)。
 
-| 问题 | 必须明确的方案 |
-|---|---|
-| DHCP 地址变化 | 路由器固定租约、主机静态地址或稳定局域网 DNS |
-| 浏览器地址认证 | 与实际固定 IP/DNS 匹配的 SAN 证书 |
-| 网络入口 | 专用网络防火墙只开放 HTTPS，绝不开放 8080 |
-| 公开数据 | 独立公开资格、配置、物化投影和白名单 DTO |
-| 外部接口 | 新增 `/display`、只读 `/api/public/*` 和无 Session 页面 |
-| 更新机制 | 快照、连续公开事件、游标、ETag 和轮询/其他传输 |
-| 威胁模型 | 局域网扫描、篡改、限流、错误泄露和外部设备测试 |
-| 文件协议 | 为当前支持版本明确公开配置、投影和不支持输入的拒绝边界 |
+`PlayerBoundaryFilter` 在全部分派前执行。8080 拒绝玩家路径；玩家 Connector 只提供
+`/player`、两份固定静态资源及有限 `/api/player/*` 白名单，拒绝根页、Host 页面/API、
+完整文件和诊断。请求必须匹配实际 TLS、本地地址、端口和精确 Host，写入另核对精确
+origin 与 Fetch Metadata，不信任代理转发头。
 
-任何网络边界变化前都必须重新确定稳定网络身份与证书边界；不得通过忽略证书错误、开放明文 LAN HTTP 或放宽主机 Filter 来绕过。
-
-允许外部设备写入仍属于更远期的多用户产品，必须重新设计身份、认证、授权、所有权、并发、幂等和滥用防护。
+邀请只产生申请；DM 批准设备后，每次读取与写入仍重查当前成员资格及授权版本，动作还要
+匹配 PC 控制、当前候选、版本和单一写连接。DM 仍独占完整文件管理与保存/结束。
+安全凭据、限流和重连查证见[安全模型](security.md)，实际运行方法和隔离 HTTPS 测试见
+[测试指南](testing.md)。隔离 loopback 测试不能代替真实局域网设备的证书、信任和网络验收。
+公网、匿名展示、`/display`、`/api/public/*` 和全局账号仍不提供；未采用设计见
+[玩家参与](design/v2/player-participation.md)。
 
 ## 12. 设计总结
 
-1. **产品边界**：产品是纯本机、单 DM 工具，规则目标是完整覆盖 SRD 5.1。
-2. **网络边界**：只保留 `127.0.0.1:8080`；LAN/公网、HTTPS、玩家账号和公开展示不属于当前产品目标。
-3. **接口边界**：只有 `/host/*`、`/api/host/*` 和 `/health`。
-4. **数据边界**：不包含公开身份、公开配置、公开投影、公开事件或公开 epoch。
+1. **产品边界**：一台主机、一名本机 DM；默认 MySQL Host 与显式 SQLite 有限模式分别执行各自合同。
+2. **网络边界**：默认只启用 `127.0.0.1:8080`；可选玩家使用独立 HTTPS/授权，公网及匿名展示不在范围内。
+3. **接口边界**：Host 路由与玩家固定白名单分别受过滤器保护；玩家 Connector 不提供 Host、根页、诊断或文件。
+4. **数据边界**：MySQL 保留冻结 v1；SQLite 的战役成员、控制、共享和历史随完整文件保存，运行安全凭据排除在外。
 5. **安全边界**：loopback 仍保留严格 Filter、CSRF、来源、Session、版本和幂等保护。
 6. **业务能力**：在既有规则哈希、事务、事件和存档机制上逐步完成角色、冒险、战斗、法术、装备、怪物和状态规则。
 7. **演进原则**：按产品原型政策支持当前版本，设计、模型与协议可协调替换；同一受支持运行保持规则、摘要、事务和恢复一致，真实数据处置及已应用迁移仍遵守明确目标与独立授权。

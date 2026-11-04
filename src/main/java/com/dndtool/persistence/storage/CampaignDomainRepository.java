@@ -11,7 +11,7 @@ import com.dndtool.service.storage.CampaignDomainData.Character;
 /** Caller-owned transaction leaves for typed aggregates and independently checked relational projections. */
 public final class CampaignDomainRepository {
     private static final List<String> TABLES = List.of("rules_runtime_material", "characters_runtime_character", "scenes_world", "combat_scene", "history_runtime_root",
-            "resources_character", "equipment_instance", "spellcasting_book", "actions_frame", "effects_instance", "monsters_instance", "manual_character", "manual_encounter");
+            "resources_character", "equipment_instance", "spellcasting_book", "actions_frame", "effects_instance", "monsters_instance", "manual_character", "manual_encounter", "participation_state", "participation_member", "participation_control", "participation_share", "participation_exploration");
 
     public void write(Connection connection, State state) throws SQLException {
         // CampaignStorageService owns an explicit SQLite BEGIN IMMEDIATE. Xerial's
@@ -23,7 +23,8 @@ public final class CampaignDomainRepository {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 for (int i = 0; i < row.size(); i++) {
                     Object value = row.get(i);
-                    if (value instanceof UUID uuid) statement.setBytes(i + 1, CampaignRepository.uuid(uuid.toString()));
+                    if (value == null) statement.setNull(i + 1, Types.BLOB);
+                    else if (value instanceof UUID uuid) statement.setBytes(i + 1, CampaignRepository.uuid(uuid.toString()));
                     else if (value instanceof String text) statement.setString(i + 1, text);
                     else if (value instanceof Long number) statement.setLong(i + 1, number);
                     else throw new SQLException("DOMAIN_BINDING_TYPE");
@@ -38,7 +39,7 @@ public final class CampaignDomainRepository {
         List<Character> characters = documents(connection, "characters_runtime_character", "character_id", Character.class);
         List<JdbcSchema2CombatRuntimeRepository.History> combats = documents(connection, "combat_scene", "combat_id", JdbcSchema2CombatRuntimeRepository.History.class);
         List<Root> roots = documents(connection, "history_runtime_root", "sequence", Root.class);
-        State state = new State(material, characters, combats, world.nodes(), world.positions(), world.items(), roots, world.manual());
+        State state = new State(material, characters, combats, world.nodes(), world.positions(), world.items(), roots, world.manual(), one(connection, "participation_state", CampaignParticipationData.State.class));
         // Check every projected value and every row; recovery never silently rebuilds a damaged index.
         Map<String, List<List<Object>>> expected = rows(state);
         for (String table : TABLES) {
@@ -87,6 +88,11 @@ public final class CampaignDomainRepository {
         Map<String, List<List<Object>>> data = new LinkedHashMap<>(); TABLES.forEach(table -> data.put(table, new ArrayList<>()));
         add(data, "rules_runtime_material", 1L, CampaignDomainCodec.text(state.material()));
         add(data, "scenes_world", 1L, CampaignDomainCodec.text(new World(state.nodes(), state.positions(), state.items(), state.manual())));
+        add(data, "participation_state", 1L, CampaignDomainCodec.text(state.participation()));
+        for (var member : state.participation().members()) add(data, "participation_member", member.id(), member.active() ? 1L : 0L, member.version(), CampaignDomainCodec.text(member));
+        for (var control : state.participation().controls()) add(data, "participation_control", control.characterId(), control.memberId(), control.version(), CampaignDomainCodec.text(control));
+        for (var share : state.participation().shares()) add(data, "participation_share", share.id(), share.subjectId(), share.active() ? 1L : 0L, share.version(), CampaignDomainCodec.text(share));
+        for (var permission : state.participation().exploration()) add(data, "participation_exploration", permission.characterId(), permission.active() ? 1L : 0L, permission.version(), CampaignDomainCodec.text(permission));
         for (var character : state.manual().characters()) {
             var current = character.current();
             add(data, "manual_character", current.id(), current.name(), current.kind(), current.active() ? 1L : 0L, current.version(), CampaignDomainCodec.text(character));
@@ -110,5 +116,5 @@ public final class CampaignDomainRepository {
         for (Root root : state.roots()) add(data, "history_runtime_root", root.sequence(), root.operationId(), root.kind(), root.subjectId(), CampaignDomainCodec.text(root));
         return data;
     }
-    private static void add(Map<String, List<List<Object>>> rows, String table, Object... values) { rows.get(table).add(List.of(values)); }
+    private static void add(Map<String, List<List<Object>>> rows, String table, Object... values) { rows.get(table).add(Arrays.asList(values)); }
 }

@@ -37,13 +37,13 @@ V001—V018 已应用后不可修改、合并、重命名或重跑。SQL 文件�
 来源 SQL 留在 WAR 外，来源迁移与授权按[来源 schema 合同](rule-source-schema.md)另行执行。
 内部快照、战斗及有限施法不会开放完整 base、Host 初始化或 archive format 2，也不改变默认发布版。
 
-### v2 存储替换的采用检查点
+### SQLite 候选与数据边界
 
 JSON 结构建库已用于[有限 SQLite 战役运行](storage-vitality-loop.md)，涵盖当前有限规则下的
-角色/战斗/场景和完整历史；逐领域覆盖及剩余门见[接合表](design/v2/domain-integration.md)。
-尚未把 MySQL 启动默认切到 SQLite，也未声明完整 SRD 已发布；不能据此删除当前迁移。后续替换按
-[存储路线](design/v2/storage-data-map-and-rollout.md)交付；候选需具备全域数据/文件、
-同版恢复、锁和真实文件系统证据，WAR 必需/禁止项按[测试指南](testing.md)同步更新。
+角色/战斗/场景、参与和裁定事实及完整历史；当前范围见该运行合同。
+MySQL 仍是未配置存储根时的默认模式，启用 SQLite 不会删除当前迁移或转换既有数据。
+SQLite 候选须覆盖完整文件、同版恢复、锁和目标文件系统边界，WAR 必需/禁止项按
+[测试指南](testing.md)核验。
 部署仍执行本指南的停机、完整备份、候选审计、可回滚替换及验收，不另设自动切换程序。
 SQLite 候选审计须包含结构 JSON、严格 codec/领域引擎、SQLite JDBC、Host 资源及
 `storage/rules/` 四个内置原包；规则作者源保留在仓库 `rule-packages/srd51-runtime/`。
@@ -52,7 +52,7 @@ SQLite 候选审计须包含结构 JSON、严格 codec/领域引擎、SQLite JDB
 Linux/WSL 或手工装配的测试容器代替原生 Windows 正式 WAR 验收。
 
 切换前明确现有 MySQL 数据保管、残留和未决操作处置，备份外部配置及需要保留的数据。
-当前可选模式按[配置合同](configuration.md#v2-存储配置目标)独立装配，不要求新来源
+当前可选模式按[配置合同](configuration.md#sqlite-装配与运行身份)独立装配，不要求新来源
 JNDI 或两根变量；原 MySQL 仍是默认，旧装配退役另需完整替换和真实数据保管边界。
 来源账本维护、授权与 WAR 部署分别执行。新运行库由产品新建/打开入口初始化，启动诊断不替
 用户创建战役、补表或重建旧库。部署回退还原匹配的配置，保留新模型文件与残留，不用
@@ -76,11 +76,33 @@ JNDI 或两根变量；原 MySQL 仍是默认，旧装配退役另需完整替�
 未解析占位符和无效根失败关闭；只有两处均没有配置才会进入原 MySQL 路线。
 Windows 服务不读取 `setenv.bat`，必须配置实际服务身份和进程环境/JVM 选项。
 
-Tomcat Connector 只绑定 `127.0.0.1:8080`，shutdown listener 也限 loopback；不启用
-AJP、HTTPS 或其他应用 context。SQLite 的 16 MiB 导入限制由应用检查，示例验收容器的
+默认 Tomcat Connector 只绑定 `127.0.0.1:8080`，shutdown listener 也限 loopback；不启用
+AJP 或其他应用 context。可选玩家 HTTPS 另按下节启用。SQLite 的 16 MiB 导入限制由应用检查，示例验收容器的
 表单 `maxPostSize` 为 `16778240`。保留 MySQL 时改用
 [ROOT-mysql.xml.example](../config/tomcat/ROOT-mysql.xml.example)，并在外部提供原环境变量；
 Connector/J 仍放在 `%CATALINA_BASE%\lib`，口令不进入 XML、批处理、JVM 参数或仓库。
+
+### 可选玩家 HTTPS 入口
+
+先完成本指南的候选构建、完整回归、WAR 审计及可回滚替换，再按明确授权配置网络。
+玩家原型仅接入 `DND_STORAGE_ROOT` 的 runtime 战役；不开启此配置时保持原单 DM 部署。
+
+1. 明确固定的局域网 IPv4 与 `8443`，配置[玩家请求边界](configuration.md#可选玩家-https-原型配置)。
+   Host Connector 保持 `127.0.0.1:8080`；不要把它改绑 LAN 或添加转发 Host 的代理。
+2. 准备设备受信任、SAN 精确包含所用 IPv4 的服务器证书，将 PKCS12 私钥库与口令保管在
+   WAR/Git 外。使用[独立 Connector 示例](../config/tomcat/player-https-connector.xml.example)，
+   通过外部环境提供私钥库位置和口令。现有 `EnvironmentPropertySource` 负责占位符；
+   不在访问日志、批处理正文或 JVM 参数里填写秘密。
+3. 在实际玩家设备安装所用 CA 的信任，并核对证书和地址。没有有效信任时停止接入，
+   不提示忽略警告。防火墙只允许专用网络的选定 HTTPS 地址/端口，8080 仍不对外开放。
+4. 用手机与桌面两类实际设备执行[玩家验收矩阵](design/v2/player-participation.md#验收与采用门)，
+   特别检查 TLS 错误、错 Origin、访问 Host 路由、两玩家越权、撤回、接管与断线查证。
+   loopback HTTPS 自动测试和手机尺寸模拟不替代此设备证据。
+5. 关闭时撤销监听与防火墙规则，并清除两项玩家配置；保留匹配版本的存储根与完整文件。
+   回退 WAR 仍按本指南，不用旧版解释新增参与事实，也不自动丢弃原运行。
+
+示例和应用代码不会自动执行这些外部操作。证书更新/地址变化必须重新核对 SAN、应用
+精确 origin 和设备信任，不能用备用 HTTP 地址掩盖失败。
 
 ### 自动化部署身份
 
@@ -102,7 +124,7 @@ DDL 权限。它不保存 `dnd_tool_se_migrator` 凭据；SQLite Tomcat 使用�
 
 ## 4. 可回滚替换
 
-1. 停止 Tomcat，并确认相关 Java 进程和 8005/8080 listener 已退出。
+1. 停止 Tomcat，并确认相关 Java 进程及 8005/8080、已启用的 8443 listener 均已退出。
 2. 对当前 `webapps\ROOT.war`（若存在）、完整展开目录 `webapps\ROOT`、ROOT context、`server.xml` 和启动配置创建仓库外回滚副本；记录原本不存在的对象。SQLite 必须在停止后整体保管私有根，包括全部 run、journal、准备/清理材料及 saves，不选择性只复制 JSON。
 3. 确认目标路径精确无误后，移除旧展开目录，复制经审计候选为 `webapps\ROOT.war`。
 4. 比较候选和活动 `ROOT.war` 的 SHA-256；确保没有临时 WAR、旧并行 context 或部分展开目录。
@@ -112,7 +134,7 @@ DDL 权限。它不保存 `dnd_tool_se_migrator` 凭据；SQLite Tomcat 使用�
 
 ## 5. 启动与验收
 
-启动后只检查最新日志段，确认没有新的 `SEVERE`、`ERROR`、连接或 schema/hash 失败。系统层面应只有一个预期 Java/Tomcat 实例，8005/8080 只监听 loopback，8443 不监听。
+启动后只检查最新日志段，确认没有新的 `SEVERE`、`ERROR`、连接或 schema/hash 失败。系统层面应只有一个预期 Java/Tomcat 实例，8005/8080 只监听 loopback；默认 8443 不监听，显式启用玩家时仅监听已核准的精确地址并执行上节验收。
 
 最小 HTTP 验收：
 
@@ -124,7 +146,8 @@ DDL 权限。它不保存 `dnd_tool_se_migrator` 凭据；SQLite Tomcat 使用�
 | `GET /api/host/storage/state` | SQLite 模式返回当前运行/残留/文件状态；不执行恢复或业务写入 |
 | `GET /api/host/storage/readiness` | `mode=SQLITE`；`200` 且 `ready=true` 的 IDLE/ACTIVE 才可新建/继续；需恢复、阻断或不可用返回 `503` 和稳定类别 |
 | 主机数据库诊断 | 仅 MySQL 模式按其合同识别迁移/规则；SQLite 模式不据此判断就绪 |
-| 错误 Host、`localhost`、`::1` | 普通 `404` |
+| DM 入口的错误 Host、`localhost`、`::1` | 普通 `404` |
+| DM 入口的 `/player`、`/api/player/*` | `404`；玩家只从显式配置的独立 HTTPS Connector 进入 |
 | `/display`、`/api/public/*` | `404` |
 
 只有 UI 或客户端 JavaScript 变化时才需要真实浏览器验收；应检查主要页面、表单和控制台错误。不要用 HTTP 探测执行真实业务写入，除非该写入验收被单独授权并有恢复方案。

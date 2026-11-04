@@ -250,6 +250,32 @@
           "foreignKeys": [],
           "checks": [],
           "indexes": []
+        },
+        {
+          "name": "core_player_control",
+          "columns": [
+            {
+              "name": "singleton",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "singleton"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
         }
       ],
       "seeds": [
@@ -1460,6 +1486,191 @@
       "seeds": []
     },
     {
+      "id": "participation",
+      "dependsOn": [
+        "manual",
+        "history-runtime"
+      ],
+      "tables": [
+        {
+          "name": "participation_state",
+          "columns": [
+            {
+              "name": "singleton",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "singleton"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "participation_member",
+          "columns": [
+            {
+              "name": "member_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "active",
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "member_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "participation_control",
+          "columns": [
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "member_id",
+              "type": "uuid",
+              "nullable": true
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "character_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "participation_share",
+          "columns": [
+            {
+              "name": "share_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "subject_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "active",
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "share_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "participation_exploration",
+          "columns": [
+            {
+              "name": "character_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "active",
+              "type": "boolean",
+              "nullable": false
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "character_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        }
+      ],
+      "seeds": []
+    },
+    {
       "id": "runtime",
       "dependsOn": [
         "manual",
@@ -1468,7 +1679,8 @@
         "actions",
         "effects",
         "monsters",
-        "health"
+        "health",
+        "participation"
       ],
       "tables": [
         {

@@ -1,0 +1,13 @@
+<!-- Optional fragment for server.xml's existing Service. Never replace the loopback Host connector.
+     EnvironmentPropertySource must be enabled. All referenced secrets live outside Git/WAR.
+     DND_PLAYER_ORIGIN must equal https://${DND_PLAYER_BIND_ADDRESS}:8443 in the application. -->
+<Connector protocol="org.apache.coyote.http11.Http11NioProtocol"
+           address="${DND_PLAYER_BIND_ADDRESS}" port="8443"
+           scheme="https" secure="true" SSLEnabled="true"
+           maxPostSize="32768" connectionTimeout="15000" acceptCount="32">
+    <SSLHostConfig protocols="TLSv1.2,TLSv1.3">
+        <Certificate certificateKeystoreFile="${DND_PLAYER_KEYSTORE}"
+                     certificateKeystorePassword="${DND_PLAYER_KEYSTORE_PASSWORD}"
+                     certificateKeystoreType="PKCS12" />
+    </SSLHostConfig>
+</Connector>

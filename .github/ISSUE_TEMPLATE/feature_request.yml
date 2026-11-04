@@ -1,12 +1,12 @@
 name: Feature request
-description: Propose a bounded change aligned with the loopback-only SRD 5.1 scope.
+description: Propose a bounded change aligned with the documented campaign-tool scope.
 title: "Feature: "
 labels: ["enhancement", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Please keep proposals within the current single-DM, loopback-only product unless the request is explicitly for a separately reviewed future scope. Do not include private campaign content or proprietary third-party rules text.
+        Describe how the proposal fits the current product and security boundaries, including the loopback-only DM entry and optional player HTTPS access. Identify any scope that needs separate design. Do not include private campaign content or proprietary third-party rules text.
   - type: textarea
     id: problem
     attributes:
@@ -27,11 +27,12 @@ body:
       label: Scope area
       options:
         - Released v1 behavior
+        - SQLite campaign runtime and player participation
         - Draft SRD 5.1 character rules
-        - Future combat/conditions
-        - Future spells
-        - Future equipment/adventure
-        - Future monsters/magic items
+        - Combat/conditions
+        - Spells
+        - Equipment/adventure
+        - Monsters/magic items
         - Documentation/tooling
         - Out of current product scope
     validations:
@@ -40,7 +41,7 @@ body:
     id: contracts
     attributes:
       label: Contracts and boundaries to preserve
-      description: Mention stable keys, migrations, archive formats, loopback-only security, or other invariants that matter.
+      description: Mention supported rule identities, migration history, file formats, DM/player access boundaries, or other invariants that matter.
   - type: textarea
     id: alternatives
     attributes:

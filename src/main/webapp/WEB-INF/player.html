@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>冒险者席位 · Local 5E</title>
+  <link rel="stylesheet" href="/player/assets/player.css">
+  <script src="/player/assets/player.js" defer></script>
+</head>
+<body>
+<main class="player-shell">
+  <header class="masthead"><a class="wordmark" href="/player" aria-label="冒险者席位首页"><span class="crest" aria-hidden="true">✧</span><span>LOCAL 5E<span class="wordmark-sub">冒险者席位</span></span></a><span id="player-connection" class="connection"><i></i>连接中</span></header>
+  <section id="player-status" class="status-banner" role="status" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><div><strong id="player-status-title">正在连接战役</strong><p id="player-status-detail">核对身份后，读取你获准查看的内容。</p></div><button id="player-sync" type="button" class="quiet" hidden>重新同步</button></section>
+  <section id="player-join" class="join-layout" hidden>
+    <div class="join-intro"><p class="eyebrow">THE NEXT CHAPTER</p><h1>冒险，<br>从这里继续。</h1><p>坐回你的席位。查看角色、回应眼前的机会，与伙伴一起推进故事。</p><div class="intro-rule"></div><p class="subtle">你会先进入等候区。DM 核对身份并分配角色后，才会显示战役内容。</p></div>
+    <div class="panel join-panel"><p class="eyebrow">加入战役</p><h2>让 DM 认出你</h2><form id="player-join-form"><label for="player-nickname">你的昵称</label><input id="player-nickname" name="nickname" autocomplete="nickname" maxlength="160" required placeholder="例如：小林"><label for="player-invitation">房间邀请码</label><input id="player-invitation" name="invitation" autocomplete="off" autocapitalize="off" spellcheck="false" required placeholder="向 DM 获取本次邀请"><p class="field-hint">昵称相同也会分别核对，不会自动认领已有角色。</p><button class="primary full" type="submit">申请加入 <span aria-hidden="true">→</span></button></form><button id="player-resume" type="button" class="quiet full">恢复此设备已批准的席位</button></div>
+  </section>
+  <section id="player-waiting" class="panel waiting-panel" hidden><div class="waiting-orbit" aria-hidden="true">✧</div><p class="eyebrow">你的席位正在准备</p><h1 id="player-waiting-title">等待 DM 核对</h1><p id="player-waiting-description">申请已经送达。DM 批准后，这里会自动更新。</p><span id="player-waiting-name" class="tag"></span><p class="subtle">此时没有角色查看或操作权限。</p></section>
+  <section id="player-table" hidden>
+    <div class="table-heading"><div><p class="eyebrow">你的冒险</p><h1 id="player-campaign-name">当前战役</h1><p id="player-greeting" class="subtle"></p></div><button id="player-takeover" type="button" class="secondary" hidden>在此设备启用操作</button></div>
+    <section id="player-pending" class="pending-panel" aria-live="polite" hidden></section>
+    <p id="player-receipt" class="receipt-note" hidden></p>
+    <div class="table-grid"><div class="main-column"><section aria-labelledby="player-cards-heading"><div class="section-heading"><h2 id="player-cards-heading">我的角色</h2><span class="section-caption">仅显示分配给你的角色</span></div><div id="player-cards" class="character-grid"></div></section><section class="panel action-panel" aria-labelledby="player-actions-heading"><div class="section-heading"><h2 id="player-actions-heading">此刻可以做什么</h2><span id="player-actions-count" class="tag"></span></div><p id="player-actions-note" class="subtle">选择当前允许的行动。每次行动都由服务器核对。</p><div id="player-actions" class="action-list"></div></section><section id="player-shared-section" aria-labelledby="player-shared-heading" hidden><div class="section-heading"><h2 id="player-shared-heading">桌上的故事</h2><span class="section-caption">DM 与你共享</span></div><div id="player-shared" class="shared-list"></div></section></div>
+    <aside><section class="panel proposal-panel"><p class="eyebrow">有一个想法？</p><h2>向 DM 提出尝试</h2><p class="subtle">描述想做的事及眼前的情境。提案等待裁定，不会掷骰或消耗资源。</p><form id="player-proposal-form"><label for="player-proposal-character">使用角色</label><select id="player-proposal-character" name="characterId" required></select><label for="player-proposal-text">你的尝试</label><textarea id="player-proposal-text" name="text" maxlength="1000" rows="4" placeholder="我想查看石门上的刻痕，寻找机关的线索。" required></textarea><button type="submit" class="secondary full">提交裁定提案</button></form></section><section class="panel proposal-history"><h2>我的提案</h2><div id="player-proposals"><p class="subtle">还没有提案。</p></div></section><p class="privacy-note">这里没有离线操作队列。连接中断后，请先同步当前进度；没有确认的操作会单独查证。</p></aside></div>
+  </section>
+  <details class="trust-help"><summary>首次连接与证书信任</summary><p>使用 DM 提供的完整 HTTPS 地址，并连接同一局域网。设备必须信任该证书，证书地址也必须与你打开的地址一致。</p><p>出现证书警告时，暂停连接，请 DM 提供正确地址与设备信任设置步骤。完成信任后重新打开邀请；不要忽略证书错误或改用 HTTP。</p></details>
+  <footer>LOCAL 5E <span>·</span> 留在故事里，每一步都由你决定。</footer>
+</main>
+</body>
+</html>

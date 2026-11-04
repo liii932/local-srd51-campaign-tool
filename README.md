@@ -9,22 +9,26 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 项目处于原型阶段，只保证当前应用版本的运行，不承诺跨版本延续战役或读取旧存档。
 设计可按当前需求和验证结果修订，现有实现不构成永久兼容基线；范围见[产品说明](./docs/product.md)。
 
-> 当前实现包含可选 SQLite 有限运行规则与默认 MySQL 简化模式，尚未完成全部 SRD 5.1。正式入口仅为
-> `http://127.0.0.1:8080`；局域网/公网、HTTPS、玩家账号、`/display`、
-> `/api/public/*` 和公开数据投影不属于当前产品目标。
+> 当前实现包含可选 SQLite 有限运行规则与默认 MySQL 简化模式，尚未完成全部 SRD 5.1。DM 入口固定为
+> `http://127.0.0.1:8080`，由本机 DM 操作。SQLite 模式另有默认关闭的独立 HTTPS 玩家原型；
+> 实际局域网启用、设备信任和验收须另行完成。公网、匿名展示和公开 API 仍不在范围内。
 
 ## 当前已实现
 
 显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
+首次体验可按[短冒险流程](./docs/storage-vitality-loop.md#跑一段短冒险)完成建队、探索、战斗和保存后继续；
+隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
 选择 `srd51-vitality@1`、`srd51-healing@1`、`srd51-runtime@1` 的准确有序组合后，可以：
 
 - 创建标准数组的有限 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史；
 - 由现有纯规则消费者执行已接入的成长/ASI/多职业、熟练、检定、装备、健康、休息与资源命令；
 - 使用有限普通战斗、移动、机会攻击、反应/继续、Bless、Cure Wounds、Shield、Counterspell、Burning Hands、法师书/准备和奥术回想；
 - 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、节点位置、简单物品、角色状态与消息根历史；
+- 管理独立的 DM-managed 自由卡、基础字段、职业等级和熟练，执行 MANUAL/SAVING_THROW、
+  有序检定效果与简易遭遇名单/阵营；
 - 在一个 SQLite 事务提交完整领域后果、历史、版本与幂等结果；保存初始及当前完整 JSON，下载/上传导入、同版重开，显式恢复或精确放弃残留。
 
-这些能力使用应用随版本交付的[四个有限 schema-2 包](./rule-packages/srd51-runtime/package-guide.md)，
+有限规则角色能力使用应用随版本交付的[四个 schema-2 包](./rule-packages/srd51-runtime/package-guide.md)，
 经过生产 ZIP reader、组合及完整类型化投影核验。它们不是完整 SRD `RELEASED` 发布，
 不借用旧完整规则族的 `DRAFT` 身份。Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、
 Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授予。
@@ -39,8 +43,8 @@ Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授�
 通用外部规则安装、完整 SRD 发布、完整通用 archive format 2 和跨版本存档兼容
 不由此有限应用模型自动完成。当前业务/根/接受在一个 SQLite 事务提交，未知结果显式
 恢复；每命令耐久和 INITIAL/MANUAL/FINAL 承担保存责任，周期 AUTO/轮换仍为后续目标。
-旧正式自由卡、MANUAL/SAVING_THROW、有序检定效果和简易遭遇名单/阵营的独立 DM-managed
-接合/验收按[领域接合表](./docs/design/v2/domain-integration.md)逐项核对，不能以有限规则角色替代。
+DM-managed 自由卡与有限规则角色各自校验，不自动互相转换；具体操作和限制见
+[SQLite 战役操作台](./docs/storage-vitality-loop.md)。
 
 ## 产品目标
 
@@ -71,13 +75,17 @@ Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授�
 
 ## 产品边界
 
-产品保持单机、单 DM，仅通过 loopback 提供服务。以下能力不属于当前产品目标；若要引入，
-必须另立范围并完成独立的架构与安全评审：
+DM 通过本机 loopback 操作。SQLite 的可选玩家原型使用独立 HTTPS 入口，支持邀请审批、
+PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操作收据查证；玩家只能接收获准
+投影，不能访问 Host 接口或完整战役文件。监听需要显式配置，应用不会自行创建 Connector。
+使用范围见[运行合同](./docs/storage-vitality-loop.md)，边界见[安全说明](./docs/security.md)，
+隔离验证见[测试指南](./docs/testing.md#玩家参与原型验证)。真实局域网部署、证书信任和外部设备验收
+仍需完成。
 
-- 局域网、公网或移动设备访问；
-- HTTPS Connector、证书、CA 和防火墙入站配置；
-- 玩家账号、角色所有权、邀请码、聊天、投票和外部写入；
-- `/display`、`/api/public/*`、公开身份、公开配置、公开投影和公开事件；
+以下仍不属于目标范围：
+
+- 公网、端口转发、云端中继、全局玩家账号、多 DM、匿名旁观、聊天和投票；
+- `/display`、`/api/public/*` 和无需认证的战役投影；
 - WebSocket、推送、脚本插件、模组/用户提供的任意 DDL 和 JSON 数据库属性袋。
   目标运行空间由应用自有 JSON 声明表、列、键、约束与依赖，编译为 SQLite DDL；
   模组作者提供规则内容，应用负责结构和执行能力。
@@ -175,13 +183,14 @@ MySQL 模式及其独立账号/历史保管，数据库维护和 WAR 部署分�
 
 ## 安全与数据约束
 
-- 业务入口只接受精确的 `127.0.0.1:8080` origin，不信任 `X-Forwarded-*`；
+- Host 入口只接受精确的 `http://127.0.0.1:8080` origin，不信任 `X-Forwarded-*`；
+- 可选玩家入口要求准确配置的 HTTPS 地址、端口和 origin，只开放玩家页面、资产及有限 API；
 - 主机写请求使用 Session、CSRF、Origin/Referer、Fetch Metadata、状态 epoch、对象版本和幂等键；
 - 客户端不能指定骰点、选中骰、派生修正、最终结果、效果算法或规范业务身份；
 - 未知、重复、未发布、摘要不一致或不受支持的冻结规则必须失败关闭；
 - 权威状态、事件、骰子、效果、字段变化、版本和幂等结果在同一事务提交或回滚；
-- 存档使用稳定业务键，不包含数据库 ID、行版本、凭据或私钥；当前格式 1 不包含完整内部历史，
-  v2 完整历史目标见[保存与恢复设计](./docs/design/v2/save-and-recovery.md)；
+- MySQL 格式 1 存档使用稳定业务键，不包含数据库 ID、行版本或完整内部历史；SQLite 完整 JSON
+  保留当前有限模型的状态、历史与规则材料，排除玩家凭据、私钥和本机控制材料；
 - 数据库账号按迁移、运行和只读验收职责分离。
 
 ## 项目结构
@@ -212,6 +221,7 @@ tools/              数据库备份和独立规则哈希验证工具
 | [SQLite 当前有限战役](./docs/storage-vitality-loop.md) | 规则选择、领域运行、严格完整文件与显式恢复 |
 | [领域接合表](./docs/design/v2/domain-integration.md) | 当前实际覆盖、旧能力差异和剩余接合门 |
 | [v2 设计基线](./docs/design/v2/README.md) | 已确定的目标设计、实现差异和采用前提 |
+| [局域网玩家参与](./docs/design/v2/player-participation.md) | 玩家参与设计与原型采用边界 |
 | [JSON 结构声明与战役建库](./docs/design/v2/storage-schema-and-planning.md) | 有限声明格式、依赖闭包、确定性计划、示例、初始化与结构恢复 |
 | [存储数据覆盖与替换路线](./docs/design/v2/storage-data-map-and-rollout.md) | 当前表组/领域/所有者映射、公共接口、配置切换、实施步骤与验收 |
 | [Agent 项目上下文](./docs/agent-context.md) | 新会话使用的精简项目地图和权威资料索引 |

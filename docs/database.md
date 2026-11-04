@@ -4,28 +4,27 @@ MySQL 模式使用 MySQL 8.0、InnoDB、JDBC 与 Tomcat JNDI DataSource；显式
 使用[当前有限战役运行路线](storage-vitality-loop.md)。两种模式分别以其数据库为活动权威，
 不从 Session 或 JVM 缓存补造事实，不双写，也不自动回退。
 
-未启用 SQLite 的原简化模式把规则目录和运行状态放在 `dnd_tool_se` 单一 schema；INTERNAL 采用独立
-来源与运行快照链。新 v2 选择每次打开私有 SQLite 工作库，来源 MySQL 仅承担准确原包、
-安装/接受账本及可重建索引；工作库内统一规则/链、角色、历史、幂等和生命周期。应用以
-当前版本 JSON 声明表、列、键、约束、索引和依赖，编译为 SQLite DDL；初始化事务共同
-建立结构、静态 seed 与完整事实。规则作者 JSON 负责内容，完整战役 JSON 是保存点投影。
-结构源、依赖闭包与同版残留验证见[结构合同](design/v2/storage-schema-and-planning.md)，
-全部表组/领域及 SQL、访问层、配置和打包的替代步骤见
-[数据映射与实施路线](design/v2/storage-data-map-and-rollout.md)。
+未启用 SQLite 的原简化模式把规则目录和运行状态放在 `dnd_tool_se` 单一 schema；INTERNAL
+采用独立来源与运行快照链。SQLite 每次新建/打开建立私有工作库，以当前版本 JSON 声明的
+表、列、键、约束、索引和依赖编译 DDL，初始化事务共同建立结构、静态 seed 与完整事实。
+规则作者 JSON 提供内容，完整战役 JSON 是保存点投影；同版残留保留原库并验证现有结构，
+不重建、不补表或重新 seed。实际所有者和文件生命周期见[运行合同](storage-vitality-loop.md)。
 
 现行 MySQL JNDI、账号与迁移清单保留；`DND_STORAGE_ROOT` 显式选择有限 SQLite 模式，
-不需要连接 MySQL。当前规则来自随应用交付的四个有限原包，角色/战斗/场景及完整历史以
+不需要连接 MySQL。当前规则来自随应用交付的四个有限原包，角色/战斗/场景、参与/裁定及完整历史以
 严格类型化文档聚合保存，并保存资源、装备、法术书、动作帧、效果与怪物的关系投影。
 `CampaignDomainRepository` 的写入只使用调用方事务；`CampaignStorageService` 将聚合、
 全部投影、根事件、revision 和请求收据在独占门及一个 `BEGIN IMMEDIATE` 中共同提交，
 无独立 C0。读取独立核对每行投影，禁止恢复时静默修复。schema-2 prepared 身份与历史
-版本保持业务引用进入完整文件；本地 core run/epoch/请求收据属于新执行空间，不入文件。准确 owner、覆盖及未完成差异见[领域接合表](design/v2/domain-integration.md)。
+版本保持业务引用进入完整文件；本地 core run/epoch/请求收据和玩家设备绑定属于执行空间，
+不入完整文件。文件打开建立新执行身份，同版残留恢复保留原 run/收据并建立新 epoch。
 SQLite schema 有独立初始化/验证
-协议，不重放 MySQL V001—V042 或篡改已应用账本。外部来源迁移仍需独立维护授权；未来
-新建应用私有空工作库是受控产品生命周期，不能因此授予现行 MySQL 应用账号 DDL 权限。
+协议，不重放 MySQL V001—V042 或篡改已应用账本。外部来源迁移仍需独立维护授权；
+新建应用私有空工作库属于受控产品生命周期，不能因此授予现行 MySQL 应用账号 DDL 权限。
 实际退役旧配置/读取器须在完整替换与明确真实数据处置后进行，不保留仅为跨版本兼容的双写。
-当前使用应用自有迁移清单及只读 verifier，并未接入 Flyway 执行器。目标 SQLite 不另建
-版本迁移链；来源共享账本继续使用独立 MySQL 维护 SQL，首次建库和同版恢复分别验收。
+MySQL 使用应用自有迁移清单及只读 verifier，未接入 Flyway 执行器。SQLite 只接受当前
+模型的初始化和同版残留核验，不建立跨版本迁移链；来源共享账本继续使用独立 MySQL
+维护 SQL，首次建库和同版恢复分别验收。
 
 ## 迁移合同
 

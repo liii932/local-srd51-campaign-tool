@@ -17,6 +17,12 @@ import static com.dndtool.service.storage.CampaignData.*;
 
 /** One-process finite Host: one private SQLite authority, complete JSON checkpoints and explicit recovery. */
 public final class CampaignStorageService implements AutoCloseable {
+    /** Internal verified bridge. Never serialize this record into a player response. */
+    public record AccessSnapshot(Snapshot snapshot, String runId, long epoch, long revision, JsonObject localControl) {
+        public AccessSnapshot { localControl = localControl.deepCopy(); }
+        @Override public JsonObject localControl() { return localControl.deepCopy(); }
+    }
+    @FunctionalInterface public interface CommandGuard { void validate(AccessSnapshot current); }
     public record Status(String state, long epoch, String runId, List<String> residualRunIds, List<String> saveFiles) { }
     public record CharacterView(String id, String name, long maximumHp, long currentHp, long version) { }
     public record EventView(long sequence, String type, String characterId, long beforeHp, long afterHp,
@@ -525,28 +531,71 @@ public final class CampaignStorageService implements AutoCloseable {
         afterBusinessCommit(!command.replayed()); return current(command);
     }
 
+    public synchronized AccessSnapshot accessSnapshot() {
+        ensureActive(true);
+        try (Connection c = connect(active.database)) { return accessSnapshot(c); }
+        catch (SQLException e) { active.blocked = "INTEGRITY"; throw database(e); }
+    }
+    private AccessSnapshot accessSnapshot(Connection c) throws SQLException {
+        Snapshot snapshot = verifiedSnapshot(c); Control control = repository.control(c);
+        if (control.sealed()) throw new StorageException("RUN_BLOCKED", "The run is sealed");
+        return new AccessSnapshot(snapshot, active.runId, control.epoch(), control.revision(), localPlayerControl(c));
+    }
+    public synchronized JsonObject localPlayerControl() {
+        ensureActive(false);
+        try (Connection c = connect(active.database)) { return localPlayerControl(c); }
+        catch (SQLException e) { throw database(e); }
+    }
+    private JsonObject localPlayerControl(Connection c) throws SQLException {
+        try (Statement statement = c.createStatement(); ResultSet result = statement.executeQuery("SELECT singleton,document FROM core_player_control")) {
+            if (!result.next() || result.getLong(1) != 1) throw new StorageException("STORAGE_INTEGRITY", "Missing local player control");
+            byte[] bytes = result.getBytes(2); JsonObject control = CampaignJson.read(bytes);
+            if (!Arrays.equals(bytes, CampaignJson.canonical(control)) || result.next()) throw new StorageException("STORAGE_INTEGRITY", "Invalid local player control");
+            return control;
+        }
+    }
+    /** Run-local security state. This does not advance game facts or enter a portable file. */
+    public synchronized void updateLocalPlayerControl(JsonObject control) {
+        ensureActive(true); if (control == null) throw CampaignJson.bad("Missing local player control");
+        byte[] bytes = CampaignJson.canonical(control); if (bytes.length > 1024 * 1024) throw CampaignJson.bad("Local player control capacity exceeded");
+        transaction(c -> {
+            verifiedSnapshot(c);
+            try (PreparedStatement statement = c.prepareStatement("UPDATE core_player_control SET document=? WHERE singleton=1")) {
+                statement.setString(1, new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+                if (statement.executeUpdate() != 1) throw new StorageException("STORAGE_INTEGRITY", "Missing local player control");
+            }
+            return null;
+        });
+    }
     public synchronized CampaignView domainCommand(String requestId, long epoch, long expectedRevision, String action, JsonObject input) {
+        return domainCommand(requestId, epoch, expectedRevision, action, input, null, current -> { });
+    }
+    /** Authorization runs in the same serialized transaction, before receipt lookup and all randomness. */
+    public synchronized CampaignView domainCommand(String requestId, long epoch, long expectedRevision, String action, JsonObject supplied,
+            CampaignParticipationData.Actor requestedActor, CommandGuard guard) {
         ensureActive(true); CampaignJson.uuid(requestId);
-        if (action == null || input == null) throw CampaignJson.bad("Missing domain command");
-        String payload = new String(CampaignJson.canonical(input), java.nio.charset.StandardCharsets.UTF_8);
-        String intent = intent("DOMAIN_COMMAND", expectedRevision, action, payload);
+        if (action == null || supplied == null || guard == null) throw CampaignJson.bad("Missing domain command or guard");
+        JsonObject input = supplied.deepCopy();
         CommandResult accepted = transaction(c -> {
-            Snapshot before = verifiedSnapshot(c); Control control = repository.control(c);
-            // A changed security generation must never replay a request from a previous process.
+            AccessSnapshot access = accessSnapshot(c); Snapshot before = access.snapshot(); Control control = repository.control(c);
             if (control.epoch() != epoch) throw new StorageException("STALE_EPOCH", "Refresh the current Host epoch");
+            guard.validate(access);
+            if (before.domains() == null) throw new StorageException("RULE_NOT_SELECTED", "Select the current campaign runtime module");
+            CampaignParticipationData.Actor actor = requestedActor == null ? CampaignParticipationCommands.actualActor(before.domains(), action, input) : requestedActor;
+            CampaignParticipationCommands.validateActor(before.domains(), action, input, actor);
+            String intent = domainIntent(expectedRevision, action, input, actor);
             CommandReceipt prior = replay(c, requestId, intent, "DOMAIN_COMMAND");
             if (prior != null) return result(prior, true);
             requireGate(c, control, epoch, expectedRevision);
             CampaignDomainData.State domains;
             try {
                 domains = new CampaignDomainCommands().apply(before, action, input, UUID.fromString(requestId), intent,
-                        sides -> new SecureRandom().nextInt(sides) + 1);
+                        sides -> new SecureRandom().nextInt(sides) + 1, actor);
             } catch (IllegalArgumentException invalid) {
                 throw new StorageException("DOMAIN_REJECTED", invalid.getMessage() == null ? "Invalid domain request" : invalid.getMessage(), invalid);
             }
             Snapshot after = CampaignData.validate(new Snapshot(before.campaignId(), before.name(), before.rules(), List.of(),
                     domains.roots().stream().map(CampaignDomainValidation::summary).toList(), domains));
-            // Capacity and complete file checks precede every SQL mutation.
             codec.encode(new Document(newId(), after));
             new CampaignDomainRepository().write(c, domains); faults.at(Boundary.AFTER_CHARACTER_UPDATE);
             repository.acceptCommand(c, requestId, intent, "DOMAIN_COMMAND", expectedRevision, CampaignDomainValidation.summary(domains.roots().getLast()));
@@ -554,6 +603,27 @@ public final class CampaignStorageService implements AutoCloseable {
             return result(repository.command(c, requestId), false);
         });
         afterBusinessCommit(!accepted.replayed()); return current(accepted);
+    }
+    /** Exact read-only result verification. An absent result never proves non-submission. */
+    public synchronized Optional<CampaignDomainData.Root> exactDomainReceipt(String requestId, String runId, long originalRevision,
+            String action, JsonObject supplied, CampaignParticipationData.Actor actor, CommandGuard guard) {
+        ensureActive(true); CampaignJson.uuid(requestId); CampaignJson.uuid(runId);
+        if (supplied == null || actor == null || guard == null || action == null) throw CampaignJson.bad("Incomplete exact receipt identity");
+        JsonObject input = supplied.deepCopy();
+        try (Connection c = connect(active.database)) {
+            AccessSnapshot access = accessSnapshot(c); if (!active.runId.equals(runId)) throw new StorageException("STALE_RUN", "Receipt belongs to a different run");
+            guard.validate(access);
+            CommandReceipt receipt = repository.command(c, requestId);
+            if (receipt == null) return Optional.empty();
+            String expected = domainIntent(originalRevision, action, input, actor);
+            if (!receipt.kind().equals("DOMAIN_COMMAND") || !receipt.intent().equals(expected)) throw new StorageException("IDEMPOTENCY_CONFLICT", "Receipt does not match the exact original actor and intent");
+            var root = access.snapshot().domains().roots().stream().filter(r -> r.operationId().toString().equals(requestId)).findFirst().orElseThrow(() -> new StorageException("STORAGE_INTEGRITY", "Receipt root is missing"));
+            if (!root.actor().equals(actor) || !root.kind().equals(action) || !root.intent().equals(expected)) throw new StorageException("STORAGE_INTEGRITY", "Receipt actor differs from root");
+            return Optional.of(root);
+        } catch (SQLException e) { throw database(e); }
+    }
+    private static String domainIntent(long revision, String action, JsonObject input, CampaignParticipationData.Actor actor) {
+        return intent("DOMAIN_COMMAND", revision, action, new String(CampaignJson.canonical(input), java.nio.charset.StandardCharsets.UTF_8), CampaignDomainCodec.text(actor));
     }
 
     private void afterBusinessCommit(boolean changed) {
@@ -618,6 +688,7 @@ public final class CampaignStorageService implements AutoCloseable {
         result.add("positions", json.toJsonTree(state.positions())); result.add("items", json.toJsonTree(state.items())); result.add("roots", json.toJsonTree(state.roots()));
         JsonObject manual = json.toJsonTree(state.manual()).getAsJsonObject();
         manual.add("catalog", json.toJsonTree(CampaignManualData.catalog())); result.add("manual", manual);
+        result.add("participation", json.toJsonTree(state.participation()));
         result.add("rules", json.toJsonTree(BundledCampaignRules.metadata())); return result;
     }
 

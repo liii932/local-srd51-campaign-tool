@@ -19,17 +19,17 @@
     DOMAIN_INVALID: '此操作不满足当前规则或状态，请检查角色、装备与待处理行动。',
     DOMAIN_REJECTED: '此操作不满足当前规则或状态，请检查角色、装备、轮次与待处理行动。',
     SCENE_ACTIVE: '请通过当前战斗或探索场景处理这项操作，关闭场景后再修改队伍与位置。',
-    STALE_COMBAT: '战斗已更新，已读取当前轮次与待处理行动。',
+    STALE_COMBAT: '战斗已更新，本次行动没有提交。',
     INACTIVE_ROSTER: '请先恢复所有离队角色，再开始共享场景。',
     ROSTER_ALREADY_STARTED: '时间已经开始推进，当前模型需要先创建完整队伍。',
     CLEANUP_BLOCKED: '清理尚未完成。未知文件或链接已保留，请检查存储目录。',
     RUN_DISCARDED: '这个运行已经开始放弃，请继续“放弃未保存进度”。',
     RUN_NOT_FOUND: '所选未结束战役已经不存在，请重新读取。',
     RUN_LOCKED: '这个未结束战役仍有其他进程使用，请先关闭对应进程。',
-    STALE_EPOCH: '页面已经过期，已重新读取战役。',
-    STALE_VERSION: '战役已更新，已重新读取最新进度。',
-    STALE_REVISION: '战役已更新，已重新读取最新进度。',
-    STALE_CHARACTER: '角色已更新，已重新读取最新生命值。',
+    STALE_EPOCH: '页面权限已经过期，本次操作没有提交。',
+    STALE_VERSION: '战役已更新，本次操作没有提交。',
+    STALE_REVISION: '战役已更新，本次操作没有提交。',
+    STALE_CHARACTER: '角色已更新，本次操作没有提交。',
     HEALING_RULE_REQUIRED: '创建战役时需要选择治疗模块。',
     RULE_NOT_SELECTED: '创建战役时需要选择治疗模块。',
     RUN_BLOCKED: '当前战役需要恢复，请使用恢复战役继续。',
@@ -40,6 +40,16 @@
     INVALID_REQUEST: '请检查输入和操作字段，必要时刷新后重试。'
   };
   const message = text => { byId('storage-message').textContent = text; };
+  function setBusy(value, text) {
+    busy = value;
+    byId('storage-workspace').disabled = value;
+    byId('storage-workspace').setAttribute('aria-busy', String(value));
+    byId('storage-message').classList.toggle('is-busy', value);
+    if (text) message(text);
+  }
+  const progressMessage = action => ({create: '正在准备战役与首份完整保存…', open: '正在核验并打开战役…', recover: '正在核验并恢复未结束战役…',
+    characters: '正在创建角色…', heal: '正在应用治疗…', save: '正在保存完整战役文件…', end: '正在保存并结束战役…',
+    import: '正在核验并导入完整战役…', delete: '正在删除所选保存文件…', discard: '正在放弃所选未结束运行…', domain: '正在提交行动并读取结果…'})[action] || '正在处理操作…';
   function options(select, items, label) {
     const selected = new Set(Array.from(select.selectedOptions, option => option.value));
     select.replaceChildren();
@@ -56,7 +66,8 @@
     if (key) link.href = endpoint + 'download?fileKey=' + encodeURIComponent(key);
     else link.removeAttribute('href');
   }
-  function render() {
+  function render(preferredFile = null) {
+    document.dispatchEvent(new CustomEvent('dnd:storage-view', {detail: view}));
     const active = view.campaign !== null;
     byId('storage-idle').hidden = active;
     byId('storage-active').hidden = !active;
@@ -72,9 +83,12 @@
     const recoverable = [...view.storage.residualRunIds];
     if (!active && view.storage.runId && !recoverable.includes(view.storage.runId)) recoverable.push(view.storage.runId);
     const saved = new Map((view.savedCampaigns || []).map(file => [file.fileKey, file]));
-    options(byId('storage-files'), view.storage.saveFiles, (id, i) => {
-      const file = saved.get(id); return file ? `${file.name} · ${file.eventTail} 条记录` : `已存战役 ${i + 1}`;
+    const files = [...saved.keys()].filter(id => view.storage.saveFiles.includes(id));
+    for (const id of view.storage.saveFiles) if (!saved.has(id)) files.push(id);
+    options(byId('storage-files'), files, (id, i) => {
+      const file = saved.get(id); return file ? `${file.name} · ${file.eventTail} 条记录 · 文件 ${id.substring(0, 8)}` : `已存战役 ${i + 1} · 文件 ${id.substring(0, 8)}`;
     });
+    if (preferredFile && files.includes(preferredFile)) byId('storage-files').value = preferredFile;
     options(byId('storage-residuals'), recoverable, (_, i) => `未结束战役 ${i + 1}`);
     byId('storage-open').querySelector('button').disabled = view.storage.state !== 'IDLE' || view.storage.saveFiles.length === 0;
     byId('storage-recover').querySelector('button').disabled = recoverable.length === 0;
@@ -245,8 +259,28 @@
       });
     }
   }
+  function refreshSceneAvailability(state) {
+    const rosterStarted = state.characters.some(character => Number(character.state.rest?.minute || 0) > 0 || Number(character.state.rest?.second || 0) > 0);
+    const richScene = state.combats.some(history => history.current.status !== 'ENDED');
+    const simpleScene = state.manual.encounters.some(encounter => encounter.status === 'ACTIVE');
+    const inactive = state.characters.some(character => !character.active);
+    byId('domain-combat-start').hidden = richScene;
+    byId('domain-create').querySelector('button').disabled = richScene || simpleScene || rosterStarted;
+    byId('domain-roster-note').textContent = richScene ? '当前战斗或探索场景尚未关闭，不能新增规则角色。'
+      : simpleScene ? '简易遭遇尚未结束，不能新增规则角色。请先在“自由卡与简易遭遇”结束当前遭遇。'
+      : rosterStarted ? '战役时间已开始推进，不能再新增规则角色。仍可在“自由卡与简易遭遇”新增自由卡。'
+      : '当前仍在时间零点，可以继续新增规则角色。';
+    byId('domain-combat-start').querySelector('button').disabled = richScene || simpleScene || inactive || state.characters.length === 0;
+    byId('domain-combat-start-note').textContent = richScene ? '已有未关闭场景，请使用下方当前场景继续。'
+      : simpleScene ? '简易遭遇正在进行，请先在“自由卡与简易遭遇”结束当前遭遇，再开始规则战斗。'
+      : inactive ? '请先在“规则角色”把全部角色加入当前队伍。' : state.characters.length === 0 ? '请先创建规则角色并准备装备。' : '';
+    byId('manual-encounter').querySelector('button[type="submit"],button:not([type])').disabled = richScene || simpleScene;
+    byId('manual-encounter-note').textContent = richScene ? '规则战斗或探索场景正在使用战役，请先关闭该场景，再开始简易遭遇。'
+      : simpleScene ? '已有简易遭遇进行中，可在下方维护参与者或结束所选遭遇。' : '';
+  }
   function renderDomain(state) {
     refreshRuleChoices();
+    refreshSceneAvailability(state);
     const cards = byId('storage-characters'); cards.replaceChildren();
     for (const character of state.characters) {
       const card = document.createElement('article'); card.className = 'card character-card'; const current = character.state;
@@ -347,22 +381,29 @@
     const combats = state.combats || [], summary = byId('domain-combat-summary'), pending = byId('domain-pending'); summary.replaceChildren(); pending.replaceChildren();
     const deployments = byId('domain-deployments');
     const previous = new Map(Array.from(deployments.querySelectorAll('[data-character]'), row => [row.dataset.character, {
-      checked: row.querySelector('[name="join"]').checked, x: row.querySelector('[name="x"]').value, y: row.querySelector('[name="y"]').value, side: row.querySelector('[name="side"]').value}]));
+      x: row.querySelector('[name="x"]').value, y: row.querySelector('[name="y"]').value, side: row.querySelector('[name="side"]').value}]));
     deployments.replaceChildren();
     for (const [index, character] of state.characters.filter(character => character.active).entries()) {
       const row = document.createElement('div'); row.className = 'deployment'; row.dataset.character = character.id;
       const old = previous.get(character.id);
-      const label = document.createElement('label'), join = document.createElement('input'); join.name = 'join'; join.type = 'checkbox'; join.checked = old?.checked ?? true;
+      const label = document.createElement('label'), join = document.createElement('input'); join.name = 'join'; join.type = 'checkbox'; join.checked = true; join.disabled = true;
       label.append(join, document.createTextNode(character.name)); row.append(label);
-      for (const [name, title, value] of [['side', '阵营', old?.side ?? (index === 0 ? 0 : 1)], ['x', 'X', old?.x ?? index * 2], ['y', 'Y', old?.y ?? 0]]) {
+      for (const [name, title, value] of [['side', '阵营', old?.side ?? (character.kind === 'NPC' ? 1 : 0)], ['x', 'X', old?.x ?? index * 2], ['y', 'Y', old?.y ?? 0]]) {
         const field = text(row, 'label', title), input = document.createElement('input'); input.name = name; input.type = 'number'; input.value = value;
         input.min = name === 'side' ? '0' : '-10000'; input.max = name === 'side' ? '15' : '10000'; input.required = true; field.append(input);
       }
       deployments.append(row);
     }
-    for (const select of document.querySelectorAll('.combat-choice')) options(select, combats.map(history => history.current.combatId), id => {
-      const battle = battleFor(id); return `第 ${combats.findIndex(history => history.current.combatId === id) + 1} 场 · ${battleStatus(battle.status)} · 第 ${battle.round} 轮`;
-    });
+    for (const select of document.querySelectorAll('.combat-choice')) {
+      const previous = battleFor(select.value);
+      options(select, combats.map(history => history.current.combatId), id => {
+        const battle = battleFor(id); return `第 ${combats.findIndex(history => history.current.combatId === id) + 1} 场 · ${battleStatus(battle.status)} · 第 ${battle.round} 轮`;
+      });
+      if (!previous || previous.status === 'ENDED') {
+        const current = combats.findLast(history => history.current.status !== 'ENDED');
+        if (current) select.value = current.current.combatId;
+      }
+    }
     refreshCombatActors();
     for (const history of combats) {
       const battle = history.current, box = document.createElement('article'); box.className = 'card';
@@ -391,7 +432,13 @@
           || flow.casts?.find(cast => cast.frameKey === leaf?.frameKey)?.actorId
           || flow.movements?.find(movement => movement.movementKey === leaf?.ownerKey)?.actorId
           || battle.saveDamageBatches?.find(batch => batch.frameKey === leaf?.frameKey)?.sourceId || active;
-        text(panel, 'h4', `${leaf?.stage || '行动处理中'} · ${leaf?.status || flow.status}`);
+        const phases = {SAVE_DAMAGE_ROLLED: '范围伤害已掷骰，等待完成结算', SAVE_DAMAGE_COMPLETED: '范围伤害结算完成',
+          MOVEMENT_LEAVE_REACH_BEFORE: '离开触及范围前，等待借机反应', MOVEMENT_CONTINUE: '等待继续移动', MOVEMENT_COMPLETED: '移动完成', MOVEMENT_STOPPED: '移动已停止',
+          ATTACK_HIT_BEFORE_DAMAGE: '攻击已命中，伤害前等待反应', ATTACK_RESOLVED: '攻击结算完成', CAST_BEFORE_COMPLETION: '施法完成前，等待反应',
+          CAST_RESOLVED: '施法结算完成', READY_TRIGGER_AFTER: '动作完成后，等待预备响应', READY_RELEASE_RESOLVED: '预备响应结算完成',
+          SAVING_THROW_RESOLVED: '豁免结算完成', HEALTH_RESOLVED: '健康效果结算完成'};
+        text(panel, 'h4', phases[leaf?.stage] || '行动等待继续结算');
+        text(panel, 'p', '请先选择下方反应或继续结算，完成后再发起新的行动。');
         for (const window of flow.windows.filter(window => window.status === 'OPEN')) {
           for (const opportunity of window.opportunities.filter(opportunity => opportunity.status === 'PENDING' && opportunity.selectionFrameKey === leaf?.frameKey)) {
             const row = document.createElement('div'); row.className = 'actions'; text(row, 'span', `${personName(opportunity.actorId)} 的反应：`);
@@ -423,12 +470,39 @@
       const ids = battle?.combatants.map(actor => actor.characterId) || [];
       for (const select of form.querySelectorAll('.combat-actor-choice')) {
         options(select, ids, personName);
-        if (select.name === 'actorId' && battle?.initiative?.[battle.activeOrdinal]) select.value = battle.initiative[battle.activeOrdinal].characterId;
+        if (select.name === 'actorId' && battle?.status === 'ACTIVE' && battle.initiative?.[battle.activeOrdinal]) select.value = battle.initiative[battle.activeOrdinal].characterId;
       }
       for (const select of form.querySelectorAll('.monster-choice')) options(select, (battle?.monsters || []).map(monster => monster.monsterId), personName);
       for (const select of form.querySelectorAll('.zone-choice')) options(select, (battle?.environmentZones || []).filter(zone => !zone.endedOperationId).map(zone => zone.zoneKey), id => {
         const zone = battle.environmentZones.find(zone => zone.zoneKey === id); return `${ruleName(zone.rule)} · ${zone.center.x}, ${zone.center.y}`;
       });
+    }
+    refreshCombatForm();
+  }
+  const combatActions = new Map(Array.from(byId('domain-combat').elements.kind.options, option => [option.value, option.textContent]));
+  function refreshCombatForm() {
+    const form = byId('domain-combat'), battle = battleFor(form.elements.combatId.value);
+    const exploration = ['EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT', 'CLOSE_SCENE'];
+    const actions = battle?.status === 'EXPLORATION' ? exploration : battle?.status === 'ACTIVE'
+      ? [...combatActions.keys()].filter(kind => !exploration.includes(kind) || kind === 'END_CONCENTRATION') : [];
+    options(form.elements.kind, actions, kind => combatActions.get(kind));
+    form.elements.kind.disabled = actions.length === 0;
+    if (battle?.status === 'EXPLORATION') options(form.elements.actorId,
+      battle.combatants.map(actor => actor.characterId).filter(id => roster().some(character => character.id === id)), personName);
+    const pending = battle?.flows.some(flow => flow.status === 'ACTIVE');
+    form.querySelector('button').disabled = actions.length === 0 || pending;
+    const kind = form.elements.kind.value;
+    byId('domain-combat-note').textContent = pending ? '请先在上方处理反应或继续结算，再进行下一次行动。'
+      : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
+      : kind === 'BEGIN_ATTACK' ? '先开始攻击动作，再选择“攻击”、目标与已装备武器。'
+      : kind === 'ATTACK' ? '先开始攻击动作，再选择触及范围内的目标和已装备武器。'
+      : battle.status === 'EXPLORATION' ? '当前为探索状态，可移动、推进时间，或重新进入战斗。' : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';
+    for (const name of ['targetId', 'itemId', 'x', 'y', 'seconds']) {
+      const input = form.elements[name];
+      const visible = ['targetId', 'itemId'].includes(name) ? kind === 'ATTACK'
+        : ['x', 'y'].includes(name) ? ['MOVE', 'EXPLORATION_MOVE'].includes(kind) : kind === 'EXPLORATION_ADVANCE_TIME';
+      input.closest('label').hidden = !visible;
+      input.disabled = !visible;
     }
     refreshCharacterChoices();
   }
@@ -535,10 +609,7 @@
       options(select, active.map(encounter => encounter.id), id => `简易遭遇 ${data.encounters.findIndex(encounter => encounter.id === id) + 1}`);
       if (!select.value && active.length === 1) select.value = active[0].id;
     }
-    const richScene = domain().combats.some(history => history.current.status !== 'ENDED');
-    byId('manual-encounter').querySelector('button[type="submit"],button:not([type])').disabled = richScene || active.length > 0;
     byId('manual-encounter-end').disabled = active.length === 0;
-    byId('domain-combat-start').querySelector('button').disabled = active.length > 0;
     const rosterNode = byId('manual-encounter-roster'), previous = new Map(Array.from(rosterNode.children, row => [row.dataset.character, {
       checked: row.querySelector('[name="join"]').checked, side: row.querySelector('[name="side"]').value, node: row.querySelector('[name="participantNodeId"]').value}])); rosterNode.replaceChildren();
     for (const card of allPeople().filter(card => card.active)) {
@@ -605,11 +676,11 @@
     if (effects.filter(effect => effect.kind === 'MESSAGE').length > 1) throw new Error('每个分支最多设置一条结果消息。');
     return effects;
   }
-  async function load() {
+  async function load(preferredFile = null) {
     const response = await fetch(endpoint + 'state', {credentials: 'same-origin', cache: 'no-store'});
     const body = await response.json();
     if (!response.ok) throw new Error(body.code || 'STORAGE_UNAVAILABLE');
-    view = body; render();
+    view = body; render(preferredFile);
   }
   async function digest(action, epoch, revision, fields) {
     const bytes = [];
@@ -623,29 +694,45 @@
   }
   async function command(action, fields, upload = null) {
     if (busy || !view) return;
-    busy = true;
+    setBusy(true, progressMessage(action));
     const epoch = view.storage.epoch, revision = String(view.campaign?.revision ?? 0);
+    let submitted = false, accepted = false, rejected = false, preferredFile = null;
     try {
       const payload = new URLSearchParams();
       for (const [key, values] of Object.entries(fields)) for (const value of values) payload.append(key, value);
+      const requestDigest = await digest(action, epoch, revision, fields);
+      submitted = true;
       const response = await fetch(endpoint + action, {method: 'POST', credentials: 'same-origin', headers: {
         'Content-Type': upload ? 'application/octet-stream' : 'application/x-www-form-urlencoded;charset=UTF-8', 'X-CSRF-Token': view.csrf,
         'X-Host-State-Epoch': epoch, 'X-Object-Row-Version': revision,
-        'X-Request-Id': crypto.randomUUID(), 'X-Request-Digest': await digest(action, epoch, revision, fields)
+        'X-Request-Id': crypto.randomUUID(), 'X-Request-Digest': requestDigest
       }, body: upload || payload.toString()});
+      rejected = !response.ok && response.status < 500;
       const body = await response.json();
       if (!response.ok) throw new Error(body.code || 'STORAGE_UNAVAILABLE');
+      accepted = true;
       if (body.savedFile) lastSaved = body.savedFile;
+      preferredFile = body.savedFile || body.importedFile || null;
       if (action === 'domain' && fields.action?.[0] === 'manual-create' && body.commandResult?.characterId) manualSelected = body.commandResult.characterId;
-      await load();
+      if (String(body.storage.epoch) !== String(epoch)) await load(preferredFile);
+      else { view = body; render(preferredFile); }
       message(body.commandResult?.replayed ? '已确认先前操作，战役记录没有重复。'
         : action === 'end' ? '战役已保存并结束，可以再次打开。' : action === 'save' ? '战役已保存。'
         : action === 'import' ? '文件已核验并导入，请选择打开。' : action === 'delete' ? '所选文件已删除。'
-        : action === 'discard' ? '所选运行已放弃，已存战役文件保留。' : '战役已更新。');
+        : action === 'discard' ? '所选运行已放弃，已存战役文件保留。'
+        : action === 'domain' && domain()?.combats.some(history => history.current.flows.some(flow => flow.status === 'ACTIVE'))
+          ? '行动已提交，请先处理“下一步与反应”。' : '战役已更新。');
+      if (action === 'domain' && !byId('domain-pending-section').closest('[data-panel]').hidden
+          && domain()?.combats.some(history => history.current.flows.some(flow => flow.status === 'ACTIVE'))) {
+        byId('domain-pending-section').scrollIntoView({block: 'nearest'});
+      }
     } catch (failure) {
-      try { await load(); } catch (_) { /* Keep the last visible state; no command is retried. */ }
-      message(messages[failure.message] || '操作未完成，请检查输入及当前战役状态。');
-    } finally { busy = false; }
+      let refreshed = false;
+      try { await load(preferredFile); refreshed = true; } catch (_) { /* Keep the last visible state; no command is retried. */ }
+      message(accepted ? `操作已提交；${refreshed ? '已重新读取当前战役。' : '尚未读回当前状态，请重新进入页面确认进度。'}`
+        : submitted && !rejected ? `本次操作的结果尚未确认；${refreshed ? '已重新读取当前战役，请核对进度后再操作。' : '暂时无法读取状态，请重新进入页面确认进度。'}`
+        : `${messages[failure.message] || '操作未完成，请检查输入及当前战役状态。'}${refreshed ? ' 已重新读取当前战役。' : ''}`);
+    } finally { setBusy(false); }
   }
   function form(id, action, extra = () => ({})) {
     byId(id).addEventListener('submit', event => {
@@ -777,7 +864,7 @@
   });
   byId('domain-combat-start').addEventListener('submit', event => {
     event.preventDefault();
-    const deployments = Array.from(byId('domain-deployments').querySelectorAll('[data-character]')).filter(row => row.querySelector('[name="join"]').checked).map(row => ({
+    const deployments = Array.from(byId('domain-deployments').querySelectorAll('[data-character]')).map(row => ({
       type: 'scene.Deployment', characterId: row.dataset.character, position: {type: 'scene.Position', x: row.querySelector('[name="x"]').value, y: row.querySelector('[name="y"]').value}, side: row.querySelector('[name="side"]').value}));
     const values = Object.fromEntries(new FormData(event.currentTarget));
     const monsterDeployments = values.monster ? [{type: 'scene.MonsterDeployment', monsterId: crypto.randomUUID(), monster: typedRule(values.monster),
@@ -854,6 +941,7 @@
     if (item) { form.elements.name.value = item.name; form.elements.quantity.value = item.quantity; }
   });
   for (const select of document.querySelectorAll('.combat-choice')) select.addEventListener('change', refreshCombatActors);
+  byId('domain-combat').elements.kind.addEventListener('change', refreshCombatForm);
   form('storage-create', 'create', () => ({modules: Array.from(byId('storage-modules').querySelectorAll('input:checked'), input => input.value)}));
   form('storage-open', 'open'); form('storage-recover', 'recover'); form('storage-character', 'characters');
   form('storage-heal', 'heal', () => ({characterVersion: [String(view.campaign.characters.find(c => c.id === byId('storage-heal-character').value).version)]}));
@@ -870,11 +958,21 @@
   });
   byId('storage-import').addEventListener('submit', async event => {
     event.preventDefault(); const file = event.currentTarget.elements.file.files[0];
+    if (busy || !view) return;
     if (!file || file.size === 0 || file.size > 16 * 1024 * 1024) { message('请选择不超过 16 MiB 的完整战役 JSON 文件。'); return; }
-    const bytes = await file.arrayBuffer();
-    const hash = await crypto.subtle.digest('SHA-256', bytes);
-    const fileSha256 = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
-    await command('import', {fileSha256: [fileSha256]}, bytes);
+    setBusy(true, '正在读取并核验导入文件…');
+    try {
+      const bytes = await file.arrayBuffer();
+      const hash = await crypto.subtle.digest('SHA-256', bytes);
+      const fileSha256 = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+      setBusy(false);
+      await command('import', {fileSha256: [fileSha256]}, bytes);
+    } catch (_) { setBusy(false); message('无法读取所选文件，请重新选择完整战役 JSON 文件。'); }
   });
-  load().then(() => message(view.campaign ? '战役已就绪。' : '创建、打开或恢复一个战役。')).catch(failure => message(messages[failure.message] || '无法读取战役。'));
+  setBusy(true, '正在读取战役…');
+  document.addEventListener('dnd:storage-refresh', () => {
+    if (!busy) load().catch(failure => message(messages[failure.message] || '无法读取当前战役。'));
+  });
+  load().then(() => message(view.campaign ? '战役已就绪。' : '创建、打开或恢复一个战役。'))
+    .catch(failure => message(messages[failure.message] || '无法读取战役。')).finally(() => setBusy(false));
 })();

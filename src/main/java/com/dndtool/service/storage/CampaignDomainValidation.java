@@ -47,14 +47,18 @@ public final class CampaignDomainValidation {
         state.characters().forEach(c->{characterCursors.put(c.id(),0);c.history().events().forEach(e->eventsById.put(e.operationId(),e));});
         state.combats().forEach(c->combatCursors.put(c.current().combatId(),0));
         CampaignManualData.State manual=CampaignManualData.State.empty();
+        CampaignParticipationData.State participation = CampaignParticipationData.State.empty();
+        Map<UUID,com.dndtool.service.Schema2CombatState.Battle> historicalBattles = new HashMap<>();
         Map<UUID,com.dndtool.service.Schema2CombatState.Status> sceneStates=new HashMap<>();
         long sequence = 0;
         if (snapshot.history().size() != state.roots().size()) throw CampaignJson.bad("Root history count differs");
         for (Root root : state.roots()) {
             if (root.sequence() != ++sequence || !rootOperations.add(root.operationId())) throw CampaignJson.bad("Root history is not contiguous and unique");
             if (!summary(root).equals(snapshot.history().get(Math.toIntExact(sequence - 1)))) throw CampaignJson.bad("Domain root summary differs");
+            CampaignParticipationCommands.validateHistoricalActor(state, root, participation, profiles, manual);
+            var sceneBefore = List.copyOf(historicalBattles.values()); var manualBefore = manual;
             boolean richBusy=sceneStates.values().stream().anyMatch(status->status!=com.dndtool.service.Schema2CombatState.Status.ENDED);
-            if(richBusy&&(root.kind().startsWith("manual-")||Set.of("character-create","character-profile","character-command","position","item","check-effects").contains(root.kind())))throw CampaignJson.bad("Root bypasses its active scene owner");
+            if(richBusy&&(root.kind().startsWith("manual-")||Set.of("character-create","character-profile","character-command","position","item","check-effects","adjudicated-check").contains(root.kind())))throw CampaignJson.bad("Root bypasses its active scene owner");
             Set<UUID> pending=new HashSet<>(root.characterOperations());
             if(pending.size()!=root.characterOperations().size())throw CampaignJson.bad("Repeated child inside one root");
             for(var character:state.characters()){
@@ -70,12 +74,16 @@ public final class CampaignDomainValidation {
                 if(cursor>=combat.events().size()||!combat.events().get(cursor).operationId().equals(root.operationId()))throw CampaignJson.bad("Root consumes a future or noncontiguous scene event");
                 if(cursor==0&&richBusy)throw CampaignJson.bad("Two historical scene owners overlap");
                 sceneStates.put(root.combatId(),combat.events().get(cursor).after().status());
+                historicalBattles.put(root.combatId(),combat.events().get(cursor).after());
                 combatCursors.put(root.combatId(),cursor+1);
                 if(!referencedCombats.add(root.operationId()))throw CampaignJson.bad("Scene child lacks a unique root");
             }
-            if(!Set.of("character-create","character-command","combat-command","check-effects").contains(root.kind())
+            if(!Set.of("character-create","character-command","combat-command","check-effects","adjudicated-check").contains(root.kind())
                     &&(!root.characterOperations().isEmpty()||root.combatId()!=null))throw CampaignJson.bad("Metadata root cannot own typed execution events");
             switch (root.kind()) {
+                case "member-add", "member-update", "control-set", "share-set", "exploration-set" -> {
+                    participation = CampaignParticipationCommands.validateAudit(root, document(root.after(), CampaignParticipationCommands.Audit.class), participation, campaign, profiles, manual, List.copyOf(historicalBattles.values()), nodes.values(), state.roots().subList(0, Math.toIntExact(root.sequence() - 1)));
+                }
                 case "character-create", "character-profile" -> {
                     if(CampaignManualData.active(manual))throw CampaignJson.bad("Rule-character profile bypasses the simple scene owner");
                     Profile after = document(root.after(), Profile.class); Profile before = profiles.get(root.subjectId());
@@ -118,6 +126,10 @@ public final class CampaignDomainValidation {
                     items.put(after.id(), after);
                     manual=CampaignManualData.touch(manual,after.characterId());
                 }
+                case "adjudicated-check" -> {
+                    if (CampaignManualData.active(manual) || !root.before().isEmpty()) throw CampaignJson.bad("Unexpected adjudication scene owner");
+                    CampaignAdjudicationCommands.validateAudit(state, root, document(root.after(), CampaignAdjudicationData.Audit.class), participation, nodes, items, positions);
+                }
                 case "check-effects" -> {
                     if (CampaignManualData.active(manual)||!root.before().isEmpty()) throw CampaignJson.bad("Unexpected check-effects owner or before document");
                     CampaignCheckEffects.validateAudit(state, root, document(root.after(), CampaignCheckEffects.Audit.class), nodes, items, positions);
@@ -146,6 +158,8 @@ public final class CampaignDomainValidation {
                     manual=CampaignManualCommands.validateAudit(state,root,document(root.after(),CampaignManualCommands.Audit.class),manual,profiles,nodes,items,positions);
                 }
             }
+            participation = CampaignParticipationCommands.afterSceneChange(sceneBefore, List.copyOf(historicalBattles.values()), manualBefore, manual, participation);
+            CampaignParticipationCommands.validateCurrent(profiles, manual, participation);
             Long prefixSecond=null;
             for(var character:state.characters()){
                 int cursor=characterCursors.get(character.id());if(cursor==0)continue;
@@ -154,6 +168,8 @@ public final class CampaignDomainValidation {
             }
         }
         if (!operations.equals(referencedOperations) || !combatOperations.equals(referencedCombats)) throw CampaignJson.bad("Orphan domain history");
+        if (!participation.equals(state.participation())) throw CampaignJson.bad("Participation current state differs from full root history");
+        CampaignParticipationCommands.validateCurrent(state);
         if(!manual.equals(state.manual()))throw CampaignJson.bad("Manual current/initial state differs from full root history");
         if(CampaignManualData.active(manual)&&state.combats().stream().anyMatch(c->c.current().status()!=com.dndtool.service.Schema2CombatState.Status.ENDED))throw CampaignJson.bad("Two scene owners are active");
         for (var c : state.characters()) if (!new Profile(c.id(), c.name(), c.kind(), c.active()).equals(profiles.remove(c.id()))) throw CampaignJson.bad("Current profile differs from history");

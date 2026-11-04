@@ -56,8 +56,8 @@ Distinguish current behavior from a target design before treating a difference a
 
 ## Product and security boundaries
 
-- The supported entry is `http://127.0.0.1:8080`; the product is a loopback-only, single-DM tool.
-- LAN/public access, HTTPS, player accounts, `/display` and `/api/public/*` remain deferred until separately designed and reviewed.
+- The tool has one DM, whose entry remains loopback-only at `http://127.0.0.1:8080`. Explicit SQLite runtime mode also has a default-disabled player HTTPS entry on an exactly configured private, link-local or loopback IPv4 address and port `8443`.
+- Player access uses campaign membership, individual approval and a separate session; it does not provide global player accounts. Public access, anonymous display, `/display` and `/api/public/*` remain unsupported. Enabling a listener, device certificate trust or firewall access follows the separate authorization and deployment requirements below.
 - Client input is untrusted. Dice, selected candidates, derived modifiers, algorithms, canonical identities, row versions and audit results are server-owned unless a documented API declares a bounded input.
 - Validate a complete request, frozen catalog, target set and optimistic versions before consuming randomness or writing audit rows.
 - Enforce Unicode policies by code point, normalize to NFC where required and reject C0/C1 controls. Do not substitute Java `String.length()`.

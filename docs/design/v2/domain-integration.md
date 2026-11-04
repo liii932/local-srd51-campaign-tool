@@ -83,9 +83,15 @@ Java 类型名、骰子或派生结果。`CampaignStorageService` 拥有事务�
 ## 支持边界和设计修订
 
 这里的“全领域”指当前正式简化能力与当前已实现的有限规则消费者全部接到新路线。
-它不把完整 SRD DRAFT、自定义作者包安装/接受、任意等级角色加入、玩家账号/步骤、LAN
-访问或尚无算法的机制改为可执行。准确生产包的有限职业/特性/法术范围以包说明和应用
+它不把完整 SRD DRAFT、自定义作者包安装/接受、任意等级角色加入、全局玩家账号/玩家步骤
+或尚无算法的机制改为可执行，也不自动启用 LAN 监听。准确生产包的有限职业/特性/法术范围以包说明和应用
 规则页为准，BLOCKED/元数据不能通过修改卡片或存档绕过。
+[玩家参与](player-participation.md#当前原型与剩余采用)已有 SQLite 原型：`CampaignParticipationCommands`
+接合成员/控制/共享/探索许可、`Root.actor` 与 `CampaignAdjudicationCommands` 接合归因和有界
+裁定，`PlayerGatewayService` 经共同门提交，`PlayerCampaignProjection/PlayerCandidateFactory`
+产生逐人投影及服务器候选。`PlayerServlet/HostPlayerServlet` 和全局 `PlayerBoundaryFilter`
+提供独立可选 HTTPS surface；默认不开监听。自由卡玩家直接检定、全部动作参数编辑、
+DM 确证未提交工具及真实手机/桌面 LAN 信任验收仍有缺口，不能据此宣布整份计划完成。
 
 当前采用聚合文档与关系投影共同校验，并把固定规则材料纳入完整文件。独占根锁和一个
 SQLite 业务/根/接受事务承担当前单实例接纳；不另建 C0 重放队列。每条命令都耐久提交，
