@@ -35,6 +35,20 @@ mvn '-Dtest=ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,ModuleCont
 无数据写入、每次 GET 更新结果及有限 HTTP/日志类别。包迁移打包时排除旧路径残留类，
 特别是旧 listener，避免重复启动诊断；这些无数据库测试不构成真实 MySQL 或部署验收。
 
+### Tomcat 测试依赖
+
+`pom.xml` 的 `tomcat.version` 统一管理 `tomcat-dbcp` 与 `tomcat-embed-core`。
+两者均保持 `test` scope，升级时使用同一 Tomcat 10.1 补丁版本，并运行：
+
+```bash
+mvn '-Dtest=MySqlIntegrationTestSupportTest,StorageHttpIntegrationTest' test
+```
+
+前者使用无网络工厂验证连接入口与连接池配置；后者在临时 SQLite 存储上验证真实 HTTP
+链路，运行前须确认 `127.0.0.1:8080` 空闲。两者均不连接真实 MySQL。Tomcat 测试依赖
+及容器提供的 Servlet API 不得进入生产 WAR；更新这些依赖不会升级外部 Tomcat 实例，
+外部容器仍按[部署指南](deployment.md)独立维护。
+
 ## 2. 必要时的完整验证
 
 不默认执行裸 `mvn test`、`mvn verify` 或 `mvn clean verify`。只有用户明确要求，当前发布/部署/合并检查点明确要求，或已确认跨模块/共用核心影响且定向覆盖不足时，才运行全量。执行前说明具体影响和覆盖缺口；文件数量、路径、JSP/CSS/资源变化或任务收尾本身不是触发理由。
