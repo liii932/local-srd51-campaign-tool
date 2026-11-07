@@ -43,7 +43,7 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 | 命令 | 接受事实与结果 |
 |---|---|
 | `START` | 服务器掷先攻 DEX 检定，应用不熟练护甲造成的劣势，保留全部原骰；按总值及同分裁定排序，开始第一个真实回合。 |
-| `BEGIN_ATTACK` | 消费本回合 action，创建有限攻击序列；当前普通 Attack 的额度为一次。 |
+| `BEGIN_ATTACK` | 消费本回合 action 一次，创建有限攻击序列；普通额度为一次，冻结规则与实际已取得的[战士 Extra Attack](schema-2-extra-attack.md)可派生为两次。客户端不能指定额度。 |
 | `ATTACK` | 从实际手持实例、冻结 profile、角色属性、熟练和目标 AC 派生攻击；自然 1 失手、自然 20 暴击，命中才掷伤害，真正更新目标角色。 |
 | `FORFEIT_ATTACKS` | 明确放弃当前序列剩余额度并关闭序列，不退还 action。 |
 | `DASH` / `DISENGAGE` / `DODGE` | 消费 action，分别增加速度等额移动、免除本人本回合机会攻击、建立真实闪避贡献。 |
@@ -71,8 +71,16 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 
 施法资格、组件、共享法术位、Wizard 法术书、Bless／Shield 贡献、专注、同名覆盖、独立压制、
 Ready 及探索持续见[施法合同](schema-2-spells.md)。怪物吐息与其适用防御见
-[有限怪物合同](schema-2-monster-breath.md)；其他怪物动作、双持附赠攻击、Extra Attack、
+[有限怪物合同](schema-2-monster-breath.md)；战士 5–6 级 Extra Attack 按[独立能力合同](schema-2-extra-attack.md)接合。
+其他怪物动作、双持附赠攻击、高等级或其他职业 Extra Attack、
 角色抗性和其他法术／反应机制仍须各自消费者，不能借通用命令绕过其成本与后果。
+
+同一 Attack action 的 `limit/performed/forfeited/closed` 由战斗序列拥有；每击的
+`sequenceKey/attackOrdinal` 关联原序列。每击完成后才增加已用次数，未决攻击期间不能开始
+下一击或放弃绕过动作流。两击之间可合法移动、处理真实反应、改变目标或放弃余数。
+机会攻击与当前 Ready 攻击响应各执行独立单击，不引用或扩大发起者普通 Attack 序列。
+恢复校验额度范围、已付动作、连续 ordinal、完成击数与未决击数，再以原冻结规则和取得事实
+核对未结束序列的额度；全部历史仍按原依赖和保留骰验算，恢复不调用随机源。
 
 ## 暂停、反应和继续
 

@@ -136,6 +136,46 @@ class CampaignRuleSupportTest {
                 .map(acquired -> acquired.feature().ruleKey()).toList());
     }
 
+    @Test void extraAttackChecksTheOriginalDeclarationAndTheFinalComposition() throws Exception {
+        var selected = BundledCampaignRules.artifacts();
+        var original = authorRow(CHARACTERS, "rules.json", "rule_key", "feature.fighter_extra_attack");
+        var extraAttack = declare(original, LOCAL, "feature.additional_extra_attack");
+        var duplicate = extension(LOCAL, selected, List.of(extraAttack), List.of(), List.of());
+        assertEquals("S2_EXTRA_ATTACK_AMBIGUOUS",
+                assertThrows(Schema2Exception.class, () -> compose(selected, duplicate)).diagnostic().code());
+
+        for (var change : Map.of("level", 4, "source_page", 24).entrySet()) {
+            var invalid = extraAttack.deepCopy();
+            invalid.addProperty(change.getKey(), change.getValue());
+            assertEquals("S2_TYPE", assertThrows(Schema2Exception.class,
+                    () -> extension(LOCAL, selected, List.of(invalid), List.of(), List.of())).diagnostic().code());
+        }
+        for (var change : Map.of("feature_kind", "OPTION", "execution_mode", "BLOCKED").entrySet()) {
+            var invalid = extraAttack.deepCopy();
+            invalid.addProperty(change.getKey(), change.getValue());
+            assertEquals("S2_TYPE", assertThrows(Schema2Exception.class,
+                    () -> extension(LOCAL, selected, List.of(invalid), List.of(), List.of())).diagnostic().code());
+        }
+        var wrongOwner = extraAttack.deepCopy();
+        wrongOwner.getAsJsonObject("owner").addProperty("rule_key", "class.wizard");
+        assertEquals("S2_TYPE", assertThrows(Schema2Exception.class,
+                () -> extension(LOCAL, selected, List.of(wrongOwner), List.of(), List.of())).diagnostic().code());
+
+        var moveGrant = operation("set_field", original);
+        moveGrant.addProperty("field", "level");
+        moveGrant.addProperty("value", 4);
+        var invalidOverride = extension(LOCAL, selected, List.of(), List.of(), List.of(moveGrant));
+        assertEquals("S2_TYPE",
+                assertThrows(Schema2Exception.class, () -> compose(selected, invalidOverride)).diagnostic().code());
+
+        var disabled = extension(LOCAL, selected, List.of(), List.of(), List.of(disabled(original)));
+        var restored = Material.of(compose(selected, disabled)).restore();
+        var row = restored.metadata().catalog().stream().filter(item -> item.key().equals("feature.fighter_extra_attack"))
+                .findFirst().orElseThrow();
+        assertFalse(row.enabled());
+        assertFalse(row.executable());
+    }
+
     @Test void localAdvancementCannotAcquireBlockedFeatOrRollForIt() {
         var context = Material.of(BundledCampaignRules.projection()).restore();
         var plan = context.initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), "fighter", "acolyte");
@@ -157,6 +197,34 @@ class CampaignRuleSupportTest {
         assertEquals("S2_GROWTH_FEAT_UNSUPPORTED", failure.getMessage());
         assertEquals(3, atThirdLevel.current().level());
         assertTrue(atThirdLevel.current().feats().isEmpty());
+    }
+
+    @Test void fighterWithExtraAttackCannotCommitAnUnsupportedMulticlassAdvance() {
+        var context = Material.of(BundledCampaignRules.projection()).restore();
+        var plan = context.initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var engine = new CampaignDomainEngine();
+        var history = engine.initial(context.projection(), plan, UUID.randomUUID(), context.initialAbilities("fighter"),
+                context.initialChoices("fighter"), UUID.randomUUID());
+        var fighter = context.rule("character.class", "class.fighter");
+        var champion = new GrowthChoices(context.rule("character.subclass", "subclass.champion"), Map.of(), null, Map.of());
+        var asi = new GrowthChoices(null, Map.of("ability.wisdom", 2), null, Map.of());
+        for (var choices : List.of(GrowthChoices.EMPTY, champion, asi, GrowthChoices.EMPTY)) {
+            history = engine.executeCharacter(context.projection(), plan, history,
+                    new Command("CHARACTER_ADVANCED", null, 0, null, "FIXED_AVERAGE", fighter, choices), UUID.randomUUID(),
+                    sides -> { throw new AssertionError("Fixed advancement requested a die"); });
+        }
+        var fighterAtFive = history;
+        assertTrue(fighterAtFive.current().abilities().get("ability.wisdom") >= 13);
+        var cleric = context.rule("character.class", "class.cleric");
+        var life = new GrowthChoices(context.rule("character.subclass", "subclass.life"), Map.of(), null, Map.of());
+        var failure = assertThrows(IllegalArgumentException.class, () -> engine.executeCharacter(context.projection(), plan,
+                fighterAtFive, new Command("CHARACTER_ADVANCED", null, 0, null, "SERVER_ROLL", cleric, life),
+                UUID.randomUUID(), sides -> { throw new AssertionError("Unsupported advancement requested a die"); }));
+        assertEquals("S2_GROWTH_EXTRA_ATTACK_SCOPE", failure.getMessage());
+        assertEquals(5, fighterAtFive.current().level());
+        assertEquals(5, fighterAtFive.events().size());
+        assertEquals(List.of("feature.fighter_extra_attack"), fighterAtFive.current().features().stream()
+                .map(row -> row.feature().ruleKey()).toList());
     }
 
     @Test void selfConsistentInitialFactsMustStillUseTheCampaignCreationTemplate() {

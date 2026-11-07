@@ -130,7 +130,7 @@ public final class Schema2CharacterEquipmentRules {
         }
     }
     static void requireNoUnownedEffects(ProductionSchema2Projection material,State state) {
-        Schema2SpellRules.requireSupportedFeatures(material, state, "S2_EQUIPMENT_EFFECT_UNSUPPORTED");
+        Schema2FeatureSupport.requireSupportedFeatures(material, state, "S2_EQUIPMENT_EFFECT_UNSUPPORTED");
     }
     static void requireNoUnownedEffects(State state) {
         if (!state.features().isEmpty() || !state.feats().isEmpty()) throw invalid("S2_EQUIPMENT_EFFECT_UNSUPPORTED");

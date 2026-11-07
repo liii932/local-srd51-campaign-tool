@@ -260,7 +260,7 @@
       "rule_key": "feature.fighter_extra_attack"
     },
     "display_name": "Extra Attack",
-    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "description": "At fighter levels 5–6, you can make up to two supported melee attacks when you take the Attack action on your turn.",
     "source_page": 25,
     "owner": {
       "kind": "rule",
@@ -269,9 +269,9 @@
       "rule_key": "class.fighter"
     },
     "level": 5,
-    "feature_kind": "OPTION",
-    "execution_mode": "BLOCKED",
-    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_FIGHTER_EXTRA_ATTACK_V1"
   },
   {
     "identity": {

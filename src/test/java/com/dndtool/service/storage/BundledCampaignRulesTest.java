@@ -8,12 +8,14 @@ import com.dndtool.service.Schema2CharacterProgressionRules;
 import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
 import com.dndtool.service.Schema2CharacterRuntime.Command;
 import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
+import com.dndtool.service.Schema2CharacterRuntime.FeatureState;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CharacterRuntime.HealthInput;
 import com.dndtool.service.Schema2CharacterRuntime.SpellbookInput;
 import com.dndtool.service.Schema2CharacterRuntime.State;
 import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2CombatState;
+import com.dndtool.service.Schema2FeatureSupport;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2SpellRules;
 import com.dndtool.service.Schema2WizardSpellbookRules;
@@ -103,6 +105,40 @@ class BundledCampaignRulesTest {
                 STANDARD.rule("character.class", "class.cleric"), 2, "FIXED_AVERAGE", GrowthChoices.EMPTY));
     }
 
+    @Test void fighterExtraAttackRequiresTheExactAcquiredFifthLevelFeature() {
+        var material = STANDARD.projection();
+        var growth = new Schema2CharacterProgressionRules();
+        var fighter = STANDARD.rule("character.class", "class.fighter");
+        var feature = (FinalFeature) find("character.feature", "feature.fighter_extra_attack");
+        assertEquals(25, feature.definition().sourcePage());
+        assertEquals(FIGHTER_EXTRA_ATTACK_ALGORITHM, feature.definition().executionAlgorithm());
+        assertEquals(FeatureExecution.AUTOMATIC, feature.definition().executionMode());
+        assertTrue(STANDARD.metadata().catalog().stream().anyMatch(row -> row.key().equals(feature.identity().ruleKey()) && row.executable()));
+
+        State fourth = fighterAtLevelFour(growth);
+        assertTrue(fourth.features().isEmpty());
+        assertEquals(1, Schema2FeatureSupport.attacksPerAttackAction(material, fourth));
+        State fifth = advanceFighter(growth, fourth, 5, GrowthChoices.EMPTY);
+        var acquired = new FeatureState(feature.identity(), fighter, 5);
+        assertEquals(List.of(acquired), fifth.features());
+        assertEquals(2, Schema2FeatureSupport.attacksPerAttackAction(material, fifth));
+        State sixth = advanceFighter(growth, fifth, 6, new GrowthChoices(null, Map.of("ability.strength", 2), null, Map.of()));
+        assertEquals(fifth.features(), sixth.features());
+        assertEquals(2, Schema2FeatureSupport.attacksPerAttackAction(material, sixth));
+
+        State missing = withFeatures(fifth, List.of());
+        assertEquals(1, Schema2FeatureSupport.attacksPerAttackAction(material, missing));
+        assertEquals("S2_GROWTH_FEATURE_STATE", assertThrows(IllegalArgumentException.class,
+                () -> growth.validateState(material, missing)).getMessage());
+        assertRejectedAttackFeature(withFeatures(fourth, List.of(acquired)));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(acquired, acquired)));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(new FeatureState(acquired.feature(), fighter, 4))));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(new FeatureState(acquired.feature(),
+                STANDARD.rule("character.class", "class.wizard"), 5))));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(new FeatureState(
+                new RuleIdentity("other_module", "character.feature", acquired.feature().ruleKey()), fighter, 5))));
+    }
+
     @Test void wizardBookUsesRegisteredExecutableAndExplicitMetadataSpells() {
         var books = new Schema2WizardSpellbookRules();
         State wizard = initial("wizard");
@@ -138,9 +174,9 @@ class BundledCampaignRulesTest {
         assertEquals(MAGIC_MODULE, STANDARD.rule("adventure.spell", "spell.shield").moduleKey());
     }
 
-    @Test void catalogOnlyFighterOptionsDoNotBecomeUnownedEquipmentCheckOrHealthInfluences() {
-        State fighter = initial("fighter");
-        assertTrue(fighter.features().isEmpty());
+    @Test void fighterExtraAttackDoesNotAffectEquipmentChecksOrHealth() {
+        var growth = new Schema2CharacterProgressionRules();
+        State fighter = advanceFighter(growth, fighterAtLevelFour(growth), 5, GrowthChoices.EMPTY);
         var equipment = new Schema2CharacterEquipmentRules();
         UUID plate = UUID.randomUUID();
         fighter = equipment.apply(STANDARD.projection(), fighter, equipmentCommand("ITEM_ACQUIRED", plate,
@@ -153,7 +189,7 @@ class BundledCampaignRulesTest {
                         STANDARD.rule("character.proficiency", "proficiency.skill.athletics"), 10, false, false, "DM confirms an ordinary Athletics task."));
         var prepared = checks.prepare(STANDARD.projection(), fighter, check);
         var result = checks.resolve(prepared, 10, null);
-        assertEquals(14, result.total());
+        assertEquals(15, result.total());
         fighter = checks.verify(STANDARD.projection(), fighter, check, result);
         var health = new Schema2CharacterHealthRules();
         var damage = new Command("HEALTH_EFFECT_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null, null, null,
@@ -215,6 +251,18 @@ class BundledCampaignRulesTest {
         var material = STANDARD.projection();
         return growth.advance(material, growth.prepareAdvance(material, state,
                 STANDARD.rule("character.class", "class.fighter"), level, "FIXED_AVERAGE", choices), null);
+    }
+
+    private static State withFeatures(State state, List<FeatureState> features) {
+        return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(), state.characterClass(),
+                state.abilities(), state.level(), state.proficiencyBonus(), state.hitPoints(), state.maximumHitPoints(), state.classes(),
+                state.hitDicePools(), state.subclasses(), features, state.feats(), state.proficiencies(), state.version(), state.resources(),
+                state.rest(), state.equipment(), state.health(), state.spellbook());
+    }
+
+    private static void assertRejectedAttackFeature(State state) {
+        assertEquals("S2_COMBAT_FEATURE_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
+                () -> Schema2FeatureSupport.attacksPerAttackAction(STANDARD.projection(), state)).getMessage());
     }
 
     private static State initial(String characterClass) {

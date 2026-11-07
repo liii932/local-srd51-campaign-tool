@@ -505,13 +505,13 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 本文前述原包排除项针对离线来源包、测试向量和作者工作目录；
 `storage/rules/{srd51-runtime,srd51-characters,srd51-magic,dm-runtime-house-rules,dm-runtime-check-variant}.zip`
 是当前显式交付的有限生产资源，逐个核对生产读取、许可和准确内容。每个内置运行组合包含四个包，按序共享
-`srd51_runtime@2`、`srd51_characters@2`、`srd51_magic@2`。标准组合的第四包是
-`dm_runtime_house_rules@3`，家规组合的第四包是 `dm_runtime_house_rules@4`。
+`srd51_runtime@3`、`srd51_characters@3`、`srd51_magic@3`。标准组合的第四包是
+`dm_runtime_house_rules@5`，家规组合的第四包是 `dm_runtime_house_rules@6`。
 变体使用感知进行运动检定，将定额直接伤害设为 3，并将自定义工匠背景的固定语言改为侏儒语。
 这些数值、属性映射和授予属于项目家规。见[家规作者包](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
 核对 WAR 内 `WEB-INF/classes/com/dndtool/service/` 下的 `Schema2CharacterRuntime`、
-`Schema2CombatHistory`、`Schema2PreparationIdentity`、`storage/CampaignRuleContext`、
+`Schema2CombatHistory`、`Schema2PreparationIdentity`、`Schema2FeatureSupport`、`storage/CampaignRuleContext`、
 `storage/CampaignRuleSupport`、`storage/LocalRuleLibrary` 与 `persistence/storage/LocalRuleLibraryLedger` 类。
 旧 `storage/CampaignRules.class` 及独立 HP 表/创建入口不应保留。
 核对迁出的 JDBC 仓储嵌套领域类型均已排除，包括 `JdbcSchema2CharacterRuntimeRepository$Command.class`、
@@ -827,6 +827,31 @@ WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边
 检定确认和其他业务提交仍须按上述授权边界验收。核对 CSP 下同源样式和脚本正常加载，
 窄屏不截断操作区或角色卡内容；自动化页面合同由 `HostOverviewPageTest`、
 `HostConsolePageTest` 和对应表单测试覆盖。
+
+<a id="extra-attack-verification"></a>
+
+## 战士 Extra Attack 的真实链路验证
+
+先运行 `StorageHttpIntegrationTest,CampaignRuleBindingIntegrationTest,LocalRuleLibraryTest`，
+核验同一服务的原包导入、独立接受、有序预览、新建、显式保存、结束和重新打开。
+活动中导入接受另一组合不能改变已冻结战役；结束后可用新组合新建，再打开原文件恢复
+原准确组合。新制品版本不能覆盖本机已接受的同版本材料，测试不清理真实规则库。
+
+`CampaignExtraAttackIntegrationTest` 使用交付原包经真实规则库选择，正常创建与升级，
+通过 `CampaignStorageService`、真实临时 SQLite 和完整文件验证 4/5/6 级攻击额度。
+覆盖一次动作成本、第三击拒绝、击间移动/OA/换目标、放弃、Ready 单击、玩家候选、
+首击保存/END/重开、装备/检定/受伤/治疗，以及非法、过期、重复、坏文件和晚写回滚。
+能力作者/组合与共同校验的定向测试见[机制合同](rules/schema-2-extra-attack.md)。
+
+浏览器验收在全新隔离根启动 `tools/storage/run-local.sh` 后执行：
+
+```bash
+node tools/storage/browser-extra-attack.cjs
+```
+
+浏览器走真实 Host 表单和 API，核对正常升级、额度展示、两击和首击检查点恢复。
+这些是有限机制的内部集成及端到端入口证据，不代表 V04 的擒抱、挣脱、拖带、释放已实现，
+也不代替真实 MySQL、原生 Windows 或部署验收。只执行相关定向测试，按 §6 另行打包审计。
 
 ## Schema 2 战斗与动作继续验证
 

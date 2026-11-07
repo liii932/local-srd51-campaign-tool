@@ -6,6 +6,7 @@ import com.dndtool.service.CampaignDomainEngine;
 import com.dndtool.service.Schema2ArcaneRecoveryRules;
 import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CombatRules;
+import com.dndtool.service.Schema2FeatureSupport;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2SpellRules;
 import java.util.List;
@@ -52,7 +53,7 @@ public final class CampaignRuleSupport {
                 || !prepared.ownerClass().equals(wizard)) throw unsupported("CASTING_OWNER");
         if (enabled(rules, FinalSubclass.class).stream().anyMatch(row -> row.definition().ownerClass().equals(cleric)
                 && !row.identity().equals(lifeSubclass))) throw unsupported("LIFE_SUBCLASS");
-        validateFeatures(rules, life, prepared);
+        validateFeatures(rules, progressions.get(fighter), life, prepared);
         validateSpells(projection, life, prepared, progressions.get(wizard).supportedMaximumLevel());
         validateCreation(context);
         return context;
@@ -89,7 +90,7 @@ public final class CampaignRuleSupport {
         return progressions;
     }
 
-    private static void validateFeatures(List<FinalRule> rules, SpellcastingDefinition life,
+    private static void validateFeatures(List<FinalRule> rules, ClassProgressionDefinition fighter, SpellcastingDefinition life,
             WizardSpellcastingDefinition wizard) {
         int arcaneRecovery = 0;
         for (var row : enabled(rules, FinalFeature.class)) {
@@ -98,6 +99,11 @@ public final class CampaignRuleSupport {
                 continue;
             if (row.identity().equals(life.requiredFeature()) || row.identity().equals(wizard.requiredFeature()))
                 continue;
+            if (FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(definition.executionAlgorithm())) {
+                if (!definition.owner().equals(fighter.ownerClass())) throw unsupported("FEATURE_OWNER");
+                if (definition.level() > fighter.supportedMaximumLevel()) throw unsupported("FEATURE_RANGE");
+                continue;
+            }
             if (definition.kind() == FeatureKind.FEATURE
                     && Schema2ArcaneRecoveryRules.ALGORITHM.equals(definition.executionAlgorithm())
                     && definition.owner().equals(wizard.ownerClass()) && definition.level() == 1
@@ -136,7 +142,7 @@ public final class CampaignRuleSupport {
                 for (String background : CampaignRuleContext.INITIAL_BACKGROUNDS) {
                     var plan = context.initialPlan(CAMPAIGN, CHARACTER, IDENTITY, characterClass, background);
                     var history = engine.initial(context.projection(), plan, PREPARATION, abilities, choices, OPERATION);
-                    Schema2SpellRules.requireSupportedFeatures(context.projection(), history.current(), "S2_FEATURE_OWNER");
+                    Schema2FeatureSupport.requireSupportedFeatures(context.projection(), history.current(), "S2_FEATURE_OWNER");
                 }
             }
         } catch (IllegalArgumentException invalid) {

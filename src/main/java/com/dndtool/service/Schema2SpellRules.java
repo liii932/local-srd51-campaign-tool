@@ -41,19 +41,15 @@ public final class Schema2SpellRules {
         public boolean concentration() {return concentration;}
     }
 
-    /** Every acquired influence must have this exact published owner and real acquisition facts. */
-    public static void requireSupportedFeatures(ProductionSchema2Projection material, State state, String code) {
-        if (!state.feats().isEmpty()) throw invalid(code);
-        if (state.features().isEmpty()) return;
+    /** Applies the finite casting-owner constraints to resolved spell-related features. */
+    static void requireSupportedCastingFeatures(ProductionSchema2Projection material, State state,
+            List<FeatureDefinition> features, String code) {
         var life=material.projection().rules().stream().filter(FinalSpellcasting.class::isInstance).map(FinalSpellcasting.class::cast).filter(FinalSpellcasting::enabled).filter(p->owns(p.definition(),state)).toList();
         var wizard=material.projection().rules().stream().filter(FinalWizardSpellcasting.class::isInstance).map(FinalWizardSpellcasting.class::cast).filter(FinalWizardSpellcasting::enabled).filter(p->ownsWizard(p.definition(),state)).toList();
         if(life.size()+wizard.size()!=1)throw invalid(code);
         RuleIdentity required=life.isEmpty()?wizard.getFirst().definition().requiredFeature():life.getFirst().definition().requiredFeature();
-        if(!life.isEmpty() && state.features().size()!=1)throw invalid(code);
-        for(FeatureState acquired:state.features()) {
-            var rows=material.projection().rules().stream().filter(FinalFeature.class::isInstance).map(FinalFeature.class::cast).filter(f->f.enabled()&&f.identity().equals(acquired.feature())).toList();
-            if(rows.size()!=1)throw invalid(code);FeatureDefinition feature=rows.getFirst().definition();
-            if(!feature.owner().equals(acquired.owner()) || feature.level()!=acquired.acquiredAtClassLevel())throw invalid(code);
+        if(!life.isEmpty() && features.size()!=1)throw invalid(code);
+        for(FeatureDefinition feature:features) {
             if(feature.identity().equals(required)) {
                 if(feature.executionMode()!=FeatureExecution.AUTOMATIC || !Set.of(CASTING_ALGORITHM,"SRD_2014_WIZARD_SPELLCASTING_V1").contains(feature.executionAlgorithm()))throw invalid(code);
             } else {
@@ -94,7 +90,7 @@ public final class Schema2SpellRules {
     public Prepared prepare(Map<UUID,Context> roster, Battle battle, UUID actor, CastInput input, boolean reaction) {
         Context context = roster.get(actor);
         if (context==null || input==null) throw invalid("S2_SPELL_COMMAND");
-        State caster=context.character(); Schema2SpellRules.requireSupportedFeatures(context.material(),caster,"S2_SPELL_EFFECT_UNSUPPORTED");
+        State caster=context.character(); Schema2FeatureSupport.requireSupportedFeatures(context.material(),caster,"S2_SPELL_EFFECT_UNSUPPORTED");
         Schema2OngoingEffectRules.requireCastingAllowed(roster,battle,actor);
         if(input.castingRule().ruleType().equals("character.wizard_spellcasting"))return prepareWizard(roster,battle,actor,input,reaction);
         if(reaction || input.slotLevel()!=1 || input.targetCastFrameKey()!=null || input.coneDirection()!=null)throw invalid("S2_SPELL_UNAVAILABLE");
@@ -132,7 +128,7 @@ public final class Schema2SpellRules {
             if (destination==null || origin.position().distanceFeet(member(battle,id).position())>(bless?30:5)) throw invalid("S2_SPELL_TARGET");
             if (cure && destination.character().health().dead()) throw invalid("S2_HEALTH_DEAD");
             if (cure) {
-                Schema2SpellRules.requireSupportedFeatures(destination.material(),destination.character(),"S2_HEALTH_EFFECT_UNSUPPORTED");
+                Schema2FeatureSupport.requireSupportedFeatures(destination.material(),destination.character(),"S2_HEALTH_EFFECT_UNSUPPORTED");
                 if (destination.character().version()>=Schema2CharacterRuntime.MAX_EVENTS-(id.equals(actor)?2:1))
                     throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
             }

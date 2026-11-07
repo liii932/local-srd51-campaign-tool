@@ -16,7 +16,12 @@ final class Schema2CombatStateValidator {
             Set<UUID> actors=new HashSet<>(),keys=new HashSet<>();Set<Position> positions=new HashSet<>();
             for(Combatant a:b.combatants()) {
                 id(a.characterId());check(actors.add(a.characterId())&&positions.add(a.position())&&a.side()>=0&&a.side()<16&&a.movementSpentHalfFeet()>=0&&a.movementSpentHalfFeet()<=480&&a.movementBonus()>=0&&a.movementBonus()<=120&&a.movementBonus()%5==0);
-                AttackSequence s=a.sequence();if(s!=null) {id(s.sequenceKey());check(s.limit()==1&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=1&&s.closed()==(s.performed()+s.forfeited()==1));}
+                AttackSequence s=a.sequence();if(s!=null) {
+                    id(s.sequenceKey());check(keys.add(s.sequenceKey())&&!a.actionAvailable()
+                            &&s.limit()>=1&&s.limit()<=2&&s.performed()>=0&&s.forfeited()>=0
+                            &&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));
+                    if(!s.closed())check(b.status()==Status.ACTIVE&&a.characterId().equals(b.activeActor()));
+                }
             }
             Set<UUID> ordered=new HashSet<>();for(int i=0;i<b.initiative().size();i++) {Initiative v=b.initiative().get(i);check(actors.contains(v.characterId())&&ordered.add(v.characterId())&&v.ordinal()==i&&v.d20()>=1&&v.d20()<=20&&v.dexterityModifier()>=-5&&v.dexterityModifier()<=10&&v.total()==v.d20()+v.dexterityModifier()&&(i==0||b.initiative().get(i-1).total()>=v.total()));}
             Map<UUID,Frame> allFrames=new HashMap<>();Map<UUID,CastAttempt> allCasts=new HashMap<>();Map<UUID,TriggerFact> triggers=new HashMap<>();int active=0;
@@ -49,6 +54,7 @@ final class Schema2CombatStateValidator {
                 for(Frame v:f.frames())if(v.windowKey()!=null)check(windows.contains(v.windowKey()));
                 Set<UUID> movementKeys=new HashSet<>();for(Movement m:f.movements()) {id(m.movementKey());check(movementKeys.add(m.movementKey())&&reference(actors,m.actorId(),live)&&m.path().size()>=1&&m.path().size()<=64&&m.cursor()>=0&&m.cursor()<=m.path().size()&&m.spent()==m.cursor()*5&&m.status()!=null&&m.readied()==(m.allowanceFeet()>0)&&m.allowanceFeet()<=120&&f.frames().stream().anyMatch(v->v.kind()==FrameKind.MOVEMENT&&v.ownerKey().equals(m.movementKey())));if(m.status()==MovementStatus.COMPLETED)check(m.cursor()==m.path().size()&&m.stopReason()==null);else if(m.status()==MovementStatus.PENDING)check(m.stopReason()==null);else check(m.stopReason()!=null);}
                 for(AttackAttempt a:f.attacks()) {
+                    check(a.sequenceKey()==null ? a.attackOrdinal()==0 : !a.opportunityAttack()&&a.attackOrdinal()>=0&&a.attackOrdinal()<2);
                     check(frames.containsKey(a.frameKey())&&frames.get(a.frameKey()).kind()==FrameKind.ATTACK&&reference(actors,a.actorId(),live)&&reference(actors,a.targetId(),live)&&!a.actorId().equals(a.targetId())&&a.itemId()!=null&&a.firstD20()>=1&&a.firstD20()<=20&&a.selectedD20()>=1&&a.selectedD20()<=20&&(a.secondD20()==null||a.secondD20()>=1&&a.secondD20()<=20)&&a.status()!=null&&a.armorClass()>0&&a.finalArmorClass()>0&&a.damageAmount()>=0&&a.damageDice().size()<=40&&a.damageDice().stream().allMatch(d->d>=1&&d<=12)&&validBless(a.blessingEffectKey(),a.blessingD4()));
                     if(a.status()==AttackStatus.HIT_PENDING_DAMAGE)check(a.initialHit()&&a.hit()&&a.damageDice().isEmpty()&&a.damageAmount()==0&&frames.get(a.frameKey()).status()!=FrameStatus.TERMINAL);
                     if(!a.hit())check(a.damageDice().isEmpty()&&a.damageAmount()==0);
@@ -58,6 +64,7 @@ final class Schema2CombatStateValidator {
                 for(AbilityCheckAttempt c:f.abilityChecks())check(frames.containsKey(c.frameKey())&&reference(actors,c.subjectId(),live)&&c.kind().equals("COUNTERSPELL")&&c.abilityKey().equals("ability.intelligence")&&c.d20()>=1&&c.d20()<=20&&c.proficiencyBonus()==0&&c.total()==c.d20()+c.abilityModifier()&&c.success()==(c.total()>=c.difficultyClass()));
                 for(ReadyRelease r:f.readyReleases())check(frames.containsKey(r.frameKey())&&frames.get(r.frameKey()).kind()==FrameKind.READY_RELEASE&&triggers.containsKey(r.triggerKey())&&r.completed()==(r.outcome()!=null)&&r.completed()==(frames.get(r.frameKey()).status()==FrameStatus.TERMINAL));
             }
+            validateAttackSequences(b);
             validateMonstersAndBatches(b,actors,allFrames,keys);
             check(active<=1&&(b.status()!=Status.ENDED||active==0));
             for(TriggerFact t:triggers.values())check(allFrames.containsKey(t.sourceFrameKey()));
@@ -87,6 +94,25 @@ final class Schema2CombatStateValidator {
             if(b.status()==Status.ENDED)check(b.concentrationHolders().isEmpty()&&b.shields().stream().noneMatch(e->e.status()==EffectStatus.ACTIVE)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING));
         } catch(NullPointerException|NoSuchElementException malformed) {throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");}
     }
+    private static void validateAttackSequences(Battle battle) {
+        for (Combatant actor : battle.combatants()) {
+            AttackSequence sequence = actor.sequence();
+            if (sequence == null) continue;
+            List<AttackAttempt> attempts = battle.flows().stream().flatMap(flow -> flow.attacks().stream())
+                    .filter(attack -> sequence.sequenceKey().equals(attack.sequenceKey()))
+                    .sorted(Comparator.comparingInt(AttackAttempt::attackOrdinal)).toList();
+            check(attempts.size() <= sequence.limit());
+            int completed = 0;
+            for (int ordinal = 0; ordinal < attempts.size(); ordinal++) {
+                AttackAttempt attack = attempts.get(ordinal);
+                check(attack.actorId().equals(actor.characterId()) && attack.attackOrdinal() == ordinal);
+                if (attack.status() == AttackStatus.RESOLVED) completed++;
+                else check(!sequence.closed() && ordinal == sequence.performed() && ordinal == attempts.size() - 1);
+            }
+            check(completed == sequence.performed() && attempts.size() - completed <= 1);
+        }
+    }
+
     private static boolean readyActive(ReadyPreparation ready) {
         return ready.status()==ReadyStatus.PREPARING || ready.status()==ReadyStatus.ARMED;
     }

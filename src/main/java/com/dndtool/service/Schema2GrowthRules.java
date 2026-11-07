@@ -187,6 +187,9 @@ final class Schema2GrowthRules {
             if (feature.definition().executionAlgorithm().equals("BOUNDED_SUBCLASS_SELECTION_V1")
                     && subclasses.stream().noneMatch(row -> row.characterClass().equals(feature.definition().owner())
                         && row.acquiredAtClassLevel() <= feature.definition().level())) fail("S2_GROWTH_SUBCLASS_REQUIRED");
+            if (FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(feature.definition().executionAlgorithm())
+                    && (classes.size() != 1 || levels.get(feature.definition().owner()) > 6))
+                fail("S2_GROWTH_EXTRA_ATTACK_SCOPE");
             result.add(new FeatureState(feature.identity(), feature.definition().owner(), feature.definition().level()));
         }
         if (result.size() > 64) fail("S2_GROWTH_BUDGET");

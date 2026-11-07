@@ -24,7 +24,7 @@ public final class Schema2ArcaneRecoveryRules {
         var profile = profile(material, before);
         new Schema2WizardSpellbookRules().validateState(material, before);
         if (before.spellbook().learnedThroughLevel() != before.level()) throw invalid("S2_SPELLBOOK_LEARNING_REQUIRED");
-        Schema2SpellRules.requireSupportedFeatures(material, before, "S2_ARCANE_RECOVERY_UNSUPPORTED");
+        Schema2FeatureSupport.requireSupportedFeatures(material, before, "S2_ARCANE_RECOVERY_UNSUPPORTED");
         long day = day(before);
         if (Objects.equals(before.spellbook().lastArcaneRecoveryDay(), day)) throw invalid("S2_ARCANE_RECOVERY_DAILY_LIMIT");
         int combined = selected.entrySet().stream().mapToInt(e -> e.getKey() * e.getValue()).sum();
