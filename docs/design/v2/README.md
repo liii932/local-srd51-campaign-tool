@@ -9,6 +9,16 @@
 当前显式 SQLite 入口运行的是随版本交付的有限四包 profile，不声称该完整规则族已发布，
 也不使用旧 MySQL archive dispatcher 激活完整 format 2。
 
+## 模组分层与机制目标
+
+[模组分层与应用执行架构](module-layering.md)规定运行核心、应用规则机制、规则模组和界面的
+职责。目标空间模型允许一个战役保有多个场景，普通执行集中在一处焦点。未来跨空间后果
+仅沿获准因果范围结算，几何、日历、物件与领域消费者分别验收。
+
+[规则行为接口验证](rule-behavior-interface-validation.md)保留 16 个样例的原接口判定、
+修订合同的纸面复验和当前程序证据。目标按[第四阶段采用门](adoption-boundaries.md#phase-four-adoption)
+逐机制接入。
+
 ## 当前选择与实现边界
 
 `DND_STORAGE_ROOT` 启用当前有限 SQLite 路线；未配置仍使用原 MySQL 简化模式。当前选择是：
@@ -27,6 +37,12 @@
 
 | 主题 | 文档 | 职责 |
 |---|---|---|
+| 四层职责与执行接口 | [模组分层](module-layering.md) | 核心/机制/内容/UI、唯一 owner、规则绑定、真实调用链和分步验收 |
+| 第四阶段行为承载验证 | [规则行为接口验证](rule-behavior-interface-validation.md) | 16 个样例的原接口判定、修订目标的纸面复验、开放范围和程序证据分列 |
+| 目标世界、局部场景与跨空间作用 | [空间与焦点](world-and-scene-spaces.md) | 唯一位置、多场景单焦点、后台冻结、受限被动因果及完整恢复 |
+| 几何、区域与安置 | [空间与区域](spatial-and-area-contract.md) | 目标三维体积、视线与完整区域证明、联动移动、生成与强制回归 |
+| 时间、期限与日历 | [时间与日历](time-and-calendar.md) | 目标空间钟、个人经历、自然日与黎明、期限交接及消费去重 |
+| 物件、魔法物品与符文 | [物件与魔法物品](objects-and-magic-items.md) | 实物身份和互动、同调、魔杖充能、符文触发与保存 |
 | 产品、原型与网络范围 | [产品说明](../../product.md)、[架构](../../architecture.md) | 当前 SQLite/默认 MySQL、支持范围、loopback 与真实数据责任 |
 | 当前领域能力与验收 | [领域接合表](domain-integration.md)、[采用边界](adoption-boundaries.md) | 实际入口、初始/当前/历史覆盖、仍需接合的旧能力与后续门 |
 | 规则身份、作者输入与组合 | [模组接口基线](module-interface-baseline.md) | 严格 schema-2、依赖/字段操作/完整链、有限内置与未来自定义接受的区别 |

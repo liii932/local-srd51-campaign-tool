@@ -40,6 +40,25 @@
 6. 当前有限模型和已有正式能力的差异有实际接合/验收记录；测试存在、自洽往返、设计
    名称、安装成功或“无冲突”均不代表本次通过、已部署或完整发布。
 
+<a id="phase-four-adoption"></a>
+
+## 第四阶段目标的采用门
+
+[规则行为接口验证](rule-behavior-interface-validation.md)区分原接口判定、修订合同的
+纸面复验与当前运行证据。应用采用必须沿实际 producer、共享计划、唯一领域 consumer、
+私有库事务、完整文件和用户入口闭合。按上面的统一门核对正常、边界、错误输入、重复请求、
+过期版本、中途恢复及提交故障，各项证据随实际接入记录。
+
+| 目标族 | 采用所需的实际证据 |
+|---|---|
+| 检定、攻击替代、反应和共享伤害 | 真实机会与公开时点、唯一攻击额度、完整目标和分量防御、同一伤害阶段及失能/专注后继。[动作继续](action-continuation-protocol.md) · [共享伤害](multi-target-save-damage.md) |
+| 三维空间与被动跨空间因果 | 实际区域、视线和位置证明，联动安置及不丢失的回归叶子。同阶段共同提交前后台健康，真实受限选择与后继随原因保存，后台时钟和普通动作冻结。[空间与区域](spatial-and-area-contract.md) · [因果作用域](world-and-scene-spaces.md#causal-scope) |
+| 持续效果、形态、召唤和疾病 | 区域进入/START、抗魔局部原因、回转溢出、群组退场和感染的实际 producer 与 consumer。恢复验证旧骰、原健康、真实位置、持续来源、发生游标及完整 pending。[持续效果](ongoing-effect-protocol.md) · [角色状态与历史](character-state-and-history.md) |
+| 日历、期限、魔法物件与储存施法 | 真实空间推进、自然日/黎明的唯一消费、迁移余量、实物与授权、魔杖状态和符文触发，连同中途应用与直接恢复验收。[时间与日历](time-and-calendar.md) · [物件与魔法物品](objects-and-magic-items.md) · [施法扩展](spellcasting-extension-contract.md) |
+
+有限 Divine Intervention 与 Glyph 的确切类型化分支按各自合同采用。任意神祇援助的
+自动执行与开放符文谓词仍属开放范围。当前运行证据见[领域接合表](domain-integration.md)。
+
 ## 保留的未完成目标
 
 完整 SRD 和未登记机制、任意自定义包接受/独立发布、任意加入等级/角色编辑器、玩家步骤、

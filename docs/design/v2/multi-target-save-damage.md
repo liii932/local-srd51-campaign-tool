@@ -8,7 +8,7 @@
 [动作继续协议](action-continuation-protocol.md)、[持续效果协议](ongoing-effect-protocol.md)、
 [运行与事务](runtime-and-transactions.md)及[保存与恢复](save-and-recovery.md)。
 
-## 唯一实例、原文和支持范围
+## 吐息实例、原文和支持范围
 
 实例为 **Hell Hound 的 Fire Breath**。本合同的应用机制标识为 `SAVE_DAMAGE_BATCH_V1`，
 具体登记为 `HELL_HOUND_FIRE_BREATH_V1`。有限消费者沿用这两个机制标识；真实内容使用
@@ -33,9 +33,9 @@
 分别是完整复合原子参数。伤害不是 spell/attack，weapon tags 为空；不能仅因同为 fire
 就与其他 delivery、材质/魔法或准确适用 gate 不同的分量乱合并。本实例没有多分量分组。
 不能只覆盖 DC 模式而遗留另一种 DC 的字段，或把一半 profile
-拼成未登记机制。未知 mode、多个伤害分量、对物体结算、Evasion 等替代 save 结果、
-Legendary Resistance、反伤、额外伤害及特殊减伤，只有建立其准确合同与完整消费者后才
-可进入支持范围；本实例不默认支持它们，也不能把实际适用者当零贡献过滤。
+拼成未登记机制。目标真实具备 Evasion 时采用[共享减免](#typed-damage-application)。
+未知 mode、此 profile 额外分量、Legendary Resistance 或其他未接合的特殊分支在接纳门
+关闭；不能把实际适用者当零贡献过滤。
 
 执行分工为：固定参数、完整目标、骰子、减免、健康和已登记专注结果由服务端自动结算；
 DM 仅在服务端合法锥向候选中有限选择。边界体积、遮挡或特殊空间关系确需裁定时，必须
@@ -48,24 +48,21 @@ DM 仅在服务端合法锥向候选中有限选择。边界体积、遮挡或�
 当前有限消费者使用类型化 batch/check/packet 等事实承载已采用分支；是否覆盖本表的全部
 更广责任，须按文末采用表和正式运行合同判断。
 每个 union 分支只允许其字段；未知、重复、缺失、null、坏类型和超界字段严格拒绝。
-客户端只提供下一节的 `BreathIntent`。下表中的 plan、cut、贡献、骰点和 outcome 都由
-服务端生成，不能经请求直接提交，也不提供通用 JSON 效果解释器。
+客户端仅提交对应 producer 的有限意图，如下一节的 `BreathIntent` 或已登记的施法意图。
+下表中的 plan、cut、贡献、骰点和 outcome 都由服务端生成，不能经请求直接提交。
 
 | 类型 / owner | 必要字段与封闭语义 |
 |---|---|
 | `CreatureRef` / 生物身份 owner | 战役稳定键、`CHARACTER/MONSTER`、该种稳定 UUIDv4 业务键；运行引用另核同一 run/snapshot。归档、离场、0 HP 和死亡不得混为“查不到记录”。 |
 | `SaveDamageBatch` / 豁免伤害协调者 | 稳定 `batch_key`、准确协议/机制版本、真实来源、release 事实、完整 `TargetSetProof`、连续 target ordinal、当前固定阶段、完成前缀和未结义务、共享 roll/各 check/packet/健康/专注结果引用、flow/frame/continuation 引用。只协调这些事实，不复制 HP、holder 或动作池。 |
-| `BatchSource` / 怪物动作 owner | 本实例恰为 `MONSTER_ACTION`：准确怪物身份、原 stat-block action 条目身份及当前授予依据、combat/turn、一次 action spend、一次 recharge-use spend、release 事件。真实执行使用同一 snapshot 的最终启用条目及来源链。未来具体法术必须另登记真实 cast 来源，不能把本实例冒充施法。 |
-| `TargetSetProof` / 空间 owner | 场景及完整 creature roster 版本、源姿态/原点、15-foot cone 的准确方向候选与排除原点选择、全部空间/遮挡/覆盖/裁定事实、逐 candidate 的纳入或排除证明、完整 T 及排序。选中区域与实际目标是不同对象；不能以用户提交的子集代替 T。 |
-| `CheckPlan` / 共享检定 planner | 稳定 check 身份、`SAVE`、purpose=`BREATH_DEX/CONCENTRATION_CON`、准确 batch/target/source/阶段、ability、server-owned DC、当前 `CheckBasis`、完整类型化贡献及来源、`ROLL/AUTO_FAILURE`。前者生成有限 roll manifest；后者必须有真实自动失败 condition 证明，不生成虚假 d20。 |
-| `CheckBasis` / 检定与贡献 owner | 采样点与依赖事实版本、实际属性修正、适用 save 熟练贡献、固定加减、bonus-die 项、advantage/disadvantage 全集及聚合证明。没有熟练来源不能自动加 PB；多份 advantage/disadvantage 按其核算法合并，二者皆有时互抵为一个 d20。 |
-| `CheckRoll` / 共享骰核 | 不可变原 d20、各骰 ordinal/faces/value、selected ordinal、原修正与贡献骰、roll manifest 身份及实际消费顺序。普通模式一个 d20，advantage/disadvantage 两个并选高/低；同点选较小 ordinal。不能事后重写原骰。 |
-| `CheckOutcome` / 共享检定 consumer | 恰引用一个真实 roll 或 AUTO_FAILURE 证明，以及已登记掷后贡献/选择，记录最终有效 total 和 `SUCCESS/FAILURE`；普通判定 `total >= DC`。原 roll、后置贡献和最终 outcome 分开保存；没有可适用后置机制时可同事务完成。 |
-| `SharedDamageRoll` / 共享伤害骰核 | 准确 batch/release/source、一个 6d6 原 manifest 和六个不可变原骰、raw total，及另存的已消费共享 roll 修正；一次 roll 供所有目标引用，不复制成五次独立伤害骰。 |
-| `DamagePacket` / 伤害 owner | 稳定 packet 身份=`(batch_key,target_ordinal)`、准确 shared roll/source、target 的唯一 save outcome、fire 分量、成功/失败比例、共享和本目标修正、完整免疫/抗性/易伤证明、`DamageApplyCut`、实际伤害及真实健康/伤害后义务引用。不能由 HP 减少量反造 packet 或用目标数拆分伤害。 |
-| `DamageApplyCut` / 批次与真实领域 owner | 全体目标在最终 APPLY 边界的权威 vitals/health、temp HP、减免/贡献/condition、holder、引用闭包及依赖版本。先形成完整不可变计划，再一次消费所有目标；它是本次事实的依据，不是第二份可写当前状态。 |
+| `BatchSource` / 动作或施法 owner | `MONSTER_ACTION` 含准确怪物、action 条目和当前授予、combat/turn、一次 action spend、一次 recharge-use spend 和 release。Fireball 的 `SPELL_EFFECT` 含准确 spell identity、cast 或储存释放授权和接受事实、来源有效环级、DC 来源和空间意图。两分支都使用准确冻结绑定和来源链。 |
+| `TargetSetProof` / 空间 owner | 准确 `AreaResolution` 引用、应用的几何版本、源姿态及区域选择、完整主体/物件 roster 版本、逐 candidate 结论及完整有序目标。区域、证据与目标名单不由客户端互相代替。 |
+| `CheckPlan/CheckStage` / 共享检定 owner | 沿[检定阶段](action-continuation-protocol.md#check-stages)的 `ABILITY_SAVE`。purpose 为 `BREATH_DEX/FIREBALL_DEX/CONCENTRATION_CON`，绑定 batch/target/source 或准确受伤 holder、权威 DC、stage ordinal、roll/basis、自动失败证明、有限贡献、真实公布结果及父返回点。 |
+| `SharedDamageRoll` / 共享伤害骰核 | 准确 batch/release/source、完整原 manifest 与不可变原骰、raw total，及另存的已消费共享 roll 修正；一次 roll 供所有目标引用。 |
+| `DamagePacket` / 伤害 owner | 稳定原 packet 身份 `(batch_key,target_ordinal)` 或准确攻击/派生来源身份。原来源、可选 shared roll 与 save outcome、分量的类型和适用标签、修正与减免证明、`DamageApplyCut`、实际伤害及真实健康/后继引用。 |
+| `DamageApplyCut` / 批次与真实领域 owner | 最终 APPLY 边界的全部真实计划对象、源目标及因果参与者的权威健康、形态、减免/条件、holder、对象状态、依赖闭包和版本。先形成全部不可变计划，再一起消费整个阶段。它是本次依据，当前状态仍归各领域唯一 owner。 |
 | `HealthPlan` / 唯一健康 owner | 完整 pre/post temp HP/HP/max HP/生命状态/稳定与死亡计数、实际吸收和 overflow、condition/onset/掉落及真实伤害触发。计划无 RNG、无写入，consumer 核对同一 cut 后一次应用。 |
-| `ConcentrationDamageObligation` / 专注 owner | 身份=`(holder acquisition fact, packet identity)`，实际伤害、固定 DC、`NOT_REQUIRED/FORCED_ENDED/CHECK_REQUIRED` 及证明，check/result 或准确强制结束引用；本批一个来源对每个受伤 holder 至多一次，不能按骰数、temp/HP 两段或目标数重复检查。 |
+| `ConcentrationDamageObligation` / 专注 owner | 身份=`(holder acquisition fact, packet identity)`，实际伤害、固定 DC、`NOT_REQUIRED/FORCED_ENDED/CHECK_REQUIRED` 及证明，check/result 或准确强制结束引用；每个独立伤害 packet 对当时受伤 holder 至多一次，不能按骰、类型分量、形态或 temp/HP 分段重复检查。 |
 
 `prepareChecks`、`prepareDamageBatch`、`prepareHealth`、`prepareConcentration` 都是只读、
 确定性的纯计划：只消费显式固定规则、当前权威事实和已经接受的结果，不抽 RNG、不查
@@ -118,17 +115,64 @@ release 时固定 area 意图、完整 T、身份/ordinal 和当时 membership �
 这些是选定的工程验证边界，不是 SRD 目标上限或已完成压测。合法值的准确编码、字段
 字节界和容量实测仍是采用材料；本表不能替代保存协议要求的实测字节/结构/预算证明。
 
+<a id="fireball-damage"></a>
+## Fireball 的完整目标与点燃
+
+Fireball 以 `SPELL_EFFECT` 从原施法或储存法术释放的唯一 owner 进入 `SAVE_DAMAGE`，
+采用[施法授权与效果分派](spellcasting-extension-contract.md#效果分派与公共领域-owner)。
+输入为准确 `SpellTargetSnapshot` 与 `AreaResolution`、法术有效环级及权威 DEX DC。
+正常施法按原有效环级，Wand 固定 DC 15 且按实际耗充能决定有效环级，Glyph 储存释放用原
+有效环级及锁定 DC。批次只引用已经接受的声明或触发及成本，不消费第二次 action、位、
+充能、材料或储存触发。原文见 [Fireball，p.144](../../references/srd-5.1/pages/page-144.md)。
+
+1. `ADMIT_RELEASE` 前由[空间与区域 owner](spatial-and-area-contract.md#areas)验证
+   150 feet 内所选点，按 clear path 与障碍重定向政策证明真实原点，再按半径 20 feet、
+   绕角传播、占位、阻挡、抗魔裁切和 cover 生成完整结果。Glyph 以触发生物为中心时，
+   由释放规则提供真实原点，空间仍生成同类证明。固定 T（所有纳入的 creature）及
+   O（有效区域内未穿戴/携带的可燃对象）；对象 owner 提供可燃性、物理暴露与真实
+   穿戴、携带、容器链证据。全部候选均有纳入或排除原因。
+   生物的 cover 继续按各目标真实 DEX 掷前点采样；不会因装备没 token、角色不在
+   initiative、目标免疫或无可见生物而漏掉 T 或 O。
+2. T 非空时共享原火伤 `(8 + 有效环级 − 3)d6`，产生 DC 确定的 DEX saves 和
+   `FAIL:FULL / SUCCESS:HALF` 初始策略；Evasion 是目标侧独立 save 后修正。无 T 时
+   不掷共享伤害和 save，仍处理完整 O。仅 O 非空为 `OBJECT_EFFECTS_ONLY`；两者
+   都空且完整证明确认才是 `NO_TARGETS`，合法来源和原支付保持接受。
+3. APPLY 前以原 O 和当前权威对象状态形成有界点燃计划，按稳定对象键排序。每个对象的
+   `IGNITE(object_key)` 应用身份是 `(release_fact,object_key,IGNITION_V1)`，持有 release/区域证明、当前
+   对象归属及 burn 状态、前后状态与事件引用。能点燃则对象/环境 owner 写入一次
+   `BURNING`（来源为该 Fireball）；已经燃烧只记录 `ALREADY_BURNING`，无重复开始。
+   原区域/资格固定于 release；若后继使原对象不再存在或变成被穿戴/携带，保留原成员
+   和原因并记合法失效，不追溯纳入新对象。可燃对象的登记触发或危险后果须预检，
+   本机制不凭物件名制造即时额外伤害。真实点燃和全体伤害一起 APPLY，所有必需后继
+   结清后才发出 Fireball 完成。应用和点燃不为对象虚构 DEX save。
+
+每个 Fireball 仍采用 T≤64 的界，O≤256；超界或缺完整空间/对象/环境证据须在接纳原
+施法/触发的成本及 RNG 前拒绝。真实可达的引燃后继和 T/O 外引用一并计入持久预留。
+这些是应用选择，当前 Burning Hands 与有限怪物消费者不由此获得点燃能力。
+
+<a id="typed-damage-application"></a>
 ## 伤害数学、共同切面与专注
 
-本实例固定以下计算顺序。设共享原骰和为 R，共享伤害 roll 的已登记减项之和为 K。
+共享伤害固定以下计算顺序。设共享原骰和为 R，共享伤害 roll 的已登记减项之和为 K。
 共享有效值 `S=max(0,R-K)`；Cutting Words 反应减的是这一个 roll，因此所有目标引用 S，
 不能只给一个目标减、对每目标再骰一次，或同时减共享值和 packet。
 
-对目标 i：失败为 `B_i=S`，成功为 `B_i=floor(S/2)`；再按具体类型登记的顺序应用本目标
-其他修正并钳为非负 `M_i`。本范围未登记的修正顺序阻断，不按数据库行先后来减。
-fire 免疫时实际伤害 `D_i=0`；否则先在有适用抗性时 `floor(M_i/2)`，再在有适用易伤时
-乘 2，得到 `D_i`。重复免疫/抗性/易伤保留全部证明，各种语义只应用一次；抵抗和易伤
-并存也不先抵消为“没有二者”，必须按上述顺序执行。
+对目标 i，先按原效果的 save 规则决定 B。吐息和 Fireball 的普通失败为 `B_i=S`，
+成功为 `B_i=floor(S/2)`。`EVASION_V1` 仅在真实有效特性与此 DEX 半伤 save 规则
+匹配时，把失败结果改为 `floor(S/2)`、成功改为 0。记录特性来源、原 outcome、原策略
+与替代策略；不改变 d20/DC 或重掷。失能本身不为 Evasion 增加原规则没有的行动成本或
+禁用条件；其真实效果/形态可用性仍在 APPLY cut 核验。效果若是 CON save、成功本来无伤
+或不是“成功一半、失败全伤”，无此替代。见 [Evasion，p.28](../../references/srd-5.1/pages/page-028.md)。
+
+本目标其他已登记减项应用后钳为非负 M，再处理适用免疫、抗性、易伤。混合伤害的
+Cutting Words 扣减只消费一次，依该攻击的原分量顺序从第一项有伤害骰的分量扣除，
+余额依序扣后续有伤害骰分量，归零止步；固定修正按原规则计入一次。这是项目对跨类型
+伤害骰减项的分配规则。单一 fire 分量
+免疫时 `D_i=0`；否则有适用抗性时 `floor(M_i/2)`，有适用易伤再乘 2。多分量攻击的
+应用先依 `damage_type` 和实际免疫/抗性/易伤适用范围标签分组；记录原有分量/来源，
+每组在同一切面按同一顺序修正，最后合计一份本次实伤。不同类型或物理标签导致的不同
+防御范围分别保留，重复同类免疫/抗性/易伤各只应用一次。抗性和易伤并存仍先减半再翻倍。
+未登记的伤害分组或修正顺序失败关闭，不依数据库行先后计算。
 
 健康 owner 用同一 APPLY cut 中的 `temp_i`、`hp_i`、`max_i` 计算：
 `absorbed_i=min(temp_i,D_i)`，`remaining_i=D_i-absorbed_i`，
@@ -137,49 +181,84 @@ fire 免疫时实际伤害 `D_i=0`；否则先在有适用抗性时 `floor(M_i/2
 这里只是伤害，不作治疗，不重发 temp HP，不把所有 0 HP 怪物通用改成 PC 死亡豁免。
 原文的近战击倒选择不适用于吐息，不能开放 nonlethal 开关。
 
+受击者当前在真实形态中时，健康 owner 消费同一 post-defense packet，使用
+[形态交接 `FormTransitionPlan`](character-state-and-history.md#形态统计与健康交接)。
+先由形态下的临时 HP 与真实形态 HP 接受，归零则在同一 APPLY 内回转并把同一包的实际剩余伤害移交
+本体；溢出保留来源及类型、不再次减免或产生新独立伤害。只有回转/溢出已结清的最终
+健康结果供归零、死亡、条件/掉落、专注和命中后订阅者观察。健康 owner 返回实际
+`temp/HP` 与 overflow 事实；专注和 Warding Bond 仍以同一 packet 的实伤为准，不按
+形态和本体 HP 减量分段计伤。形态到期、压制等非伤害原因不制造溢出 packet。
+
 **共同切面是对同时生效作出的工程时序选择，不是 SRD 额外规定的遍历顺序。**
 
 1. 所有 APPLY 前的真实反应和必需选择先结清。每个 DEX check 在自己的合法掷前点采样
    当前贡献；已产生 roll/outcome 保留。未发生的 save 不能套 release 时冻结的旧贡献。
-2. 全部 save 终结后，在唯一 `DAMAGE_APPLY` 边界重读完整 T 的当前减免/健康/holder/效果
-   闭包，形成一份 `DamageApplyCut`。先算出**全体** packets 与 HealthPlans，再应用全体
-   健康变化；不能处理 A 后先结束 A 的专注，再用变化后的抗性给 B 算本次伤害。
+2. 全部 save 终结后，在唯一 `DAMAGE_APPLY` 边界重读完整 T、O 及因果参与者的当前
+   减免、健康、holder、物件、效果及依赖闭包，形成一份 `DamageApplyCut`。先算出全体
+   packets、HealthPlans 与对象应用，再提交该阶段全体变化。不能处理 A 后先结束 A 的
+   专注，再用变化后的抗性给 B 算本次伤害。
 3. 全体伤害健康事实成立后，健康/专注/effect owner 先归并并消费本批全部确定的失能/死亡
    及其强制 holder 结束；同阶段结束一并发生，再重求持续贡献和有限后继。保留 source、
    application、原因及 callback 的真实状态；用持续效果协议的完整闭包，不只清 holder。
 4. 强制结束及其当前必需后继结清后，确定仍在集中且 `D_i>0` 的 holder。DC 为
-   `max(10,floor(D_i/2))`；用 D 而非 HP delta、overflow、R、S 或 B。temp HP 全吸收仍需
-   检查，D=0 不产生无意义 CON check，已强制结束者不再抽 CON d20。
+   `max(10,floor(D_i/2))`；以 packet 最终实际伤害 D 为依据，temp HP 全吸收仍需检查。
+   D=0 或已强制结束者不抽 CON d20。
 5. 以此时的统一 `CONCENTRATION_CHECK_CUT` 形成全部所需 CON CheckPlans，再按 target
    ordinal 执行。共同 cut 已不包含第 3 步结束的来源；本批一个 CON 失败不在另一个本批
-   CON check 之间临时撤掉其 cut 内贡献。全部这些 outcomes 确定后，再批量结束失败
-   holders 及其完整效果子图。新产生的独立伤害是新 packet/source/义务，不能折回本批 D。
+   CON check 之间临时撤掉其 cut 内贡献。选项自身的消费状态仍必须在当前权威状态重验。
+   全部 outcomes 公布后批量结束失败 holders 及其完整效果子图。新产生的独立伤害
+   使用新 packet/source/义务，不能折回本批 D。
 6. 全部真实后继终结才终结 batch/flow。存在 callback 反应或选择时可保存已完成的全体
-   健康/结束前缀和准确余集，沿唯一 flow 继续；不能回到目标循环重伤害一次。
+   健康/结束前缀和准确余集，按所属空间的 flow 继续，原伤害保持已消费。
 
-本实例只接纳已登记并能保持该切面语义的 check 贡献。适用的骰后 save/CON 选择或反应，
-必须有准确 CheckPlan、时点、choice/子动作、原结果保留和对剩余 cut 的政策；本合同
-没有开放任意插队修改。缺这类消费者就阻断相关根，不能先接受再默认不使用。
+DEX 和 CON 都通过[通用检定阶段](action-continuation-protocol.md#check-stages)接受
+真实掷前/掷后选择。DEX 每次只采自己的未掷依据；CON 共用切面，切面内先确定全部
+主体的掷骰基础、自动贡献、效果来源和固定 DC，每次选择消费当前的唯一资源或效果。
+若某一次选择消耗共享来源，使它不再有另一份未付的使用权，后项不得凭 cut 二次消费。
+该限制不追溯取消已接受贡献，普通行动不得插队修改共同切面。缺消费者则在原接纳门关闭。
 持续效果带来的 HP/max HP、条件/onset、掉持物、结束回调、压制原因解除及 winner 变化
 均归真实 owner。未知订阅者或无法证明有限的后果在根完整预检中拒绝。
 
+<a id="causal-damage-apply"></a>
+### 跨空间因果伤害
+
+同一 APPLY 可因 [Warding Bond](ongoing-effect-protocol.md#warding-bond) 包含多个空间。
+原伤害先确定各类型实伤，从有效 `WardingBondLink` 生成准确 `WARDING_BOND_RELAY`
+packet，保留该量的类型及原 packet/关系身份；施法者防御仍在自己的切面上结算。已存在
+环或无法证明终止的依赖在首 RNG 前拒绝。先按原目标 ordinal，再按父 packet 与稳定关系
+键的拓扑序排所有派生 packet；同一事件的触发账本按真实 edge/packet 身份去重。若一次
+APPLY 内多个 packet 命中同一生物，防御统一采样于 cut，健康 owner 按该顺序把 temp
+HP、当前 HP 与形态变化归入一个本地拟应用状态，整阶段一次原子提交，不为每包重新读取
+已变化的外部 HP；每包独立实伤及相应后续义务保留。
+
+在 [`CausalScope`](world-and-scene-spaces.md#causal-scope) 内，凡 APPLY 前的后台
+减伤选择或真实反应都会停在当前准确因果叶子，双方均无该阶段 HP 写入。所有前置义务结清
+后一起写入全部已计划 packet、前后台健康/对象/历史及版本；任一端失败则回滚整个本阶段。
+APPLY 后的专注选择、反应或结束链保存已发生的前后台健康事实和准确后继，沿同一因果
+叶子取得受限权限。后台原流和日历仍冻结；义务不等切回才补伤害，也不自动 PASS。缺
+几何证据、消费者、全空间闭包或终结预留均在原分支接纳前拒绝。
+
 ## 固定阶段、release 与唯一动作流
 
-本机制的唯一新增执行 frame kind 为 **`SAVE_DAMAGE`**，owner_ref 恰指该
-`SaveDamageBatch`。怪物吐息以 `ROOT` 建立它，来源为真实 `MONSTER_ACTION`；没有攻击骰、
-cast、slot 或第二个 action。未来已登记的施法效果可将准确 batch 作 `CONTINUATION`
-孩子，复用原施法成本，但本合同不自动支持任何法术，也不开放任意 producer。
+执行帧 `SAVE_DAMAGE` 的 owner_ref 恰指准确 `SaveDamageBatch`。怪物吐息以 `ROOT`
+建立它，引用真实 `MONSTER_ACTION`。Fireball 以真实施法或储存释放的 `CONTINUATION`
+建立同类批次，复用原 release 成本。本合同当前明确这两种 producer 的完整语义；采用边界
+仍取决于各自实际执行与保存证据。
+
+batch 和直接目标属于原动作流的空间；跨空间的派生目标沿[因果作用域](world-and-scene-spaces.md#causal-scope)
+接入原流的后继。后台原切面和已结算前缀冻结，切回按新焦点代次及更新后的业务版本
+重验原未执行余集。
 
 | 固定领域阶段 / checkpoint | 准确已发生事实与继续责任 |
 |---|---|
-| `ADMIT_RELEASE` | 完整预检全部规则、目标、依赖/frontier、成本、版本、预算后，接受 action/recharge-use 各一次并记录 release。release 前源必须有真实动作和可用能力、非失能并满足自身限制；release 后的单纯失能/死亡不取消已经释放的吐息。改变已释放伤害须有准确机制，不能因 source 当前不能行动而静默取消。 |
-| `ROLL_SHARED_DAMAGE` | T 非空时一次抽 6d6，保存原 manifest/roll。到动作协议既有 `DAMAGE_ROLLED_BEFORE_APPLY`，绑定准确 shared roll；尚无本批 HP/CON 结果。 |
+| `ADMIT_RELEASE` | 完整预检规则、目标、依赖/frontier、成本、版本与预算后，吐息接受真实 action/recharge-use 并记 release；Fireball 消费准确已接受的施法或储存释放返回点。本协议中 release 后单纯失能/死亡不取消已释放效果；改变已释放效果须有准确机制。 |
+| `ROLL_SHARED_DAMAGE` | T 非空时一次按准确来源 manifest 抽骰（吐息 6d6、Fireball 按环级），保存原 manifest/roll。到 `DAMAGE_ROLLED_BEFORE_APPLY` 时尚无本批 HP/CON 或点燃结果。T 空且 O 非空时直接进入对象 APPLY 计划。 |
 | `RESOLVE_SHARED_ROLL_WINDOW` | 完整 reader 按动作协议产生所有真实 Cutting Words 等候选；有候选就 WAITING_WINDOW，并保存 raw/窗口/预留。真实反应孩子消费自己的 reaction/资源/骰，贡献引用 shared roll。关闭窗口后准确 continuation 合成 S 一次；不重掷 R、不提前套各目标减免。 |
 | `TARGET_SAVE` | 按 ordinal 完成每个 DEX CheckPlan/roll/outcome，保存准确已完成前缀。需要已登记 choice 时用同一 flow 的 `DOMAIN_CHOICE`；没有则同事务连续处理，不强制每目标一个请求。原骰不可修改，当前未掷 check 用当前合法依据。 |
-| `DAMAGE_APPLY` | 所有 pre-apply 义务完成且完整重验通过；产生共同 cut、所有 packet/HealthPlan 并一起应用。此阶段内禁止逐目标提交或等待用户。 |
+| `DAMAGE_APPLY` | 所有 pre-apply 义务完成且完整重验通过；产生共同 cut、所有 packet/HealthPlan 和对象应用并一起提交。原空间和因果参与空间同一事务，无逐目标或逐空间提交。 |
 | `FORCED_CONCENTRATION_END` | 批量处理本批失能/死亡与强制 holder/effect 结束。若真实后继需暂停，普通 `ONGOING_EFFECT_TRANSITION` 子帧引用准确 transition，并返回本阶段的准确未决 obligation；健康前缀已真实成立。 |
 | `CONCENTRATION_CHECKS` | 所有强制闭包结清后生成统一 CON cut 和准确 check 余集；沿共享核一次执行，结果固定后批量消费失败结束及其后继。只允许本阶段完整登记的操作，不把“可随时结束专注”当作破坏 cut 的并行入口。 |
-| `AFTER_BATCH` → `COMPLETE` | 全部 packets、健康/专注及当前必需效果义务终态后，才提供准确 `READY_TRIGGER_AFTER` 等已登记 after 触发；真实孩子终结后收束 batch/flow。原吐息不是施法，不能产生 Counterspell 或 Shield 的攻击命中窗口。 |
+| `AFTER_BATCH` → `COMPLETE` | 全部 packets、健康/专注、点燃及当前必需效果义务终态后，才提供准确 `READY_TRIGGER_AFTER` 等 after 触发；真实孩子终结后收束 batch/flow。吐息与 Fireball 的伤害阶段均没有攻击命中窗；真正施法才在其原声明／工作时处理 Counterspell。 |
 
 continuation 必须指向准确 batch/frame/checkpoint、上述阶段及当前 target/obligation
 ordinal；这是封闭的应用枚举，不由客户端拼字符串定位。共享 roll 窗口使用动作协议既有
@@ -194,7 +273,7 @@ ordinal；这是封闭的应用枚举，不由客户端拼字符串定位。共�
 
 ## RNG、完整预检与事务故障
 
-无交互正常路径的骰消费序为：共享 6d6 按 die ordinal → 按 target ordinal 的 DEX checks
+无交互正常路径的骰消费序为：共享伤害骰按 die ordinal → 按 target ordinal 的 DEX checks
 （每 check 的 d20 ordinal 在前，bonus dice 按其稳定条目身份/来源事实排序）→ 同序且真正
 需要的 CON checks。AUTO_FAILURE 仅记录证明，不为保持固定长度而浪费 d20。
 有反应/choice 时，当前真实孩子在其到达点消费自己 manifest；返回只消费剩余后缀。
@@ -229,8 +308,8 @@ ordinal；这是封闭的应用枚举，不由客户端拼字符串定位。共�
 | commit 成功后响应失败 | 保留全部接受事实；同键同意图只重放原结果，不重掷/扣资源/继续。 |
 | commit 未知或 rollback 失败 | 隔离连接并使执行资格失效；按原操作身份在共同守卫下只读查证完整闭包。不换键重试，不把空查询当回滚，不自动继续或释放额度。 |
 
-每个接受结果包含原操作、根事件、batch/flow、该次阶段、成本/roll/check/packet/真实
-结果引用和当时 `WAITING/COMPLETE/NO_TARGETS`；它永远不改为后来状态。当前只读 view
+每个接受结果包含原操作、根事件、batch/flow、该次阶段、成本/roll/check/packet/点燃
+结果引用和当时 `WAITING/COMPLETE/NO_TARGETS/OBJECT_EFFECTS_ONLY`；它永远不改为后来状态。当前只读 view
 另报当前叶子、允许操作、全部目标可读结果/来源、当前版本与运行阻断原因。重放旧 WAITING
 不重新打开窗口，GET 不掷 recharge、不补伤害或结束效果。
 
@@ -242,27 +321,28 @@ ordinal；这是封闭的应用枚举，不由客户端拼字符串定位。共�
 | 业务事实 / 唯一状态与版本 owner | 历史及文件/直接恢复落点 |
 |---|---|
 | batch、完整 T/ordinal、release、阶段/前缀、所有结果/义务引用 / batch 聚合 | batch 分区及完整 typed 命令正文；保留原稳定键、原来源/空间证明和真实阶段，不恢复为“重新开始吐息”。 |
+| Fireball 的完整 O、对象资格及每个点燃应用 / 空间、对象与环境聚合 | 保存原完整区域证明、对象身份和纳入依据、当前 burn 状态、点燃接受和后继引用；无 T 的 `OBJECT_EFFECTS_ONLY` 恢复时也不补骰或再次点燃。 |
 | action spend、recharge 可用性/最近消费与恢复事实 / 怪物动作及 turn/rest 资源聚合 | 怪物当前资源分区及全历史；恢复原可用/已用状态，不在恢复时补 turn START 掷骰或短休。 |
 | 每 check 的 basis、roll/自动失败证明、选择/贡献与 outcome / 共享检定事实，引用父 batch 或专注 owner | 检定及其真实父正文；原始骰、最终判定、准确 cause/贡献必须齐全，不能从新能力值反算或只存 total。 |
 | shared roll、修正及 packet / 伤害事实，引用 batch | 完整伤害分区/历史；所有目标引用同一原 roll，保留各自 save、cut、减免证明、实际伤害和应用身份，不能从 HP delta 重建。 |
 | temp HP、HP/max HP、健康、0 HP/死亡/稳定、condition/onset 和掉落 / 各真实健康、条件、物品聚合 | 初始/当前状态仍分别保存，事件正文引用完整前后事实与主体；恢复直接写当前状态，不能从初始卡或事件重放重建。只吸收 temp HP 也真实推进其 owner；火免疫且无其他状态变化的目标不虚增 vitals 版本。 |
 | holder、伤害集中义务/CON cut、强制或失败结束、来源/application/原因/回调 / 专注及具体效果聚合 | 专注/持续效果分区及完整历史；源结束与待 callback 可同时成立，恢复 ENDED 不复活。未受本批直接伤害的效果目标也要保存完整引用。 |
-| frame、checkpoint、窗口、机会、choice、transition/返回点 / 唯一 flow 与领域 owner | 动作流/持续效果分区；保存整个活动祖先链和因历史引用需保留的终结对象，不只保存 top 或 WAITING 标志。 |
+| 回转与溢出、跨空间派生关系与收束状态 / 形态、健康、持续效果与因果域 owner | 保存单次健康 handoff、原/派生 packet、空间及关系证据、施加状态、触发账本、全体阶段前缀和待结唯一因果叶子；不得只保存前台或用恢复重放后台伤害。 |
+| frame、checkpoint、窗口、机会、choice、transition/返回点 / 所属空间的 flow 与领域 owner | 动作流与持续效果分区保存空间归属、全部活动祖先链、真实叶子和历史引用所需的终结对象。冻结的 batch 同样纳入完整文件。 |
 | 根事件与全部 typed 正文 / 战役事件尾 | 每命令一个全局根，子事实使用稳定 `(event_sequence, ordinal)`；恢复原 sequence/尾，不重编号、不补造 NOTE，不删历史只保 UI 最近记录。 |
-| run/snapshot、物理行 ID、row_version/CAS、请求键/接受收据、进程资格、保存技术水位、预算/预留控制 / 本地运行协调者 | 明确排除于可移植业务文件。新运行重建映射及从 0 开始的本地聚合版本、当前完整收束预留；不恢复旧请求的执行权利。准确规则组合绑定按公共 rules 外壳重核。 |
+| 业务绑定与本地运行控制 | 可移植业务文件保留准确规则绑定及因果引用所需的业务身份和版本。物理运行标识、物理行 ID、本地 CAS、请求收据、进程资格、保存技术水位及预算控制由运行维护。新运行从已验证业务事实建立本地映射、执行前置和完整收束预留。 |
 
 一个命令内同一真实聚合只推进一次版本；读依赖可以必须有 CAS 而不加版。CHECK/DAMAGE
 不可变事实和 batch 的阶段指针不另造与真实健康/效果状态漂移的版本源。怪物/角色身份、
 已结束过程及原 release 保留历史引用；普通业务不能按“死亡/离场”物理删除它们。
 
-CheckBasis、TargetSetProof、APPLY/CON cut 在文件中保存的是当时真实事实/数值和可移植
-事件引用；其中用于本地校验的 run/snapshot/row_version 等 token 仍排除，新本地验证
-映射重新建立。不能从恢复后的当前 HP/效果反算旧 cut，或携带旧 CAS 授权继续。
+CheckBasis、TargetSetProof、APPLY/CON cut 在文件中保存当时的真实事实、数值和可移植
+事件引用。恢复直接装载历史切面，并为新运行重建本地验证映射。
 
-严格恢复 reader 独立核验：同战役完整身份/准确规则组合、真实 source/action/recharge
-消费、T 的唯一连续顺序、shared roll 的六个骰及修正、每个 check 的 basis/合法结果、
-packet/健康数学、共同 cut、holder acquisition 与每来源一次义务、效果结束闭包、阶段
-前缀与唯一叶子、所有 typed 历史/来源引用，以及已消费/未消费余集。保存证明必须逐字段
+严格恢复 reader 独立核验：同战役完整身份、准确规则组合和成本消费，T/O 的完整唯一顺序、
+shared roll 的准确来源 manifest 及修正，每个 check 的 basis/合法结果，packet/健康/形态
+数学，共同 cut，每独立 packet 的 holder 义务，对象点燃，因果域闭包与账本，效果结束
+闭包、阶段前缀与唯一叶子、所有 typed 历史/来源引用，以及已消费/未消费余集。保存证明必须逐字段
 覆盖源→文件、文件→恢复投影和真实数据库读回；writer/reader 自洽往返不够。
 缺分区、未知类型、无健康结果却标已应用或缺一个未受伤的效果目标都拒绝，不能填空数组。
 
@@ -277,10 +357,10 @@ packet/健康数学、共同 cut、holder acquisition 与每来源一次义务�
 全部历史和引用。封存前失败保留完整源；之后关闭并隔离整个私有目录，再可重入删除，
 部分删除不承诺事务回滚。旧 run 在清理后失效，正式文件独立保留。清理不构成业务专注结束或伤害。
 
-容量按真实图计费：T=64 时最多一 shared roll、64 个 DEX 结果、64 个 packet/健康结果、
-64 个本来源集中义务；CON 只给实际需要者，但必须预留其最大可达数量及完整效果子图、
-反应/choice、typed 历史和终结后缀。来源结束可能影响 T 之外的 applications，不能用
-64 代替效果闭包界。共享 roll、健康和专注节点按真实身份 union，不能父子重复计费或先
+容量按真实图计费：T=64 时最多一 shared roll、64 个 DEX 结果、64 个原 packet 与直接
+健康计划，以及本来源至多 64 个直接专注义务。对象 O、形态/装备、因果派生 packet 和
+后继专注另按真实闭包计费。必须预留所有可达 CON、完整效果子图、反应/choice、typed
+历史和终结后缀，不能用 64 代替闭包界。共享 roll、健康和专注节点按真实身份 union，不能父子重复计费或先
 释放父预留再申请孩子；未来 recharge/新 turn/新吐息另准入，不预留无限未来历史。
 
 ## 独立 golden trace
@@ -370,7 +450,7 @@ consumer 宣称完成。当前文档核对不代替测试、真实 SQL／权限�
 | 第 64 个目标坏规则/来源/版本，或第 65 个真实目标 | 首 RNG 前整根拒绝，不留前 63 个目标/资源前缀，不截断。 |
 | 未知/禁用 action、错误 profile/字段组合、缺 health/effect/反应 reader | 失败关闭；不能空结果或默认无候选。合法 NO_TARGETS 必须由完整空间证明区分。 |
 | 重复抗性、抗性与易伤并存、奇数除法、共享减项大于R | 例：23成功→11→抗性5→易伤10；两份抗性仍5；R23−K24钳0，所有D为0且无CON。免疫目标仍保完整来源和save。 |
-| 自动失败、adv/disadv、自然1/20 | Paralyzed/Petrified/Stunned/Unconscious有真实DEX自动失败证明，零d20；单独Incapacitated没有这条规则。Restrained为DEX劣势，Prone不据此改save。adv/disadv抵消只一d20；总值到DC才成功，不能套攻击critical规则；未支持Evasion等实际分支阻断。 |
+| 自动失败、adv/disadv、自然1/20 | Paralyzed/Petrified/Stunned/Unconscious有真实DEX自动失败证明，零d20；单独Incapacitated没有这条规则。Restrained为DEX劣势，Prone不据此改save。adv/disadv抵消只一d20；总值到DC才成功，普通save无攻击critical。Evasion的失败半伤使用同一真实失败结果，不另掷骰。 |
 | 全体伤害同时、E排序更换、初始生命边界 | 只要同一cut，A仍5；不能因实现for循环先结束E而改成11。零HP承伤、即死、monster死亡政策、held-drop/condition消费必须由真实health计划验证。 |
 | temp吸尽、免疫、多个集中者 | D仍DC11；B D0不查；E失能零CON。先全部强制结束，再统一CON cut；两个CON失败结果批量结束，后一个不因前一个失败临时丢失本cut贡献。 |
 | SAVE前反应改变贡献、APPLY前减免变化 | 已掷结果保留；未掷save采样当前依据，最终减免重读APPLY cut。原release不能冻结旧抗性/HP，也不能把后来的修正倒改原骰。 |
