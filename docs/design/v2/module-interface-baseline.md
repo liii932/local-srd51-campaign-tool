@@ -119,6 +119,25 @@ schema 2 的[离线安装与接受](../../rules/schema-2-installation-and-accept
 独立维护入口与不可变事实；具体可接受范围、真实数据库采用门和运行阻断见该合同。
 既有内建注册表与 schema 1 PARTITION 安装事实不因此转化为 schema 2 接受记录。
 
+### 行为声明的目标接合
+
+下面是目标支持族及其语义 owner，不是当前作者包已接受的新 discriminator。每一族的
+字段、范围、事实来源、阶段及消费者由对应合同固定，规则包只能选择有限分支和参数。
+实际作者编码须随消费者一次采用；不能先接受一个自由 `effects` 列表再猜测解释。
+
+| 有限声明族 | 必须接入的权威合同 |
+|---|---|
+| 检定贡献、命中附加项、攻击替代 | [动作继续](action-continuation-protocol.md#check-stages)：真实 grant、适用 check、贡献时点/次数、准确成本与公开结果；擒抱及联动移动有独立领域分支 |
+| 时间/恢复与跨空间关系 | [时间日历](time-and-calendar.md)、[因果范围](world-and-scene-spaces.md#causal-scope)：明确期限基准、日界归属、发生身份、范围证明及真实后果；不能以通用秒数或后台标志代替 |
+| 区域、压制及持续后果 | [空间几何](spatial-and-area-contract.md#areas)、[持续效果](ongoing-effect-protocol.md)：有限形状/传播、完整目标及物件、作用 provenance、发生去重和结束消费者 |
+| 形态与召唤 | [角色状态](character-state-and-history.md#form-health)：准确属性块、替换字段/健康策略、装备、生成/群组/退场及空间交接；不给作者任意复制或恢复 HP 的指令 |
+| 物件、充能与储存施法 | [物件](objects-and-magic-items.md)、[施法](spellcasting-extension-contract.md#item-and-stored-grants)：真实物件授予、固定谓词词汇、资源接受、一次触发与真实储存收据 |
+
+新增类型不继承任意未声明能力。例如火伤不自动点燃物件，效果名字不证明神祇来源，
+储存标签不授权没有 consumer 的法术，叙事裁定不允许写任意状态。表外语义先作有界设计，
+未闭合前拒绝对应声明；[复验报告](rule-behavior-interface-validation.md)保留这些边界，不能
+用缩小后的替代轨迹改变原样例结论。
+
 ## 规则能力与应用存储模块
 
 规则制品、规则模组、游戏机制和应用存储模块分别承担原包/接受、准确组合/覆盖、行为支持
