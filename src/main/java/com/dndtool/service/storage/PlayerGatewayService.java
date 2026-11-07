@@ -1,7 +1,7 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.CharacterNamePolicy;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
 import com.dndtool.service.storage.CampaignParticipationData.*;
 import com.dndtool.service.storage.CampaignStorageService.AccessSnapshot;
 import com.google.gson.*;
@@ -265,13 +265,13 @@ public final class PlayerGatewayService {
                 case "proposal-execute" -> {
                     fields(input,"proposalId","ability","dc","reason");Proposal proposal=pendingProposal(text(input,"proposalId"));
                     String ability=text(input,"ability"),dcText=text(input,"dc"),reason=CampaignManualData.text(text(input,"reason"),1,500);
-                    if(!JdbcSchema2CharacterRuntimeRepository.ABILITIES.contains(ability) || !dcText.matches("0|[1-9][0-9]?"))throw denied(400,"PLAYER_INVALID_ADJUDICATION");
+                    if(!Schema2CharacterRuntime.ABILITIES.contains(ability) || !dcText.matches("0|[1-9][0-9]?"))throw denied(400,"PLAYER_INVALID_ADJUDICATION");
                     int dc=Integer.parseInt(dcText);if(dc>30)throw denied(400,"PLAYER_INVALID_ADJUDICATION");
                     if(!proposal.memberId.equals(access.snapshot().domains().participation().controller(proposal.characterId)))throw denied(409,"PLAYER_PROPOSAL_EXPIRED");
                     requireMember(access,proposal.memberId);
                     var character=access.snapshot().domains().characters().stream().filter(c->c.id().equals(proposal.characterId)&&c.active()&&c.kind().equals("PC")).findFirst().orElseThrow(()->denied(409,"PLAYER_ADJUDICATION_UNSUPPORTED"));
-                    var command=new JdbcSchema2CharacterRuntimeRepository.Command("CHECK_RESOLVED",null,0,null,null,null,JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY,null,
-                            new JdbcSchema2CharacterRuntimeRepository.CheckInput(BundledCampaignRules.rule("adventure.check","check.srd2014"),"ABILITY",ability,null,dc,false,false,reason));
+                    var command=new Schema2CharacterRuntime.Command("CHECK_RESOLVED",null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,
+                            new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check","check.srd2014"),"ABILITY",ability,null,dc,false,false,reason));
                     JsonObject check=new JsonObject();check.addProperty("characterId",proposal.characterId.toString());check.addProperty("characterVersion",Long.toString(character.history().current().version()));check.add("command",CampaignDomainCodec.toJson(command));
                     for(String branch:List.of("success","failure")) {
                         JsonObject effect=new JsonObject();effect.addProperty("targetId",proposal.characterId.toString());effect.add("healthEffect",JsonNull.INSTANCE);effect.add("itemId",JsonNull.INSTANCE);effect.addProperty("itemDelta","0");effect.add("nodeId",JsonNull.INSTANCE);effect.addProperty("message",branch.equals("success")?"检定成功":"检定失败");check.add(branch,effect);

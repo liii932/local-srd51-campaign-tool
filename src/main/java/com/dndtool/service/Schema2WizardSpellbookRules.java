@@ -1,15 +1,14 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Sole owner of the finite Wizard's acquired spellbook and prepared-list facts. */
 public final class Schema2WizardSpellbookRules {
     private static final Comparator<RuleIdentity> ORDER=Comparator.comparing(RuleIdentity::moduleKey).thenComparing(RuleIdentity::ruleType).thenComparing(RuleIdentity::ruleKey);
-    public static boolean handles(Command command) { return JdbcSchema2CharacterRuntimeRepository.spellbookKind(command.kind()); }
+    public static boolean handles(Command command) { return Schema2CharacterRuntime.spellbookKind(command.kind()); }
     public State apply(ProductionSchema2Projection material,State before,Command command) {
         if(before==null || !handles(command) || before.rest().active()!=null || before.hitPoints()==0 || before.health().dead())throw invalid("S2_SPELLBOOK_COMMAND");
         validateState(material,before);
@@ -42,7 +41,7 @@ public final class Schema2WizardSpellbookRules {
         }
         learned.sort(Comparator.comparingInt(LearnedSpell::acquiredAtClassLevel).thenComparing(LearnedSpell::spell,ORDER));
         SpellbookState book=new SpellbookState(input.castingRule(),level,learned,prepared,marker,markerSecond,old==null?null:old.lastArcaneRecoveryDay());
-        State after=JdbcSchema2CharacterRuntimeRepository.withSpellbook(before,before.version()+1,book);
+        State after=Schema2CharacterRuntime.withSpellbook(before,before.version()+1,book);
         if(preparationMinutes>0) {
             RestState r=after.rest(); if(r.minute()>Schema2CharacterRestRules.MAX_MINUTE-preparationMinutes)throw invalid("S2_CHARACTER_TIME");
             after=new State(after.identity(),after.campaignId(),after.characterId(),after.preparationOperationId(),after.characterClass(),after.abilities(),after.level(),after.proficiencyBonus(),after.hitPoints(),after.maximumHitPoints(),after.classes(),after.hitDicePools(),after.subclasses(),after.features(),after.feats(),after.proficiencies(),after.version(),after.resources(),new RestState(r.minute()+preparationMinutes,r.second(),r.lastLongRestEndMinute(),r.lastLongRestEndSecond(),null),after.equipment(),after.health(),book);

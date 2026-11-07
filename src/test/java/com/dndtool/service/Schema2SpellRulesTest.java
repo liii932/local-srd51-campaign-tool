@@ -1,8 +1,8 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.service.Schema2CombatState.Command;
@@ -27,7 +27,7 @@ class Schema2SpellRulesTest {
     private Battle battle;
     Schema2SpellRulesTest() {roster.put(a,context(a));roster.put(b,context(b));}
     private Context context(UUID id) {
-        var initial=fullPlan(material,new Identity(UUID.randomUUID(),UUID.randomUUID()),campaign,id);
+        var initial=fullPlan(material,new Schema2PreparationIdentity(UUID.randomUUID(),UUID.randomUUID()),campaign,id);
         State state=new Schema2CharacterProgressionRules().initial(material,initial,UUID.randomUUID(),fullAbilities(),initialChoices());
         Context c=new Context(material,initial,state); UUID symbol=UUID.randomUUID();
         var equipmentRules=new Schema2CharacterEquipmentRules();

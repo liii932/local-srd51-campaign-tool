@@ -2,7 +2,7 @@ package com.dndtool.persistence;
 
 import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.HexFormat;
@@ -18,7 +18,7 @@ class JdbcSchema2ToolSnapshotTest {
 
     @Test void mixedLanguagesAndToolsReadBackEveryTypedFieldAndFullChain() throws Exception {
         var fixture = new Schema2RuntimeJdbcFixture();
-        var identity = Identity.random();
+        var identity = Schema2PreparationIdentity.random();
         try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
             repository.store(transaction.connection(), identity, projection());
             assertEquals(37, fixture.rows("s2_runtime_tool").size());
@@ -50,7 +50,7 @@ class JdbcSchema2ToolSnapshotTest {
                 f -> f.rows("s2_runtime_tool").getFirst().put("rule_index",
                         f.rows("s2_runtime_language").getFirst().get("rule_index")))) {
             var fixture = new Schema2RuntimeJdbcFixture();
-            var identity = Identity.random();
+            var identity = Schema2PreparationIdentity.random();
             storeAndCommit(fixture, identity);
             mutation.accept(fixture);
             assertThrows(SQLException.class, () -> repository.read(fixture.connection, identity));
@@ -59,7 +59,7 @@ class JdbcSchema2ToolSnapshotTest {
 
     @Test void eachNewTypedTableFailureRollsBackWithTheCaller() throws Exception {
         var good = new Schema2RuntimeJdbcFixture();
-        storeAndCommit(good, Identity.random());
+        storeAndCommit(good, Schema2PreparationIdentity.random());
         var inserts = good.sql.stream().filter(sql -> sql.startsWith("INSERT INTO ")).toList();
         for (String table : List.of("s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry")) {
             var fixture = new Schema2RuntimeJdbcFixture();
@@ -67,7 +67,7 @@ class JdbcSchema2ToolSnapshotTest {
                     .filter(i -> inserts.get(i).startsWith("INSERT INTO " + table + " ("))
                     .findFirst().orElseThrow() + 1;
             try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
-                assertThrows(SQLException.class, () -> repository.store(transaction.connection(), Identity.random(), projection()));
+                assertThrows(SQLException.class, () -> repository.store(transaction.connection(), Schema2PreparationIdentity.random(), projection()));
                 assertEquals(0, fixture.commits);
                 assertEquals(0, fixture.rollbacks);
                 transaction.rollback();
@@ -76,7 +76,7 @@ class JdbcSchema2ToolSnapshotTest {
         }
     }
 
-    private void storeAndCommit(Schema2RuntimeJdbcFixture fixture, Identity identity) throws SQLException {
+    private void storeAndCommit(Schema2RuntimeJdbcFixture fixture, Schema2PreparationIdentity identity) throws SQLException {
         try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
             repository.store(transaction.connection(), identity, projection()); transaction.commit();
         }

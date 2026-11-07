@@ -1,6 +1,6 @@
 package com.dndtool.service.storage;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.nio.file.Path;
@@ -98,7 +98,7 @@ class CampaignManualIntegrationTest {
 
     @Test void ordinaryCharacterAndSceneRootsCannotBeReorderedAgainstTheirEventPrefixes() {
         Fixture f=new Fixture();f.apply("character-create",object("name","甲","kind","PC","classKey","fighter","backgroundKey","acolyte"));UUID a=f.snapshot.domains().characters().getFirst().id();
-        for(int i=0;i<2;i++){var c=f.snapshot.domains().characters().getFirst();var check=new JdbcSchema2CharacterRuntimeRepository.Command("CHECK_RESOLVED",null,0,null,null,null,JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY,null,new JdbcSchema2CharacterRuntimeRepository.CheckInput(BundledCampaignRules.rule("adventure.check","check.srd2014"),"ABILITY","ability.strength",null,10,false,false,"DM确认检定。"));JsonObject p=object("characterId",a.toString(),"characterVersion",Long.toString(c.history().current().version()));p.add("command",CampaignDomainCodec.toJson(check));f.apply("character-command",p);}
+        for(int i=0;i<2;i++){var c=f.snapshot.domains().characters().getFirst();var check=new Schema2CharacterRuntime.Command("CHECK_RESOLVED",null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check","check.srd2014"),"ABILITY","ability.strength",null,10,false,false,"DM确认检定。"));JsonObject p=object("characterId",a.toString(),"characterVersion",Long.toString(c.history().current().version()));p.add("command",CampaignDomainCodec.toJson(check));f.apply("character-command",p);}
         assertThrows(StorageException.class,()->CampaignData.validate(reorder(f.snapshot,1,2)));
         Fixture scene=new Fixture();scene.apply("character-create",object("name","甲","kind","PC","classKey","fighter","backgroundKey","acolyte"));scene.apply("character-create",object("name","乙","kind","PC","classKey","fighter","backgroundKey","acolyte"));var ids=scene.snapshot.domains().characters().stream().map(Character::id).toList();
         JsonObject start=object("combatVersion","-1");start.add("combatId",JsonNull.INSTANCE);start.add("command",CampaignDomainCodec.toJson(Schema2CombatState.Command.start(List.of(new Schema2CombatState.Deployment(ids.get(0),new Schema2CombatState.Position(0,0),0),new Schema2CombatState.Deployment(ids.get(1),new Schema2CombatState.Position(1,0),1)),ids)));scene.apply("combat-command",start);
@@ -113,7 +113,7 @@ class CampaignManualIntegrationTest {
         Item retained=f.snapshot.domains().items().getFirst();assertFalse(retained.active());assertEquals(template.key(),retained.sourceKey());assertEquals(template.description(),retained.description());
         var manual=f.snapshot.domains().manual();f.apply("note",object("text","保留自由卡"));assertEquals(manual,f.snapshot.domains().manual());
         f.apply("character-create",object("name","规则卡","kind","PC","classKey","fighter","backgroundKey","acolyte"));var rich=f.snapshot.domains().characters().getFirst();
-        JsonObject check=object("characterId",rich.id().toString(),"characterVersion",Long.toString(rich.history().current().version()));check.add("command",CampaignDomainCodec.toJson(new JdbcSchema2CharacterRuntimeRepository.Command("CHECK_RESOLVED",null,0,null,null,null,JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY,null,new JdbcSchema2CharacterRuntimeRepository.CheckInput(BundledCampaignRules.rule("adventure.check","check.srd2014"),"ABILITY","ability.strength",null,0,false,false,"DM确认检定。"))));
+        JsonObject check=object("characterId",rich.id().toString(),"characterVersion",Long.toString(rich.history().current().version()));check.add("command",CampaignDomainCodec.toJson(new Schema2CharacterRuntime.Command("CHECK_RESOLVED",null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check","check.srd2014"),"ABILITY","ability.strength",null,0,false,false,"DM确认检定。"))));
         for(String branch:List.of("success","failure")){JsonObject effects=object("targetId",rich.id().toString(),"itemDelta","0","message","保留其他角色");effects.add("healthEffect",JsonNull.INSTANCE);effects.add("itemId",JsonNull.INSTANCE);effects.add("nodeId",JsonNull.INSTANCE);check.add(branch,effects);}
         f.apply("check-effects",check);assertEquals(manual,f.snapshot.domains().manual());assertEquals(retained,f.snapshot.domains().items().getFirst());
     }

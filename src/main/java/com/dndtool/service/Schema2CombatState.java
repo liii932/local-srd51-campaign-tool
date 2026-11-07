@@ -2,8 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthResult;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
+import com.dndtool.service.Schema2CharacterRuntime.HealthResult;
+import com.dndtool.service.Schema2CharacterRuntime.State;
 import java.util.*;
 
 /** Typed INTERNAL combat facts. Character health and inventory retain their existing sole owner. */
@@ -47,12 +47,12 @@ public final class Schema2CombatState {
     public record Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path,
             List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey,
             UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey,
-            ZoneInput zoneInput, UUID zoneKey, com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput healthInput, int seconds,
+            ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
             List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput) {
-        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput healthInput, int seconds, List<MonsterDeployment> monsterDeployments, BreathInput breathInput) {
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds, List<MonsterDeployment> monsterDeployments, BreathInput breathInput) {
             this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,monsterDeployments,breathInput,null);
         }
-        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput healthInput, int seconds) {
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds) {
             this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,List.of(),null);
         }
         public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey) {
@@ -101,7 +101,7 @@ public final class Schema2CombatState {
         public static Command exploreMove(UUID actor,List<Position> path) {
             return new Command(Kind.EXPLORATION_MOVE,actor,null,null,path,List.of(),List.of(),null,null,null,null);
         }
-        public static Command worldHealth(UUID actor,UUID target,com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput input) {
+        public static Command worldHealth(UUID actor,UUID target,com.dndtool.service.Schema2CharacterRuntime.HealthInput input) {
             return new Command(Kind.EXPLORATION_HEALTH,actor,target,null,List.of(),List.of(),List.of(),null,null,null,null,null,null,null,null,null,input,0);
         }
         public static Command reenter(UUID actor,List<UUID> ties) {
@@ -358,7 +358,7 @@ public final class Schema2CombatState {
     public record HealthChange(UUID characterId, State before, State after, UUID frameKey,
             int damageAmount, boolean critical, HealthResult healthResult, boolean deathSave,
             boolean timeAdvance, int seconds, RuleIdentity resource, long resourceAmount, boolean healing,
-            com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput environmentInput) {
+            com.dndtool.service.Schema2CharacterRuntime.HealthInput environmentInput) {
         public HealthChange(UUID characterId, State before, State after, UUID frameKey, int damageAmount,
                 boolean critical, HealthResult healthResult, boolean deathSave, boolean timeAdvance, int seconds,
                 RuleIdentity resource, long resourceAmount, boolean healing) {

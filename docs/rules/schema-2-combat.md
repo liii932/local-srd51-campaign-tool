@@ -99,8 +99,10 @@ GET、超时、重启和恢复都不隐式 PASS。旧请求只返回其不可变
 
 ## 事务、存储、预算与恢复
 
-所有写入使用[共同业务事务](business-write-transactions.md)。`JdbcSchema2CombatRuntimeRepository`
-是调用方拥有连接的叶仓储；运行 V033/V034 保存类型化成员、输入、版本闭包、原骰、结果、
+`Schema2CombatHistory` 拥有战斗成员、事件、历史及其结构和容量校验。所有写入使用
+[共同业务事务](business-write-transactions.md)。`JdbcSchema2CombatRuntimeRepository`
+在调用方连接上适配类型化行，并核对事实计数与实际行数。运行 V033/V034 保存类型化成员、
+输入、版本闭包、原骰、结果、
 状态前后值、帧、窗口、机会、移动、攻击及角色子事件引用。V032 保存冻结战斗规则镜像。
 数据没有任意 JSON 状态袋。角色子事件包括伤害、回合死亡豁免与六秒时间推进，引用准确的
 战斗操作和领域事实；其幂等键按根操作、角色和子序号稳定产生。

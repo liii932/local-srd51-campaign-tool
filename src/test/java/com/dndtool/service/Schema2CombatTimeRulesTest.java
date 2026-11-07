@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

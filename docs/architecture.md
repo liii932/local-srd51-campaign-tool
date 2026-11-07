@@ -82,7 +82,11 @@ DM 访问 http://127.0.0.1:8080/host
 核验后显式恢复新 epoch，不重播未持久意图。根与子事件、原骰、初始/当前状态及 pending 共同进入
 完整文件，打开和恢复直接核验事实而不重放。显式模式使用自己的服务与 epoch，关闭旧
 MySQL 读写路由；未配置时仍使用原模式。它不等同完整 SRD 或通用完整 format 2 发布。
-下述 INTERNAL MySQL 来源/快照/历史实现说明的是原服务边界；新的 SQLite 路线复用其
+角色命令、角色状态、战斗历史与准备身份由 `Schema2CharacterRuntime`、`Schema2CombatHistory`
+和 `Schema2PreparationIdentity` 定义。领域层校验事实形状、历史邻接和容量；JDBC 仓储
+适配类型化行，SQLite 仓储保存严格聚合，两个存储入口复用同一事实合同。
+
+下述 INTERNAL MySQL 来源/快照/历史实现说明的是原服务边界。SQLite 路线复用其
 纯规则消费者，不调用它们另开 MySQL 事务。schema-2 prepared 身份与历史 version 是
 保留的业务关系，本地 core run/epoch/HTTP 收据另建且不入文件。每命令 SQLite 耐久和
 INITIAL/MANUAL/FINAL 承担当前保存责任，周期 AUTO 是后续容量测量目标。

@@ -2,7 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.*;
+import com.dndtool.service.Schema2CombatHistory.*;
 import com.dndtool.service.Schema2CombatState.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -21,26 +21,26 @@ public final class Schema2CombatRuntimeService {
         public Request {
             for (UUID id : Arrays.asList(operationId,combatId,campaignId)) uuid(id);
             if (Set.of(operationId,combatId,campaignId).size()!=3 || rules==null || members==null || command==null
-                    || members.size()<2 || members.size()>JdbcSchema2CombatRuntimeRepository.MAX_CHARACTER_MEMBERS || expectedCharacterVersions==null)
+                    || members.size()<2 || members.size()>Schema2CombatHistory.MAX_CHARACTER_MEMBERS || expectedCharacterVersions==null)
                 throw rejected("S2_COMBAT_REQUEST");
-            members = members.stream().sorted(Comparator.comparing(Member::characterId, JdbcSchema2CombatRuntimeRepository.UUID_ORDER)).toList();
+            members = members.stream().sorted(Comparator.comparing(Member::characterId, Schema2CombatHistory.UUID_ORDER)).toList();
             Set<UUID> ids = new HashSet<>();
             for (Member member:members) {
                 uuid(member.characterId()); uuid(member.preparationOperationId());
                 uuid(member.identity().runId()); uuid(member.identity().snapshotId());
                 if (!ids.add(member.characterId())) throw rejected("S2_COMBAT_REQUEST");
             }
-            if (!ids.equals(expectedCharacterVersions.keySet()) || expectedCharacterVersions.values().stream().anyMatch(v->v==null||v<0||v>=JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS)
+            if (!ids.equals(expectedCharacterVersions.keySet()) || expectedCharacterVersions.values().stream().anyMatch(v->v==null||v<0||v>=Schema2CharacterRuntime.MAX_EVENTS)
                     || (command.kind()==Kind.START ? expectedVersion!=-1 : expectedVersion<0)) throw rejected("S2_COMBAT_REQUEST");
             expectedCharacterVersions = Map.copyOf(expectedCharacterVersions);
         }
         public String digest() { return fingerprint(this); }
     }
-    public record Save(History combat, List<JdbcSchema2CharacterRuntimeRepository.History> characters) {
+    public record Save(History combat, List<Schema2CharacterRuntime.History> characters) {
         public Save { characters=List.copyOf(characters); }
     }
     private record Pending(UUID combatId,String digest,Save save,boolean isolated) { }
-    private record CharacterRead(Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,
+    private record CharacterRead(Map<UUID,Schema2CharacterRuntime.History> histories,
             Map<UUID,Schema2CharacterRuntimeService.Material> materials) { }
     private final DataSource runtime;
     private final IntUnaryOperator dice;
@@ -70,13 +70,13 @@ public final class Schema2CombatRuntimeService {
             if (previous==null) {
                 if (request.expectedVersion()!=-1) throw rejected("S2_COMBAT_NOT_FOUND");
                 requireNoActiveCombat(connection,request.campaignId());
-                if (combats.findByCampaign(connection,request.campaignId()).size()>=JdbcSchema2CombatRuntimeRepository.MAX_EVENTS)
+                if (combats.findByCampaign(connection,request.campaignId()).size()>=Schema2CombatHistory.MAX_EVENTS)
                     throw rejected("S2_COMBAT_CAPACITY");
             } else if (!previous.members().equals(request.members()) || !previous.current().campaignId().equals(request.campaignId()))
                 throw rejected("S2_COMBAT_BINDING");
             else if (previous.current().version()!=request.expectedVersion()) throw rejected("S2_COMBAT_STALE_VERSION");
             var read=readCharacters(connection,request.members());
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories=read.histories();
+            Map<UUID,Schema2CharacterRuntime.History> histories=read.histories();
             Map<UUID,Schema2CombatRules.Context> contexts=contexts(request.members(),histories,request.expectedCharacterVersions(),read.materials());
             for (var context:contexts.values()) request.rules().verify(context.material());
             for (var entry:histories.entrySet()) if (entry.getValue().current().version()!=request.expectedCharacterVersions().get(entry.getKey()))
@@ -96,7 +96,7 @@ public final class Schema2CombatRuntimeService {
                         state.preparationOperationId(),Schema2RulesBinding.from(context.material()),state.version(),command,Map.of());
                 if (!Schema2CombatCharacterFacts.verify(context.material(),state,command,change.healthResult(),change.after()).equals(change.after()))
                     throw new SQLException("S2_COMBAT_HEALTH_RESULT");
-                characters.append(connection,new JdbcSchema2CharacterRuntimeRepository.Event(child,childRequest.digest(),command,null,
+                characters.append(connection,new Schema2CharacterRuntime.Event(child,childRequest.digest(),command,null,
                         change.before(),change.after(),null,change.healthResult()));
                 children.add(child);
             }
@@ -179,13 +179,13 @@ public final class Schema2CombatRuntimeService {
         if (new JdbcSchema2CombatRuntimeRepository().findByCampaign(connection,campaign).stream().anyMatch(h->h.current().status()!=Schema2CombatState.Status.ENDED))
             throw rejected("S2_CHARACTER_COMBAT_ACTIVE");
     }
-    static void validateCharacterReferences(Connection connection,JdbcSchema2CharacterRuntimeRepository.History history,DataSource runtime) throws SQLException {
+    static void validateCharacterReferences(Connection connection,Schema2CharacterRuntime.History history,DataSource runtime) throws SQLException {
         validateCharacterReferences(connection,history);
         var service=new Schema2CombatRuntimeService(runtime); Set<UUID> owners=new HashSet<>();
         for(var child:history.events()) if(child.command().combatInput()!=null) owners.add(child.command().combatInput().combatId());
         for(UUID owner:owners) service.validate(connection,service.combats.read(connection,owner));
     }
-    static void validateCharacterReferences(Connection connection,JdbcSchema2CharacterRuntimeRepository.History history) throws SQLException {
+    static void validateCharacterReferences(Connection connection,Schema2CharacterRuntime.History history) throws SQLException {
         var combats=new JdbcSchema2CombatRuntimeRepository();
         for (var child:history.events()) if (child.command().combatInput()!=null) {
             var input=child.command().combatInput(); Event owner=combats.findOperation(connection,input.combatOperationId());
@@ -203,7 +203,7 @@ public final class Schema2CombatRuntimeService {
     }
 
     private CharacterRead readCharacters(Connection c,List<Member> members) throws SQLException {
-        Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> found=new LinkedHashMap<>();
+        Map<UUID,Schema2CharacterRuntime.History> found=new LinkedHashMap<>();
         Map<UUID,Schema2CharacterRuntimeService.Material> materials=new LinkedHashMap<>();
         for (Member member:members) {
             var history=characters.read(c,member.characterId());
@@ -222,7 +222,7 @@ public final class Schema2CombatRuntimeService {
         return materials;
     }
     private Map<UUID,Schema2CombatRules.Context> contexts(List<Member> members,
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,Map<UUID,Long> versions,
+            Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Long> versions,
             Map<UUID,Schema2CharacterRuntimeService.Material> materials) {
         return domain.contexts(members, histories, versions, materials);
     }
@@ -231,9 +231,10 @@ public final class Schema2CombatRuntimeService {
         var all=readCharacters(c,history.members()); validateEvents(history,all.histories(),all.materials());
         return all;
     }
-    private void validateEvents(History history,Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> all,
+    private void validateEvents(History history,Map<UUID,Schema2CharacterRuntime.History> all,
             Map<UUID,Schema2CharacterRuntimeService.Material> materials) throws SQLException {
-        domain.validateCombatEvents(history, all, materials);
+        try { domain.validateCombatEvents(history, all, materials); }
+        catch (Schema2RuntimeFactsException invalid) { throw new SQLException(invalid.getMessage(), invalid); }
     }
     private static void validateSaveShape(Save save) throws SQLException {
         if (save==null||save.combat()==null||save.characters().size()!=save.combat().members().size()) throw new SQLException("S2_COMBAT_RESTORE_INVALID");
@@ -243,7 +244,7 @@ public final class Schema2CombatRuntimeService {
         for (var history:save.characters()) JdbcSchema2CharacterRuntimeRepository.validate(history);
     }
     private void validateSaved(Connection c,Save save) throws SQLException {
-        Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> all=new LinkedHashMap<>();
+        Map<UUID,Schema2CharacterRuntime.History> all=new LinkedHashMap<>();
         for (var history:save.characters()) { characterService.validateRestoration(c,history); all.put(history.current().characterId(),history); }
         try { validateEvents(save.combat(),all,readMaterials(c,save.combat().members())); } catch (SQLException|RuntimeException invalid) { throw rejected("S2_COMBAT_RESTORE_INVALID"); }
     }
@@ -253,7 +254,7 @@ public final class Schema2CombatRuntimeService {
     }
 
     private void reserve(History previous,Schema2CombatRules.Prepared prepared,
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Request request) {
+            Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Request request) {
         domain.reserve(previous, prepared, histories, contexts, request);
     }
 

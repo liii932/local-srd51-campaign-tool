@@ -1,8 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 
 /** Advances the existing character clock for a completed combat round; no second time store or dice. */
 public final class Schema2CombatTimeRules {
@@ -25,7 +24,7 @@ public final class Schema2CombatTimeRules {
         healthRules.validateState(before);
         if (seconds < 1 || seconds > 28800 || before.rest().active() != null)
             throw invalid("S2_COMBAT_TIME_INPUT");
-        if (before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1)
+        if (before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
             throw invalid("S2_COMBAT_TIME_CAPACITY");
         long totalSeconds = before.rest().second() + (long) seconds;
         long minute = before.rest().minute() + totalSeconds / 60;

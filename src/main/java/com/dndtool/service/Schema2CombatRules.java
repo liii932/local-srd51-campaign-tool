@@ -2,9 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2CombatState.Command;
 import com.dndtool.service.Schema2CombatState.Stage;
@@ -18,7 +16,7 @@ import static com.dndtool.service.Schema2CombatState.*;
 /** Closed ordinary-melee combat consumer. All preflight is pure and precedes the first die. */
 public final class Schema2CombatRules {
     public static final int MAX_COMBATANTS = 64, MAX_FLOWS = 128, MAX_PATH = 64, MAX_FACTS = 4096;
-    public static final int START_TIME_HEADROOM_MINUTES = (JdbcSchema2CombatRuntimeRepository.MAX_EVENTS * 6 + 59) / 60 + 240;
+    public static final int START_TIME_HEADROOM_MINUTES = (Schema2CombatHistory.MAX_EVENTS * 6 + 59) / 60 + 240;
     public record Context(ProductionSchema2Projection material, InitialPlan initial, State character) { }
     public static final class Prepared {
         private final UUID operationId, combatId, campaignId;
@@ -236,10 +234,10 @@ public final class Schema2CombatRules {
         State character = context.character();
         if (character.hitPoints() == 0 && !character.health().stable() && !character.health().dead()) health.prepare(context.material(),character,deathCommand(context));
     }
-    private JdbcSchema2CharacterRuntimeRepository.Command deathCommand(Context context) {
+    private Schema2CharacterRuntime.Command deathCommand(Context context) {
         var owners = context.material().projection().rules().stream().filter(FinalHealth.class::isInstance).map(FinalHealth.class::cast).filter(FinalHealth::enabled).toList();
         if (owners.size() != 1) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
-        return new JdbcSchema2CharacterRuntimeRepository.Command("DEATH_SAVE_RESOLVED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,
+        return new Schema2CharacterRuntime.Command("DEATH_SAVE_RESOLVED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,
                 new HealthInput(owners.getFirst().identity(),null,null,"Combat turn begins"));
     }
     private Resolution execute(Prepared p, Draws dice) {

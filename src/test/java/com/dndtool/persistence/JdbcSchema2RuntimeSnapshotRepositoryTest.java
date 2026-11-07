@@ -2,7 +2,7 @@ package com.dndtool.persistence;
 
 import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Strict row/transaction proxy evidence only, not real MySQL acceptance. */
 class JdbcSchema2RuntimeSnapshotRepositoryTest {
-    private static final Identity ID = new Identity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"), UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
+    private static final Schema2PreparationIdentity ID = new Schema2PreparationIdentity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"), UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
     private static final JdbcSchema2RuntimeSnapshotRepository REPOSITORY = new JdbcSchema2RuntimeSnapshotRepository();
 
     @Test void fullActualTypedReadbackMatchesIndependentGoldenBytesAndHasNoSourceDependency() throws Exception {
@@ -72,9 +72,9 @@ class JdbcSchema2RuntimeSnapshotRepositoryTest {
 
     @Test void completeIdentityBindingPreventsCrossRunReadAndReuseIsNeverIdempotentSuccess() throws Exception {
         var fixture = new Schema2RuntimeJdbcFixture(); var projection = projection(); storeAndCommit(fixture, ID, projection);
-        var other = Identity.random();
-        assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, new Identity(other.runId(), ID.snapshotId())));
-        assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, new Identity(ID.runId(), other.snapshotId())));
+        var other = Schema2PreparationIdentity.random();
+        assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, new Schema2PreparationIdentity(other.runId(), ID.snapshotId())));
+        assertThrows(SQLException.class, () -> REPOSITORY.read(fixture.connection, new Schema2PreparationIdentity(ID.runId(), other.snapshotId())));
         try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
             assertThrows(SQLException.class, () -> REPOSITORY.store(transaction.connection(), ID, projection)); transaction.rollback();
         }
@@ -88,7 +88,7 @@ class JdbcSchema2RuntimeSnapshotRepositoryTest {
                 f -> f.rows("s2_runtime_member").getFirst().put("load_index", 1),
                 f -> f.rows("s2_runtime_member").getFirst().put("logical_sha256", ascii("a".repeat(64))),
                 f -> f.rows("s2_runtime_snapshot").getFirst().put("material_scope", ascii("COMPLETE")),
-                f -> f.rows("s2_runtime_snapshot").getFirst().put("run_id", Identity.random().runBytes()),
+                f -> f.rows("s2_runtime_snapshot").getFirst().put("run_id", Schema2PreparationIdentity.random().runBytes()),
                 f -> f.rows("s2_runtime_language").getFirst().put("display_name", "Changed valid name"),
                 f -> f.rows("s2_runtime_language_set").getFirst().put("minimum_enabled_members", 128),
                 f -> f.rows("s2_runtime_language_entry").getFirst().put("language_rule_key", ascii("missing")),
@@ -139,19 +139,19 @@ class JdbcSchema2RuntimeSnapshotRepositoryTest {
         var fixture = new Schema2RuntimeJdbcFixture(); storeAndCommit(fixture, ID, projection());
         int writes = fixture.writes; fixture.readOnly = true;
         assertGolden(REPOSITORY.read(fixture.connection, ID).projection()); assertEquals(writes, fixture.writes);
-        assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, Identity.random(), projection()));
+        assertThrows(SQLException.class, () -> REPOSITORY.store(fixture.connection, Schema2PreparationIdentity.random(), projection()));
     }
 
     @Test void exactUuidNetworkBytesAndInvalidPairsAreRejected() {
         assertArrayEquals(HexFormat.of().parseHex("00112233445546778899aabbccddeeff"), ID.runBytes());
         assertArrayEquals(HexFormat.of().parseHex("ffeeddccbbaa49888766554433221100"), ID.snapshotBytes());
-        assertEquals(ID, Identity.fromBytes(ID.runBytes(), ID.snapshotBytes()));
-        assertThrows(IllegalArgumentException.class, () -> new Identity(ID.runId(), ID.runId()));
-        assertThrows(IllegalArgumentException.class, () -> Identity.fromBytes(new byte[16], ID.snapshotBytes()));
-        assertThrows(IllegalArgumentException.class, () -> Identity.fromBytes(new byte[15], ID.snapshotBytes()));
+        assertEquals(ID, Schema2PreparationIdentity.fromBytes(ID.runBytes(), ID.snapshotBytes()));
+        assertThrows(IllegalArgumentException.class, () -> new Schema2PreparationIdentity(ID.runId(), ID.runId()));
+        assertThrows(IllegalArgumentException.class, () -> Schema2PreparationIdentity.fromBytes(new byte[16], ID.snapshotBytes()));
+        assertThrows(IllegalArgumentException.class, () -> Schema2PreparationIdentity.fromBytes(new byte[15], ID.snapshotBytes()));
     }
 
-    private static void storeAndCommit(Schema2RuntimeJdbcFixture fixture, Identity identity,
+    private static void storeAndCommit(Schema2RuntimeJdbcFixture fixture, Schema2PreparationIdentity identity,
             ProductionSchema2Projection projection) throws SQLException {
         try (var transaction = BusinessWriteTestSupport.internal(fixture.connection)) {
             REPOSITORY.store(transaction.connection(), identity, projection);

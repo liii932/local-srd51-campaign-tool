@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
 import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.testing.IsolatedJvmTest;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Real coordinator and repositories over transaction SQL proxies; no MySQL or execution evidence. */
 class Schema2SnapshotTransferServiceTest {
     private static final UUID OPERATION = UUID.fromString("01872103-0345-4abc-8def-0123456789ab");
-    private static final Identity IDENTITY = new Identity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
+    private static final Schema2PreparationIdentity IDENTITY = new Schema2PreparationIdentity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
             UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
     private static final String GUARD_SQL = "SELECT control_id, protocol_version, row_version, snapshot_count FROM s2_runtime_control WHERE control_id = 1 FOR UPDATE";
 
@@ -77,7 +77,7 @@ class Schema2SnapshotTransferServiceTest {
         assertEquals(Status.COMMITTED, replay.status()); assertEquals("S2_SNAPSHOT_REPLAY", replay.code());
         assertGolden(replay.snapshot().projection()); assertEquals(writes, fixture.runtime.writes);
         assertArrayEquals(operationDigest, (byte[]) fixture.runtime.rows("s2_runtime_operation").getFirst().get("operation_digest_sha256"));
-        var operationConflict = fixture.service.transfer(new Request(OPERATION, Identity.random(), fixture.source.selections(), null));
+        var operationConflict = fixture.service.transfer(new Request(OPERATION, Schema2PreparationIdentity.random(), fixture.source.selections(), null));
         assertEquals(Status.ROLLED_BACK, operationConflict.status()); assertEquals("S2_OPERATION_CONFLICT", operationConflict.code());
         var identityConflict = fixture.service.transfer(new Request(UUID.randomUUID(), IDENTITY, fixture.source.selections(), null));
         assertEquals(Status.ROLLED_BACK, identityConflict.status()); assertEquals("S2_IDENTITY_CONFLICT", identityConflict.code());

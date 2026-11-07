@@ -3,9 +3,9 @@ package com.dndtool.service;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.ProgressionScope;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.ResourceState;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.ResourceState;
+import com.dndtool.service.Schema2CharacterRuntime.State;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -125,7 +125,7 @@ class Schema2CharacterProgressionRulesTest {
                 .addProperty("value", "1-2:UNLIMITED,3-20:4"));
         var unlimited = ProductionSchema2Projection.compose(
                 com.dndtool.module.composition.Schema2GrantFixtures.artifacts(files));
-        var plan = initialPlan(unlimited, new Identity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID());
+        var plan = initialPlan(unlimited, new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID());
         State state = rules.initial(unlimited, plan, UUID.randomUUID(), abilities());
         assertEquals(new ResourceState(ENERGY, 0, 0, true), resource(state, ENERGY));
         State spent = rules.spend(unlimited, state, ENERGY, 1_000_000);
@@ -146,7 +146,7 @@ class Schema2CharacterProgressionRulesTest {
 
     private State initial() { return rules.initial(material, plan(), UUID.randomUUID(), abilities()); }
     private Schema2InitialCharacterPlanService.InitialPlan plan() {
-        return initialPlan(material, new Identity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID());
+        return initialPlan(material, new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID());
     }
     private static ResourceState resource(State state, RuleIdentity identity) {
         return state.resources().stream().filter(value -> value.identity().equals(identity)).findFirst().orElseThrow();
@@ -154,7 +154,7 @@ class Schema2CharacterProgressionRulesTest {
     private static State replace(State state, int level, long hp, long hpMax, int dice, int diceMax, List<ResourceState> resources) {
         return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(), state.characterClass(),
                 state.abilities(), level, state.proficiencyBonus(), hp, hpMax, state.classes(),
-                List.of(new com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HitDicePool(state.hitDicePools().getFirst().sides(), dice, diceMax)),
+                List.of(new com.dndtool.service.Schema2CharacterRuntime.HitDicePool(state.hitDicePools().getFirst().sides(), dice, diceMax)),
                 state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version(), resources, state.rest());
     }
     private static void assertCode(String code, org.junit.jupiter.api.function.Executable executable) {

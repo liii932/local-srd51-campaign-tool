@@ -4,10 +4,9 @@ import com.dndtool.module.AdvancementValueProfile;
 import com.dndtool.module.ResourceRecoveryProfile;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.ResourceState;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.ResourceState;
+import com.dndtool.service.Schema2CharacterRuntime.State;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -20,7 +19,7 @@ public final class Schema2CharacterProgressionRules {
     private final Schema2GrowthRules growth = new Schema2GrowthRules();
     public static final String FIXED_AVERAGE = "FIXED_AVERAGE", SERVER_ROLL = "SERVER_ROLL";
     private static final Set<String> HP_CHOICES = Set.of(FIXED_AVERAGE, SERVER_ROLL);
-    private static final Set<String> ABILITIES = Set.copyOf(JdbcSchema2CharacterRuntimeRepository.ABILITIES);
+    private static final Set<String> ABILITIES = Set.copyOf(Schema2CharacterRuntime.ABILITIES);
     private static final List<Integer> STANDARD_ARRAY = List.of(8, 10, 12, 13, 14, 15);
     private static final Comparator<RuleIdentity> IDENTITY_ORDER = Comparator.comparing(RuleIdentity::moduleKey)
             .thenComparing(RuleIdentity::ruleType).thenComparing(RuleIdentity::ruleKey);
@@ -175,7 +174,7 @@ public final class Schema2CharacterProgressionRules {
             throw invalid("S2_GROWTH_STATE");
         if (state.level() < 1 || state.level() > progression.supportedMaximumLevel()
                 || state.maximumHitDice() != state.level() || state.hitDice() < 0 || state.hitDice() > state.maximumHitDice()
-                || state.version() < 0 || state.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS
+                || state.version() < 0 || state.version() >= Schema2CharacterRuntime.MAX_EVENTS
                 || state.maximumHitPoints() < 1 || state.maximumHitPoints() > 65_535
                 || state.hitPoints() < 0 || state.hitPoints() > state.maximumHitPoints()) throw invalid("S2_GROWTH_STATE");
         int constitution = modifier(state.abilities(), "ability.constitution");
@@ -234,12 +233,12 @@ public final class Schema2CharacterProgressionRules {
             result.add(new ResourceState(resource.identity(), maximum.unlimited() ? 0
                     : Math.max(0, maximum.maximum() - spent), maximum.maximum(), maximum.unlimited()));
         }
-        if (result.size() > JdbcSchema2CharacterRuntimeRepository.MAX_RESOURCES) throw invalid("S2_RESOURCE_BUDGET");
+        if (result.size() > Schema2CharacterRuntime.MAX_RESOURCES) throw invalid("S2_RESOURCE_BUDGET");
         return result.stream().sorted(RESOURCE_ORDER).toList();
     }
 
     private static Map<RuleIdentity, ResourceState> indexed(List<ResourceState> resources) {
-        if (resources == null || resources.size() > JdbcSchema2CharacterRuntimeRepository.MAX_RESOURCES)
+        if (resources == null || resources.size() > Schema2CharacterRuntime.MAX_RESOURCES)
             throw invalid("S2_RESOURCE_STATE");
         Map<RuleIdentity, ResourceState> result = new HashMap<>();
         for (ResourceState resource : resources) {
@@ -268,7 +267,7 @@ public final class Schema2CharacterProgressionRules {
             throw invalid("S2_GROWTH_ABILITIES");
     }
     private static void requireMutationCapacity(State state) {
-        if (state.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1)
+        if (state.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
             throw invalid("S2_GROWTH_EVENT_LIMIT");
     }
     private static int modifier(Map<String, Integer> values, String key) { return Math.floorDiv(values.get(key) - 10, 2); }

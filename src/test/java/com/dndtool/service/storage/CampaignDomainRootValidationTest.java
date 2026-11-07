@@ -1,9 +1,9 @@
 package com.dndtool.service.storage;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.Command;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.CheckInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.RestInput;
+import com.dndtool.service.Schema2CharacterRuntime.Command;
+import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.RestInput;
 import com.google.gson.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;

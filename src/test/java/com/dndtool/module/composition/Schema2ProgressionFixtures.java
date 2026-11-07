@@ -1,6 +1,6 @@
 package com.dndtool.module.composition;
 
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2InitialCharacterPlanService;
 import com.dndtool.service.Schema2InitialProficiencyRules;
 import com.google.gson.JsonArray;
@@ -136,19 +136,19 @@ public final class Schema2ProgressionFixtures {
     public static List<ProductionRuleArtifact> fullArtifacts() { return Schema2GrantFixtures.artifacts(fullPackages()); }
     public static ProductionSchema2Projection fullProjection() { return ProductionSchema2Projection.compose(fullArtifacts()); }
     public static Schema2InitialCharacterPlanService.InitialPlan fullPlan(ProductionSchema2Projection material,
-            Identity identity, UUID campaign, UUID character) { return initialPlan(material, identity, campaign, character); }
+            Schema2PreparationIdentity identity, UUID campaign, UUID character) { return initialPlan(material, identity, campaign, character); }
     public static Map<String, Integer> fullAbilities() {
         return Map.of("ability.strength", 15, "ability.dexterity", 12, "ability.constitution", 13,
                 "ability.intelligence", 10, "ability.wisdom", 8, "ability.charisma", 14);
     }
-    public static com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices fullInitialChoices() {
-        return new com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices(null, Map.of(), null, Map.of(INITIAL_SKILL_SLOT, List.of(ATHLETICS)));
+    public static com.dndtool.service.Schema2CharacterRuntime.GrowthChoices fullInitialChoices() {
+        return new com.dndtool.service.Schema2CharacterRuntime.GrowthChoices(null, Map.of(), null, Map.of(INITIAL_SKILL_SLOT, List.of(ATHLETICS)));
     }
-    public static com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices fullMulticlassChoices() {
-        return new com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices(ALT_SUBCLASS, Map.of(), null, Map.of(MULTICLASS_SKILL_SLOT, List.of(ACROBATICS)));
+    public static com.dndtool.service.Schema2CharacterRuntime.GrowthChoices fullMulticlassChoices() {
+        return new com.dndtool.service.Schema2CharacterRuntime.GrowthChoices(ALT_SUBCLASS, Map.of(), null, Map.of(MULTICLASS_SKILL_SLOT, List.of(ACROBATICS)));
     }
     public static Schema2InitialCharacterPlanService.InitialPlan initialPlan(ProductionSchema2Projection material,
-            Identity identity, UUID campaign, UUID character) {
+            Schema2PreparationIdentity identity, UUID campaign, UUID character) {
         var sources = new Schema2InitialProficiencyRules.Sources(new RuleIdentity(BASE, "character.race", "race.human"),
                 null, new RuleIdentity(BASE, "character.background", "background.guard"), CLASS);
         var plan = new Schema2InitialCharacterPlanService().prepareMaterial(identity, Schema2RulesBinding.from(material),

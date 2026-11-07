@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Snapshot;
 import com.dndtool.service.Schema2InitialProficiencyRules.*;
 import java.sql.Connection;
@@ -24,7 +24,7 @@ public final class Schema2InitialCharacterPlanService {
     }
 
     /** The caller owns the existing runtime transaction; no connection state or rows are changed. */
-    public Plan prepare(Connection connection, Identity identity, Schema2RulesBinding binding, Request request)
+    public Plan prepare(Connection connection, Schema2PreparationIdentity identity, Schema2RulesBinding binding, Request request)
             throws SQLException {
         if (identity == null || binding == null || request == null) throw new IllegalArgumentException("S2_INITIAL_REQUEST");
         Snapshot actual = snapshots.read(connection, identity);
@@ -37,7 +37,7 @@ public final class Schema2InitialCharacterPlanService {
      * Builds the same bounded plan from completely reread source material before a runtime
      * connection is borrowed. The result is a preparation, never an execution capability.
      */
-    public Plan prepareMaterial(Identity identity, Schema2RulesBinding binding,
+    public Plan prepareMaterial(Schema2PreparationIdentity identity, Schema2RulesBinding binding,
             ProductionSchema2Projection material, Request request) {
         if (identity == null || binding == null || material == null || request == null)
             throw new IllegalArgumentException("S2_INITIAL_REQUEST");
@@ -48,7 +48,7 @@ public final class Schema2InitialCharacterPlanService {
     }
 
     /** Independently rebuilds retained source/choice projections; never re-grants or writes facts. */
-    public Plan validate(Connection connection, Identity identity, Schema2RulesBinding binding, Plan submitted)
+    public Plan validate(Connection connection, Schema2PreparationIdentity identity, Schema2RulesBinding binding, Plan submitted)
             throws SQLException {
         if (submitted == null || !Objects.equals(identity, submitted.identity()) || !Objects.equals(binding, submitted.binding()))
             throw new IllegalArgumentException("S2_INITIAL_PLAN_MISMATCH");
@@ -58,11 +58,11 @@ public final class Schema2InitialCharacterPlanService {
     }
 
     @FunctionalInterface public interface SnapshotReader {
-        Snapshot read(Connection connection, Identity identity) throws SQLException;
+        Snapshot read(Connection connection, Schema2PreparationIdentity identity) throws SQLException;
     }
 
     /** Snapshot-bound INTERNAL plan retaining its local runtime identity, not a portable archive. */
-    public record Plan(Identity identity, Schema2RulesBinding binding, Sources sources,
+    public record Plan(Schema2PreparationIdentity identity, Schema2RulesBinding binding, Sources sources,
                        Map<com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity,
                                List<com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity>> choices,
                        List<SlotFact> slots, List<GrantFact> grants) {

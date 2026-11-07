@@ -1,8 +1,8 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.google.gson.*;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +41,7 @@ public final class Schema2CombatTestFixture {
         }
         files.getFirst().put("rules.json",rows.toString().getBytes(StandardCharsets.UTF_8));return ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
     }
-    public static Context context(ProductionSchema2Projection material,UUID campaign,UUID character,Identity identity,UUID preparation) {
+    public static Context context(ProductionSchema2Projection material,UUID campaign,UUID character,Schema2PreparationIdentity identity,UUID preparation) {
         var initial=fullPlan(material,identity,campaign,character);
         State state=new Schema2CharacterProgressionRules().initial(material,initial,preparation,fullAbilities(),INITIAL_CHOICES);
         var equipment=new Schema2CharacterEquipmentRules();UUID instance=UUID.randomUUID();
@@ -50,7 +50,7 @@ public final class Schema2CombatTestFixture {
         return new Context(material,initial,state);
     }
     public static Context context(ProductionSchema2Projection material,UUID campaign,UUID character) {
-        return context(material,campaign,character,new Identity(UUID.randomUUID(),UUID.randomUUID()),UUID.randomUUID());
+        return context(material,campaign,character,new Schema2PreparationIdentity(UUID.randomUUID(),UUID.randomUUID()),UUID.randomUUID());
     }
     public static Context withState(Context context,State state) {return new Context(context.material(),context.initial(),state);}
     public static State withHealth(State state,long hp,HealthState health) {

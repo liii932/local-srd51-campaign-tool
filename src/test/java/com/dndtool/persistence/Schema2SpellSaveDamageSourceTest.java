@@ -1,7 +1,7 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
@@ -15,7 +15,7 @@ class Schema2SpellSaveDamageSourceTest {
         JdbcSchema2CharacterSourceRepository.verifyAll(source.connection,artifacts);
         var row=source.rows("rule_schema2_spell").stream().filter(r->Arrays.equals(ascii("SRD_2014_BURNING_HANDS_V1"),(byte[])r.get("algorithm"))).findFirst().orElseThrow();
         row.put("algorithm",ascii("SRD_2014_BURNING_HANDS_METADATA_V1"));assertThrows(SQLException.class,()->JdbcSchema2CharacterSourceRepository.verifyAll(source.connection,artifacts));
-        var identity=Identity.random();var runtime=new Schema2RuntimeJdbcFixture();var repository=new JdbcSchema2RuntimeSnapshotRepository();var material=Schema2SpellSaveDamageFixtures.projection();
+        var identity=Schema2PreparationIdentity.random();var runtime=new Schema2RuntimeJdbcFixture();var repository=new JdbcSchema2RuntimeSnapshotRepository();var material=Schema2SpellSaveDamageFixtures.projection();
         try(var tx=BusinessWriteTestSupport.internal(runtime.connection)){repository.store(tx.connection(),identity,material);tx.commit();}
         assertArrayEquals(material.finalRulesJson(),repository.read(runtime.connection,identity).projection().finalRulesJson());
         var physical=runtime.rows("s2_runtime_spell").stream().filter(r->Arrays.equals(ascii("SRD_2014_BURNING_HANDS_V1"),(byte[])r.get("algorithm"))).findFirst().orElseThrow();

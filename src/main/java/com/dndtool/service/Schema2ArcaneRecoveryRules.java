@@ -1,8 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -50,7 +49,7 @@ public final class Schema2ArcaneRecoveryRules {
         }
         List<ResourceState> resources = rested.resources().stream().map(r -> new ResourceState(r.identity(),
                 r.current() + additions.getOrDefault(r.identity(), 0), r.maximum(), r.unlimited())).toList();
-        SpellbookState book = JdbcSchema2CharacterRuntimeRepository.withArcaneRecoveryDay(before.spellbook(), day);
+        SpellbookState book = Schema2CharacterRuntime.withArcaneRecoveryDay(before.spellbook(), day);
         return new State(rested.identity(), rested.campaignId(), rested.characterId(), rested.preparationOperationId(), rested.characterClass(),
                 rested.abilities(), rested.level(), rested.proficiencyBonus(), rested.hitPoints(), rested.maximumHitPoints(), rested.classes(),
                 rested.hitDicePools(), rested.subclasses(), rested.features(), rested.feats(), rested.proficiencies(), rested.version(), resources,

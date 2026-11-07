@@ -1,8 +1,8 @@
 package com.dndtool.module.composition;
 
 import com.dndtool.service.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.google.gson.*;
 import java.nio.charset.StandardCharsets;
@@ -65,7 +65,7 @@ public final class Schema2WizardFixtures {
     public static List<ProductionRuleArtifact> artifacts(){return Schema2GrantFixtures.artifacts(packages());}
     public static ProductionSchema2Projection projection(){return ProductionSchema2Projection.compose(artifacts());}
     public static Context initialContext(ProductionSchema2Projection material,UUID campaign,UUID character) {
-        Identity identity=Identity.random();
+        Schema2PreparationIdentity identity=Schema2PreparationIdentity.random();
         var sources=new Schema2InitialProficiencyRules.Sources(new RuleIdentity(BASE,"character.race","race.human"),null,
                 new RuleIdentity(BASE,"character.background","background.guard"),WIZARD);
         var prepared=new Schema2InitialCharacterPlanService().prepareMaterial(identity,Schema2RulesBinding.from(material),material,

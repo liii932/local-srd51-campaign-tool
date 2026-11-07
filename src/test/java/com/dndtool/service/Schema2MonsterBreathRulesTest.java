@@ -1,8 +1,8 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.State;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.*;
 import com.google.gson.*;
@@ -32,7 +32,7 @@ class Schema2MonsterBreathRulesTest {
             for(UUID actor:List.of(A,B)) {
                 Context context;
                 if(spell) {
-                    var plan=fullPlan(material,new Identity(UUID.randomUUID(),UUID.randomUUID()),campaign,actor);
+                    var plan=fullPlan(material,new Schema2PreparationIdentity(UUID.randomUUID(),UUID.randomUUID()),campaign,actor);
                     State state=new Schema2CharacterProgressionRules().initial(material,plan,UUID.randomUUID(),fullAbilities(),initialChoices());
                     var eq=new Schema2CharacterEquipmentRules();UUID symbol=id(actor.equals(A)?101:102);
                     state=eq.apply(material,state,equipment("ITEM_ACQUIRED",symbol,HOLY_SYMBOL,"CARRIED"),symbol);

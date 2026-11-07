@@ -1,8 +1,8 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.*;
@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JdbcSchema2RestStateTest {
     private static final JdbcSchema2CharacterRuntimeRepository REPOSITORY = new JdbcSchema2CharacterRuntimeRepository();
-    private static final Identity ID = Identity.random();
+    private static final Schema2PreparationIdentity ID = Schema2PreparationIdentity.random();
     private static final UUID CAMPAIGN=UUID.randomUUID(), CHARACTER=UUID.randomUUID(), PREPARATION=UUID.randomUUID();
     private static final RuleIdentity CLASS=new RuleIdentity("base","character.class","class.guard"), REST=new RuleIdentity("base","adventure.rest","rest.srd2014");
     private static final Map<String,Integer> ABILITIES=Map.of("ability.strength",15,"ability.dexterity",14,"ability.constitution",13,"ability.intelligence",12,"ability.wisdom",10,"ability.charisma",8);

@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Snapshot;
 import com.dndtool.persistence.JdbcSchema2SnapshotControlRepository;
 import com.dndtool.persistence.JdbcSchema2SnapshotControlRepository.Operation;
@@ -38,9 +38,9 @@ public final class Schema2SnapshotTransferService {
     public enum Kind { CAPTURE, RESTORE }
     public enum Status { COMMITTED, ROLLED_BACK, NOT_EXECUTED, UNKNOWN, RESOLVED_COMMITTED, NOT_COMMITTED }
     public record Result(Status status, String code, Intent intent, Snapshot snapshot) { }
-    public record Request(UUID operationId, Identity identity, List<Schema2SourceLedger.Identity> selection,
+    public record Request(UUID operationId, Schema2PreparationIdentity identity, List<Schema2SourceLedger.Identity> selection,
                           Schema2RulesBinding restoreBinding, InitialPlan initialPlan) {
-        public Request(UUID operationId, Identity identity, List<Schema2SourceLedger.Identity> selection,
+        public Request(UUID operationId, Schema2PreparationIdentity identity, List<Schema2SourceLedger.Identity> selection,
                 Schema2RulesBinding restoreBinding) { this(operationId, identity, selection, restoreBinding, null); }
         public Request {
             validateIdentity(operationId, identity);
@@ -51,8 +51,8 @@ public final class Schema2SnapshotTransferService {
         }
     }
     /** Retain this accurate intent when a submission is unknown; resolution never consults source. */
-    public record Intent(UUID operationId, Identity identity, Kind kind, Schema2RulesBinding rules, InitialPlan initialPlan) {
-        public Intent(UUID operationId, Identity identity, Kind kind, Schema2RulesBinding rules) {
+    public record Intent(UUID operationId, Schema2PreparationIdentity identity, Kind kind, Schema2RulesBinding rules, InitialPlan initialPlan) {
+        public Intent(UUID operationId, Schema2PreparationIdentity identity, Kind kind, Schema2RulesBinding rules) {
             this(operationId, identity, kind, rules, null);
         }
         public Intent {
@@ -154,7 +154,7 @@ public final class Schema2SnapshotTransferService {
             long retainedBytes = 0;
             Operation found = null;
             for (var record : records) {
-                var stored = snapshots.read(connection, new Identity(record.runId(), record.snapshotId()));
+                var stored = snapshots.read(connection, new Schema2PreparationIdentity(record.runId(), record.snapshotId()));
                 var initial = initialPlans.read(connection, record.operationId(), stored);
                 var accepted = new Intent(record.operationId(), stored.identity(), Kind.valueOf(record.kind()),
                         Schema2RulesBinding.from(stored.projection()), initial);
@@ -275,13 +275,13 @@ public final class Schema2SnapshotTransferService {
         return "S2_TRANSFER_BLOCKED";
     }
 
-    private static void validatePlan(UUID operation, Identity identity, InitialPlan initial) {
+    private static void validatePlan(UUID operation, Schema2PreparationIdentity identity, InitialPlan initial) {
         if (initial != null && (!identity.equals(initial.character().identity())
                 || operation.equals(initial.campaignId()) || operation.equals(initial.characterId())))
             throw new IllegalArgumentException("S2_INITIAL_IDENTITY");
     }
 
-    private static void validateIdentity(UUID operation, Identity identity) {
+    private static void validateIdentity(UUID operation, Schema2PreparationIdentity identity) {
         if (operation == null || operation.version() != 4 || operation.variant() != 2 || identity == null
                 || operation.equals(identity.runId()) || operation.equals(identity.snapshotId()))
             throw new IllegalArgumentException("S2_OPERATION_IDENTITY");

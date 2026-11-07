@@ -2,7 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.AdvancementValueProfile;
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;

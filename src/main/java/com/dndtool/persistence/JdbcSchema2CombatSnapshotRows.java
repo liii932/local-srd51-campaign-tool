@@ -3,14 +3,14 @@ package com.dndtool.persistence;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Closed combat/melee/walking-speed typed rules in the caller-owned snapshot transaction. */
 final class JdbcSchema2CombatSnapshotRows {
     private JdbcSchema2CombatSnapshotRows() { }
     static boolean supports(FinalRule row) { return row instanceof FinalCombat || row instanceof FinalWeaponAttack || row instanceof FinalMovement; }
-    static void store(Connection connection, Identity id, int index, FinalRule row) throws SQLException {
+    static void store(Connection connection, Schema2PreparationIdentity id, int index, FinalRule row) throws SQLException {
         List<Object> values = new ArrayList<>(List.of(id.snapshotBytes(), index, ascii(row.identity().moduleKey()), ascii(row.identity().ruleKey()), row.definition().displayName()));
         String table, columns;
         if (row instanceof FinalCombat v) {
@@ -37,7 +37,7 @@ final class JdbcSchema2CombatSnapshotRows {
             require(statement.executeUpdate() == 1);
         }
     }
-    static Map<Integer, FinalRule> read(Connection connection, Identity id) throws SQLException {
+    static Map<Integer, FinalRule> read(Connection connection, Schema2PreparationIdentity id) throws SQLException {
         Map<Integer, FinalRule> result = new TreeMap<>();
         for (String table : List.of("combat", "weapon_attack", "movement")) {
             try (var statement = connection.prepareStatement("SELECT * FROM s2_runtime_" + table + " WHERE snapshot_id = ? ORDER BY rule_index LIMIT 257")) {

@@ -2,7 +2,7 @@ package com.dndtool.persistence;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2GrantFixtures;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Complete typed row readback with independent fixed final-rule and chain bytes. */
 class JdbcSchema2GrantSnapshotTest {
     private static final JdbcSchema2RuntimeSnapshotRepository REPOSITORY = new JdbcSchema2RuntimeSnapshotRepository();
-    private static final Identity ID = Identity.random();
+    private static final Schema2PreparationIdentity ID = Schema2PreparationIdentity.random();
     private static final ProductionSchema2Projection PROJECTION = ProductionSchema2Projection.compose(Schema2GrantFixtures.fixedArtifacts());
 
     @Test void completeCharacterSourcesSlotsAndAtomicGrantHistoryMatchFixedGoldenBytes() throws Exception {
@@ -51,7 +51,7 @@ class JdbcSchema2GrantSnapshotTest {
         for (String table : List.of("s2_runtime_character_source", "s2_runtime_proficiency_grant")) {
             mutations.add(f -> f.rows(table).removeFirst());
             mutations.add(f -> f.rows(table).add(new LinkedHashMap<>(f.rows(table).getFirst())));
-            mutations.add(f -> f.rows(table).getFirst().put("snapshot_id", Identity.random().snapshotBytes()));
+            mutations.add(f -> f.rows(table).getFirst().put("snapshot_id", Schema2PreparationIdentity.random().snapshotBytes()));
         }
         mutations.add(f -> row(f, "s2_runtime_character_source", "rule_key", "subrace.north").put("parent_race_rule_type", ascii("character.class")));
         mutations.add(f -> row(f, "s2_runtime_character_source", "rule_key", "subrace.north").put("parent_race_module_key", null));

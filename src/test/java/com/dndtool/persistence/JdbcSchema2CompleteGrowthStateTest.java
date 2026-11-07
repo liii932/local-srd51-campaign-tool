@@ -1,9 +1,11 @@
 package com.dndtool.persistence;
 
+import com.dndtool.service.Schema2RuntimeFactsException;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.*;
@@ -13,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JdbcSchema2CompleteGrowthStateTest {
     private static final JdbcSchema2CharacterRuntimeRepository REPOSITORY = new JdbcSchema2CharacterRuntimeRepository();
-    private static final Identity ID = Identity.random();
+    private static final Schema2PreparationIdentity ID = Schema2PreparationIdentity.random();
     private static final UUID CAMPAIGN = UUID.randomUUID(), CHARACTER = UUID.randomUUID(), PREPARATION = UUID.randomUUID();
     private static final RuleIdentity A = rule("base", "character.class", "class.guard"), B = rule("extension", "character.class", "class.guard");
     private static final RuleIdentity SUB = rule("base", "character.subclass", "subclass.guard"), FEAT = rule("base", "character.feat", "feat.grappler");
@@ -93,7 +95,7 @@ class JdbcSchema2CompleteGrowthStateTest {
         }
         History dense = new History(previous,events);
         State candidate = new State(ID,CAMPAIGN,CHARACTER,PREPARATION,A,ABILITIES,1,2,11,11,base.classes(),base.hitDicePools(),List.of(),features,List.of(),grants,125,List.of(),new RestState(125,null,null));
-        assertThrows(SQLException.class, () -> JdbcSchema2CharacterRuntimeRepository.checkCandidateCapacity(dense,candidate,new Command("RESOURCE_SPENT",rule("base","character.resource","resource.energy"),1,null,null)));
+        assertThrows(Schema2RuntimeFactsException.class, () -> Schema2CharacterRuntime.checkCandidateCapacity(dense,candidate,new Command("RESOURCE_SPENT",rule("base","character.resource","resource.energy"),1,null,null)));
     }
 
     private static History history() {

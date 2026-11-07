@@ -1,7 +1,7 @@
 package com.dndtool.persistence.storage;
 
+import com.dndtool.service.Schema2CombatHistory;
 import com.dndtool.service.storage.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
@@ -37,7 +37,7 @@ public final class CampaignDomainRepository {
         Material material = one(connection, "rules_runtime_material", Material.class);
         World world = one(connection, "scenes_world", World.class);
         List<Character> characters = documents(connection, "characters_runtime_character", "character_id", Character.class);
-        List<JdbcSchema2CombatRuntimeRepository.History> combats = documents(connection, "combat_scene", "combat_id", JdbcSchema2CombatRuntimeRepository.History.class);
+        List<Schema2CombatHistory.History> combats = documents(connection, "combat_scene", "combat_id", Schema2CombatHistory.History.class);
         List<Root> roots = documents(connection, "history_runtime_root", "sequence", Root.class);
         State state = new State(material, characters, combats, world.nodes(), world.positions(), world.items(), roots, world.manual(), one(connection, "participation_state", CampaignParticipationData.State.class));
         // Check every projected value and every row; recovery never silently rebuilds a damaged index.

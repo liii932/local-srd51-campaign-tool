@@ -1,6 +1,6 @@
 package com.dndtool.service.storage;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.nio.file.*;
@@ -56,8 +56,8 @@ class CampaignParticipationIntegrationTest {
             send(storage, "character-create", object("name", "战士", "kind", "PC", "classKey", "fighter", "backgroundKey", "acolyte"));
             UUID pc = storage.accessSnapshot().snapshot().domains().characters().getFirst().id(), member = member(storage, "玩家"); control(storage, pc, member, 0);
             JsonObject command = object("characterId", pc.toString(), "characterVersion", Long.toString(storage.accessSnapshot().snapshot().domains().characters().getFirst().history().current().version()));
-            var check = new JdbcSchema2CharacterRuntimeRepository.Command("CHECK_RESOLVED", null, 0, null, null, null, JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null,
-                    new JdbcSchema2CharacterRuntimeRepository.CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定检定。"));
+            var check = new Schema2CharacterRuntime.Command("CHECK_RESOLVED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null,
+                    new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定检定。"));
             command.add("command", CampaignDomainCodec.toJson(check));
             var before = storage.accessSnapshot(); String request = uuid(); Actor actor = Actor.player(member, pc);
             storage.domainCommand(request, before.epoch(), before.revision(), "character-command", command, actor, access -> assertEquals(before.snapshot(), access.snapshot()));
@@ -138,17 +138,17 @@ class CampaignParticipationIntegrationTest {
         UUID rich(String name) { apply("character-create", object("name", name, "kind", "PC", "classKey", "fighter", "backgroundKey", "acolyte")); return snapshot.domains().characters().stream().filter(c -> c.name().equals(name)).findFirst().orElseThrow().id(); }
         UUID member(String name) { apply("member-add", object("name", name)); return snapshot.domains().roots().getLast().subjectId(); }
         void control(UUID pc, UUID member, long version) { apply("control-set", object("characterId", pc.toString(), "memberId", member.toString(), "controlVersion", Long.toString(version))); }
-        JsonObject check(UUID pc) { var c = snapshot.domains().characters().stream().filter(v -> v.id().equals(pc)).findFirst().orElseThrow(); JsonObject p = object("characterId", pc.toString(), "characterVersion", Long.toString(c.history().current().version())); p.add("command", CampaignDomainCodec.toJson(new JdbcSchema2CharacterRuntimeRepository.Command("CHECK_RESOLVED", null, 0, null, null, null, JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null, new JdbcSchema2CharacterRuntimeRepository.CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定检定。")))); return p; }
+        JsonObject check(UUID pc) { var c = snapshot.domains().characters().stream().filter(v -> v.id().equals(pc)).findFirst().orElseThrow(); JsonObject p = object("characterId", pc.toString(), "characterVersion", Long.toString(c.history().current().version())); p.add("command", CampaignDomainCodec.toJson(new Schema2CharacterRuntime.Command("CHECK_RESOLVED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定检定。")))); return p; }
         void grant(UUID pc) { long version = snapshot.domains().participation().exploration().stream().filter(e -> e.characterId().equals(pc)).mapToLong(Exploration::version).findFirst().orElse(0); JsonObject p = object("characterId", pc.toString(), "permissionVersion", Long.toString(version)); p.add("sceneId", JsonNull.INSTANCE); p.add("actions", new JsonArray()); p.getAsJsonArray("actions").add("CHARACTER_COMMAND"); p.addProperty("active", true); apply("exploration-set", p); }
         void equip(UUID pc) {
             UUID operation = UUID.randomUUID();
-            var acquired = new JdbcSchema2CharacterRuntimeRepository.Command("ITEM_ACQUIRED", null, 0, null, null, null, JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null, null,
-                    new JdbcSchema2CharacterRuntimeRepository.EquipmentInput(operation, BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "确认物品。"), null);
+            var acquired = new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
+                    new Schema2CharacterRuntime.EquipmentInput(operation, BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "确认物品。"), null);
             var card = snapshot.domains().characters().stream().filter(c -> c.id().equals(pc)).findFirst().orElseThrow();
             JsonObject input = object("characterId", pc.toString(), "characterVersion", Long.toString(card.history().current().version())); input.add("command", CampaignDomainCodec.toJson(acquired));
             var next = new CampaignDomainCommands().apply(snapshot, "character-command", input, operation, "0".repeat(64), sides -> 10); snapshot = CampaignData.validate(snapshot(snapshot.campaignId(), next));
-            var equipped = new JdbcSchema2CharacterRuntimeRepository.Command("ITEM_EQUIPPED", null, 0, null, null, null, JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null, null,
-                    new JdbcSchema2CharacterRuntimeRepository.EquipmentInput(operation, null, "MAIN_HAND", "确认装备。"), null);
+            var equipped = new Schema2CharacterRuntime.Command("ITEM_EQUIPPED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
+                    new Schema2CharacterRuntime.EquipmentInput(operation, null, "MAIN_HAND", "确认装备。"), null);
             card = snapshot.domains().characters().stream().filter(c -> c.id().equals(pc)).findFirst().orElseThrow(); input = object("characterId", pc.toString(), "characterVersion", Long.toString(card.history().current().version())); input.add("command", CampaignDomainCodec.toJson(equipped)); apply("character-command", input);
         }
         void combat(Schema2CombatState.Command command) { var battle = snapshot.domains().combats().isEmpty() ? null : snapshot.domains().combats().getFirst().current(); JsonObject p = object("combatVersion", battle == null ? "-1" : Long.toString(battle.version())); p.add("combatId", battle == null ? JsonNull.INSTANCE : new JsonPrimitive(battle.combatId().toString())); p.add("command", CampaignDomainCodec.toJson(command)); apply("combat-command", p); }

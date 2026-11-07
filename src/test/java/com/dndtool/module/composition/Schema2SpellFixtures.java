@@ -1,6 +1,6 @@
 package com.dndtool.module.composition;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CombatTestFixture;
 import com.google.gson.*;
 import java.nio.charset.StandardCharsets;

@@ -3,8 +3,8 @@ package com.dndtool.service.storage;
 import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2InitialCharacterPlanService;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2InitialProficiencyRules;
@@ -42,7 +42,7 @@ public final class BundledCampaignRules {
     public static Metadata metadata() { return Material.METADATA; }
 
     /** A bounded default plan; it creates no rows, rolls or execution capability. */
-    public static InitialPlan initialPlan(UUID campaignId, UUID characterId, Identity preparationIdentity,
+    public static InitialPlan initialPlan(UUID campaignId, UUID characterId, Schema2PreparationIdentity preparationIdentity,
             String classKey, String backgroundKey) {
         String chosenClass = classKey(classKey);
         String background = backgroundKey(backgroundKey);

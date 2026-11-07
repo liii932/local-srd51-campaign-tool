@@ -3,8 +3,8 @@ package com.dndtool.service;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +25,7 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.Progressio
 public final class Schema2CharacterRuntimeService {
     public enum Status { COMMITTED, REPLAYED, REJECTED, UNKNOWN, NOT_COMMITTED }
     public record Result(Status status, String code, Event event) { }
-    public record Request(UUID operationId, Identity identity, UUID campaignId, UUID characterId,
+    public record Request(UUID operationId, Schema2PreparationIdentity identity, UUID campaignId, UUID characterId,
             UUID preparationOperationId, Schema2RulesBinding rules, long expectedVersion,
             Command command, Map<String, Integer> initialAbilities) {
         public Request {
@@ -36,7 +36,7 @@ public final class Schema2CharacterRuntimeService {
             if (ids.stream().anyMatch(id -> id == null || id.version() != 4 || id.variant() != 2)
                     || new HashSet<>(ids).size() != ids.size()) throw rejected("S2_CHARACTER_IDENTITY");
             if (command.kind().equals("INITIALIZED")) {
-                if (expectedVersion != -1 || !initialAbilities.keySet().equals(Set.copyOf(JdbcSchema2CharacterRuntimeRepository.ABILITIES)))
+                if (expectedVersion != -1 || !initialAbilities.keySet().equals(Set.copyOf(Schema2CharacterRuntime.ABILITIES)))
                     throw rejected("S2_CHARACTER_REQUEST");
             } else if (expectedVersion < 0 || !initialAbilities.isEmpty()) throw rejected("S2_CHARACTER_REQUEST");
             if (initialAbilities.entrySet().stream().anyMatch(entry -> entry.getKey() == null || entry.getValue() == null
@@ -70,7 +70,7 @@ public final class Schema2CharacterRuntimeService {
     /** Every source, version, capacity and rule check precedes randomness and the first insert. */
     public Result execute(Request request) {
         Objects.requireNonNull(request);
-        if (JdbcSchema2CharacterRuntimeRepository.combatKind(request.command().kind()))
+        if (Schema2CharacterRuntime.combatKind(request.command().kind()))
             return new Result(Status.REJECTED, "S2_CHARACTER_COMBAT_OWNER_REQUIRED", null);
         return transact(false, request.characterId(), request.digest(), null, connection -> {
             Material material = material(connection, request.identity(), request.preparationOperationId());
@@ -94,7 +94,7 @@ public final class Schema2CharacterRuntimeService {
                 if (history == null) throw rejected("S2_CHARACTER_NOT_FOUND");
                 if (!sameBinding(request, history.current())) throw rejected("S2_CHARACTER_BINDING");
                 if (history.current().version() != request.expectedVersion()) throw rejected("S2_CHARACTER_STALE_VERSION");
-                if (history.events().size() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS)
+                if (history.events().size() >= Schema2CharacterRuntime.MAX_EVENTS)
                     throw rejected("S2_CHARACTER_CAPACITY");
             }
             Event event = domain.characterEvent(material, history, request, dice);
@@ -182,7 +182,7 @@ public final class Schema2CharacterRuntimeService {
         }
     }
 
-    Material material(Connection connection, Identity identity, UUID preparationOperation) throws SQLException {
+    Material material(Connection connection, Schema2PreparationIdentity identity, UUID preparationOperation) throws SQLException {
         var snapshot = snapshots.read(connection, identity);
         if (snapshot == null) throw rejected("S2_CHARACTER_BINDING");
         var initial = initialPlans.read(connection, preparationOperation, snapshot);
@@ -215,7 +215,8 @@ public final class Schema2CharacterRuntimeService {
     }
 
     void validateHistory(Material material, History history) throws SQLException {
-        domain.validateCharacterHistory(material, history);
+        try { domain.validateCharacterHistory(material, history); }
+        catch (Schema2RuntimeFactsException invalid) { throw new SQLException(invalid.getMessage(), invalid); }
     }
 
     private Result transact(boolean inspection, UUID characterId, String digest, History restoration, Work work) {

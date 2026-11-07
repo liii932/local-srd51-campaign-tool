@@ -1,8 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -52,7 +51,7 @@ public final class Schema2CharacterHealthRules {
     public Resolution applyHealing(State before, int amount) {
         validateState(before);
         if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
-        if (before.rest().active()!=null || before.version()>=JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS-1) throw invalid("S2_HEALTH_COMMAND");
+        if (before.rest().active()!=null || before.version()>=Schema2CharacterRuntime.MAX_EVENTS-1) throw invalid("S2_HEALTH_COMMAND");
         var healing=heal(before.hitPoints(),before.maximumHitPoints(),amount);
         HealthState next=healing.applied()>0?living(before.health().temporaryHitPoints()):before.health();
         State after=copy(before,healing.after(),next,before.rest(),before.version()+1); validateState(after);
@@ -72,7 +71,7 @@ public final class Schema2CharacterHealthRules {
         validateState(before);
         if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
         if (before.rest().active() != null) throw invalid("S2_HEALTH_REST_ACTIVE");
-        if (before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
+        if (before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
     }
 
     public State verifyDamage(State before, int amount, boolean critical, DamageResolution saved) {
@@ -102,7 +101,7 @@ public final class Schema2CharacterHealthRules {
     public PreparedHealth prepare(ProductionSchema2Projection material, State before, Command command) {
         growth.validateState(material, before); rests.validateState(material, before); validateState(before);
         Schema2CharacterEquipmentRules.requireCompleteScope(material, before, "S2_HEALTH_GROWTH_SCOPE");
-        if (!handles(command) || before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
+        if (!handles(command) || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
         if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
         if (before.rest().active() != null) throw invalid("S2_HEALTH_REST_ACTIVE");
         Schema2SpellRules.requireSupportedFeatures(material,before,"S2_HEALTH_EFFECT_UNSUPPORTED");

@@ -1,9 +1,8 @@
 package com.dndtool.service;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthResult;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.HealthInput;
+import com.dndtool.service.Schema2CharacterRuntime.HealthResult;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CombatRules.Context;
 import java.util.*;
 
@@ -76,7 +75,7 @@ public final class Schema2ExplorationRules {
         requireExploration(battle);
         Context context=roster.get(target);
         if(context==null||input==null||input.effect()==null) throw invalid("S2_EXPLORATION_HEALTH_INPUT");
-        var command=new JdbcSchema2CharacterRuntimeRepository.Command("HEALTH_EFFECT_RESOLVED",null,0,null,null,null,
+        var command=new Schema2CharacterRuntime.Command("HEALTH_EFFECT_RESOLVED",null,0,null,null,null,
                 GrowthChoices.EMPTY,null,null,null,input);
         var prepared=new Schema2CharacterHealthRules().prepare(context.material(),context.character(),command);
         var effects=context.material().projection().rules().stream().filter(FinalVitalEffect.class::isInstance).map(FinalVitalEffect.class::cast)

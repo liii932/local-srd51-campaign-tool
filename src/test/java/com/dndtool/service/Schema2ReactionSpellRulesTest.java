@@ -2,9 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.service.Schema2CombatState.Command;
@@ -25,28 +24,28 @@ class Schema2ReactionSpellRulesTest {
     final Map<UUID,Context> roster=new HashMap<>();Battle battle;
     Context wizard(UUID actor,int level) {
         var sources=new Schema2InitialProficiencyRules.Sources(new RuleIdentity(BASE,"character.race","race.human"),null,new RuleIdentity(BASE,"character.background","background.guard"),WIZARD);
-        var identity=new Identity(UUID.randomUUID(),UUID.randomUUID());
+        var identity=new Schema2PreparationIdentity(UUID.randomUUID(),UUID.randomUUID());
         var plan=new Schema2InitialCharacterPlanService().prepareMaterial(identity,com.dndtool.module.composition.Schema2RulesBinding.from(material),material,new Schema2InitialProficiencyRules.Request(sources,Map.of()));
         var initial=new Schema2InitialCharacterPlanService.InitialPlan(campaign,actor,plan);var growth=new Schema2CharacterProgressionRules();
         State state=growth.initial(material,initial,UUID.randomUUID(),fullAbilities(),GrowthChoices.EMPTY);var book=new Schema2WizardSpellbookRules();
-        state=book.apply(material,state,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(SHIELD))));
+        state=book.apply(material,state,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(SHIELD))));
         List<List<RuleIdentity>> learning=List.of(List.of(spell("detect_magic"),spell("disguise_self")),List.of(spell("expeditious_retreat"),spell("false_life")),List.of(spell("feather_fall"),spell("find_familiar")),List.of(COUNTERSPELL,spell("fog_cloud")));
         for(int next=2;next<=level;next++) {
             GrowthChoices choices=next==2?new GrowthChoices(EVOCATION,Map.of(),null,Map.of()):next==4?new GrowthChoices(null,Map.of("ability.intelligence",2),null,Map.of()):GrowthChoices.EMPTY;
             state=growth.advance(material,growth.prepareAdvance(material,state,WIZARD,next,"FIXED_AVERAGE",choices),null);
-            state=book.apply(material,state,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_ADVANCED",new SpellbookInput(CASTING,learning.get(next-2),state.spellbook().prepared())));
+            state=book.apply(material,state,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_ADVANCED",new SpellbookInput(CASTING,learning.get(next-2),state.spellbook().prepared())));
         }
         if(level==5) {
             var rests=new Schema2CharacterRestRules();
             state=rests.apply(material,state,rest("REST_STARTED",new RestInput("LONG_REST",null,0,0,Map.of())),null);
             state=rests.apply(material,state,rest("TIME_ADVANCED",new RestInput(null,"SLEEP",480,0,Map.of())),null);
             state=rests.apply(material,state,rest("REST_COMPLETED",new RestInput(null,null,0,0,Map.of())),null);
-            state=book.apply(material,state,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(COUNTERSPELL,SHIELD))));
+            state=book.apply(material,state,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(COUNTERSPELL,SHIELD))));
         }
         UUID weapon=UUID.randomUUID();var equipmentRules=new Schema2CharacterEquipmentRules();state=equipmentRules.apply(material,state,equipment("ITEM_ACQUIRED",weapon,ITEM_WEAPON,"CARRIED"),weapon);state=equipmentRules.apply(material,state,equipment("ITEM_EQUIPPED",weapon,null,"MAIN_HAND"),UUID.randomUUID());
         return new Context(material,initial,state);
     }
-    static JdbcSchema2CharacterRuntimeRepository.Command rest(String kind,RestInput input) {return new JdbcSchema2CharacterRuntimeRepository.Command(kind,null,0,null,null,null,GrowthChoices.EMPTY,input);}
+    static Schema2CharacterRuntime.Command rest(String kind,RestInput input) {return new Schema2CharacterRuntime.Command(kind,null,0,null,null,null,GrowthChoices.EMPTY,input);}
     Resolution apply(Command command,int...rolls) {
         UUID op=UUID.randomUUID();var before=battle;var prepared=rules.preflight(op,combat,campaign,roster,before,command);AtomicInteger i=new AtomicInteger();
         var result=rules.resolve(prepared,sides->{assertTrue(i.get()<rolls.length,"unexpected d"+sides);return rolls[i.getAndIncrement()];});assertEquals(rolls.length,i.get());rules.verify(op,combat,campaign,roster,before,command,result);

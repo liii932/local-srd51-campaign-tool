@@ -2,8 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -116,7 +116,7 @@ class Schema2GrowthRulesTest {
         });
         var requiringSelection = ProductionSchema2Projection.compose(com.dndtool.module.composition.Schema2GrantFixtures.artifacts(files));
         State first = rules.initial(requiringSelection, fullPlan(requiringSelection,
-                new Identity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID()),
+                new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID()),
                 UUID.randomUUID(), fullAbilities(), fullInitialChoices());
         assertCode("S2_GROWTH_FEATURE_SELECTION_UNSUPPORTED", () -> rules.prepareAdvance(requiringSelection,
                 first, CLASS, 2, "SERVER_ROLL", GrowthChoices.EMPTY));
@@ -140,14 +140,14 @@ class Schema2GrowthRulesTest {
             grant.addProperty("kind", "FIXED"); grant.add("target", jsonIdentity(tool)); row.add("grant", grant); root.getAsJsonArray().add(row);
         });
         var combined = ProductionSchema2Projection.compose(com.dndtool.module.composition.Schema2GrantFixtures.artifacts(files));
-        State first = rules.initial(combined, fullPlan(combined, new Identity(UUID.randomUUID(), UUID.randomUUID()),
+        State first = rules.initial(combined, fullPlan(combined, new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()),
                 UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), fullAbilities(), fullInitialChoices());
         assertTrue(first.proficiencies().contains(new ProficiencyState(slot, tool, 1)));
         assertSame(first, rules.validateState(combined, first));
     }
 
     private State initial(Map<String, Integer> abilities) {
-        return rules.initial(material, fullPlan(material, new Identity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID()),
+        return rules.initial(material, fullPlan(material, new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID()),
                 UUID.randomUUID(), abilities, fullInitialChoices());
     }
     private Schema2CharacterProgressionRules.PreparedAdvance prepare(State state, RuleIdentity target, GrowthChoices choices) {

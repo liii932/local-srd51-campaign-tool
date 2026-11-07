@@ -2,8 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
 import com.dndtool.persistence.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.Member;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CombatHistory.Member;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRuntimeService.*;
 import com.dndtool.service.Schema2CombatRuntimeService.Status;
 import com.dndtool.service.Schema2CombatState.*;
@@ -62,7 +62,7 @@ class Schema2CombatRuntimeServiceTest {
         int rolls=f.rolls,writes=f.runtime.writes;
         assertEquals(Status.REPLAYED,f.service.execute(move).status()); assertEquals(rolls,f.rolls); assertEquals(writes,f.runtime.writes);
         var oldCharacter=f.character(f.a);
-        var ordinary=f.characterRequest(f.a,new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT",ENERGY,1,null,null));
+        var ordinary=f.characterRequest(f.a,new Schema2CharacterRuntime.Command("RESOURCE_SPENT",ENERGY,1,null,null));
         assertEquals("S2_CHARACTER_COMBAT_ACTIVE",f.characterService.execute(ordinary).code());
         assertEquals(oldCharacter,f.character(f.a));
         f.nextRolls.addAll(List.of(15,1));
@@ -97,10 +97,10 @@ class Schema2CombatRuntimeServiceTest {
         closedTarget.battle=closed.combat().current(); closedTarget.commit(closedTarget.continuation());
         assertEquals(new Position(-1,0),closedTarget.actor(f.a).position()); assertEquals(0,closedTarget.rolls);
         var last=pending.combat().events().getLast(); var deps=new ArrayList<>(last.dependencies());
-        deps.set(0,new JdbcSchema2CombatRuntimeRepository.Dependency(deps.getFirst().characterId(),0));
-        var altered=new JdbcSchema2CombatRuntimeRepository.Event(last.operationId(),last.requestDigest(),last.command(),deps,last.characterOperations(),last.before(),last.resolution());
+        deps.set(0,new Schema2CombatHistory.Dependency(deps.getFirst().characterId(),0));
+        var altered=new Schema2CombatHistory.Event(last.operationId(),last.requestDigest(),last.command(),deps,last.characterOperations(),last.before(),last.resolution());
         var events=new ArrayList<>(pending.combat().events()); events.set(events.size()-1,altered);
-        Save forged=new Save(new JdbcSchema2CombatRuntimeRepository.History(pending.combat().current(),pending.combat().members(),events),pending.characters());
+        Save forged=new Save(new Schema2CombatHistory.History(pending.combat().current(),pending.combat().members(),events),pending.characters());
         Fixture reject=new Fixture(false); int writes=reject.runtime.writes;
         assertEquals(Status.REJECTED,reject.service.restore(forged).status()); assertEquals(writes,reject.runtime.writes);
         assertFalse(BusinessWriteTransactions.isBlocked());
@@ -127,10 +127,10 @@ class Schema2CombatRuntimeServiceTest {
         f.commit(Command.action(Kind.END_TURN,f.a));
         f.commit(Command.action(Kind.END_COMBAT,f.b));
         assertEquals(Schema2CharacterRuntimeService.Status.REJECTED,f.characterService.execute(f.characterRequest(f.a,
-                new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT",ENERGY,1,null,null))).status());
+                new Schema2CharacterRuntime.Command("RESOURCE_SPENT",ENERGY,1,null,null))).status());
         f.commit(Command.action(Kind.CLOSE_SCENE,f.b));
         assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(f.characterRequest(f.a,
-                new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT",ENERGY,1,null,null))).status());
+                new Schema2CharacterRuntime.Command("RESOURCE_SPENT",ENERGY,1,null,null))).status());
     }
 
     @Test void staleVersionsUnknownTokensBadPathAndCapacityRejectBeforeRandomnessOrWrites() throws Exception {
@@ -195,25 +195,25 @@ class Schema2CombatRuntimeServiceTest {
         Fixture(boolean initialize) throws Exception {
             this(initialize,Schema2CombatTestFixture.packages(),INITIAL_CHOICES);
         }
-        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices) throws Exception {
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,Schema2CharacterRuntime.GrowthChoices choices) throws Exception {
             this(initialize,packages,choices,CLASS);
         }
-        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices,RuleIdentity startingClass) throws Exception {
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,Schema2CharacterRuntime.GrowthChoices choices,RuleIdentity startingClass) throws Exception {
             this(initialize,packages,choices,startingClass,Map.of(),Map.of());
         }
-        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices,RuleIdentity startingClass,
-                Map<UUID,RuleIdentity> characterClasses,Map<UUID,JdbcSchema2CharacterRuntimeRepository.GrowthChoices> characterChoices) throws Exception {
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,Schema2CharacterRuntime.GrowthChoices choices,RuleIdentity startingClass,
+                Map<UUID,RuleIdentity> characterClasses,Map<UUID,Schema2CharacterRuntime.GrowthChoices> characterChoices) throws Exception {
             this(initialize,packages,choices,startingClass,characterClasses,characterChoices,List.of());
         }
-        Fixture(boolean initialize,List<Map<String,byte[]>> packages,JdbcSchema2CharacterRuntimeRepository.GrowthChoices choices,RuleIdentity startingClass,
-                Map<UUID,RuleIdentity> characterClasses,Map<UUID,JdbcSchema2CharacterRuntimeRepository.GrowthChoices> characterChoices,List<UUID> additionalCharacters) throws Exception {
+        Fixture(boolean initialize,List<Map<String,byte[]>> packages,Schema2CharacterRuntime.GrowthChoices choices,RuleIdentity startingClass,
+                Map<UUID,RuleIdentity> characterClasses,Map<UUID,Schema2CharacterRuntime.GrowthChoices> characterChoices,List<UUID> additionalCharacters) throws Exception {
             var artifacts=Schema2GrantFixtures.artifacts(packages);
             material=ProductionSchema2Projection.compose(artifacts); binding=Schema2RulesBinding.from(material);
             source=new Schema2SourceReadFixture(artifacts);
             int ordinal=0;
             var participants=new ArrayList<>(List.of(a,b));participants.addAll(additionalCharacters);
             for(UUID character:participants) {
-                ordinal++; Identity identity=new Identity(stable(ordinal,1),stable(ordinal,2)); UUID preparation=stable(ordinal,3);
+                ordinal++; Schema2PreparationIdentity identity=new Schema2PreparationIdentity(stable(ordinal,1),stable(ordinal,2)); UUID preparation=stable(ordinal,3);
                 members.add(new Member(character,identity,preparation));
                 var selection=new Schema2InitialProficiencyRules.Request(new Schema2InitialProficiencyRules.Sources(
                         new RuleIdentity(BASE,"character.race","race.human"),null,new RuleIdentity(BASE,"character.background","background.guard"),characterClasses.getOrDefault(character,startingClass)),Map.of());
@@ -222,7 +222,7 @@ class Schema2CombatRuntimeServiceTest {
                 var transfer=new Schema2SnapshotTransferService(source.dataSource(),runtime.dataSource()).transferPrepared(prepared);
                 assertEquals(Schema2SnapshotTransferService.Status.COMMITTED,transfer.status(),transfer.code());
                 if(initialize) {
-                    var initial=new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED",null,0,null,null,null,characterChoices.getOrDefault(character,choices));
+                    var initial=new Schema2CharacterRuntime.Command("INITIALIZED",null,0,null,null,null,characterChoices.getOrDefault(character,choices));
                     var created=characterService.execute(new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),identity,campaign,character,preparation,binding,-1,initial,fullAbilities()));
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,created.status(),created.code());
                     UUID item=stable(ordinal,4); items.put(character,item);
@@ -233,8 +233,8 @@ class Schema2CombatRuntimeServiceTest {
             }
         }
         static UUID stable(int ordinal,int kind) { return UUID.fromString(String.format("50000000-0000-4000-8000-%012d",ordinal*10+kind)); }
-        JdbcSchema2CharacterRuntimeRepository.State character(UUID id)throws Exception{return characterService.read(id).current();}
-        Schema2CharacterRuntimeService.Request characterRequest(UUID id,JdbcSchema2CharacterRuntimeRepository.Command command)throws Exception {
+        Schema2CharacterRuntime.State character(UUID id)throws Exception{return characterService.read(id).current();}
+        Schema2CharacterRuntimeService.Request characterRequest(UUID id,Schema2CharacterRuntime.Command command)throws Exception {
             Member m=members.stream().filter(x->x.characterId().equals(id)).findFirst().orElseThrow();
             return new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),m.identity(),campaign,id,m.preparationOperationId(),binding,character(id).version(),command,Map.of());
         }

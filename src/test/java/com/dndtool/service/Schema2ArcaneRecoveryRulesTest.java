@@ -1,8 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -97,8 +96,8 @@ class Schema2ArcaneRecoveryRulesTest {
         State initial = initialContext(material, UUID.randomUUID(), UUID.randomUUID()).character();
         assertCode("S2_ARCANE_RECOVERY_UNSUPPORTED", () -> shortRest(material, spend(material, initial, 1, 1), Map.of(1, 1)));
         State known = learnedContext(material, UUID.randomUUID(), UUID.randomUUID(), 1).character();
-        State forged = JdbcSchema2CharacterRuntimeRepository.withSpellbook(known, known.version(),
-                JdbcSchema2CharacterRuntimeRepository.withArcaneRecoveryDay(known.spellbook(), 1L));
+        State forged = Schema2CharacterRuntime.withSpellbook(known, known.version(),
+                Schema2CharacterRuntime.withArcaneRecoveryDay(known.spellbook(), 1L));
         assertCode("S2_ARCANE_RECOVERY_STATE", () -> new Schema2WizardSpellbookRules().validateState(material, forged));
     }
 

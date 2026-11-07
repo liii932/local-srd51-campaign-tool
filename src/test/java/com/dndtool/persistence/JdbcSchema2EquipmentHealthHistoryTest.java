@@ -1,8 +1,10 @@
 package com.dndtool.persistence;
 
+import com.dndtool.service.Schema2RuntimeFactsException;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.*;
@@ -12,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JdbcSchema2EquipmentHealthHistoryTest {
     private static final JdbcSchema2CharacterRuntimeRepository REPOSITORY = new JdbcSchema2CharacterRuntimeRepository();
-    private static final Identity IDENTITY = Identity.random();
+    private static final Schema2PreparationIdentity IDENTITY = Schema2PreparationIdentity.random();
     private static final UUID CAMPAIGN = UUID.randomUUID(), CHARACTER = UUID.randomUUID(), PREPARATION = UUID.randomUUID(), ITEM_ID = UUID.randomUUID();
     private static final RuleIdentity CLASS = rule("character.class", "class.guard"), ITEM = rule("equipment.item", "item.leather_armor"),
             HEALTH = rule("adventure.health", "health.srd2014"), DAMAGE = rule("adventure.vital_effect", "vital_effect.falling");
@@ -84,10 +86,10 @@ class JdbcSchema2EquipmentHealthHistoryTest {
         assertEquals(0, fixture.writes);
         var unsorted = List.of(new EquipmentItem(UUID.fromString("ffffffff-ffff-4fff-bfff-ffffffffffff"), ITEM, "CARRIED"),
                 new EquipmentItem(UUID.fromString("00000000-0000-4000-8000-000000000001"), ITEM, "CARRIED"));
-        assertThrows(SQLException.class, () -> JdbcSchema2CharacterRuntimeRepository.checkCandidateCapacity(null, state(0, 11, unsorted, HealthState.INITIAL, 0)));
+        assertThrows(Schema2RuntimeFactsException.class, () -> Schema2CharacterRuntime.checkCandidateCapacity(null, state(0, 11, unsorted, HealthState.INITIAL, 0)));
         var conflict = List.of(new EquipmentItem(UUID.fromString("00000000-0000-4000-8000-000000000001"), ITEM, "BOTH_HANDS"),
                 new EquipmentItem(UUID.fromString("ffffffff-ffff-4fff-bfff-ffffffffffff"), ITEM, "MAIN_HAND"));
-        assertThrows(SQLException.class, () -> JdbcSchema2CharacterRuntimeRepository.checkCandidateCapacity(null, state(0, 11, conflict, HealthState.INITIAL, 0)));
+        assertThrows(Schema2RuntimeFactsException.class, () -> Schema2CharacterRuntime.checkCandidateCapacity(null, state(0, 11, conflict, HealthState.INITIAL, 0)));
     }
 
     @Test void everyWriteFailureRollsBackEquipmentHealthAndDiceTogether() throws Exception {

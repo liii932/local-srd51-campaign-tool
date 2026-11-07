@@ -1,11 +1,14 @@
 package com.dndtool.persistence;
 
+import com.dndtool.service.Schema2RuntimeFactsException;
+import com.dndtool.service.Schema2CombatHistory;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.Event;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.History;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2CombatHistory.*;
+import com.dndtool.service.Schema2CombatHistory.Event;
+import com.dndtool.service.Schema2CombatHistory.History;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.service.Schema2CombatState.Command;
 import java.nio.ByteBuffer;
@@ -20,7 +23,7 @@ class JdbcSchema2CombatRuntimeRepositoryTest {
     private static final JdbcSchema2CharacterRuntimeRepository CHARACTERS = new JdbcSchema2CharacterRuntimeRepository();
     private static final UUID A = UUID.fromString("00000000-0000-4000-8000-000000000001"), B = UUID.fromString("00000000-0000-4000-8000-000000000002");
     private static final UUID CAMPAIGN = UUID.randomUUID(), COMBAT = UUID.randomUUID(), ITEM = UUID.randomUUID();
-    private static final Identity IA = Identity.random(), IB = Identity.random();
+    private static final Schema2PreparationIdentity IA = Schema2PreparationIdentity.random(), IB = Schema2PreparationIdentity.random();
     private static final UUID PA = UUID.randomUUID(), PB = UUID.randomUUID();
     private static final RuleIdentity CLASS = rule("character.class","class.guard"), COMBAT_RULE = rule("adventure.combat","combat.srd2014"), HEALTH = rule("adventure.health","health.srd2014");
     private static final List<Member> MEMBERS = List.of(new Member(A,IA,PA),new Member(B,IB,PB));
@@ -45,9 +48,9 @@ class JdbcSchema2CombatRuntimeRepositoryTest {
         var fixture=seeded(); Battle initial=battle(0,List.of(),new Position(0,0),0);
         var start=start(initial); UUID op=UUID.randomUUID(),frame=UUID.randomUUID(),flow=UUID.randomUUID(),childOp=UUID.randomUUID();
         State before=CHARACTERS.read(fixture.connection,B).current(),after=character(B,IB,PB,1,0);
-        var childCommand=new JdbcSchema2CharacterRuntimeRepository.Command("COMBAT_DAMAGE_APPLIED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,
+        var childCommand=new Schema2CharacterRuntime.Command("COMBAT_DAMAGE_APPLIED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,
                 new HealthInput(HEALTH,null,null,"战斗伤害"),new CombatInput(COMBAT,op,frame,A,11,false));
-        var child=new JdbcSchema2CharacterRuntimeRepository.Event(childOp,"c".repeat(64),childCommand,null,before,after,null,new HealthResult(List.of(),null,null,11,11));
+        var child=new Schema2CharacterRuntime.Event(childOp,"c".repeat(64),childCommand,null,before,after,null,new HealthResult(List.of(),null,null,11,11));
         var attempt=new AttackAttempt(frame,A,B,ITEM,null,0,false,15,null,15,2,2,10,false,false,false,true,List.of(9),11);
         var f=new Flow(flow,frame,null,FlowStatus.COMPLETED,List.of(new Frame(frame,null,FrameKind.ATTACK,frame,Invocation.ROOT,FrameStatus.TERMINAL,Stage.ATTACK_RESOLVED,null,null)),List.of(),null,List.of(attempt));
         Battle ordinary=battle(1,List.of(f),new Position(0,0),0);
@@ -78,8 +81,8 @@ class JdbcSchema2CombatRuntimeRepositoryTest {
                 State before=CHARACTERS.read(tx.connection(),member.characterId()).current();
                 State after=new State(before.identity(),before.campaignId(),before.characterId(),before.preparationOperationId(),before.characterClass(),before.abilities(),before.level(),before.proficiencyBonus(),before.hitPoints(),before.maximumHitPoints(),before.classes(),before.hitDicePools(),before.subclasses(),before.features(),before.feats(),before.proficiencies(),1,before.resources(),new RestState(0,6,null,null,null),before.equipment(),before.health());
                 UUID child=UUID.randomUUID(),frame=UUID.randomUUID();HealthResult health=new HealthResult(List.of(),null,null,0,0);
-                var command=new JdbcSchema2CharacterRuntimeRepository.Command("COMBAT_TIME_ADVANCED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,new HealthInput(HEALTH,null,null,"战斗回合时间"),new CombatInput(COMBAT,op,frame,B,0,false,6));
-                CHARACTERS.append(tx.connection(),new JdbcSchema2CharacterRuntimeRepository.Event(child,"c".repeat(64),command,null,before,after,null,health));
+                var command=new Schema2CharacterRuntime.Command("COMBAT_TIME_ADVANCED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,new HealthInput(HEALTH,null,null,"战斗回合时间"),new CombatInput(COMBAT,op,frame,B,0,false,6));
+                CHARACTERS.append(tx.connection(),new Schema2CharacterRuntime.Event(child,"c".repeat(64),command,null,before,after,null,health));
                 children.add(child);changes.add(new HealthChange(member.characterId(),before,after,frame,0,false,health,false,true,6));
             }
             Battle round=new Battle(COMBAT,CAMPAIGN,COMBAT_RULE,Status.ACTIVE,2,3,0,2,initial.combatants(),initial.initiative(),List.of());
@@ -124,12 +127,12 @@ class JdbcSchema2CombatRuntimeRepositoryTest {
 
     @Test void candidateAndMandatorySuffixCapacityRejectBeforeAnyMutation() throws Exception {
         var history=pendingHistory();
-        assertDoesNotThrow(()->JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(null,null,8,2,3));
-        assertDoesNotThrow(()->JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(null,null,16,16,0));
-        assertThrows(SQLException.class,()->JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(history,history.current(),128,2,3));
-        assertThrows(SQLException.class,()->JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(history,history.current(),30,16,64));
-        assertThrows(SQLException.class,()->JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(null,null,16,16,64));
-        assertThrows(SQLException.class,()->JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(null,null,-1,2,1));
+        assertDoesNotThrow(()->Schema2CombatHistory.checkReservedCapacity(null,null,8,2,3));
+        assertDoesNotThrow(()->Schema2CombatHistory.checkReservedCapacity(null,null,16,16,0));
+        assertThrows(Schema2RuntimeFactsException.class,()->Schema2CombatHistory.checkReservedCapacity(history,history.current(),128,2,3));
+        assertThrows(Schema2RuntimeFactsException.class,()->Schema2CombatHistory.checkReservedCapacity(history,history.current(),30,16,64));
+        assertThrows(Schema2RuntimeFactsException.class,()->Schema2CombatHistory.checkReservedCapacity(null,null,16,16,64));
+        assertThrows(Schema2RuntimeFactsException.class,()->Schema2CombatHistory.checkReservedCapacity(null,null,-1,2,1));
         var fixture=seeded();assertThrows(SQLException.class,()->REPO.restore(fixture.connection,history));
         assertTrue(fixture.rows("s2_combat_event").isEmpty());
     }
@@ -262,8 +265,8 @@ class JdbcSchema2CombatRuntimeRepositoryTest {
         var resumed=new Flow(moveFlow,moveFrame,moveFrame,FlowStatus.ACTIVE,frames,List.of(new Window(window,moveFrame,0,0,WindowStatus.CLOSED,List.of(completeChance),trigger)),List.of(move),List.of(),List.of(),List.of(),List.of(new ReadyRelease(releaseFrame,readyKey,triggerKey,true,"SPELL_RELEASED")),List.of());
         Battle after=new Battle(COMBAT,CAMPAIGN,COMBAT_RULE,Status.ACTIVE,1,2,1,4,actors,initial.initiative(),List.of(finishedCast,resumed),List.of(),List.of(new ReadyPreparation(readyKey,A,1,3,readyInput,ReadyStatus.RELEASED,held.frameKey(),null)),List.of(trigger),List.of(),List.of(),List.of(),List.of());
         var priorHeal=original.children().getLast();var healthInput=priorHeal.command().healthInput();
-        var healCommand=new JdbcSchema2CharacterRuntimeRepository.Command("COMBAT_HEALING_APPLIED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,healthInput,new CombatInput(COMBAT,releaseOp,releaseFrame,A,6,false));
-        var healChild=new JdbcSchema2CharacterRuntimeRepository.Event(UUID.randomUUID(),"e".repeat(64),healCommand,null,priorHeal.before(),priorHeal.after(),null,priorHeal.healthResult());
+        var healCommand=new Schema2CharacterRuntime.Command("COMBAT_HEALING_APPLIED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,healthInput,new CombatInput(COMBAT,releaseOp,releaseFrame,A,6,false));
+        var healChild=new Schema2CharacterRuntime.Event(UUID.randomUUID(),"e".repeat(64),healCommand,null,priorHeal.before(),priorHeal.after(),null,priorHeal.healthResult());
         var healing=new HealthChange(A,priorHeal.before(),priorHeal.after(),releaseFrame,6,false,priorHeal.healthResult(),false,false,0,null,0,true);
         var released=new Event(releaseOp,"f".repeat(64),Command.releaseReady(A,readyKey,moveFlow,selection,window,opportunity),deps,List.of(healChild.operationId()),paused,new Resolution(after,List.of(healing),List.of(),List.of()));
         return new SpellScenario(new History(after,MEMBERS,List.of(original.history().events().getFirst(),prepared,turn,movement,released)),List.of(costChild,healChild));
@@ -289,35 +292,35 @@ class JdbcSchema2CombatRuntimeRepositoryTest {
         var events=new ArrayList<>(original.history().events());events.add(event);return new SpellScenario(new History(after,MEMBERS,events),original.children());
     }
 
-    private record SpellScenario(History history,List<JdbcSchema2CharacterRuntimeRepository.Event> children) { }
+    private record SpellScenario(History history,List<Schema2CharacterRuntime.Event> children) { }
     private static final RuleIdentity SLOT=rule("character.resource","resource.spell_slot_1"), CASTING=rule("character.spellcasting","spellcasting.cleric");
     private static SpellScenario spellScenario(boolean healing) throws Exception {
         RuleIdentity spell=rule("adventure.spell",healing?"spell.cure_wounds":"spell.bless");
         UUID operation=UUID.randomUUID(),frame=UUID.randomUUID(),flow=UUID.randomUUID(),effect=healing?null:UUID.randomUUID();
         Battle initial=battle(0,List.of(),new Position(0,0),0);State before=withSlots(character(A,IA,PA,0,6),2);
         State spent=withSlots(character(A,IA,PA,1,6),1);
-        var resourceCommand=new JdbcSchema2CharacterRuntimeRepository.Command("COMBAT_RESOURCE_SPENT",SLOT,1,null,null,null,GrowthChoices.EMPTY,null,null,null,null,new CombatInput(COMBAT,operation,frame,A,0,false));
-        var cost=new JdbcSchema2CharacterRuntimeRepository.Event(UUID.randomUUID(),"c".repeat(64),resourceCommand,null,before,spent);
-        List<JdbcSchema2CharacterRuntimeRepository.Event> children=new ArrayList<>(List.of(cost));
+        var resourceCommand=new Schema2CharacterRuntime.Command("COMBAT_RESOURCE_SPENT",SLOT,1,null,null,null,GrowthChoices.EMPTY,null,null,null,null,new CombatInput(COMBAT,operation,frame,A,0,false));
+        var cost=new Schema2CharacterRuntime.Event(UUID.randomUUID(),"c".repeat(64),resourceCommand,null,before,spent);
+        List<Schema2CharacterRuntime.Event> children=new ArrayList<>(List.of(cost));
         List<HealthChange> changes=new ArrayList<>(List.of(new HealthChange(A,before,spent,frame,0,false,null,false,false,0,SLOT,1,false)));
         if(healing) {
             State healed=withSlots(character(A,IA,PA,2,11),1);HealthResult result=new HealthResult(List.of(4),null,null,6,5);
-            var command=new JdbcSchema2CharacterRuntimeRepository.Command("COMBAT_HEALING_APPLIED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,new HealthInput(HEALTH,null,null,"法术治疗"),new CombatInput(COMBAT,operation,frame,A,6,false));
-            children.add(new JdbcSchema2CharacterRuntimeRepository.Event(UUID.randomUUID(),"d".repeat(64),command,null,spent,healed,null,result));
+            var command=new Schema2CharacterRuntime.Command("COMBAT_HEALING_APPLIED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,new HealthInput(HEALTH,null,null,"法术治疗"),new CombatInput(COMBAT,operation,frame,A,6,false));
+            children.add(new Schema2CharacterRuntime.Event(UUID.randomUUID(),"d".repeat(64),command,null,spent,healed,null,result));
             changes.add(new HealthChange(A,spent,healed,frame,6,false,result,false,false,0,null,0,true));
         }
         var cast=new CastAttempt(frame,A,CASTING,spell,List.of(A),SLOT,1,null,healing?List.of(4):List.of(),healing?2:0,healing?6:0,healing?5:0,effect);
         List<SavingThrowAttempt> saves=healing?List.of():List.of(new SavingThrowAttempt(frame,A,"CONCENTRATION","ability.constitution",12,1,0,effect,3,10,16,true));
         var typedFlow=new Flow(flow,frame,null,FlowStatus.COMPLETED,List.of(new Frame(frame,null,FrameKind.CAST,frame,Invocation.ROOT,FrameStatus.TERMINAL,Stage.CAST_RESOLVED,null,null)),List.of(),null,List.of(),List.of(cast),saves);
         Battle after=new Battle(COMBAT,CAMPAIGN,COMBAT_RULE,Status.ACTIVE,1,1,0,1,initial.combatants(),initial.initiative(),List.of(typedFlow),healing?List.of():List.of(new OngoingEffect(effect,spell,A,List.of(A),0,60,EffectStatus.ACTIVE,null)),List.of(),List.of(),List.of(),healing?List.of():List.of(new ConcentrationHolder(A,ConcentrationKind.BLESS_EFFECT,effect)),List.of(),List.of());
-        Event accepted=new Event(operation,"b".repeat(64),new Command(Kind.CAST,A,null,null,List.of(),List.of(),List.of(),null,null,null,null,new CastInput(CASTING,spell,List.of(A),null)),DEPS,children.stream().map(JdbcSchema2CharacterRuntimeRepository.Event::operationId).toList(),initial,new Resolution(after,changes,List.of(),List.of()));
+        Event accepted=new Event(operation,"b".repeat(64),new Command(Kind.CAST,A,null,null,List.of(),List.of(),List.of(),null,null,null,null,new CastInput(CASTING,spell,List.of(A),null)),DEPS,children.stream().map(Schema2CharacterRuntime.Event::operationId).toList(),initial,new Resolution(after,changes,List.of(),List.of()));
         return new SpellScenario(new History(after,MEMBERS,List.of(start(initial),accepted)),children);
     }
     private static Schema2RuntimeJdbcFixture spellStored(SpellScenario scenario)throws Exception {
         var fixture=new Schema2RuntimeJdbcFixture();for(Member m:MEMBERS)fixture.rows("s2_initial_plan").add(new LinkedHashMap<>(Map.of("operation_id",bytes(m.preparationOperationId()),"run_id",m.identity().runBytes(),"snapshot_id",m.identity().snapshotBytes(),"campaign_id",bytes(CAMPAIGN),"character_id",bytes(m.characterId()))));
         fixture.dataSource();fixture.saveCommitted();
         try(var tx=BusinessWriteTransactions.openInternal(fixture.dataSource())) {
-            for(Member m:MEMBERS){State state=character(m.characterId(),m.identity(),m.preparationOperationId(),0,m.characterId().equals(A)?6:11);if(m.characterId().equals(A))state=withSlots(state,2);CHARACTERS.append(tx.connection(),new JdbcSchema2CharacterRuntimeRepository.Event(UUID.randomUUID(),"e".repeat(64),new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED",null,0,null,null),null,null,state));}
+            for(Member m:MEMBERS){State state=character(m.characterId(),m.identity(),m.preparationOperationId(),0,m.characterId().equals(A)?6:11);if(m.characterId().equals(A))state=withSlots(state,2);CHARACTERS.append(tx.connection(),new Schema2CharacterRuntime.Event(UUID.randomUUID(),"e".repeat(64),new Schema2CharacterRuntime.Command("INITIALIZED",null,0,null,null),null,null,state));}
             for(var child:scenario.children())CHARACTERS.append(tx.connection(),child);
             REPO.restore(tx.connection(),scenario.history());tx.commit();
         }
@@ -354,9 +357,9 @@ class JdbcSchema2CombatRuntimeRepositoryTest {
     private static Schema2RuntimeJdbcFixture stored(History history)throws Exception{var fixture=seeded();try(var tx=BusinessWriteTransactions.openInternal(fixture.dataSource())){REPO.restore(tx.connection(),history);tx.commit();}return fixture;}
     private static Schema2RuntimeJdbcFixture seeded()throws Exception{
         var f=new Schema2RuntimeJdbcFixture();for(Member m:MEMBERS)f.rows("s2_initial_plan").add(new LinkedHashMap<>(Map.of("operation_id",bytes(m.preparationOperationId()),"run_id",m.identity().runBytes(),"snapshot_id",m.identity().snapshotBytes(),"campaign_id",bytes(CAMPAIGN),"character_id",bytes(m.characterId()))));
-        f.dataSource();f.saveCommitted();try(var tx=BusinessWriteTransactions.openInternal(f.dataSource())){for(Member m:MEMBERS){State s=character(m.characterId(),m.identity(),m.preparationOperationId(),0,11);var e=new JdbcSchema2CharacterRuntimeRepository.Event(UUID.randomUUID(),"e".repeat(64),new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED",null,0,null,null),null,null,s);CHARACTERS.restore(tx.connection(),new JdbcSchema2CharacterRuntimeRepository.History(s,List.of(e)));}tx.commit();}return f;
+        f.dataSource();f.saveCommitted();try(var tx=BusinessWriteTransactions.openInternal(f.dataSource())){for(Member m:MEMBERS){State s=character(m.characterId(),m.identity(),m.preparationOperationId(),0,11);var e=new Schema2CharacterRuntime.Event(UUID.randomUUID(),"e".repeat(64),new Schema2CharacterRuntime.Command("INITIALIZED",null,0,null,null),null,null,s);CHARACTERS.restore(tx.connection(),new Schema2CharacterRuntime.History(s,List.of(e)));}tx.commit();}return f;
     }
-    private static State character(UUID id,Identity identity,UUID preparation,long version,long hp){return new State(identity,CAMPAIGN,id,preparation,CLASS,Map.of("ability.strength",15,"ability.dexterity",14,"ability.constitution",13,"ability.intelligence",12,"ability.wisdom",10,"ability.charisma",8),1,2,hp,11,List.of(new ClassLevel(CLASS,1)),List.of(new HitDicePool(10,1,1)),List.of(),List.of(),List.of(),List.of(),version,List.of(),RestState.INITIAL,List.of(),HealthState.INITIAL);}
+    private static State character(UUID id,Schema2PreparationIdentity identity,UUID preparation,long version,long hp){return new State(identity,CAMPAIGN,id,preparation,CLASS,Map.of("ability.strength",15,"ability.dexterity",14,"ability.constitution",13,"ability.intelligence",12,"ability.wisdom",10,"ability.charisma",8),1,2,hp,11,List.of(new ClassLevel(CLASS,1)),List.of(new HitDicePool(10,1,1)),List.of(),List.of(),List.of(),List.of(),version,List.of(),RestState.INITIAL,List.of(),HealthState.INITIAL);}
     private static RuleIdentity rule(String type,String key){return new RuleIdentity("base",type,key);}
     private static byte[]bytes(UUID id){return ByteBuffer.allocate(16).putLong(id.getMostSignificantBits()).putLong(id.getLeastSignificantBits()).array();}
 }
