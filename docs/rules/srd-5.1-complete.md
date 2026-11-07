@@ -4,6 +4,10 @@
 > 产品形态：loopback-only、单 DM、本机 Web 工具
 > 当前状态：目标范围与验收要求；当前 Host 的简化 v1 行为见 [srd-5.1.md](srd-5.1.md)
 
+The [English semantic specification](../semantics/srd-5.1/README.md) defines the
+source-rule foundation. Its semantic coverage and source review are separate from
+this product goal and from executable support.
+
 ## 1. 范围定义
 
 项目目标是完整支持 SRD 5.1 中能够用于创建角色、运行冒险和结算游戏状态的规则。这里的

@@ -4,6 +4,10 @@
 每页保留页码并链接回 PDF；第 1 页是许可说明，第 2 页是原文的空白页说明。
 文本不翻译、不摘要，不替代项目的规则实现合同或可执行作者 JSON。
 
+The [English semantic specification](../../semantics/srd-5.1/README.md) explains
+behavior in original prose and records source coverage. Its definitions do not
+establish runtime implementation support.
+
 ## 主题入口
 
 下表按原文起始页定位常用主题；具体条目也可通过正文搜索或机器索引查找。

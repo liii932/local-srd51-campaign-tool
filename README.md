@@ -214,6 +214,10 @@ tools/              数据库备份和独立规则哈希验证工具
 
 ## 文档索引
 
+The [English SRD 5.1 semantic specification](./docs/semantics/srd-5.1/README.md)
+defines source behavior independently of runtime support. Its coverage ledger
+tracks semantic drafting and source review separately from implementation.
+
 | 文档 | 内容 |
 |---|---|
 | [快速开始](./docs/getting-started.md) | 环境前提、构建、配置和最小启动验收 |

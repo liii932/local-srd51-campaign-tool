@@ -1,5 +1,10 @@
 # SRD 5.1 机制覆盖与接入责任
 
+For source-rule definitions and semantic review, use the
+[English semantic specification](../semantics/srd-5.1/README.md). The matrix below
+continues to track application integration; semantic completeness does not confer
+runtime support.
+
 本文把[完整覆盖目标](srd-5.1-complete.md)拆到可以审查的机制族。规则基线为本地 SRD 5.1；
 [主题索引](../references/srd-5.1/README.md)和分页文本提供出处，原文存在不证明规则数据、执行器或产品入口存在。
 当前采用边界以[采用边界](../design/v2/adoption-boundaries.md)及下列领域合同为准。
