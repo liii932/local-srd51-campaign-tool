@@ -1,14 +1,16 @@
 package com.dndtool.web;
 
+import com.dndtool.module.composition.ProductionRuleArtifact;
+import com.dndtool.service.storage.BundledCampaignRules;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.dndtool.service.storage.CampaignCodec;
 import com.dndtool.service.storage.CampaignJson;
 import com.dndtool.service.storage.CampaignDomainCodec;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.service.Schema2CharacterRuntime.Command;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
+import java.io.ByteArrayOutputStream;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.URI;
@@ -19,10 +21,16 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -36,13 +44,14 @@ class StorageHttpIntegrationTest {
             .connectTimeout(Duration.ofSeconds(5)).build();
     private JsonObject state;
 
-    @Test void protectedHttpCreatesHealsSavesReopensAndRecoversWithoutJndi() throws Exception {
+    @Test void protectedHttpCreatesSavesReopensAndRecoversWithoutJndi() throws Exception {
         Path root = temporary.resolve("private-store");
         String residual;
+        JsonObject retained;
         try (StorageLoopLauncher ignored = StorageLoopLauncher.start(root)) {
             assertEquals(303, get("/host").statusCode());
             var page = get("/host/storage"); assertEquals(200, page.statusCode());
-            assertTrue(page.body().contains("生命值战役"));
+            assertTrue(page.body().contains("本机规则库"));
             var script = get("/host/assets/host-storage.js");
             assertEquals(200, script.statusCode());
             assertTrue(script.headers().firstValue("Content-Type").orElse("").contains("javascript"));
@@ -50,79 +59,88 @@ class StorageHttpIntegrationTest {
             var style = get("/host/assets/host-storage.css");
             assertEquals(200, style.statusCode());
             assertTrue(style.headers().firstValue("Content-Type").orElse("").contains("text/css"));
-            assertTrue(style.body().contains(":root"));
             refresh();
             assertTrue(state.get("campaign").isJsonNull());
-            assertEquals("0", state.getAsJsonObject("storage").get("epoch").getAsString());
+            assertEquals("0", epoch());
             assertEquals(409, postRaw("/api/host/campaigns", "", Map.of()).statusCode());
             assertEquals(404, get("/api/host/rules").statusCode());
             assertEquals(403, postRaw("/api/host/storage/create", "", Map.of("Origin", "https://invalid.example")).statusCode());
 
-            var created = command("create", fields("name", "微光营地", "modules", List.of("srd51-vitality@1", "srd51-healing@1")));
+            var standardMembers = prepareBundled();
+            var standardRules = result(rulePost("rule-preview", fields("members", standardMembers)));
+            var created = command("create", fields("name", "微光营地", "members", standardMembers));
             assertEquals(200, created.statusCode(), created.body());
-            String newEpoch = JsonParser.parseString(created.body()).getAsJsonObject().getAsJsonObject("storage").get("epoch").getAsString();
+            String newEpoch = json(created).getAsJsonObject("storage").get("epoch").getAsString();
             assertNotEquals("0", newEpoch);
-            Map<String, List<String>> initialCharacter = fields("name", "艾拉", "maximumHp", "12", "currentHp", "5");
-            assertEquals(409, postRaw("/api/host/storage/characters", encode(initialCharacter),
-                    commandHeaders(newEpoch, "0", UUID.randomUUID().toString(), StorageRequestDigest.sha256("characters", newEpoch, "0", initialCharacter))).statusCode());
-            refresh(); // The same GET that the page performs refreshes the server-owned session epoch.
-            fieldsCommand("characters", fields("name", "艾拉", "maximumHp", "12", "currentHp", "5"));
-            var character = campaign().getAsJsonArray("characters").get(0).getAsJsonObject();
-            assertEquals(5, character.get("currentHp").getAsLong());
-            assertEquals(1, character.get("version").getAsLong());
-            String characterId = character.get("id").getAsString();
-            Map<String, List<String>> heal = fields("characterId", characterId, "characterVersion", character.get("version").getAsString(), "amount", "4");
-            String epoch = epoch(), revision = revision(), requestId = UUID.randomUUID().toString();
-            String digest = StorageRequestDigest.sha256("heal", epoch, revision, heal);
-            var headers = commandHeaders(epoch, revision, requestId, digest);
-            var accepted = postRaw("/api/host/storage/heal", encode(heal), headers);
-            assertEquals(200, accepted.statusCode(), accepted.body());
-            var replayed = postRaw("/api/host/storage/heal", encode(heal), headers);
-            assertEquals(200, replayed.statusCode(), replayed.body());
-            var acceptance = JsonParser.parseString(accepted.body()).getAsJsonObject().getAsJsonObject("commandResult");
-            var replay = JsonParser.parseString(replayed.body()).getAsJsonObject().getAsJsonObject("commandResult");
-            assertFalse(acceptance.get("replayed").getAsBoolean());
-            assertTrue(replay.get("replayed").getAsBoolean());
-            assertEquals(acceptance.get("acceptedRevision"), replay.get("acceptedRevision"));
-            assertEquals(5, replay.get("beforeHp").getAsLong());
-            assertEquals(9, replay.get("afterHp").getAsLong());
+            var note = domainFields("note", object("text", "记下营地的路标"));
+            String requestId = UUID.randomUUID().toString();
+            String digest = StorageRequestDigest.sha256("domain", newEpoch, "0", note);
+            var headers = commandHeaders(newEpoch, "0", requestId, digest);
+            assertEquals(409, postRaw("/api/host/storage/domain", encode(note), headers).statusCode());
             refresh();
-            assertEquals(9, campaign().getAsJsonArray("characters").get(0).getAsJsonObject().get("currentHp").getAsLong());
-            assertEquals(2, campaign().getAsJsonArray("history").size());
-
-            String healedVersion = campaign().getAsJsonArray("characters").get(0).getAsJsonObject().get("version").getAsString();
-            Map<String, List<String>> tampered = fields("characterId", characterId, "characterVersion", healedVersion, "amount", "99");
-            assertEquals(400, postRaw("/api/host/storage/heal", encode(tampered), commandHeaders(epoch(), revision(), UUID.randomUUID().toString(), digest)).statusCode());
-            Map<String, List<String>> stale = fields("characterId", characterId, "characterVersion", "0", "amount", "1");
-            var staleResponse = command("heal", stale);
-            assertEquals(409, staleResponse.statusCode());
-            assertEquals("STALE_CHARACTER", JsonParser.parseString(staleResponse.body()).getAsJsonObject().get("code").getAsString());
-            refresh(); assertEquals(2, campaign().getAsJsonArray("history").size());
+            assertEquals(404, command("characters", fields("name", "艾拉", "maximumHp", "12", "currentHp", "5")).statusCode());
+            assertEquals(404, command("heal", Map.of()).statusCode());
+            var standardCampaign = campaign();
+            assertEquals(standardRules, standardCampaign.getAsJsonObject("domain").get("rules"));
+            var variantCandidates = RuleHttpFixture.members(library(), BundledCampaignRules.CHECK_VARIANT);
+            var variantMember = variantCandidates.getLast();
+            result(rulePost("rule-import-bundled", fields("member", RuleHttpFixture.tuple(variantMember))));
+            accept(variantMember);
+            assertTrue(review(variantMember).get("acceptance").isJsonObject());
+            refresh();
+            assertEquals(standardCampaign, campaign());
+            var accepted = postRaw("/api/host/storage/domain", encode(note), headers);
+            assertEquals(200, accepted.statusCode(), accepted.body());
+            var replayed = postRaw("/api/host/storage/domain", encode(note), headers);
+            assertEquals(200, replayed.statusCode(), replayed.body());
+            var receipt = json(accepted).getAsJsonObject("commandResult");
+            var replay = json(replayed).getAsJsonObject("commandResult");
+            assertFalse(receipt.get("replayed").getAsBoolean());
+            assertTrue(replay.get("replayed").getAsBoolean());
+            assertEquals(receipt.get("acceptedRevision"), replay.get("acceptedRevision"));
+            assertEquals(receipt.get("subjectId"), replay.get("subjectId"));
+            refresh();
+            assertEquals(1, campaign().getAsJsonArray("history").size());
+            var tampered = domainFields("note", object("text", "替换内容"));
+            assertEquals(400, postRaw("/api/host/storage/domain", encode(tampered), headers).statusCode());
+            var stale = postRaw("/api/host/storage/domain", encode(note), commandHeaders(newEpoch, "0", UUID.randomUUID().toString(), digest));
+            assertError(stale, 409, "STALE_REVISION");
             var noCsrf = commandHeaders(epoch(), revision(), UUID.randomUUID().toString(), StorageRequestDigest.sha256("save", epoch(), revision(), Map.of()));
             noCsrf.remove("X-CSRF-Token");
             assertEquals(403, postRaw("/api/host/storage/save", "", noCsrf).statusCode());
 
-            fieldsCommand("save", Map.of());
-            var ended = command("end", Map.of());
-            assertEquals(200, ended.statusCode(), ended.body());
-            String fileKey = JsonParser.parseString(ended.body()).getAsJsonObject().get("savedFile").getAsString();
+            var saved = command("save", Map.of());
+            assertEquals(200, saved.statusCode(), saved.body());
+            String fileKey = json(saved).get("savedFile").getAsString();
+            var download = getBytes("/api/host/storage/download?fileKey=" + fileKey);
+            assertEquals(200, download.statusCode());
             refresh();
-            assertTrue(state.get("campaign").isJsonNull());
+            retained = campaign().getAsJsonObject("domain");
+            var history = campaign().getAsJsonArray("history");
+            fieldsCommand("end", Map.of());
+            var variantMembers = variantCandidates.stream().map(RuleHttpFixture::tuple).toList();
+            var variantRules = result(rulePost("rule-preview", fields("members", variantMembers)));
+            assertNotEquals(standardRules.get("binding"), variantRules.get("binding"));
+            fieldsCommand("create", fields("name", "家规营地", "members", variantMembers));
+            assertEquals(variantRules, campaign().getAsJsonObject("domain").get("rules"));
+            fieldsCommand("end", Map.of());
             fieldsCommand("open", fields("fileKey", fileKey));
-            var reopenedCharacter = campaign().getAsJsonArray("characters").get(0).getAsJsonObject();
-            assertEquals(9, reopenedCharacter.get("currentHp").getAsLong());
-            assertEquals(2, reopenedCharacter.get("version").getAsLong());
+            assertEquals(retained, campaign().getAsJsonObject("domain"));
+            assertEquals(history, campaign().getAsJsonArray("history"));
+            var afterSwitch = getBytes("/api/host/storage/download?fileKey=" + fileKey);
+            assertEquals(200, afterSwitch.statusCode());
+            assertArrayEquals(download.body(), afterSwitch.body());
+            fieldsCommand("domain", domainFields("note", object("text", "从已保存的营地继续")));
             assertEquals(2, campaign().getAsJsonArray("history").size());
-            fieldsCommand("heal", fields("characterId", characterId, "characterVersion", reopenedCharacter.get("version").getAsString(), "amount", "20"));
-            assertEquals(12, campaign().getAsJsonArray("characters").get(0).getAsJsonObject().get("currentHp").getAsLong());
+            retained = campaign().getAsJsonObject("domain");
             residual = state.getAsJsonObject("storage").get("runId").getAsString();
         }
         try (StorageLoopLauncher ignored = StorageLoopLauncher.start(root)) {
             refresh();
             assertTrue(state.get("campaign").isJsonNull());
             fieldsCommand("recover", fields("runId", residual));
-            assertEquals(12, campaign().getAsJsonArray("characters").get(0).getAsJsonObject().get("currentHp").getAsLong());
-            assertEquals(3, campaign().getAsJsonArray("history").size());
+            assertEquals(retained, campaign().getAsJsonObject("domain"));
+            assertEquals(2, campaign().getAsJsonArray("history").size());
             fieldsCommand("end", Map.of());
         }
     }
@@ -137,66 +155,160 @@ class StorageHttpIntegrationTest {
         }
     }
 
-    @Test void protectedFileImportDownloadDeleteAndExplicitResidualAbandonmentStayWithinManagedIdentities() throws Exception {
-        Path root = temporary.resolve("file-store"); byte[] bytes;
-        try (var input = getClass().getResourceAsStream("/storage/vitality-known-file.json")) { bytes = input.readAllBytes(); }
-        String key = new CampaignCodec().decode(bytes).fileKey(), residual, finalFile;
-        try (StorageLoopLauncher ignored = StorageLoopLauncher.start(root)) {
+    @Test void ruleLibraryPreservesOriginalZipAndFileOpenRequiresExactLocalAcceptance() throws Exception {
+        String fileKey;
+        byte[] file;
+        try (StorageLoopLauncher ignored = StorageLoopLauncher.start(temporary.resolve("file-source"))) {
             refresh();
-            String digest = StorageRequestDigest.sha256("import", epoch(), "0", fields("fileSha256", CampaignJson.sha256(bytes)));
-            var headers = commandHeaders(epoch(), "0", UUID.randomUUID().toString(), digest);
-            var noCsrf = new LinkedHashMap<>(headers); noCsrf.remove("X-CSRF-Token");
-            assertEquals(403, upload(bytes, noCsrf).statusCode());
-            byte[] tampered = bytes.clone(); tampered[tampered.length / 2] ^= 1;
-            assertEquals(400, upload(tampered, headers).statusCode());
-            assertEquals(200, upload(bytes, headers).statusCode()); refresh();
+            assertTrue(library().getAsJsonArray("inventory").isEmpty());
+            var candidates = RuleHttpFixture.members(library(), BundledCampaignRules.CHECK_VARIANT);
+            var house = candidates.getLast();
+            var members = candidates.stream().map(RuleHttpFixture::tuple).toList();
+            var preview = fields("members", members);
+            assertRuleIssue(rulePost("rule-preview", preview), "RULE_PACKAGE_MISSING", candidates.getFirst());
+            byte[] zip;
+            try (var input = getClass().getResourceAsStream("/storage/rules/dm-runtime-check-variant.zip")) {
+                assertNotNull(input);
+                zip = input.readAllBytes();
+            }
+            String operation = UUID.randomUUID().toString();
+            var importHeaders = ruleHeaders("rule-import", fields("fileSha256", CampaignJson.sha256(zip)), operation);
+            var noCsrf = new LinkedHashMap<>(importHeaders); noCsrf.remove("X-CSRF-Token");
+            assertEquals(403, upload("rule-import", zip, noCsrf).statusCode());
+            byte[] altered = zip.clone(); altered[altered.length / 2] ^= 1;
+            assertError(upload("rule-import", altered, importHeaders), 400, "INVALID_REQUEST_DIGEST");
+            assertInvalidRulePackageDiagnostics(zip, operation, house);
+            assertTrue(library().getAsJsonArray("inventory").isEmpty());
+            var imported = result(upload("rule-import", zip, importHeaders));
+            assertEquals(imported, result(upload("rule-import", zip, importHeaders)));
+            var review = review(house);
+            assertEquals(house, review.getAsJsonObject("imported").get("member"));
+            assertTrue(review.get("acceptance").isJsonNull());
+            assertEquals("DND_LOCAL_RULE_REVIEW_V1", review.get("reviewProtocol").getAsString());
+            assertTrue(review.get("declaration").isJsonObject());
+            String query = ruleQuery(house) + "&rawZipSha256=" + house.get("rawZipSha256").getAsString();
+            var zipResponse = getBytes("/api/host/storage/rule-download?" + query);
+            assertEquals(200, zipResponse.statusCode());
+            assertArrayEquals(zip, zipResponse.body());
+            assertEquals("application/zip", zipResponse.headers().firstValue("Content-Type").orElseThrow());
+            assertTrue(zipResponse.headers().firstValue("Content-Disposition").orElseThrow().contains(".zip"));
+            assertEquals(400, get("/api/host/storage/rule-download?" + query + "&moduleKey=extra").statusCode());
+            for (var candidate : candidates.subList(0, 3)) result(rulePost("rule-import-bundled", fields("member", RuleHttpFixture.tuple(candidate))));
+            assertRuleIssue(rulePost("rule-preview", preview), "RULE_PACKAGE_NOT_ACCEPTED", candidates.getFirst());
+            assertRuleIssue(command("create", fields("name", "未接受", "members", members)), "RULE_PACKAGE_NOT_ACCEPTED", candidates.getFirst());
             assertTrue(state.get("campaign").isJsonNull());
-            assertEquals("IDLE", state.getAsJsonObject("storage").get("state").getAsString());
-            assertEquals(key, state.getAsJsonObject("storage").getAsJsonArray("saveFiles").get(0).getAsString());
-            var downloaded = get("/api/host/storage/download?fileKey=" + key);
-            assertEquals(200, downloaded.statusCode()); assertEquals(new String(bytes, StandardCharsets.UTF_8), downloaded.body());
-            assertTrue(downloaded.headers().firstValue("Content-Disposition").orElse("").contains(key + ".json"));
-            assertFalse(downloaded.body().contains(root.toString()));
-            assertEquals(400, get("/api/host/storage/download?fileKey=" + key + "&extra=value").statusCode());
-            assertEquals(400, get("/api/host/storage/download?fileKey=" + key + "&fileKey=" + key).statusCode());
-            assertEquals(409, get("/api/host/storage/download?fileKey=..%2Fsecret").statusCode());
-            assertEquals(409, upload(bytes, commandHeaders(epoch(), "0", UUID.randomUUID().toString(), digest)).statusCode());
+            for (var candidate : candidates.subList(0, 3)) accept(candidate);
+            var acceptFields = fields("member", RuleHttpFixture.tuple(house), "reviewProtocol", review.get("reviewProtocol").getAsString());
+            String acceptId = UUID.randomUUID().toString();
+            var accepted = result(rulePost("rule-accept", acceptFields, acceptId));
+            assertEquals(accepted, result(rulePost("rule-accept", acceptFields, acceptId)));
+            assertEquals("local-dm", accepted.getAsJsonObject("acceptance").get("acceptedBy").getAsString());
+            assertEquals("COMMITTED", result(get("/api/host/storage/rule-operation?operationId=" + acceptId)).get("state").getAsString());
+            assertEquals("COMMITTED", result(rulePost("rule-recover", fields("operationId", acceptId))).get("state").getAsString());
+            var wrongOrder = new ArrayList<>(members); java.util.Collections.swap(wrongOrder, 0, 1);
+            assertEquals(409, rulePost("rule-preview", fields("members", wrongOrder)).statusCode());
+            var projected = result(rulePost("rule-preview", preview));
+            assertEquals(house, projected.getAsJsonObject("binding").getAsJsonArray("members").asList().getLast());
+            fieldsCommand("create", fields("name", "可携带规则战役", "members", members));
+            assertEquals(projected.get("binding"), campaign().getAsJsonObject("domain").getAsJsonObject("rules").get("binding"));
+            var ended = command("end", Map.of());
+            assertEquals(200, ended.statusCode(), ended.body());
+            fileKey = json(ended).get("savedFile").getAsString();
+            file = getBytes("/api/host/storage/download?fileKey=" + fileKey).body();
+        }
 
-            byte[] invalid = "{}".getBytes(StandardCharsets.UTF_8);
-            var invalidResponse = upload(invalid, commandHeaders(epoch(), "0", UUID.randomUUID().toString(),
-                    StorageRequestDigest.sha256("import", epoch(), "0", fields("fileSha256", CampaignJson.sha256(invalid)))));
-            assertEquals(409, invalidResponse.statusCode()); refresh();
-            assertEquals(1, state.getAsJsonObject("storage").getAsJsonArray("saveFiles").size());
-            fieldsCommand("create", fields("name", "受控文件操作", "modules", List.of("srd51-vitality@1", "srd51-healing@1")));
-            assertEquals(409, command("delete", fields("fileKey", key)).statusCode());
-            var ended = command("end", Map.of()); assertEquals(200, ended.statusCode(), ended.body());
-            finalFile = JsonParser.parseString(ended.body()).getAsJsonObject().get("savedFile").getAsString(); refresh();
-            fieldsCommand("delete", fields("fileKey", key));
-            assertEquals(200, get("/api/host/storage/download?fileKey=" + finalFile).statusCode());
-            fieldsCommand("open", fields("fileKey", finalFile));
+        Path target = temporary.resolve("file-target");
+        String residual;
+        try (StorageLoopLauncher ignored = StorageLoopLauncher.start(target)) {
+            refresh();
+            var importedFile = upload("import", file, ruleHeaders("import", fields("fileSha256", CampaignJson.sha256(file)), UUID.randomUUID().toString()));
+            assertEquals(200, importedFile.statusCode(), importedFile.body());
+            refresh();
+            assertEquals("IDLE", state.getAsJsonObject("storage").get("state").getAsString());
+            var open = fields("fileKey", fileKey);
+            var candidates = RuleHttpFixture.members(library(), BundledCampaignRules.CHECK_VARIANT);
+            assertRuleIssue(command("open", open), "RULE_PACKAGE_MISSING", candidates.getFirst());
+            for (var candidate : candidates) result(rulePost("rule-import-bundled", fields("member", RuleHttpFixture.tuple(candidate))));
+            assertRuleIssue(command("open", open), "RULE_PACKAGE_NOT_ACCEPTED", candidates.getFirst());
+            var download = getBytes("/api/host/storage/download?fileKey=" + fileKey);
+            assertEquals(200, download.statusCode()); assertArrayEquals(file, download.body());
+            assertTrue(download.headers().firstValue("Content-Disposition").orElseThrow().contains(fileKey + ".json"));
+            assertEquals(400, get("/api/host/storage/download?fileKey=" + fileKey + "&extra=value").statusCode());
+            assertEquals(400, get("/api/host/storage/download?fileKey=" + fileKey + "&fileKey=" + fileKey).statusCode());
+            for (var candidate : candidates) accept(candidate);
+            fieldsCommand("open", open);
+            assertEquals("可携带规则战役", campaign().get("name").getAsString());
+            assertEquals(409, command("delete", open).statusCode());
             residual = state.getAsJsonObject("storage").get("runId").getAsString();
         }
-        try (StorageLoopLauncher ignored = StorageLoopLauncher.start(root)) {
+        try (StorageLoopLauncher ignored = StorageLoopLauncher.start(target)) {
             refresh(); assertEquals("RESIDUAL", state.getAsJsonObject("storage").get("state").getAsString());
-            assertEquals(409, command("delete", fields("fileKey", finalFile)).statusCode());
+            assertEquals(409, command("delete", fields("fileKey", fileKey)).statusCode());
             fieldsCommand("discard", fields("runId", residual));
             assertEquals("IDLE", state.getAsJsonObject("storage").get("state").getAsString());
-            assertEquals(200, get("/api/host/storage/download?fileKey=" + finalFile).statusCode());
+            assertEquals(200, get("/api/host/storage/download?fileKey=" + fileKey).statusCode());
             assertEquals(409, command("discard", fields("runId", UUID.randomUUID().toString())).statusCode());
         }
     }
 
-    private HttpResponse<String> upload(byte[] bytes, Map<String, String> headers) throws Exception {
-        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:8080/api/host/storage/import"))
+    private HttpResponse<String> upload(String action, byte[] bytes, Map<String, String> headers) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:8080/api/host/storage/" + action))
                 .header("Content-Type", "application/octet-stream");
         headers.forEach(request::header);
         return client.send(request.POST(HttpRequest.BodyPublishers.ofByteArray(bytes)).build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    private void assertInvalidRulePackageDiagnostics(byte[] original, String operation, JsonObject expectedMember) throws Exception {
+        var members = new TreeMap<>(ProductionRuleArtifact.read(original).originalMembers());
+        String rules = new String(members.get("rules.json"), StandardCharsets.UTF_8);
+        members.put("rules.json", rules.replace("DM_ANTIMAGIC_ZONE_V1", "UNKNOWN_MECHANISM").getBytes(StandardCharsets.UTF_8));
+        byte[] malformed = storedZip(members);
+        String raw = CampaignJson.sha256(malformed);
+        var response = upload("rule-import", malformed, ruleHeaders("rule-import", fields("fileSha256", raw), operation));
+        assertError(response, 409, "RULE_PACKAGE_INVALID");
+        var issue = json(response).getAsJsonArray("issues").get(1).getAsJsonObject();
+        assertEquals("S2_TYPE", issue.get("diagnosticCode").getAsString());
+        assertEquals("AUTHOR", issue.get("stage").getAsString());
+        assertEquals(expectedMember.get("moduleKey"), issue.get("moduleKey"));
+        assertEquals(expectedMember.get("releaseVersion"), issue.get("releaseVersion"));
+        assertEquals(raw, issue.get("expectedRawZipSha256").getAsString());
+        assertEquals("rules.json", issue.get("path").getAsString());
+        assertEquals("/0/algorithm", issue.get("pointer").getAsString());
+
+        String unsafePath = "/private/operator-file.json";
+        byte[] unsafe = storedZip(Map.of(unsafePath, new byte[]{1}));
+        var rejected = upload("rule-import", unsafe, ruleHeaders("rule-import", fields("fileSha256", CampaignJson.sha256(unsafe)), operation));
+        assertError(rejected, 409, "RULE_PACKAGE_INVALID");
+        assertFalse(rejected.body().contains(unsafePath));
+        var zipIssue = json(rejected).getAsJsonArray("issues").get(1).getAsJsonObject();
+        assertEquals("PARSE", zipIssue.get("stage").getAsString());
+        assertEquals("$zip", zipIssue.get("path").getAsString());
+        assertTrue(zipIssue.get("byteOffset").getAsInt() >= 0);
+    }
+
+    private static byte[] storedZip(Map<String, byte[]> members) throws Exception {
+        var output = new ByteArrayOutputStream();
+        try (var zip = new ZipOutputStream(output)) {
+            for (var member : members.entrySet()) {
+                byte[] bytes = member.getValue();
+                var crc = new CRC32(); crc.update(bytes);
+                var entry = new ZipEntry(member.getKey());
+                entry.setTimeLocal(LocalDateTime.of(2020, 1, 1, 0, 0));
+                entry.setMethod(ZipEntry.STORED);
+                entry.setSize(bytes.length);
+                entry.setCrc(crc.getValue());
+                zip.putNextEntry(entry);
+                zip.write(bytes);
+                zip.closeEntry();
+            }
+        }
+        return output.toByteArray();
+    }
+
     @Test void fullCampaignDomainFormsPersistCharactersWorldItemsNotesAndRejectUnboundPayloads() throws Exception {
         try (StorageLoopLauncher ignored = StorageLoopLauncher.start(temporary.resolve("domain-store"))) {
             refresh();
-            fieldsCommand("create", fields("name", "完整领域战役", "modules", List.of("srd51-vitality@1", "srd51-healing@1", "srd51-runtime@1")));
+            fieldsCommand("create", fields("name", "完整领域战役", "members", prepareBundled()));
             assertTrue(campaign().get("domain").isJsonObject());
             String classKey = ruleKey("character.class", "fighter"), backgroundKey = ruleKey("character.background", "");
             fieldsCommand("domain", domainFields("character-create", object("name", "完整角色", "kind", "PC", "classKey", classKey, "backgroundKey", backgroundKey)));
@@ -206,6 +318,7 @@ class StorageHttpIntegrationTest {
             assertTrue(character.getAsJsonObject("state").get("abilities").isJsonObject());
             fieldsCommand("domain", domainFields("node-create", object("name", "石桥")));
             String nodeId = campaign().getAsJsonObject("domain").getAsJsonArray("nodes").get(0).getAsJsonObject().get("id").getAsString();
+            focus("WORLD", nodeId);
             fieldsCommand("domain", domainFields("position", object("characterId", characterId, "nodeId", nodeId)));
             fieldsCommand("domain", domainFields("item", object("itemId", null, "characterId", characterId, "name", "火把", "quantity", "3")));
             fieldsCommand("domain", domainFields("note", object("text", "石桥前扎营")));
@@ -217,13 +330,13 @@ class StorageHttpIntegrationTest {
             var conditional = object("characterId", characterId, "characterVersion", currentCharacter.get("version").getAsString());
             conditional.add("command", CampaignDomainCodec.toJson(check));
             String itemId = campaign().getAsJsonObject("domain").getAsJsonArray("items").get(0).getAsJsonObject().get("id").getAsString();
-            conditional.add("success", checkBranch(characterId, itemId, "1", nodeId, "成功抵达石桥"));
-            conditional.add("failure", checkBranch(characterId, itemId, "-1", null, "失败消耗火把"));
+            conditional.add("success", checkBranch(characterId, itemId, "1", "成功备好火把"));
+            conditional.add("failure", checkBranch(characterId, itemId, "-1", "失败消耗火把"));
             fieldsCommand("domain", domainFields("check-effects", conditional));
             assertEquals(4, campaign().getAsJsonObject("domain").getAsJsonArray("items").get(0).getAsJsonObject().get("quantity").getAsInt());
-            var auditRoot = campaign().getAsJsonObject("domain").getAsJsonArray("roots").get(5).getAsJsonObject();
+            var auditRoot = campaign().getAsJsonObject("domain").getAsJsonArray("roots").asList().getLast().getAsJsonObject();
             assertEquals("check-effects", auditRoot.get("kind").getAsString());
-            assertEquals("成功抵达石桥", JsonParser.parseString(auditRoot.get("after").getAsString()).getAsJsonObject().get("message").getAsString());
+            assertEquals("成功备好火把", JsonParser.parseString(auditRoot.get("after").getAsString()).getAsJsonObject().get("message").getAsString());
             String before = revision();
             Map<String, List<String>> validNote = domainFields("note", object("text", "原意图"));
             Map<String, List<String>> changedNote = domainFields("note", object("text", "被替换的意图"));
@@ -240,10 +353,10 @@ class StorageHttpIntegrationTest {
             fieldsCommand("open", fields("fileKey", fileKey));
             var restored = campaign().getAsJsonObject("domain");
             assertEquals(characterId, restored.getAsJsonArray("characters").get(0).getAsJsonObject().get("id").getAsString());
-            assertEquals(nodeId, restored.getAsJsonArray("positions").get(0).getAsJsonObject().get("nodeId").getAsString());
+            assertEquals(nodeId, restored.getAsJsonArray("positions").get(0).getAsJsonObject().getAsJsonObject("space").get("id").getAsString());
             assertEquals("火把", restored.getAsJsonArray("items").get(0).getAsJsonObject().get("name").getAsString());
             assertEquals(4, restored.getAsJsonArray("items").get(0).getAsJsonObject().get("quantity").getAsInt());
-            assertEquals(6, restored.getAsJsonArray("roots").size());
+            assertEquals(7, restored.getAsJsonArray("roots").size());
             fieldsCommand("end", Map.of());
         }
     }
@@ -251,10 +364,10 @@ class StorageHttpIntegrationTest {
     private String ruleKey(String type, String fragment) {
         return ruleRecord(type, fragment).get("key").getAsString();
     }
-    @Test void freeCardsManualAndSavingChecksOrderedEffectsAndSimpleEncountersSurviveTheSameFile() throws Exception {
+    @Test void freeCardsChecksAdjudicatedSceneAndWorldTravelSurviveTheSameFile() throws Exception {
         try (StorageLoopLauncher ignored = StorageLoopLauncher.start(temporary.resolve("manual-store"))) {
             refresh();
-            fieldsCommand("create", fields("name", "自由卡战役", "modules", List.of("srd51-vitality@1", "srd51-healing@1", "srd51-runtime@1")));
+            fieldsCommand("create", fields("name", "自由卡战役", "members", prepareBundled()));
             fieldsCommand("domain", domainFields("manual-create", object("name", "自由角色", "kind", "PC", "template", "blank")));
             String character = manualCardByName("自由角色").get("id").getAsString();
             fieldsCommand("domain", domainFields("manual-create", object("name", "守卫", "kind", "NPC", "template", "guard")));
@@ -273,12 +386,20 @@ class StorageHttpIntegrationTest {
             var nodes = campaign().getAsJsonObject("domain").getAsJsonArray("nodes");
             String hall = null, yard = null;
             for (var entry : nodes) { var node = entry.getAsJsonObject(); if (node.get("name").getAsString().equals("门厅")) hall = node.get("id").getAsString(); else yard = node.get("id").getAsString(); }
-            fieldsCommand("domain", domainFields("manual-party-position", object("nodeId", hall)));
+            assertNotNull(hall); assertNotNull(yard);
+            focus("WORLD", hall);
+            fieldsCommand("domain", domainFields("node-link", object("from", hall, "to", yard)));
+            for (String id : List.of(character, guard))
+                fieldsCommand("domain", domainFields("position", object("characterId", id, "nodeId", hall)));
+            fieldsCommand("domain", domainFields("scene-create", object("name", "门厅交手", "nodeId", hall,
+                    "width", "4", "height", "4", "resolution", "DM")));
+            String scene = spaces().getAsJsonArray("scenes").get(0).getAsJsonObject().get("id").getAsString();
             var participants = new com.google.gson.JsonArray();
-            participants.add(object("characterId", character, "side", "ALLY", "nodeId", hall)); participants.add(object("characterId", guard, "side", "ENEMY", "nodeId", hall));
-            var start = object("nodeId", hall); start.add("participants", participants);
-            fieldsCommand("domain", domainFields("manual-encounter-start", start));
-            String encounter = campaign().getAsJsonObject("domain").getAsJsonObject("manual").getAsJsonArray("encounters").get(0).getAsJsonObject().get("id").getAsString();
+            participants.add(object("id", character, "version", placementVersion(character), "x", "0", "y", "0", "side", "0"));
+            participants.add(object("id", guard, "version", placementVersion(guard), "x", "1", "y", "0", "side", "1"));
+            var start = object("sceneId", scene); start.add("subjects", participants);
+            fieldsCommand("domain", domainFields("scene-enter", start));
+            fieldsCommand("domain", domainFields("scene-mode", object("mode", "COMBAT")));
             var success = new com.google.gson.JsonArray(); success.add(object("kind", "HP", "targetId", character, "amount", "3"));
             success.add(object("kind", "HP", "targetId", character, "amount", "-1")); success.add(object("kind", "MESSAGE", "text", "先恢复再消耗"));
             var failure = new com.google.gson.JsonArray(); failure.add(object("kind", "HP", "targetId", character, "amount", "-1"));
@@ -290,7 +411,7 @@ class StorageHttpIntegrationTest {
 
             var failEffects = new com.google.gson.JsonArray(); failEffects.add(object("kind", "HP", "targetId", character, "amount", "-1"));
             failEffects.add(object("kind", "GRANT_TEMPORARY_ITEM", "targetId", character, "name", "检定补给", "description", "豁免失败分支记录", "quantity", "2"));
-            failEffects.add(object("kind", "POSITION", "targetId", character, "nodeId", yard)); failEffects.add(object("kind", "MESSAGE", "text", "豁免失败后退至庭院"));
+            failEffects.add(object("kind", "MESSAGE", "text", "豁免失败，消耗补给"));
             var saving = manualPayload(character, object("checkKind", "SAVING_THROW", "key", save, "manualName", null, "manualModifier", null, "rollMode", "ADVANTAGE", "dc", "60"));
             targets = new com.google.gson.JsonArray(); targets.add(object("characterId", character, "version", manualCardByName("自由角色").get("version").getAsString()));
             saving.add("targets", targets); saving.add("success", success); saving.add("failure", failEffects);
@@ -301,13 +422,22 @@ class StorageHttpIntegrationTest {
             assertFalse(audit.getAsJsonObject("result").get("success").getAsBoolean());
             assertEquals(4, audit.getAsJsonObject("result").get("modifier").getAsInt());
             assertEquals(2, audit.getAsJsonObject("result").getAsJsonArray("dice").size());
-            fieldsCommand("domain", domainFields("manual-encounter-close", object("encounterId", encounter)));
+            fieldsCommand("domain", domainFields("scene-mode", object("mode", "EXPLORATION")));
+            var leave = new JsonObject(); leave.add("subjects", transfers(character, guard));
+            fieldsCommand("domain", domainFields("scene-leave", leave));
+            focus("SCENE", scene);
+            fieldsCommand("domain", domainFields("scene-close", new JsonObject()));
+            var travel = object("targetNodeId", yard, "minutes", "2", "adjudication", "经门厅走到庭院");
+            travel.add("subjects", transfers(character, guard));
+            fieldsCommand("domain", domainFields("travel", travel));
             var ended = command("end", Map.of()); assertEquals(200, ended.statusCode(), ended.body());
             String file = JsonParser.parseString(ended.body()).getAsJsonObject().get("savedFile").getAsString(); refresh();
             fieldsCommand("open", fields("fileKey", file));
             assertEquals(5, manualCardByName("自由角色").getAsJsonObject("fields").get("hp.current").getAsInt());
             assertEquals(3, manualCardByName("自由角色").getAsJsonObject("classes").get("class.fighter").getAsInt());
-            assertEquals("CLOSED", campaign().getAsJsonObject("domain").getAsJsonObject("manual").getAsJsonArray("encounters").get(0).getAsJsonObject().get("status").getAsString());
+            assertEquals("CLOSED", spaces().getAsJsonArray("scenes").get(0).getAsJsonObject().get("mode").getAsString());
+            assertEquals(yard, spaces().getAsJsonObject("focus").getAsJsonObject("space").get("id").getAsString());
+            assertEquals(120, clockSecond(hall)); assertEquals(0, clockSecond(yard));
             assertTrue(campaign().getAsJsonObject("domain").getAsJsonArray("items").asList().stream().anyMatch(item -> item.getAsJsonObject().get("name").getAsString().equals("检定补给")));
             fieldsCommand("end", Map.of());
         }
@@ -332,11 +462,39 @@ class StorageHttpIntegrationTest {
         }
         throw new AssertionError("Missing supported rule: " + type + " " + fragment);
     }
-    private static JsonObject checkBranch(String target, String item, String delta, String node, String message) {
-        JsonObject branch = object("targetId", target, "itemId", item, "itemDelta", delta, "nodeId", node, "message", message);
+    private static JsonObject checkBranch(String target, String item, String delta, String message) {
+        JsonObject branch = object("targetId", target, "itemId", item, "itemDelta", delta, "message", message);
         branch.add("healthEffect", com.google.gson.JsonNull.INSTANCE); return branch;
     }
-    private static Map<String, List<String>> domainFields(String action, JsonObject payload) { return fields("action", action, "payload", payload.toString()); }
+    private JsonObject spaces() { return campaign().getAsJsonObject("domain").getAsJsonObject("space"); }
+    private void focus(String kind, String id) throws Exception {
+        var payload = new JsonObject(); payload.add("target", object("kind", kind, "id", id));
+        fieldsCommand("domain", domainFields("focus-set", payload));
+    }
+    private String placementVersion(String id) {
+        return campaign().getAsJsonObject("domain").getAsJsonArray("positions").asList().stream()
+                .map(com.google.gson.JsonElement::getAsJsonObject).filter(p -> p.get("characterId").getAsString().equals(id))
+                .findFirst().orElseThrow().get("version").getAsString();
+    }
+    private com.google.gson.JsonArray transfers(String... subjects) {
+        var result = new com.google.gson.JsonArray();
+        for (String id : subjects) result.add(object("id", id, "version", placementVersion(id)));
+        return result;
+    }
+    private long clockSecond(String id) {
+        return spaces().getAsJsonArray("clocks").asList().stream().map(com.google.gson.JsonElement::getAsJsonObject)
+                .filter(clock -> clock.getAsJsonObject("space").get("id").getAsString().equals(id))
+                .findFirst().orElseThrow().get("second").getAsLong();
+    }
+    private Map<String, List<String>> domainFields(String action, JsonObject payload) {
+        if (state.get("campaign").isJsonObject()) {
+            var current = spaces().getAsJsonObject("focus");
+            var focus = object("generation", current.get("generation").getAsString());
+            focus.add("space", current.get("space"));
+            payload = payload.deepCopy(); payload.add("focus", focus);
+        }
+        return fields("action", action, "payload", payload.toString());
+    }
     private static JsonObject object(Object... pairs) {
         JsonObject result = new JsonObject();
         for (int index = 0; index < pairs.length; index += 2) {
@@ -368,12 +526,56 @@ class StorageHttpIntegrationTest {
     private HttpResponse<String> command(String action, Map<String, List<String>> fields) throws Exception {
         return postRaw("/api/host/storage/" + action, encode(fields), commandHeaders(epoch(), revision(), UUID.randomUUID().toString(), StorageRequestDigest.sha256(action, epoch(), revision(), fields)));
     }
+    private List<String> prepareBundled() throws Exception {
+        var candidates = RuleHttpFixture.members(library(), BundledCampaignRules.STANDARD);
+        for (var member : candidates) {
+            result(rulePost("rule-import-bundled", fields("member", RuleHttpFixture.tuple(member))));
+            accept(member);
+        }
+        return candidates.stream().map(RuleHttpFixture::tuple).toList();
+    }
+    private JsonObject library() throws Exception { return result(get("/api/host/storage/rule-library")); }
+    private JsonObject review(JsonObject member) throws Exception { return result(get("/api/host/storage/rule-review?" + ruleQuery(member))); }
+    private void accept(JsonObject member) throws Exception {
+        result(rulePost("rule-accept", fields("member", RuleHttpFixture.tuple(member), "reviewProtocol", review(member).get("reviewProtocol").getAsString())));
+    }
+    private HttpResponse<String> rulePost(String action, Map<String, List<String>> fields) throws Exception {
+        return rulePost(action, fields, UUID.randomUUID().toString());
+    }
+    private HttpResponse<String> rulePost(String action, Map<String, List<String>> fields, String operation) throws Exception {
+        return postRaw("/api/host/storage/" + action, encode(fields), ruleHeaders(action, fields, operation));
+    }
+    private Map<String, String> ruleHeaders(String action, Map<String, List<String>> fields, String operation) {
+        return commandHeaders(epoch(), "0", operation, StorageRequestDigest.sha256(action, epoch(), "0", fields));
+    }
+    private static String ruleQuery(JsonObject member) {
+        return "moduleKey=" + member.get("moduleKey").getAsString() + "&releaseVersion=" + member.get("releaseVersion").getAsString();
+    }
+    private static JsonObject json(HttpResponse<String> response) { return JsonParser.parseString(response.body()).getAsJsonObject(); }
+    private static JsonObject result(HttpResponse<String> response) {
+        assertEquals(200, response.statusCode(), response.body());
+        return json(response).getAsJsonObject("result");
+    }
+    private static void assertError(HttpResponse<String> response, int status, String code) {
+        assertEquals(status, response.statusCode(), response.body());
+        assertEquals(code, json(response).get("code").getAsString());
+    }
+    private static void assertRuleIssue(HttpResponse<String> response, String code, JsonObject member) {
+        assertError(response, 409, code);
+        var issue = json(response).getAsJsonArray("issues").get(0).getAsJsonObject();
+        assertEquals(member.get("moduleKey"), issue.get("moduleKey"));
+        assertEquals(member.get("releaseVersion"), issue.get("releaseVersion"));
+        assertEquals(member.get("rawZipSha256"), issue.get("expectedRawZipSha256"));
+    }
     private Map<String, String> commandHeaders(String epoch, String revision, String requestId, String digest) {
         return new LinkedHashMap<>(Map.of("Origin", "http://127.0.0.1:8080", "X-CSRF-Token", state.get("csrf").getAsString(),
                 "X-Host-State-Epoch", epoch, "X-Object-Row-Version", revision, "X-Request-Id", requestId, "X-Request-Digest", digest));
     }
     private HttpResponse<String> get(String path) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:8080" + path)).GET().build(), HttpResponse.BodyHandlers.ofString());
+    }
+    private HttpResponse<byte[]> getBytes(String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:8080" + path)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
     }
     private HttpResponse<String> postRaw(String path, String body, Map<String, String> headers) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:8080" + path))

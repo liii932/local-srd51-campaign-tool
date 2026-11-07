@@ -17,24 +17,15 @@ public final class CampaignParticipationCommands {
     public record Audit(Request request, State before, State after) { public Audit { if (request == null || before == null || after == null) throw CampaignJson.bad("Incomplete participation audit"); } }
     public record Result(State state, UUID subjectId, Audit audit) { }
     public static boolean supports(String action) { return Set.of("member-add", "member-update", "control-set", "share-set", "exploration-set").contains(action); }
-    public static String action(Request request) {
-        return switch (request) { case MemberAdd ignored -> "member-add"; case MemberUpdate ignored -> "member-update"; case ControlSet ignored -> "control-set"; case ShareSet ignored -> "share-set"; case ExplorationSet ignored -> "exploration-set"; };
-    }
     public static Result resolve(CampaignDomainData.State before, String action, JsonObject input, UUID operation, UUID campaign) {
         Request request = parse(action, input);
-        return transition(before.participation(), request, operation, campaign, profiles(before), before.manual(), before.combats().stream().map(c -> c.current()).toList(), before.nodes(), before.roots());
-    }
-    public static State validateAudit(CampaignDomainData.Root root, Audit audit, State current, UUID campaign,
-            Map<UUID,CampaignDomainData.Profile> profiles, CampaignManualData.State manual, List<Schema2CombatState.Battle> battles,
-            Collection<CampaignDomainData.Node> nodes, List<CampaignDomainData.Root> roots) {
-        if (!root.kind().equals(action(audit.request())) || !root.before().isEmpty() || !audit.before().equals(current)) throw CampaignJson.bad("Participation audit adjacency differs");
-        Result expected = transition(current, audit.request(), root.operationId(), campaign, profiles, manual, battles, nodes, roots);
-        if (!expected.subjectId().equals(root.subjectId()) || !expected.audit().equals(audit)) throw CampaignJson.bad("Participation audit does not match its typed transition");
-        return expected.state();
+        return transition(before.participation(), request, operation, campaign, profiles(before), before.manual(),
+                before.combats().stream().map(c -> c.current()).toList(), before.nodes(), before.roots(), before.space(), before.positions());
     }
     private static Result transition(State previous, Request request, UUID operation, UUID campaign,
             Map<UUID,CampaignDomainData.Profile> profiles, CampaignManualData.State manual, List<Schema2CombatState.Battle> battles,
-            Collection<CampaignDomainData.Node> nodes, List<CampaignDomainData.Root> roots) {
+            Collection<CampaignDomainData.Node> nodes, List<CampaignDomainData.Root> roots, CampaignSpaceData.State space,
+            Collection<CampaignDomainData.Position> positions) {
         List<Member> members = new ArrayList<>(previous.members()); List<Control> controls = new ArrayList<>(previous.controls());
         List<Share> shares = new ArrayList<>(previous.shares()); List<Exploration> exploration = new ArrayList<>(previous.exploration()); UUID subject;
         switch (request) {
@@ -66,18 +57,26 @@ public final class CampaignParticipationCommands {
                 for (UUID member : r.audience().memberIds()) previous.member(member);
                 switch (r.kind()) {
                     case CHARACTER -> profile(profiles, manual, r.subjectId());
-                    case SCENE -> { if (battles.stream().noneMatch(b -> b.combatId().equals(r.subjectId())) && nodes.stream().noneMatch(n -> n.id().equals(r.subjectId())) && manual.encounters().stream().noneMatch(e -> e.id().equals(r.subjectId()))) throw CampaignJson.bad("Unknown scene share target"); }
+                    case SCENE -> { if (space.scenes().stream().noneMatch(s -> s.id().equals(r.subjectId())) && nodes.stream().noneMatch(n -> n.id().equals(r.subjectId()))) throw CampaignJson.bad("Unknown scene share target"); }
                     case LOG -> { if (!campaign.equals(r.subjectId()) && roots.stream().noneMatch(root -> root.operationId().equals(r.subjectId()))) throw CampaignJson.bad("Unknown log share target"); }
                 }
                 subject = old == null ? operation : old.id(); shares.remove(old); shares.add(new Share(subject, r.kind(), r.subjectId(), r.audience(), r.active(), Math.addExact(r.shareVersion(), 1)));
             }
             case ExplorationSet r -> {
                 CampaignDomainData.Profile pc = profile(profiles, manual, r.characterId());
-                if (!pc.active() || !pc.kind().equals("PC")) throw CampaignJson.bad("Exploration permission requires an active PC");
-                if (r.sceneId() != null && battles.stream().noneMatch(b -> b.combatId().equals(r.sceneId()) && b.status() == Schema2CombatState.Status.EXPLORATION)
-                        && nodes.stream().noneMatch(n -> n.id().equals(r.sceneId()))) throw CampaignJson.bad("Unknown current exploration scope");
                 Exploration old = exploration.stream().filter(e -> e.characterId().equals(r.characterId())).findFirst().orElse(null);
                 version(old == null ? 0 : old.version(), r.permissionVersion()); subject = r.characterId();
+                if (r.active()) {
+                    if (!pc.active() || !pc.kind().equals("PC") || !profiles.containsKey(r.characterId()))
+                        throw CampaignJson.bad("Exploration permission requires an active rule-managed PC");
+                    var place = positions.stream().filter(p -> p.characterId().equals(r.characterId())).findFirst().orElseThrow(() -> CampaignJson.bad("Exploration permission requires a placed PC"));
+                    if (!place.space().id().equals(r.sceneId())) throw CampaignJson.bad("Exploration permission must match the PC's current space");
+                    if (place.space().kind().equals("WORLD") ? !r.actions().equals(Set.of("CHARACTER_COMMAND"))
+                            : space.scenes().stream().noneMatch(s -> s.id().equals(r.sceneId()) && s.mode().equals("EXPLORATION") && s.resolution().equals("RULES")))
+                        throw CampaignJson.bad("Unsupported exploration permission for this space");
+                } else if (old == null || !Objects.equals(old.sceneId(), r.sceneId()) || !old.actions().equals(r.actions())) {
+                    throw CampaignJson.bad("Revoke the exact existing exploration permission");
+                }
                 exploration.remove(old); exploration.add(new Exploration(subject, r.sceneId(), r.actions(), r.active(), Math.addExact(r.permissionVersion(), 1)));
             }
         }
@@ -86,14 +85,61 @@ public final class CampaignParticipationCommands {
         State after = new State(members, controls, shares, exploration); return new Result(after, subject, new Audit(request, previous, after));
     }
 
-    public static State afterSceneChange(List<Schema2CombatState.Battle> before, List<Schema2CombatState.Battle> after,
-            CampaignManualData.State manualBefore, CampaignManualData.State manualAfter, State participation) {
-        Map<UUID,Schema2CombatState.Status> old = new HashMap<>(); before.forEach(b -> old.put(b.combatId(), b.status()));
-        boolean changed = !Objects.equals(manualBefore.partyNodeId(), manualAfter.partyNodeId()) || after.stream().anyMatch(b -> old.get(b.combatId()) != b.status())
-                || !manualBefore.encounters().stream().map(e -> e.id() + ":" + e.status()).toList().equals(manualAfter.encounters().stream().map(e -> e.id() + ":" + e.status()).toList());
-        if (!changed) return participation;
-        Set<UUID> ids = new HashSet<>(); participation.exploration().forEach(e -> ids.add(e.characterId()));
+    public static State afterSpaceChange(CampaignSpaceData.State before, CampaignSpaceData.State after,
+            Collection<CampaignDomainData.Position> positionsBefore, Collection<CampaignDomainData.Position> positionsAfter, State participation) {
+        if (participation.exploration().isEmpty()) return participation;
+        Map<UUID, CampaignSpaceData.Ref> oldPositions = new HashMap<>(), newPositions = new HashMap<>();
+        positionsBefore.forEach(p -> oldPositions.put(p.characterId(), p.space()));
+        positionsAfter.forEach(p -> newPositions.put(p.characterId(), p.space()));
+        Map<UUID, String> oldModes = new HashMap<>(), newModes = new HashMap<>();
+        before.scenes().forEach(s -> oldModes.put(s.id(), s.mode()));
+        after.scenes().forEach(s -> newModes.put(s.id(), s.mode()));
+        Set<UUID> ids = new HashSet<>();
+        for (Exploration permit : participation.exploration()) {
+            if (!Objects.equals(oldPositions.get(permit.characterId()), newPositions.get(permit.characterId()))
+                    || !Objects.equals(oldModes.get(permit.sceneId()), newModes.get(permit.sceneId()))) ids.add(permit.characterId());
+        }
+        if (ids.isEmpty()) return participation;
         return new State(participation.members(), participation.controls(), participation.shares(), invalidate(participation.exploration(), ids));
+    }
+    static boolean permitted(CampaignDomainData.State state, UUID character, String action) {
+        var focus = state.space().focus().space();
+        return focus != null && CampaignSpaceCommands.focused(state, character)
+                && state.participation().exploration().stream().anyMatch(p -> p.characterId().equals(character)
+                        && p.active() && focus.id().equals(p.sceneId()) && p.actions().contains(action));
+    }
+    public static void requireExecutionPermission(CampaignDomainData.State state, String action, JsonObject input, Actor actor) {
+        if (actor.kind() != ActorKind.PLAYER) return;
+        UUID character = actor.characterId();
+        if (!CampaignSpaceCommands.focused(state, character)) throw playerPermissionDenied();
+        if (action.equals("character-command")) {
+            var command = CampaignDomainCodec.fromJson(input.get("command"), com.dndtool.service.Schema2CharacterRuntime.Command.class);
+            if (!CampaignSpaceCommands.isWorldFocus(state) || !permitted(state, character, "CHARACTER_COMMAND")
+                    || !Set.of("ITEM_EQUIPPED", "ITEM_UNEQUIPPED", "RESOURCE_SPENT").contains(command.kind()))
+                throw playerPermissionDenied();
+            return;
+        }
+        var current = CampaignSpaceCommands.currentBattle(state);
+        if (!action.equals("combat-command") || current == null) throw playerPermissionDenied();
+        var command = CampaignDomainCodec.fromJson(input.get("command"), Schema2CombatState.Command.class);
+        var battle = current.current();
+        if (battle.activeFlow() != null) return; // Scene preflight accepts only the entitled current leaf.
+        if (battle.status() == Schema2CombatState.Status.EXPLORATION) {
+            String required = switch (command.kind()) {
+                case CAST -> "CHARACTER_COMMAND";
+                case EXPLORATION_MOVE -> "EXPLORATION_MOVE";
+                case END_CONCENTRATION -> "END_CONCENTRATION";
+                default -> throw playerPermissionDenied();
+            };
+            if (!permitted(state, character, required)) throw playerPermissionDenied();
+        } else if (!Set.of(Schema2CombatState.Kind.END_TURN, Schema2CombatState.Kind.BEGIN_ATTACK,
+                Schema2CombatState.Kind.FORFEIT_ATTACKS, Schema2CombatState.Kind.ATTACK, Schema2CombatState.Kind.CAST,
+                Schema2CombatState.Kind.MOVE, Schema2CombatState.Kind.DASH, Schema2CombatState.Kind.DISENGAGE,
+                Schema2CombatState.Kind.DODGE, Schema2CombatState.Kind.STAND_UP, Schema2CombatState.Kind.END_CONCENTRATION).contains(command.kind()))
+            throw playerPermissionDenied();
+    }
+    private static StorageException playerPermissionDenied() {
+        return new StorageException("PLAYER_COMMAND_FORBIDDEN", "This action is outside the player's current execution permission");
     }
     private static List<Exploration> invalidate(List<Exploration> permissions, Set<UUID> characters) {
         return new ArrayList<>(permissions.stream().map(e -> e.active() && characters.contains(e.characterId()) ? new Exploration(e.characterId(), e.sceneId(), e.actions(), false, Math.addExact(e.version(), 1)) : e).toList());
@@ -131,34 +177,7 @@ public final class CampaignParticipationCommands {
         if (actor.kind() == ActorKind.DM) { if (!Objects.equals(controller, actor.representedMemberId())) throw CampaignJson.bad("DM represented member differs from historical control"); }
         else if (!participation.member(actor.memberId()).active() || !Objects.equals(controller, actor.memberId())) throw new StorageException("PLAYER_CONTROL_REQUIRED", "This member does not currently control the acting PC");
     }
-    public static UUID historicalCharacter(CampaignDomainData.State state, CampaignDomainData.Root root) {
-        if (supports(root.kind()) || root.kind().equals("character-create") || root.kind().equals("character-profile") || root.kind().equals("manual-create") || root.kind().equals("manual-profile")) return null;
-        if (root.kind().equals("adjudicated-check")) return CampaignDomainCodec.decode(root.after().getBytes(java.nio.charset.StandardCharsets.UTF_8), CampaignAdjudicationData.Audit.class).decision().check().characterId();
-        if (root.kind().equals("combat-command")) return state.combats().stream().flatMap(c -> c.events().stream()).filter(e -> e.operationId().equals(root.operationId())).findFirst().orElseThrow(() -> CampaignJson.bad("Missing scene actor event")).command().actorId();
-        if (root.kind().equals("character-command") || root.kind().equals("position")) return root.subjectId();
-        if (root.kind().equals("item")) return CampaignDomainCodec.decode(root.after().getBytes(java.nio.charset.StandardCharsets.UTF_8), CampaignDomainData.Item.class).characterId();
-        if (root.kind().equals("check-effects")) return CampaignDomainCodec.decode(root.after().getBytes(java.nio.charset.StandardCharsets.UTF_8), CampaignCheckEffects.Audit.class).input().characterId();
-        if (root.kind().startsWith("manual-")) {
-            var request = CampaignDomainCodec.decode(root.after().getBytes(java.nio.charset.StandardCharsets.UTF_8), CampaignManualCommands.Audit.class).request();
-            return switch (request) {
-                case CampaignManualCommands.FieldEdit r -> r.characterId(); case CampaignManualCommands.ClassEdit r -> r.characterId();
-                case CampaignManualCommands.ProficiencyEdit r -> r.characterId(); case CampaignManualCommands.ItemEdit r -> r.characterId();
-                case CampaignManualCommands.Check r -> r.characterId(); default -> null;
-            };
-        }
-        return null;
-    }
-    public static void validateHistoricalActor(CampaignDomainData.State state, CampaignDomainData.Root root, State participation,
-            Map<UUID,CampaignDomainData.Profile> profiles, CampaignManualData.State manual) {
-        if (!Objects.equals(historicalCharacter(state, root), root.actor().characterId())) throw CampaignJson.bad("Historical command actor differs from typed command");
-        validateActor(participation, root.actor());
-        if (root.actor().kind() == ActorKind.PLAYER) {
-            if (!Set.of("character-command", "combat-command").contains(root.kind())) throw CampaignJson.bad("Player history contains a DM management operation");
-            var pc = profile(profiles, manual, root.actor().characterId());
-            if (!pc.active() || !pc.kind().equals("PC")) throw CampaignJson.bad("Historical player actor is not an active PC");
-        }
-    }
-    public static Map<UUID,CampaignDomainData.Profile> profiles(CampaignDomainData.State state) {
+    private static Map<UUID,CampaignDomainData.Profile> profiles(CampaignDomainData.State state) {
         Map<UUID,CampaignDomainData.Profile> values = new HashMap<>(); state.characters().forEach(c -> values.put(c.id(), new CampaignDomainData.Profile(c.id(), c.name(), c.kind(), c.active()))); return values;
     }
     private static CampaignDomainData.Profile profile(Map<UUID,CampaignDomainData.Profile> profiles, CampaignManualData.State manual, UUID id) {

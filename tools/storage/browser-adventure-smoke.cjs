@@ -9,7 +9,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {chromium} = require('playwright');
-const {observeStorageAction} = require('./browser-action.cjs');
+const {observeStorageAction, waitForStorageReady} = require('./browser-action.cjs');
+const {selectStandardRules} = require('./browser-rule-library.cjs');
+
+const {focusSpace, placeAtFocus, beginBattle} = require('./browser-spaces.cjs');
 
 const ORIGIN = 'http://127.0.0.1:8080', HTTP_TIMEOUT = 120000;
 const NAME = '石桥巡查短冒险', PC = '巡桥者艾拉', NPC = '守桥人洛恩';
@@ -62,7 +65,9 @@ async function main() {
     });
     // Observe feedback before allowing the real request through, without changing its body or response.
     await page.route(`${ORIGIN}/api/host/storage/*`, async route => {
-      if (route.request().method() === 'POST') {
+      const request = route.request();
+      const ruleCommand = new URL(request.url()).pathname.startsWith('/api/host/storage/rule-');
+      if (request.method() === 'POST' && !ruleCommand) {
         try {
           const busy = await page.evaluate(() => {
             const workspace = document.querySelector('#storage-workspace'), message = document.querySelector('#storage-message');
@@ -82,7 +87,7 @@ async function main() {
       && response.url() === `${ORIGIN}/api/host/storage/state`, {timeout: HTTP_TIMEOUT});
     await page.goto(ORIGIN + '/host/storage', {waitUntil: 'domcontentloaded'});
     const loaded = await response; assert.equal(loaded.status(), 200); current = await loaded.json();
-    await page.waitForFunction(() => document.querySelector('#storage-workspace')?.getAttribute('aria-busy') === 'false');
+    await waitForStorageReady(page);
   }
   const form = id => page.locator('#' + id);
   const card = name => current.campaign.domain.characters.find(character => character.name === name);
@@ -135,6 +140,7 @@ async function main() {
     finally { timing.elapsedMs = Date.now() - started; }
   }
   const submit = (id, label) => action('domain', () => form(id).getByRole('button', {name: label, exact: true}).click());
+  const actionBody = async (name, trigger) => (await action(name, trigger)).body;
   async function rule(selector, key) {
     const value = await page.locator(selector).locator('option').evaluateAll((options, key) =>
       options.find(option => option.value.endsWith('/' + key))?.value, key);
@@ -176,7 +182,7 @@ async function main() {
       assert.deepEqual(current.storage.saveFiles, []); assert.deepEqual(current.savedCampaigns, []);
       assert.equal(await form('storage-files').locator('option').count(), 0);
       assert.equal(await form('storage-residuals').locator('option').count(), 0);
-      for (const module of ['srd51-healing@1', 'srd51-runtime@1']) await page.locator(`#storage-modules input[value="${module}"]`).check();
+      await selectStandardRules(page);
       await form('storage-create').locator('[name="name"]').fill(NAME);
       await action('create', () => form('storage-create').getByRole('button', {name: '创建战役', exact: true}).click());
       assert.equal(current.storage.state, 'ACTIVE'); assert.equal(current.campaign.name, NAME);
@@ -217,13 +223,11 @@ async function main() {
       }
       campId = current.campaign.domain.nodes.find(node => node.name === '石桥营地').id;
       towerId = current.campaign.domain.nodes.find(node => node.name === '桥后哨所').id;
+      await focusSpace(page, actionBody, 'WORLD', campId);
       await form('domain-link').locator('[name="from"]').selectOption(campId);
-      await form('domain-link').locator('[name="to"]').selectOption(towerId); await submit('domain-link', '建立连接');
+      await form('domain-link').locator('[name="to"]').selectOption(towerId); await submit('domain-link', '建立有向连接');
       assert.ok(current.campaign.domain.nodes.find(node => node.id === campId).adjacent.includes(towerId));
-      for (const [id, node] of [[pcId, campId], [npcId, towerId]]) {
-        await form('domain-position').locator('[name="characterId"]').selectOption(id);
-        await form('domain-position').locator('[name="nodeId"]').selectOption(node); await submit('domain-position', '移动到地点');
-      }
+      await placeAtFocus(page, actionBody, [pcId, npcId]);
       await form('domain-item').locator('[name="characterId"]').selectOption(pcId);
       await form('domain-item').locator('[name="name"]').fill('巡桥火把');
       await form('domain-item').locator('[name="quantity"]').fill('2'); await submit('domain-item', '保存物品记录');
@@ -235,28 +239,34 @@ async function main() {
       await form('check-with-effects').check();
       for (const branch of ['success', 'failure']) {
         await form('domain-check').locator(`[name="${branch}Target"]`).selectOption(pcId);
-        await form('domain-check').locator(`[name="${branch}Node"]`).selectOption(branch === 'success' ? towerId : campId);
-        await form('domain-check').locator(`[name="${branch}Message"]`).fill(branch === 'success' ? '发现桥后的脚印，抵达哨所。' : '没有辨清脚印，留在营地警戒。');
+        await form('domain-check').locator(`[name="${branch}Message"]`).fill(branch === 'success' ? '发现桥后的脚印，准备前往哨所。' : '没有辨清脚印，留在营地警戒。');
       }
       await submit('domain-check', '服务器掷骰检定');
       const check = card(PC).history.events.at(-1).checkResult; assert.ok(check);
       assert.ok(check.firstD20 >= 1 && check.firstD20 <= 20); assert.equal(check.secondD20, null);
       assert.equal(check.total, check.selectedD20 + check.abilityModifier + check.proficiencyBonus);
       assert.equal(check.success, check.total >= 12);
-      assert.equal(current.campaign.domain.positions.find(position => position.characterId === pcId).nodeId, check.success ? towerId : campId);
+      assert.equal(current.campaign.domain.positions.find(position => position.characterId === pcId).space.id, campId);
       report.checkResult = check;
       assert.match(await form('storage-history').innerText(), check.success ? /发现桥后的脚印/ : /没有辨清脚印/);
-      await pane('world'); await screenshot('01-exploration-wide.png', 1440, 1050); await screenshot('02-exploration-mobile.png', 390, 844);
+      await pane('world');
+      await form('domain-travel').locator('[name="targetNodeId"]').selectOption(towerId);
+      for (const id of [pcId, npcId])
+        await form('domain-travel-subjects').locator(`[data-character="${id}"] [name="join"]`).check();
+      await form('domain-travel').locator('[name="minutes"]').fill('2');
+      await form('domain-travel').locator('[name="adjudication"]').fill('沿桥面巡查抵达哨所');
+      await submit('domain-travel', '沿路线转移');
+      const spaces = current.campaign.domain.space;
+      assert.equal(spaces.focus.space.id, towerId);
+      assert.equal(Number(spaces.clocks.find(clock => clock.space.id === campId).second), 120);
+      assert.equal(Number(spaces.clocks.find(clock => clock.space.id === towerId).second), 0);
+      assert.ok(current.campaign.domain.positions.every(position => position.space.id === towerId));
+      await screenshot('01-exploration-wide.png', 1440, 1050); await screenshot('02-exploration-mobile.png', 390, 844);
       report.checks.push('Two actual connected locations, positions and inventory; real DC12 roll applied only its declared result branch');
     });
     await stage('fight, pass a reaction and resolve an attack', async () => {
       await page.setViewportSize({width: 1440, height: 1050}); await pane('combat');
-      for (const row of await form('domain-deployments').locator('[data-character]').all()) {
-        const pc = await row.getAttribute('data-character') === pcId;
-        await row.locator('[name="side"]').fill(pc ? '0' : '1');
-        await row.locator('[name="x"]').fill(pc ? '0' : '1'); await row.locator('[name="y"]').fill('0');
-      }
-      await submit('domain-combat-start', '开始战斗');
+      await beginBattle(page, actionBody, [[pcId, 1, 0, 0], [npcId, 2, 0, 1]]);
       assert.equal(battle().initiative.length, 2);
       assert.deepEqual(battle().initiative.map(turn => turn.characterId).sort(), [pcId, npcId].sort());
       const initialRolls = current.campaign.domain.combats.at(-1).events.at(-1).resolution.rolls;
@@ -267,9 +277,10 @@ async function main() {
         assert.ok(die); assert.equal(die.sides, 20); assert.equal(die.value, turn.d20);
       }
       const actorId = battle().initiative[battle().activeOrdinal].characterId;
-      const targetId = actorId === pcId ? npcId : pcId, x = actorId === pcId ? 0 : 1;
+      const targetId = actorId === pcId ? npcId : pcId;
+      const x = battle().combatants.find(actor => actor.characterId === actorId).position.x;
       const weapon = current.campaign.domain.characters.find(character => character.id === actorId).state.equipment.find(item => item.location === 'MAIN_HAND');
-      await combatAction('MOVE', {x: x === 0 ? -1 : 2, y: 0}); await settle();
+      await combatAction('MOVE', {x: x === 1 ? 0 : 3, y: 0}); await settle();
       assert.ok(report.reactionsPassed > 0); assert.ok(report.continuations > 0);
       await combatAction('MOVE', {x, y: 0}); await settle();
       await combatAction('BEGIN_ATTACK');
@@ -345,7 +356,7 @@ async function main() {
       assert.deepEqual([...current.storage.saveFiles].sort(), [...acceptedFiles.keys()].sort());
       report.checks.push('A continued UI turn appended exactly one root/history event; final END left IDLE with no residual run and preserved earlier save bytes');
     });
-    assert.equal(report.busyChecks, report.actions.length, 'Every real POST must expose busy feedback');
+    assert.equal(report.busyChecks, report.actions.length, 'Every campaign POST must expose busy feedback');
     assert.deepEqual(report.pageErrors, []); assert.deepEqual(report.cspFailures, []); assert.deepEqual(report.busyFailures, []);
     report.result = 'PASSED';
   } catch (failure) {

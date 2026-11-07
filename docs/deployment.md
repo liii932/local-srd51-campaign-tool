@@ -46,7 +46,7 @@ SQLite 候选须覆盖完整文件、同版恢复、锁和目标文件系统边�
 [测试指南](testing.md)核验。
 部署仍执行本指南的停机、完整备份、候选审计、可回滚替换及验收，不另设自动切换程序。
 SQLite 候选审计须包含结构 JSON、严格 codec/领域引擎、SQLite JDBC、Host 资源及
-`storage/rules/` 四个内置原包；规则作者源保留在仓库 `rule-packages/srd51-runtime/`。
+本机规则库服务/账本、机制支持校验以及 `storage/rules/` 五个导入候选；规则作者源保留在仓库 `rule-packages/srd51-runtime/`。
 仅在满足[本地文件系统能力](configuration.md#sqlite-当前应用存储配置)的平台配置
 `DND_STORAGE_ROOT`；Windows 使用 NTFS/ACL，进程中断与物理断电保证分开，不能以
 Linux/WSL 或手工装配的测试容器代替原生 Windows 正式 WAR 验收。
@@ -152,7 +152,8 @@ DDL 权限。它不保存 `dnd_tool_se_migrator` 凭据；SQLite Tomcat 使用�
 
 只有 UI 或客户端 JavaScript 变化时才需要真实浏览器验收；应检查主要页面、表单和控制台错误。不要用 HTTP 探测执行真实业务写入，除非该写入验收被单独授权并有恢复方案。
 
-就绪检查会核验实际服务、四个内置规则包、可见保存文件及活动状态，`/health` 仅证明进程
+就绪检查核验实际服务、可见保存文件及活动状态，不读取规则库或内置候选；新建/打开
+另行核验准确原包与接受。`/health` 仅证明进程
 存活。`STORAGE_RECOVERY_REQUIRED` 要求在页面显式恢复或精确放弃；`STORAGE_BLOCKED`
 或 `STORAGE_UNAVAILABLE` 保留材料并按错误类别排查，不切换到另一个空根掩盖故障。
 隔离正式 WAR 的可重复验收见[测试指南](testing.md#原生-windows-外部-tomcat-候选验收)。

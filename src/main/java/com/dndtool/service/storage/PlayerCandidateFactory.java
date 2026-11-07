@@ -1,5 +1,7 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
 import com.dndtool.service.*;
@@ -21,16 +23,25 @@ public final class PlayerCandidateFactory {
 
     public static List<Candidate> candidates(CampaignStorageService.AccessSnapshot access, UUID player) {
         var domain = access.snapshot().domains(); PlayerCampaignProjection.requireMember(domain, player);
-        Set<UUID> own = PlayerCampaignProjection.owned(domain, player), visible = PlayerCampaignProjection.visible(domain, player);
-        var material = domain.material().restore(); List<Candidate> result = new ArrayList<>();
-        var history = domain.combats().stream().filter(c -> c.current().status() != Status.ENDED).findFirst().orElse(null);
+        Set<UUID> own = new LinkedHashSet<>(PlayerCampaignProjection.owned(domain, player));
+        own.removeIf(id -> !CampaignSpaceCommands.focused(domain, id));
+        if (own.isEmpty()) return List.of();
+        Set<UUID> visible = PlayerCampaignProjection.visible(domain, player);
+        var material = domain.material().restore().projection(); List<Candidate> result = new ArrayList<>();
+        var history = CampaignSpaceCommands.currentBattle(domain);
         if (history == null) {
-            if (!CampaignManualData.active(domain.manual())) for (var character : domain.characters())
-                if (own.contains(character.id()) && permit(domain, character.id(), null, "CHARACTER_COMMAND")) characterChoices(result, domain, material, character);
+            if (CampaignSpaceCommands.isWorldFocus(domain)) for (var character : domain.characters())
+                if (own.contains(character.id()) && CampaignParticipationCommands.permitted(domain, character.id(), "CHARACTER_COMMAND"))
+                    characterChoices(result, domain, material, character);
             return List.copyOf(result);
         }
         Battle battle = history.current(); Map<UUID, Schema2CombatRules.Context> roster = new LinkedHashMap<>();
-        domain.characters().forEach(c -> roster.put(c.id(), new Schema2CombatRules.Context(material, c.initial(), c.history().current())));
+        var scene = CampaignSpaceData.Ref.scene(battle.combatId());
+        long sceneSecond = domain.space().clock(scene).second();
+        Set<UUID> combatants = new HashSet<>(battle.combatants().stream().map(Combatant::characterId).toList());
+        domain.characters().stream()
+                .filter(c -> combatants.contains(c.id()) && CampaignSpaceCommands.focused(domain, c.id()))
+                .forEach(c -> roster.put(c.id(), new Schema2CombatRules.Context(material, c.initial(), c.history().current(), sceneSecond)));
         var factory = new BattleChoices(result, domain, battle, roster);
         if (battle.activeFlow() != null) {
             Flow flow = battle.activeFlow(); Frame leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
@@ -68,19 +79,15 @@ public final class PlayerCandidateFactory {
                         factory.add(Command.attack(actor, target, item.itemId()), "攻击 " + PlayerCampaignProjection.characterName(domain, target) + " · " + PlayerCampaignProjection.ruleName(domain, item.item()));
                 factory.moves(actor, false); factory.spells(actor, visible);
             } else if (battle.status() == Status.EXPLORATION) {
-                if (permit(domain, actor, battle.combatId(), "EXPLORATION_MOVE")) factory.moves(actor, true);
-                if (permit(domain, actor, battle.combatId(), "END_CONCENTRATION")) factory.add(Command.action(Kind.END_CONCENTRATION, actor), "结束专注");
+                if (CampaignParticipationCommands.permitted(domain, actor, "EXPLORATION_MOVE")) factory.moves(actor, true);
+                if (CampaignParticipationCommands.permitted(domain, actor, "END_CONCENTRATION")) factory.add(Command.action(Kind.END_CONCENTRATION, actor), "结束专注");
                 // Spell use in exploration must be explicitly granted for this exact scene.
-                if (permit(domain, actor, battle.combatId(), "CHARACTER_COMMAND")) factory.spells(actor, visible);
+                if (CampaignParticipationCommands.permitted(domain, actor, "CHARACTER_COMMAND")) factory.spells(actor, visible);
             }
         }
         return List.copyOf(result);
     }
 
-    private static boolean permit(CampaignDomainData.State domain, UUID character, UUID scene, String action) {
-        return domain.participation().exploration().stream().anyMatch(p -> p.characterId().equals(character) && p.active()
-                && Objects.equals(p.sceneId(), scene) && p.actions().contains(action));
-    }
     private static void characterChoices(List<Candidate> result, CampaignDomainData.State domain, ProductionSchema2Projection material, CampaignDomainData.Character character) {
         var state = character.history().current();
         for (var item : state.equipment()) {
@@ -93,18 +100,19 @@ public final class PlayerCandidateFactory {
                         new Schema2CharacterRuntime.EquipmentInput(item.itemId(), null, unequip ? null : location, "玩家调整自己的装备"), null);
                 try { new Schema2CharacterEquipmentRules().apply(material, state, command, UUID.randomUUID()); }
                 catch (IllegalArgumentException unavailable) { continue; }
-                addCharacter(result, character, command, (unequip ? "卸下 " : "装备 ") + PlayerCampaignProjection.ruleName(domain, item.item()) + (unequip ? "" : " · " + locationLabel(location)));
+                addCharacter(result, domain, character, command, (unequip ? "卸下 " : "装备 ") + PlayerCampaignProjection.ruleName(domain, item.item()) + (unequip ? "" : " · " + locationLabel(location)));
             }
         }
         for (var resource : state.resources()) {
             try { new Schema2CharacterProgressionRules().spend(material, state, resource.identity(), 1); }
             catch (IllegalArgumentException unavailable) { continue; }
-            addCharacter(result, character, new Schema2CharacterRuntime.Command("RESOURCE_SPENT", resource.identity(), 1, null, null),
+            addCharacter(result, domain, character, new Schema2CharacterRuntime.Command("RESOURCE_SPENT", resource.identity(), 1, null, null),
                     "使用 1 次 " + PlayerCampaignProjection.ruleName(domain, resource.identity()));
         }
     }
-    private static void addCharacter(List<Candidate> result, CampaignDomainData.Character character, Schema2CharacterRuntime.Command command, String label) {
+    private static void addCharacter(List<Candidate> result, CampaignDomainData.State domain, CampaignDomainData.Character character, Schema2CharacterRuntime.Command command, String label) {
         JsonObject input = new JsonObject(); input.addProperty("characterId", character.id().toString()); input.addProperty("characterVersion", Long.toString(character.history().current().version()));
+        input.add("focus", CampaignSpaceCommands.focusPayload(domain));
         input.add("command", CampaignDomainCodec.toJson(command)); add(result, label, character.id(), "character-command", input);
     }
     private static void add(List<Candidate> result, String label, UUID actor, String action, JsonObject input) {
@@ -127,9 +135,13 @@ public final class PlayerCandidateFactory {
         }
         void add(Command command, String label) {
             if (result.size() >= MAX_CHOICES) return;
-            try { rules.preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(), roster, battle, command); }
-            catch (IllegalArgumentException unavailable) { return; }
+            try {
+                CampaignDomainCommands.preflightGrid(domain, command);
+                rules.preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(), roster, battle, command);
+            }
+            catch (StorageException | IllegalArgumentException unavailable) { return; }
             JsonObject input = new JsonObject(); input.addProperty("combatId", battle.combatId().toString()); input.addProperty("combatVersion", Long.toString(battle.version()));
+            input.add("focus", CampaignSpaceCommands.focusPayload(domain));
             input.add("command", CampaignDomainCodec.toJson(command)); PlayerCandidateFactory.add(result, label, command.actorId(), "combat-command", input);
         }
         void moves(UUID actor, boolean exploration) {

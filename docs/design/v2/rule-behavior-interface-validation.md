@@ -20,7 +20,7 @@
 | 合同入口 | 原评估使用的边界 |
 |---|---|
 | [模组分层](module-layering.md#模组到机制的接口)、[应用内契约](module-layering.md#应用内契约) | 规则只声明有限类型和参数；应用机制解释规则；候选、预检、求解、领域应用、共同提交、直接恢复分别负责 |
-| [模组接口](module-interface-baseline.md#四阶段校验与发布资格) | 新行为先由应用提供明确 consumer 和完整支持合同；作者不能注册处理器、脚本、任意表达式或写状态指令 |
+| [模组接口](module-interface-baseline.md#阶段校验与执行资格) | 新行为先由应用提供明确 consumer 和完整支持合同；作者不能注册处理器、脚本、任意表达式或写状态指令 |
 | [动作登记](action-continuation-protocol.md#封闭登记与完整预检)、[活动链](action-continuation-protocol.md#活动链与调用边界) | 应用登记有限阶段、生产者/消费点、成本、原骰、返回点和恢复；`DOMAIN_CHOICE` 与反应分开；继续只消费准确叶子的未执行后缀 |
 | [持续效果登记](ongoing-effect-protocol.md#封闭登记重叠与条件聚合)、[时间与发生身份](ongoing-effect-protocol.md#时钟资格变化与重新求值) | source/application/contribution/cause 分开；登记真实消费者、进出、到期、进展与结束义务；保存发生游标及已消费前缀 |
 | [施法分派](spellcasting-extension-contract.md#效果分派与公共领域-owner)、[共享伤害](multi-target-save-damage.md#伤害数学共同切面与专注) | 有限类型化子计划、完整目标 reader、共享原骰、逐目标修正、分伤害类型及唯一健康 owner |
@@ -51,19 +51,19 @@
 | [V01](#v01) Bardic Inspiration | 攻击 d20 后、判定前选择消费灵感 | P，限攻击分支 | P | 未接入掷后选择 |
 | [V02](#v02) Sneak Attack | 命中后的额外骰、暴击与每 turn 用量 | P | P | 未接入 |
 | [V03](#v03) Divine Smite | 最终近战命中后选法术位，追加异类型伤害 | P | P | 未接入 |
-| [V04](#v04) Grapple + Extra Attack | 一击改为技能对抗，拖带与无动作释放 | U | P | 有限近战已接入；额外攻击、擒抱、挣脱、拖带和释放待采用 |
+| [V04](#v04) Grapple + Extra Attack | 一击改为技能对抗，拖带与无动作释放 | U | P | 未接入；当前攻击序列额度为 1 |
 | [V05](#v05) Counterspell | 已知瞬时法术的嵌套反制及原前缀恢复 | P | P | 有限子集已接入 |
 | [V06](#v06) Fireball + Evasion | 完整目标已确定后的共享伤害、逐目标减免与专注 | P，限伤害分派片段 | P | 未接入 Fireball/Evasion；已有 Burning Hands 相邻链路 |
 | [V07](#v07) Spirit Guardians | 明确进入、同 turn 重进、以后 turn 的 START | P，限明确触发片段 | P | 未接入 |
 | [V08](#v08) Polymorph | 形态 HP 耗尽、回转及本体溢出伤害 | U | P | 未接入 |
 | [V09](#v09) Antimagic Field | 已知覆盖下两个独立原因压制 Bless，期限继续 | P，限贡献压制片段 | P | 固定 DM 区域有相邻机制；真实法术未接入 |
 | [V10](#v10) Conjure Animals | 战斗中生成多个主体、群组先攻、消失退场 | U | P | 未接入 |
-| [V11](#v11) Forced March / Food and Water | 按自然日归集旅行及生存消耗、逐次累积力竭 | U | P | 已有场景时间推进，尚无旅行日账本 |
+| [V11](#v11) Forced March / Food and Water | 按自然日归集旅行及生存消耗、逐次累积力竭 | U | P | 仅有 DM 旅行耗时及时间推进 |
 | [V12](#v12) Sewer Plague | 同空间潜伏期、症状、休息治疗及治愈顺序 | P，限所列进展 | P | 未接入 |
 | [V13](#v13) Wand of Fireballs | 同调、充能施法、最后一充能及黎明恢复 | U | P | 未接入 |
 | [V14](#v14) Glyph of Warding | 物件条件触发、一次结算与储存施法释放 | U | P，限列明的条件与释放 | 未接入 |
 | [V15](#v15) Divine Intervention | 百分骰／自动成功、有限 DM 后果与恢复资格 | P，限有限后果 | P，限有限后果 | 未接入；现有裁定入口只处理已支持的检定后果 |
-| [V16](#v16) Warding Bond | 前台受伤引发后台主体同步受伤 | F | P，真实距离与完整因果域 | 未接入跨空间伤害 |
+| [V16](#v16) Warding Bond | 前台受伤引发后台主体同步受伤 | F | P，真实距离与完整因果域 | 未接入；现行交接拒绝该依赖 |
 
 这些样例覆盖不同接口压力点，未穷举角色构筑、多职业、升级、感官/遮蔽、社交、三维
 空间、位面和全部怪物能力。P 的数量不表示完整规则覆盖率，U/F 也不证明整个分层方向不可用。
@@ -155,8 +155,9 @@ DEX(Acrobatics) 对抗，替代 Attack 动作中的一击。拖带通常使速�
 许可也未闭合。目标选技能时的保存须保留原 ordinal 与选择权，不能另建普通检定而丢掉序列。
 新增替代 attempt 或联动移动接口后只能验证新设计。
 
-**程序。** [现行战斗](../../../src/main/java/com/dndtool/service/Schema2CombatRules.java)支持有限近战。
-额外攻击的角色授予与额度、擒抱替代、挣脱、拖带和释放仍需各自接入。
+**程序。** [BEGIN_ATTACK](../../../src/main/java/com/dndtool/service/Schema2CombatRules.java)
+当前额度为 1；[角色包](../../../rule-packages/srd51-runtime/srd51-characters/rules.json)
+的 Extra Attack 执行标记为 `BLOCKED`。
 
 <a id="v05"></a>
 ### V05：嵌套 Counterspell
@@ -243,7 +244,7 @@ B 同 turn 离开再进入不再次产生进入伤害。到 B 以后一次 START
 下游不会提前看到死亡。尺寸/占位、抗魔压制后形态恢复也缺具体合同。非自愿目标成功豁免
 是合法付费无效果，不能与非法形态/CR 的前置拒绝混为一谈。
 
-**程序。** [角色事实](../../../src/main/java/com/dndtool/persistence/JdbcSchema2CharacterRuntimeRepository.java)
+**程序。** [角色事实](../../../src/main/java/com/dndtool/service/Schema2CharacterRuntime.java)
 与[健康规则](../../../src/main/java/com/dndtool/service/Schema2CharacterHealthRules.java)
 维护一组普通 HP/统计，未接形态层次。
 
@@ -286,8 +287,9 @@ B 同 turn 离开再进入不再次产生进入伤害。到 B 以后一次 START
 尚未闭合战斗中原子生成/退场、群组插入轮次、当前成员消失及 pending 重验的交接。
 不能先在世界创建，再伪装成战斗内合法生成。任一初始格非法应使整次声明在付费/RNG 前拒绝。
 
-**程序。** [初始先攻](../../../src/main/java/com/dndtool/service/Schema2CombatRules.java)在开战时
-按每只已部署怪物独立结算。战中原子生成、群组回合与退场尚待接入。
+**程序。** [monster-create/applyScene](../../../src/main/java/com/dndtool/service/storage/CampaignSpaceCommands.java)
+只允许在世界节点创建，场景回写要求主体已经安置；[初始先攻](../../../src/main/java/com/dndtool/service/Schema2CombatRules.java)
+按每只怪物独立结算，不提供本例的群组生命周期。
 
 <a id="v11"></a>
 ### V11：强行军、食水与自然日
@@ -304,13 +306,14 @@ B 总值 12 成功。两次检定须消费各自时点的当前力竭，不能�
 另一个反例：食水不足来源的力竭在未吃喝足量前不能借普通休息直接清除。
 
 **U 的原因。** 语义文档对未指定重置的 per-day 采用 DM 建立的世界自然日，这是明确标注
-的项目解释。[个人资格](time-and-calendar.md#personal-eligibility)按实际经历秒计量，
-奥术回想使用 `floor(个人经历秒/86400)`。两者的重置依据不同。接口还缺每日活动归集、跨空间
+的项目解释。[当前角色时钟](world-and-scene-spaces.md#角色累计经历时间)则携带实际经历秒，
+奥术回想当前用 `floor(个人经历秒/86400)`；两者并不等价。接口还缺每日活动归集、跨空间
 日界和食水欠量的事实边界。时间服务可推进秒，不代表已有“旅行了多久/哪一天”的 reader。
 保存须保留活动日、逐小时已消费前缀和各类力竭来源，否则重开会补骰或错误恢复。
 
-**程序。** [场景探索](../../../src/main/java/com/dndtool/service/Schema2ExplorationRules.java)
-已有时间推进。强行军、旅行日账本及食水消耗仍待各自消费者。
+**程序。** [旅行入口](../../../src/main/java/com/dndtool/service/storage/CampaignSpaceCommands.java)
+按 DM 裁定分钟推进源域并执行空间交接；[时钟测试源码](../../../src/test/java/com/dndtool/service/storage/CampaignSpaceTimeBoundaryTest.java)
+覆盖跨快慢时钟的恢复与空间写回滚。二者无强行军、速度、地形或食水消耗消费者。
 
 <a id="v12"></a>
 ### V12：Sewer Plague 的潜伏期、症状和休息结算
@@ -351,8 +354,9 @@ B 总值 12 成功。两次检定须消费各自时点的当前力竭，不能�
 与同调者相距超过 100 尺持续 24 小时的边界还需要跨空间距离/计时定义。V06 的完整 Fireball 几何
 缺口也传递到这里。不能拿角色每日恢复或墙钟替代黎明，也不能把转交物件实现为复制新资源。
 
-**程序。** 当前有限施法使用职业或法术书授权。物品授权、充能与黎明仍待接入。
-[施法实现](../../../src/main/java/com/dndtool/service/Schema2SpellRules.java)
+**程序。** 当前[施法实现](../../../src/main/java/com/dndtool/service/Schema2SpellRules.java)
+和[应用支持门](../../../src/main/java/com/dndtool/service/storage/CampaignRuleSupport.java)
+没有本例的物品授权/充能/黎明消费者。
 
 <a id="v14"></a>
 ### V14：Glyph of Warding 的物件触发与储存施法
@@ -372,8 +376,9 @@ B 总值 12 成功。两次检定须消费各自时点的当前力竭，不能�
 释放这种授权，不能伪装成角色重新施法或 Ready。稳定等待未来触发不应永久占用活动 flow；
 只有实际触发后尚未完成的义务进入当前流。爆炸球体/绕角还受 V06 同类缺口约束。
 
-**程序。** [施法规则](../../../src/main/java/com/dndtool/service/Schema2SpellRules.java)
-只承接有限法术。铭文宿主、条件 reader 和储存释放授权仍待接入。
+**程序。** [空间命令](../../../src/main/java/com/dndtool/service/storage/CampaignSpaceCommands.java)
+提供主体网格，[施法规则](../../../src/main/java/com/dndtool/service/Schema2SpellRules.java)
+只承接有限法术；未见真实铭文宿主、条件 reader 或储存释放授权。
 
 <a id="v15"></a>
 ### V15：Divine Intervention 的有限 DM 后果
@@ -395,8 +400,9 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 不能提交任意 JSON 修改世界；不是每种神祇干预都由此通过。百分骰后另起无关联的裁定根
 不能取代该未决特性的继续责任。
 
-**程序。** 现有 DM 裁定调用受支持的检定后果。神祇干预的职业授予、百分骰与有界决定属于
-目标轨迹。[现有 DM 裁定](../../../src/main/java/com/dndtool/service/storage/CampaignAdjudicationCommands.java)
+**程序。** [现有 DM 裁定](../../../src/main/java/com/dndtool/service/storage/CampaignAdjudicationCommands.java)
+只调用受支持的检定后果；[职业支持](../../../src/main/java/com/dndtool/service/storage/CampaignRuleSupport.java)
+也没有该高等级特性。因此这是设计可承载的有限轨迹，不是当前自由卡/备注的自动能力。
 
 <a id="v16"></a>
 ### V16：Warding Bond 跨空间传递伤害
@@ -413,11 +419,12 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 **F 的原因。** 原[后台冻结](world-and-scene-spaces.md#执行焦点与冻结)禁止该写入，
 原[空间交接](world-and-scene-spaces.md#空间和模式命令)关闭未接合的跨主体影响。
 两个场景锚定同一世界节点不提供物理距离，不能自动推定“超过 60 尺所以结束”。
-原设计要求拒绝携带该依赖的转移。本例要求羁绊保持且伤害同步结算。
+拒绝携带该依赖转移是合法现行守卫，但不等于支持本例的跨空间羁绊行为。
 
-**程序。** 当前没有 Warding Bond 消费者。
-[共享伤害](../../../src/main/java/com/dndtool/service/Schema2SaveDamageRules.java)处理所属场景的
-有限目标。跨空间作用域属于修订后的设计。
+**程序。** 当前没有 Warding Bond 消费者。[空间入口](../../../src/main/java/com/dndtool/service/storage/CampaignSpaceCommands.java)
+对后台主体返回 `SPACE_FROZEN`，并拒绝携带活动场景依赖的交接；
+[共享伤害实现](../../../src/main/java/com/dndtool/service/Schema2SaveDamageRules.java)
+仍按所属场景内的有限目标处理。跨空间作用域只存在于修订后的设计。
 
 <a id="gap-ledger"></a>
 
@@ -434,7 +441,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 | G01.1 普通能力检定、技能对抗 | U→P | d20=10、+4 与 d8=3 得 17；普通 DC 15 成功，对抗胜 total 16，双方结清前无胜负。保存的是 14 和可选骰，错 choice 零新骰。[检定阶段](action-continuation-protocol.md#check-stages) | [V01](#v01)；有限独立检定无该 choice |
 | G01.2 普通属性及专注豁免 | U→P | DEX DC 15 或实伤 30 的 CON DC 15，同一 14→17 通过；自动失败仅保存真实条件，零 d20。专注结束消费准确 holder 义务，重复不得重扣灵感。[检定阶段](action-continuation-protocol.md#check-stages)、[专注 cut](multi-target-save-damage.md#typed-damage-application) | [V01](#v01)；有限 save 无该续接 |
 | G01.3 死亡豁免 | U→P | 0 HP 且未稳定时 8+3=11 记一次成功；自然 1 仍两次失败，20 走恢复 1 HP 分支。坏当前生命状态或过期叶子不产生新骰或计数。[死亡向量](action-continuation-protocol.md#check-and-attack-vectors) | [V01](#v01)；当前死亡骰无该选择 |
-| G04.1 攻击替代及强制技能选择 | U→P | 5 级两击，首 ordinal 先保留唯一擒抱 attempt。选择技能点无攻击骰/伤害；无手、过大、越距拒绝整次新 attempt。[擒抱替代](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；额外攻击、擒抱替代与强制技能选择待采用 |
+| G04.1 攻击替代及强制技能选择 | U→P | 5 级两击，首 ordinal 先保留唯一擒抱 attempt。选择技能点无攻击骰/伤害；无手、过大、越距拒绝整次新 attempt。[擒抱替代](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；额度 1，Extra Attack 阻断 |
 | G04.2 对抗、平局与挣脱 | U→P | 16>14 建关系；初次 17 平局消费首 ordinal、无 Grappled。后续花动作挣脱平 14，状态不变；恢复不补另一笔 action。[擒抱替代](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；无此对抗 owner |
 | G04.3 拖带 | U→P | 尺寸差不足两级时主速度 30→15，否则维持 30。真实 OA 在离开前，被拖者不耗移动且无自身 OA；配对第二端失败时两端位置与 spent 同回滚。[联动步段](action-continuation-protocol.md#coupled-move) | [V04](#v04)；现行移动为单主体 |
 | G04.4 无动作释放及失效 | U→P | 当前等待期间释放只结束准确关系与手位。重复释放不多消条件；联动等待恢复后只停后缀，已走位置、原骰不倒改。[释放写门](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；无关系或例外写门 |
@@ -462,7 +469,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 | G09.3 神器及直接神祇来源 | U→P | 冻结神器本身、由它实际创建的效果及直接神祇因果可例外；普通信仰、名称或客户端标记不通过。恢复核对来源链，缺证不默认放行。[来源分类](ongoing-effect-protocol.md#antimagic-field) | [V09](#v09)；无完整来源分类 |
 | G09.4 召唤暂隐、复现与终结 | U→P | 解除最后原因才在原场景/时间域找安置；无合法格保存 `WAITING_PLACEMENT`。获准的因果 scope 中再次压制使原返回为 `CANCELLED_RESUPPRESSED`，仍暂隐且保同一 ID、HP 和先攻；再次解除最后原因才开新 episode。源终止优先 `CANCELLED_SOURCE_ENDED` 永久退场。恢复只装载取消事实及准确新叶子，不等待已取消的 RETURN。[抗魔暂隐](ongoing-effect-protocol.md#antimagic-field)、[安置](spatial-and-area-contract.md#placement-transition) | [V09](#v09)；无主体暂隐 |
 | G09.5 传送、位面旅行与门户 | U→P | 传送任一端覆盖，无转移/焦点变化；门户实际开口交叠关闭通路，物理门仍可开。移场解除时不补传；过期端点版本或错继续点不改两端。[抗魔旅行](ongoing-effect-protocol.md#antimagic-field) | [V09](#v09)；无该消费者 |
-| G10.1 原子生成及环级 | U→P | 两狼全体预检和生成；选 2 档在 5/7/9 环为 4/6/8 只，6/8 环仍 2。声明任一非法格零成本；已付后被占为 NO_SPAWN，真实抗魔阻断单格另记，不以失败回写冒充已出生。[生成](character-state-and-history.md#summon-turn) | [V10](#v10)；仅开战部署 |
+| G10.1 原子生成及环级 | U→P | 两狼全体预检和生成；选 2 档在 5/7/9 环为 4/6/8 只，6/8 环仍 2。声明任一非法格零成本；已付后被占为 NO_SPAWN，真实抗魔阻断单格另记，不以失败回写冒充已出生。[生成](character-state-and-history.md#summon-turn) | [V10](#v10)；仅世界创建 |
 | G10.2 群组先攻与游标 | U→P | 只掷 12+2=14，中途按稳定项及本轮关闭前缀插入；已消费轮次不补发。保存组骰/当前成员，错游标拒绝，恢复不重掷。[群组回合](character-state-and-history.md#summon-turn) | [V10](#v10)；单怪先攻 |
 | G10.3 指令、控制与退场 | U→P | 可听口令零 action，友善无账号控制；W1 归零消失、W2 留场，源结束连同暂隐成员收束。若恰为当前成员，保存原骰并结一次关闭余集，迟到旧候选拒绝；成员写失败不留孤立安置。[召唤生命周期](character-state-and-history.md#summon-lifecycle) | [V10](#v10)；无群组生命周期 |
 
@@ -470,8 +477,8 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 
 | 缺口 | 原→修订 | 合同接点与分支复验 | 当前程序证据 |
 |---|---|---|---|
-| G11.1 独立自然日、迁移和个人资格 | U→P | 已旅行 8 小时、摄入半份，交接保留账本和游标，只绑定目的严格未来日界；后台不补日或个人秒。空间存续期固定定义及 episode，活动空间改制、移动黎明或重新绑定的请求不能制造同日恢复。日界不改变长休间隔或 Arcane Recovery 个人日档。[日历发生](time-and-calendar.md#calendar-events)、[个人资格](time-and-calendar.md#personal-eligibility) | [V11](#v11)；已有场景时间推进 |
-| G11.2 逐小时旅行 | U→P | 真实参加者 9/10 小时末各结一次；A 2→3 后下一次按劣势，不提前冻结。正逢日界先结额外小时；恢复原小时游标及余集，虚报旅时或旧发生不能补骰。[旅行账本](time-and-calendar.md#daily-activity) | [V11](#v11)；无逐小时旅行结算 |
+| G11.1 独立自然日、迁移和个人资格 | U→P | 已旅行 8 小时、摄入半份，交接保留账本和游标，只绑定目的严格未来日界；后台不补日或个人秒。空间存续期固定定义及 episode，活动空间改制、移动黎明或重新绑定的请求不能制造同日恢复。日界不改变长休间隔或 Arcane Recovery 个人日档。[日历发生](time-and-calendar.md#calendar-events)、[个人资格](time-and-calendar.md#personal-eligibility) | [V11](#v11)；有独立秒与恢复相邻测试 |
+| G11.2 逐小时旅行 | U→P | 真实参加者 9/10 小时末各结一次；A 2→3 后下一次按劣势，不提前冻结。正逢日界先结额外小时；恢复原小时游标及余集，虚报旅时或旧发生不能补骰。[旅行账本](time-and-calendar.md#daily-activity) | [V11](#v11)；仅 DM 计时 |
 | G11.3 食水与力竭归因 | U→P | CON+0，六个半份日欠粮刚好 3 日不加、第七日超过才加；热日恰 1 加仑走 DC 15，低于半量零骰，已有力竭再加 2。足量解除恢复限制，未足量长休不清该来源；重复日界不扣第二份库存。[食水账本](time-and-calendar.md#daily-activity) | [V11](#v11)；无摄入、欠量消费者 |
 | G12.1 感染迁移与真实暴露 | U→P | d4=2 的 172800 个人秒跨快慢时钟不变，已过 3600 则余 169200。真实暴露免疫/已感染零新潜伏骰，未知接触不冒充免疫；未结豁免不迁叶子。[暴露与迁移](ongoing-effect-protocol.md#疾病进展石化与休息) | [V12](#v12)；无感染 owner |
 | G12.2 石化独立原因 | U→P | 两个有效原因保同一暂停余量，解除首个仍冻结，末因解除后同 episode 继续；余量零仅一次 onset。暂停中无补长休疾病骰，已有力竭保留，治愈后解除不恢复。[石化](ongoing-effect-protocol.md#disease-progression) | [V12](#v12)；无疾病暂停 |
@@ -487,7 +494,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 | G14.4 储存授权与集中改写 | U→P | 三环 Glyph 与真实准备的一环 Bless 分别付款，储存合法单目标档；释放使触发者取得 d4 贡献，完整 60 秒，无 holder 或第二次付款。储存 Fireball 以触发者为中心重建完整范围。其他储存效果须有各自准确消费者；坏授权拒绝，真实目标失效不改找替代。回滚保护触发收据和未应用后缀。[储存施法](spellcasting-extension-contract.md#item-and-stored-grants)、[实物向量](objects-and-magic-items.md#object-recovery) | [V14](#v14)；无此授权 |
 | G14.5 任意开放条件 | U→U | 仅通过已登记事实和有界词汇；例如任意历史叙述或未登记条件在铭刻接受前拒绝，保存/恢复不把它改写成可执行谓词。[有限词汇边界](objects-and-magic-items.md#glyph-predicate) | [V14](#v14)；无通用执行 |
 | G15.1 任意机械神祇援助 | U→U | 已预检治疗/效果仍为 P；有界 NARRATIVE 保存一次真实叙事、可见性和成功冷却，不改变 HP、位或世界状态。脚本、字段补丁或临时未预检机械后果拒绝，等待原叶子保留。[有限裁定边界](ongoing-effect-protocol.md#divine-intervention) | [V15](#v15)；仅现有检定裁定 |
-| G16.1 跨空间距离与存续 | F→P | 可比较物理框架证明戒指、实际距离 ≤60 尺才继续，61 尺正常结束；同世界锚点但无变换拒交接，不推断超距。后台个人期限不补算，旧距离或缺闭包零新骰。[空间证明](spatial-and-area-contract.md#spatial-proof)、[羁绊](ongoing-effect-protocol.md#warding-bond) | [V16](#v16)；无跨空间距离与交接 |
+| G16.1 跨空间距离与存续 | F→P | 可比较物理框架证明戒指、实际距离 ≤60 尺才继续，61 尺正常结束；同世界锚点但无变换拒交接，不推断超距。后台个人期限不补算，旧距离或缺闭包零新骰。[空间证明](spatial-and-area-contract.md#spatial-proof)、[羁绊](ongoing-effect-protocol.md#warding-bond) | [V16](#v16)；现行冻结拒绝 |
 | G16.2 前后台原子伤害及后继 | F→P | 原 14 火→7 与 relay 7→3 的健康同阶段；前置后台选择时两端未伤，后置专注等待时两端已伤。后台归零或再伤害照真实 owner 及 scope 叶子结算，不开放普通流；第二端写失败共同回滚。[共同提交](world-and-scene-spaces.md#cross-space-apply)、[伤害接点](multi-target-save-damage.md#causal-damage-apply) | [V16](#v16)；无同阶段跨空间写入 |
 | G16.3 调度、递归与直接恢复 | F→P | 完整无环图、唯一边和受限继续。已登记的关系重验、区域覆盖、实物触发可分别消费真实同调离身、覆盖变化、Glyph 互动或位移；切焦点、普通后台 MOVE/开箱与旧后台叶子不产生这些事实。环或未知后果首骰前拒绝。恢复仅保当前 scope 叶子及原冻结流，不自动 PASS、不重传 7；之后切回重验原后缀。[受限入口](world-and-scene-spaces.md#causal-scope)、[恢复](world-and-scene-spaces.md#scope-recovery) | [V16](#v16)；无因果域/恢复 |
 
@@ -528,9 +535,13 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 
 ## 证据与复验边界
 
-本页设计结论来自逐例语义、相关 SRD 原文、设计条款和现有源码的纸面核对。
-程序列仅记录现有有限实现的相邻能力和缺口。实际运行及完整文件资格见[采用边界](adoption-boundaries.md)，
-新目标图的每个机制须另外取得端到端证据。
+本页结论来自逐例语义、相关 SRD 原文、现有设计条款和当前源码的纸面核对。源码中的测试
+只用于辨别现有分支，不把其存在或过去结果当作本轮运行证据。未执行 Maven、应用命令、
+真实数据库或部署；文档检查只能证明内容/链接/格式，不授予运行或规则发布资格。
+
+程序列区分有限 INTERNAL 场景消费者和当前 SQLite 可移植 `RULE_BOUND_CAMPAIGN`
+format 3。后者的原有运行、检查点与直接打开证据仍按[采用边界](adoption-boundaries.md)
+判定，不能将本文新设计的业务图算作已经由该文件格式读写。
 
 复验时先固定待验证的合同内容和样例范围，再逐项核对声明、权威输入、阶段/成本、随机、
 后果、时间及恢复。内容变化须重审相关结论；不以文档哈希代替实际阅读。实现之后另行增加

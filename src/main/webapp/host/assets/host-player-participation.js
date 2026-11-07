@@ -17,6 +17,16 @@
     ...(hostView?.campaign?.domain?.characters || []).map(card => ({id:card.id,name:card.name,kind:card.kind})),
     ...(hostView?.campaign?.domain?.manual?.characters || []).map(history => ({id:history.current.id,name:history.current.name,kind:history.current.kind}))
   ];
+  const domain = () => hostView?.campaign?.domain;
+  const focusedSpace = () => domain()?.space.focus.space;
+  const focusedScene = () => {
+    const focus = focusedSpace();
+    return focus?.kind === 'SCENE' ? domain().space.scenes.find(scene => scene.id === focus.id) : null;
+  };
+  const isFocused = id => {
+    const focus = focusedSpace(), place = domain()?.positions.find(p => p.characterId === id)?.space;
+    return Boolean(focus && place && focus.kind === place.kind && focus.id === place.id);
+  };
   const pcCards = () => cards().filter(card => card.kind === 'PC');
   const currentView = () => Boolean(state && hostView?.campaign
     && String(state.epoch) === String(hostView.storage.epoch)
@@ -27,7 +37,7 @@
     for (const value of values) { const option = element('option', '', label(value)); option.value = value.id; select.append(option); }
     if (Array.from(select.options).some(option => option.value === selected)) select.value = selected;
   }
-  function setBusy(value) { busy = value; panel.setAttribute('aria-busy', String(value)); for (const button of panel.querySelectorAll('button')) button.disabled = value; if (!value && state) renderControls(); }
+  function setBusy(value) { busy = value; panel.setAttribute('aria-busy', String(value)); for (const button of panel.querySelectorAll('button')) button.disabled = value; if (!value && state) { renderControls(); renderExplorationForm(); } }
   async function digest(action, epoch, revision, fields) {
     const bytes = [], integer = value => bytes.push(value >>> 24 & 255, value >>> 16 & 255, value >>> 8 & 255, value & 255);
     const string = value => { const encoded = new TextEncoder().encode(String(value)); integer(encoded.length); bytes.push(...encoded); };
@@ -105,10 +115,11 @@
     receivers.replaceChildren(element('legend','','指定接收成员'));
     for (const member of members()) { const label=element('label'),input=element('input'); input.type='checkbox';input.value=member.id;input.checked=checked.has(member.id);label.append(input,document.createTextNode(memberLabel(member)));receivers.append(label); }
     renderShareSubjects();
+    renderExplorationForm();
   }
   function renderShareSubjects() {
     const form=$('host-player-share-form'), kind=form.elements.kind.value;
-    const choices=kind==='CHARACTER' ? cards() : kind==='SCENE' ? [...(hostView?.campaign?.domain?.nodes || []),...(hostView?.campaign?.domain?.combats || []).filter(scene=>scene.current.status!=='ENDED').map(scene=>({id:scene.current.combatId,name:'当前战斗 / 探索场景'}))] : hostView?.campaign ? [{id:hostView.campaign.campaignId,name:'持续共享获准的行动记录'}] : [];
+    const choices=kind==='CHARACTER' ? cards() : kind==='SCENE' ? [...(domain()?.nodes || []), ...(domain()?.space.scenes || [])] : hostView?.campaign ? [{id:hostView.campaign.campaignId,name:'持续共享获准的行动记录'}] : [];
     selectOptions(form.elements.subjectId,choices,value=>value.name);
     renderSharePolicy();
   }
@@ -122,7 +133,8 @@
     $('host-player-share-members').hidden=form.elements.audience.value!=='SELECTED';
   }
   function renderProposals() {
-    const key=JSON.stringify({proposals:state.proposals,members:members().map(member=>[member.id,member.name]),cards:(hostView?.campaign?.domain?.characters || []).map(card=>card.id),scenes:(hostView?.campaign?.domain?.combats || []).map(scene=>scene.current.status)});
+    const key=JSON.stringify({proposals:state.proposals,members:members().map(member=>[member.id,member.name]),
+      eligibility:(domain()?.characters || []).map(card=>[card.id,card.active,isFocused(card.id)]),focus:focusedSpace(),resolution:focusedScene()?.resolution});
     if(key===proposalRenderKey)return;proposalRenderKey=key;
     const container=$('host-player-proposals');container.replaceChildren(); const proposals=(state.proposals || []).filter(proposal=>proposal.state==='WAITING_DM');
     if (!proposals.length) container.append(element('p','player-empty','暂无等待裁定的提案。'));
@@ -130,8 +142,9 @@
       const article=element('article','player-proposal'), member=members().find(member=>member.id===(proposal.memberId || proposal.playerKey)), card=cards().find(card=>card.id===proposal.characterId);
       article.append(element('h4','',`${member?.name || '玩家'} · ${card?.name || '玩家角色'}`),element('span','player-label','提案 · 尚未执行'),element('p','',proposal.text));
       const reject=element('button','player-secondary','拒绝本次提案');reject.type='button';reject.addEventListener('click',()=>command('proposal-reject',{proposalId:proposal.id}));article.append(reject);
-      const ruleCard=(hostView?.campaign?.domain?.characters || []).find(card=>card.id===proposal.characterId),activeScene=(hostView?.campaign?.domain?.combats || []).some(scene=>scene.current.status!=='ENDED');
-      if(ruleCard&&!activeScene){
+      const ruleCard=domain()?.characters.find(card=>card.id===proposal.characterId && card.active);
+      const canAdjudicate=ruleCard && isFocused(ruleCard.id) && focusedScene()?.resolution!=='RULES';
+      if(canAdjudicate){
         const form=element('form'),title=element('h4','','属性检定裁定'),grid=element('div','player-adjudicate-grid');
         const abilityLabel=element('label','','使用属性'),ability=element('select');ability.name='ability';
         for(const [key,name] of [['strength','力量'],['dexterity','敏捷'],['constitution','体质'],['intelligence','智力'],['wisdom','感知'],['charisma','魅力']]){const option=element('option','',name);option.value='ability.'+key;ability.append(option);}abilityLabel.append(ability);
@@ -139,7 +152,7 @@
         const reasonLabel=element('label','','裁定理由（最多 500 个字符）'),reason=element('textarea');reason.name='reason';reason.maxLength=1000;reason.rows=2;reason.required=true;reason.value=[...proposal.text].slice(0,500).join('');reasonLabel.append(reason);
         const note=element('p','player-small','此类型只执行一次属性检定，不附加任意状态或结果。选择 DC 不保证成功。'),execute=element('button','','裁定并执行检定');execute.type='submit';
         form.append(title,grid,reasonLabel,note,execute);form.addEventListener('submit',event=>{event.preventDefault();const normalizedReason=reason.value.normalize('NFC');if([...normalizedReason].length>500){message('裁定理由最多 500 个字符，请缩短后再执行。');reason.focus();return;}command('proposal-execute',{proposalId:proposal.id,ability:ability.value,dc:dc.value,reason:normalizedReason});});article.append(form);
-      }else article.append(element('p','player-small',activeScene?'当前场景仍在进行，请先按场景的真实机会处理；这里不会绕过场景执行检定。':'这个角色尚无可在此执行的裁定类型。你可以回应叙事或拒绝提案。'));
+      }else article.append(element('p','player-small',ruleCard?'请将焦点切到该角色所在的世界节点或 DM 裁定场景，再执行此检定。':'这个角色可通过叙事回应或由 DM 在自由卡中裁定。'));
       const narrative=element('form'),narrativeLabel=element('label','','仅回应叙事'),reply=element('textarea');reply.name='text';reply.maxLength=1000;reply.rows=2;reply.required=true;reply.placeholder='说明现场发生了什么，或补充需要玩家确认的情境。';narrativeLabel.append(reply);const respond=element('button','player-secondary','回应叙事，不执行检定');respond.type='submit';narrative.append(narrativeLabel,respond);narrative.addEventListener('submit',event=>{event.preventDefault();command('proposal-narrative',{proposalId:proposal.id,text:reply.value.normalize('NFC')});});article.append(narrative);container.append(article);
     }
   }
@@ -155,20 +168,45 @@
       if(!response.ok || data.status==='ERROR') throw new Error(data.code || 'PLAYER_UNAVAILABLE');
       const previous=state;state=data;
       if(!busy && (!previous || JSON.stringify(previous)!==JSON.stringify(state))) render();
-      if(hostView?.campaign && String(hostView.campaign.revision)!==String(state.revision)) document.dispatchEvent(new Event('dnd:storage-refresh'));
+      if(state.configured && hostView?.campaign && String(hostView.campaign.revision)!==String(state.revision)) document.dispatchEvent(new Event('dnd:storage-refresh'));
       if(showMessage && state.configured && hostView?.campaign) message('逐人核对加入、分配角色，并选择明确的共享受众。');
     }catch(failure){if(showMessage) message(messages[failure.message] || '暂时无法读取玩家席位。');}
     finally{readPromise=null;clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden && !busy) refresh(false);else schedule();},document.hidden?15000:4000);}})();return readPromise;
   }
   function schedule(){clearTimeout(timer);timer=setTimeout(()=>refresh(false),document.hidden?15000:4000);}
-  document.addEventListener('dnd:storage-view',event=>{hostView=event.detail;if(state&&!busy){render();if(hostView?.campaign&&!currentView())refresh(false);}});
+  document.addEventListener('dnd:storage-view',event=>{hostView=event.detail;if(state&&!busy){render();if(state.configured&&hostView?.campaign&&!currentView())refresh(false);}});
   $('host-players-refresh').addEventListener('click',()=>refresh());
   $('host-players-invite').addEventListener('click',()=>command('invite'));
   $('host-players-close').addEventListener('click',()=>command('close'));
   $('host-players-pause').addEventListener('click',()=>command('pause',{paused:String(!state.paused)}));
   $('host-player-copy').addEventListener('click',async()=>{if(!invitationUrl)return;try{await navigator.clipboard.writeText(invitationUrl);message('完整邀请已复制。请只交给本次希望邀请的玩家。');}catch(_){message('浏览器未允许复制，请选择上方完整邀请链接手动复制。');}});
   $('host-player-control-form').addEventListener('submit',event=>{event.preventDefault();const values=new FormData(event.currentTarget),control=(participation().controls || []).find(control=>control.characterId===values.get('characterId'));governance('control',{characterId:values.get('characterId'),controlVersion:String(control?.version??0),memberId:values.get('operation')==='revoke'?null:values.get('memberId')});});
-  $('host-player-exploration-form').addEventListener('submit',event=>{event.preventDefault();const values=new FormData(event.currentTarget),permission=(participation().exploration || []).find(permission=>permission.characterId===values.get('characterId')),actions=values.getAll('allowedAction').sort();if(values.get('enabled')==='true'&&!actions.length){message('请至少选择一个有限操作范围。');return;}governance('exploration',{characterId:values.get('characterId'),permissionVersion:String(permission?.version??0),sceneId:hostView?.campaign?.domain?.combats?.filter(scene=>scene.current.status!=='ENDED').at(-1)?.current.combatId||null,actions,active:values.get('enabled')==='true'});});
+  const explorationForm = $('host-player-exploration-form');
+  const permissionFor = id => (participation().exploration || []).find(permission => permission.characterId === id);
+  function renderExplorationForm() {
+    const values = explorationForm.elements, id = values.characterId.value;
+    const focus = focusedSpace(), scene = focusedScene();
+    const revoke = values.enabled.value === 'false';
+    const supported = domain()?.characters.some(card => card.id === id && card.active) && isFocused(id)
+      && (focus?.kind === 'WORLD' || scene?.resolution === 'RULES' && scene.mode === 'EXPLORATION');
+    for (const action of explorationForm.querySelectorAll('[name="allowedAction"]'))
+      action.disabled = revoke || !supported || (focus.kind === 'WORLD' && action.value !== 'CHARACTER_COMMAND');
+    explorationForm.querySelector('button').disabled = busy || (revoke ? !permissionFor(id)?.active : !supported);
+    $('host-player-exploration-note').textContent = revoke ? '撤回该角色的现有探索许可。'
+      : supported ? focus.kind === 'WORLD' ? '许可绑定角色所在的焦点世界节点。' : '许可绑定角色所在的焦点规则探索场景。'
+      : '请先将规则 PC 安置在焦点世界节点或规则探索场景。';
+  }
+  explorationForm.addEventListener('change', renderExplorationForm);
+  explorationForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const values = new FormData(event.currentTarget), characterId = values.get('characterId');
+    const permission = permissionFor(characterId), active = values.get('enabled') === 'true';
+    const actions = active ? values.getAll('allowedAction').sort() : permission?.actions;
+    if (!actions?.length) { message('请至少选择一个有限操作范围。'); return; }
+    const sceneId = active ? focusedSpace()?.id : permission?.sceneId;
+    if (!sceneId || active && !isFocused(characterId)) { message('请核对角色的准确探索范围。'); return; }
+    governance('exploration', {characterId, permissionVersion:String(permission?.version ?? 0), sceneId, actions, active});
+  });
   const shareForm=$('host-player-share-form');shareForm.elements.kind.querySelector('[value="CARD"]').value='CHARACTER';shareForm.elements.kind.addEventListener('change',renderShareSubjects);
   shareForm.elements.subjectId.addEventListener('change',renderSharePolicy);
   shareForm.elements.audience.addEventListener('change',()=>$('host-player-share-members').hidden=shareForm.elements.audience.value!=='SELECTED');

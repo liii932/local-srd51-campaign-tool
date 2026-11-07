@@ -4,6 +4,19 @@
 const assert = require('node:assert/strict');
 const ORIGIN = 'http://127.0.0.1:8080';
 
+const waitForStorageReady = page => page.locator('#storage-workspace[aria-busy="false"]:enabled').waitFor({state: 'attached'});
+
+function waitForExactText(page, selector, expected) {
+  const escaped = expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return page.locator(selector).filter({hasText: new RegExp('^\\s*' + escaped + '\\s*$')}).waitFor({state: 'attached'});
+}
+
+function waitForHistoryCount(page, expected) {
+  const selector = expected === 0 ? '#storage-history:not(:has(> li))'
+    : '#storage-history > li:nth-of-type(' + expected + '):last-of-type';
+  return page.locator(selector).waitFor({state: 'attached'});
+}
+
 async function observeStorageAction(page, name, trigger, timing, timeout = 120000, phase = () => {}) {
   const started = Date.now(), posts = [], states = [];
   let resolvePost, resolveState;
@@ -47,10 +60,7 @@ async function observeStorageAction(page, name, trigger, timing, timeout = 12000
       timing.stateMs = Date.now() - started - (timing.stateRequestMs || 0);
     }
     phase('render');
-    await page.waitForFunction(() => {
-      const workspace = document.querySelector('#storage-workspace');
-      return workspace && workspace.getAttribute('aria-busy') === 'false' && !workspace.disabled;
-    });
+    await waitForStorageReady(page);
     assert.equal(posts.length, 1, `${name} must submit once without retrying`);
     assert.equal(states.length, timing.stateRefreshRequired ? 1 : 0,
       `${name} must refresh the session only after an epoch change or a failed command`);
@@ -62,4 +72,4 @@ async function observeStorageAction(page, name, trigger, timing, timeout = 12000
   }
 }
 
-module.exports = {observeStorageAction};
+module.exports = {observeStorageAction, waitForStorageReady, waitForExactText, waitForHistoryCount};

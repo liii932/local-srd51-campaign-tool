@@ -2,6 +2,7 @@ package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,10 +19,11 @@ class CampaignArcaneRecoveryIntegrationTest {
         return input;
     }
     private static void createWizard(CampaignStorageService service) {
-        service.create("奥术回想", List.of(CampaignRules.BASE, CampaignRules.HEALING, CampaignRules.RUNTIME));
-        var current = service.current();
-        service.domainCommand(uuid(), current.epoch(), current.revision(), "character-create",
+        CampaignRuleFixtures.create(service, "奥术回想");
+        CampaignSpaceFixtures.command(service, "character-create",
                 input("name", "法师", "kind", "PC", "classKey", "wizard", "backgroundKey", "acolyte"));
+        UUID world = CampaignSpaceFixtures.world(service, "营地");
+        CampaignSpaceFixtures.place(service, UUID.fromString(character(service).get("id").getAsString()), world);
     }
     private static JsonObject character(CampaignStorageService service) {
         return service.current().domain().getAsJsonArray("characters").get(0).getAsJsonObject();
@@ -33,7 +35,7 @@ class CampaignArcaneRecoveryIntegrationTest {
         var character = character(service);
         var request = input("characterId", character.get("id").getAsString(), "characterVersion", character.get("version").getAsString());
         request.add("command", CampaignDomainCodec.toJson(command));
-        return request;
+        return CampaignSpaceFixtures.focused(service.accessSnapshot().snapshot().domains(), request);
     }
     private static void apply(CampaignStorageService service, Command command) {
         var current = service.current();
@@ -56,15 +58,36 @@ class CampaignArcaneRecoveryIntegrationTest {
     }
     private static void learn(CampaignStorageService service) {
         apply(service, Command.spellbook("SPELLBOOK_INITIALIZED", new SpellbookInput(
-                BundledCampaignRules.rule("character.wizard_spellcasting", "spellcasting.wizard"),
-                BundledCampaignRules.initialWizardBook(), BundledCampaignRules.initialWizardPrepared())));
+                CampaignRuleFixtures.rules().rule("character.wizard_spellcasting", "spellcasting.wizard"),
+                CampaignRuleFixtures.rules().initialWizardBook(), CampaignRuleFixtures.rules().initialWizardPrepared())));
     }
     private static void spend(CampaignStorageService service, int amount) {
-        apply(service, new Command("RESOURCE_SPENT", BundledCampaignRules.rule("character.resource", "resource.wizard.slot1"), amount, null, null));
+        apply(service, new Command("RESOURCE_SPENT", CampaignRuleFixtures.rules().rule("character.resource", "resource.wizard.slot1"), amount, null, null));
     }
     private static long slots(CampaignStorageService service) {
         return state(service).resources().stream().filter(resource -> resource.identity().ruleKey().equals("resource.wizard.slot1"))
                 .findFirst().orElseThrow().current();
+    }
+    private static void travelToNewNode(CampaignStorageService service, int minutes) {
+        var source = service.accessSnapshot().snapshot().domains().space().focus().space();
+        CampaignSpaceFixtures.command(service, "node-create", input("name", "下一站"));
+        var state = service.accessSnapshot().snapshot().domains();
+        UUID destination = state.roots().getLast().subjectId();
+        UUID wizard = state.characters().getFirst().id();
+        long positionVersion = CampaignSpaceCommands.position(state, wizard).version();
+        long departure = state.space().clock(source).second();
+        CampaignSpaceFixtures.command(service, "node-link", input("from", source.id().toString(), "to", destination.toString()));
+        JsonObject travel = input("targetNodeId", destination.toString(), "minutes", Integer.toString(minutes),
+                "adjudication", "DM裁定沿路步行。");
+        JsonArray subjects = new JsonArray();
+        subjects.add(input("id", wizard.toString(), "version", Long.toString(positionVersion)));
+        travel.add("subjects", subjects);
+        CampaignSpaceFixtures.command(service, "travel", travel);
+        var arrived = service.accessSnapshot().snapshot().domains().space();
+        var ref = CampaignSpaceData.Ref.world(destination);
+        assertEquals(ref, arrived.focus().space());
+        assertEquals(0, arrived.clock(ref).second());
+        assertEquals(departure + minutes * 60L, arrived.clock(source).second());
     }
     private static void rejected(CampaignStorageService service, Command command, String reason) {
         var before = service.current();
@@ -83,11 +106,15 @@ class CampaignArcaneRecoveryIntegrationTest {
             assertEquals(1, slots(service)); assertEquals(0L, state(service).spellbook().lastArcaneRecoveryDay());
             assertTrue(service.domainCommand(operation, before.epoch(), before.revision(), "character-command", request).lastCommand().replayed());
             assertEquals(accepted.domain(), service.current().domain());
-            endRest(service); start(service); time(service, 60);
+            endRest(service);
+            travelToNewNode(service, 15);
+            assertEquals(75, state(service).rest().minute());
+            assertEquals(0L, state(service).spellbook().lastArcaneRecoveryDay());
+            start(service); time(service, 60);
             rejected(service, finish(Map.of(1, 1)), "S2_ARCANE_RECOVERY_DAILY_LIMIT");
             apply(service, finish(Map.of()));
             assertEquals(1, slots(service)); assertEquals(0L, state(service).spellbook().lastArcaneRecoveryDay());
-            endRest(service); time(service, 1260); start(service); time(service, 60);
+            endRest(service); time(service, 1245); start(service); time(service, 60);
             apply(service, finish(Map.of(1, 1)));
             assertEquals(1440, state(service).rest().minute());
             assertEquals(2, slots(service)); assertEquals(1L, state(service).spellbook().lastArcaneRecoveryDay());
@@ -125,8 +152,8 @@ class CampaignArcaneRecoveryIntegrationTest {
             rejected(service, finish(Map.of(1, 1)), "S2_ARCANE_RECOVERY_UNSUPPORTED");
             apply(service, finish(Map.of())); endRest(service); learn(service);
             apply(service, new Command("CHARACTER_ADVANCED", null, 0, null, "FIXED_AVERAGE",
-                    BundledCampaignRules.rule("character.class", "class.wizard"),
-                    new GrowthChoices(BundledCampaignRules.rule("character.subclass", "subclass.evocation"), Map.of(), null, Map.of())));
+                    CampaignRuleFixtures.rules().rule("character.class", "class.wizard"),
+                    new GrowthChoices(CampaignRuleFixtures.rules().rule("character.subclass", "subclass.evocation"), Map.of(), null, Map.of())));
             start(service); time(service, 60);
             rejected(service, finish(Map.of(1, 1)), "S2_SPELLBOOK_LEARNING_REQUIRED");
         }

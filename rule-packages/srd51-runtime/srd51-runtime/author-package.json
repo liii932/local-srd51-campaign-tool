@@ -1,7 +1,7 @@
 {
   "author_schema_version": 2,
   "module_key": "srd51_runtime",
-  "release_version": "1",
+  "release_version": "2",
   "package_display_name": "SRD 5.1 — finite runtime mechanisms",
   "role": "base",
   "dependencies": [],

@@ -11,15 +11,15 @@ The campaign freezes the complete typed projection, identities and field chains.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `1` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
-| `srd51_characters` version `1` | extension | `srd51_runtime=1` | Fighter/cleric/wizard growth, resources, equipment, checks, health and ordinary combat |
-| `srd51_magic` version `1` | extension | `srd51_runtime=1`, `srd51_characters=1` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `1` | extension | `srd51_runtime=1` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `2` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
+| `srd51_characters` version `2` | extension | `srd51_runtime=2` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat |
+| `srd51_magic` version `2` | extension | `srd51_runtime=2`, `srd51_characters=2` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `3` | extension | `srd51_runtime=2` | Explicit DM antimagic area and fixed direct vital effects |
 
-The order above is the only bundled configuration. Each package stays within
-the production reader's definition, entry and byte budgets. Every reference
-keeps its original module identity; use `BundledCampaignRules.rule(type,key)`
-instead of assuming all rules belong to the base.
+The standard combination uses the order above. The check variant keeps the
+first three members and selects `dm_runtime_house_rules` version `4` as its
+fourth member. Each reference retains its complete module and rule identity.
+Resolve references in the campaign's frozen `CampaignRuleContext`.
 
 ## Executable scope
 
@@ -65,9 +65,8 @@ This selection does not supply racial ability increases, complete racial
 traits, dwarf poison defenses or its heavy-armor speed exception, background
 skill/feature effects, starting equipment packages, cantrips, general cleric
 preparation, spell transcription, versatile/thrown weapon modes or full class
-feature execution. Fighter Fighting Style, Second Wind, Action Surge, Extra
-Attack and Champion Improved Critical are catalog-only `OPTION` metadata;
-this finite profile does not acquire them. Fighter resources track uses and
+feature execution. Fighter Fighting Style, Second Wind, Action Surge and
+Extra Attack and Champion Improved Critical are catalog-only `OPTION` metadata. Fighter resources track uses and
 recovery without executing those effects. Evocation Savant and Sculpt Spells
 are also catalog-only `OPTION` metadata and are not acquired, while the
 Evocation subclass identity is retained. Grappler is blocked acquisition

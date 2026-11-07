@@ -1,8 +1,11 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2PreparationIdentity;
+
 import com.dndtool.service.Schema2CombatHistory;
+
 import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel;
 import com.dndtool.module.composition.Schema2RulesBinding;
@@ -30,6 +33,7 @@ public final class CampaignDomainCodec {
         type("rules-binding", Schema2RulesBinding.class);
         type("preparation-identity", Schema2PreparationIdentity.class);
         register("campaign", CampaignDomainData.class);
+        register("space", CampaignSpaceData.class);
         register("participation", CampaignParticipationData.class);
         register("participation-command", CampaignParticipationCommands.class);
         register("adjudication", CampaignAdjudicationData.class);

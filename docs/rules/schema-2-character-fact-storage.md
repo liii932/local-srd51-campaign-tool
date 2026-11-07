@@ -6,13 +6,17 @@
 [成长与资源](schema-2-character-statistics.md)、[标准休息](schema-2-character-rest.md)及
 [共同业务事务](business-write-transactions.md)。
 
-四类规则使用准确运行镜像。`Schema2CharacterRuntime` 定义输入、结果、状态和历史，
-`Schema2PreparationIdentity` 保存准确的 run 与 snapshot 身份。领域模型校验事实形状、
-历史邻接和容量。`JdbcSchema2CharacterRuntimeRepository` 在调用方事务中追加、读回和
-直接恢复这些类型化事实。SQLite 聚合同样使用这套领域类型及结构校验。
-`Schema2CharacterRuntimeService` 复用该仓储执行既有成长/资源/休息以及真实检定、装备和健康命令；
-[角色基础合同](schema-2-character-foundations.md)限定 Check/Equipment/Health 规则消费者、共同前提和历史语义重算。
-结构与算术校验不能替代这些业务校验，仓储可写或恢复本身不授予执行或发布资格。
+当前已接通四类规则的准确运行镜像。`Schema2CharacterRuntime` 定义命令、原骰与结果、当前状态
+和不可变历史的类型化 record，`Schema2PreparationIdentity` 保存准确的 run 与 snapshot 身份。
+领域模型负责状态、事件形状、前后邻接与容量预检。`JdbcSchema2CharacterRuntimeRepository`
+把这些事实编码为 SQL 行并追加、读回和直接恢复，在 JDBC 边界将领域历史校验拒绝转换为稳定的
+`SQLException`。叶仓储接收已准备的事实，不抽骰或推导规则效果。
+
+`Schema2CharacterRuntimeService` 在内部 JDBC 路径复用该仓储。`CampaignDomainEngine` 在
+SQLite 路径复用相同领域类型，从经核验的战役规则上下文读取准确材料。两条路径的检定、
+装备和健康语义由[角色基础合同](schema-2-character-foundations.md)及其消费者约束，
+SQLite 绑定与恢复见[领域接合](../design/v2/domain-integration.md)。结构与算术校验仍需与
+实际规则语义校验共同完成。
 
 ## 规则镜像与事实的区别
 
@@ -71,7 +75,7 @@
 - 稳定时 HP 为 0、计数为 0、未死亡，恢复期限的分钟／秒必须严格晚于当前时刻，分钟不超过 1,000,000,000。
 - 其余零 HP 状态的恢复期限为空；这些形状不授权任何健康状态变化或自动时间收益。
 
-仓储约束每类事件允许改变的字段。检定只能改变角色版本；装备命令保留 HP、健康、成长和
+领域历史校验约束每类事件允许改变的字段。检定只能改变角色版本；装备命令保留 HP、健康、成长和
 资源，仅允许装备及适用的时间字段变化；健康命令保留装备、时间、成长和资源。
 状态结构及邻接检查不替代伤害、治疗、死亡、穿脱或到期恢复的规则语义验证。
 
@@ -98,16 +102,17 @@
 已存在角色、身份冲突或不连续历史拒绝，任一失败由事务 owner 回滚整笔候选。
 
 读回独立查询状态、各类命令和原骰；缺行、多余行、重复/断裂索引、孤儿、跨角色与错误类型
-均拒绝，无角色根时也检查全部子表。请求摘要仍作为调用方提供的准确操作事实保存，
-仓储只校验摘要格式与唯一性；`Schema2CharacterRuntimeService` 的请求指纹绑定全部有界输入、准确规则、
+均拒绝，无角色根时也检查全部子表。请求摘要作为调用方提供的准确操作事实保存，
+领域检查摘要格式与历史内操作身份唯一性，仓储检查全局操作身份。`Schema2CharacterRuntimeService`
+的请求指纹绑定全部有界输入、准确规则、
 版本和身份，负责同操作回放、正文冲突拒绝及从保存事件重新核对请求摘要。
 
 ## 历史预算与采用边界
 
 每个角色最多 128 个事件、32768 个类型化历史子行。每个前后状态的装备实例、命令/结果头
-及每个效果骰都计入预算。`checkCandidateCapacity` 对尚无实际骰子的健康候选保守预留
-一个结果头加最多 20 个原骰行；已有事件按实际行数计数，不能只检查事件总数。
-容量检查本身不抽骰、不执行效果；RuntimeService 在完整命令预检后、首次随机性前调用它。
+及每个效果骰都计入预算。`Schema2CharacterRuntime.checkCandidateCapacity` 对尚无实际骰子的健康候选保守预留
+一个结果头加最多 20 个原骰行；已有事件按实际保存的事实数量计数。
+应用在完整命令预检后、首次随机性前检查容量，使用类型化事实即可计算。
 
 真实业务消费者沿共同事务完成规则预检、随机结果生成、追加、实际读回和历史重算，
 提交未知时隔离并只读查证原操作；其语义和验证见[角色基础合同](schema-2-character-foundations.md)。

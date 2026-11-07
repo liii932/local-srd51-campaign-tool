@@ -17,7 +17,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 class StorageSchemaCatalogTest {
     static final String UUID = "d158ee4d-96d5-4d6b-9cf9-c83514da69b8";
     static final String SCHEMA = """
-        {"declarationVersion":1,"applicationModel":"srd51-vitality-1","storageModel":"sqlite-vitality-1","dialect":"sqlite-strict-1","modules":[
+        {"declarationVersion":1,"applicationModel":"campaign-spaces-3","storageModel":"sqlite-campaign-3","dialect":"sqlite-strict-1","modules":[
           {"id":"core","dependsOn":[],"tables":[
             {"name":"core_kind","columns":[{"name":"kind","type":"text","nullable":false,"minCodePoints":2,"maxCodePoints":3,"ascii":true}],"primaryKey":["kind"],"uniqueKeys":[],"foreignKeys":[],"checks":[],"indexes":[]},
             {"name":"core_campaign","columns":[{"name":"id","type":"uuid","nullable":false},{"name":"name","type":"text","nullable":false,"minCodePoints":1,"maxCodePoints":80,"ascii":false}],"primaryKey":["id"],"uniqueKeys":[],"foreignKeys":[],"checks":[],"indexes":[]}
@@ -52,14 +52,14 @@ class StorageSchemaCatalogTest {
     @Test
     void independentCanonicalVectorFixesDefaultsFieldOrderAndDomainSeparatedDigest() {
         String minimal = """
-            {"declarationVersion":1,"applicationModel":"srd51-vitality-1","storageModel":"sqlite-vitality-1","dialect":"sqlite-strict-1","modules":[{"id":"core","dependsOn":[],"tables":[{"name":"core_flag","columns":[{"name":"id","type":"int64","nullable":false,"minimum":"0","maximum":"1"}],"primaryKey":["id"],"uniqueKeys":[],"foreignKeys":[],"checks":[],"indexes":[]}],"seeds":[{"table":"core_flag","rows":[{"id":"0"}]}]}]}
+            {"declarationVersion":1,"applicationModel":"campaign-spaces-3","storageModel":"sqlite-campaign-3","dialect":"sqlite-strict-1","modules":[{"id":"core","dependsOn":[],"tables":[{"name":"core_flag","columns":[{"name":"id","type":"int64","nullable":false,"minimum":"0","maximum":"1"}],"primaryKey":["id"],"uniqueKeys":[],"foreignKeys":[],"checks":[],"indexes":[]}],"seeds":[{"table":"core_flag","rows":[{"id":"0"}]}]}]}
             """;
         String canonical = """
-            {"applicationModel":"srd51-vitality-1","declarationVersion":1,"dialect":"sqlite-strict-1","implementationContract":"sqlite-vitality-schema-1","modules":[{"dependsOn":[],"id":"core","seeds":[{"rows":[{"id":"0"}],"table":"core_flag"}],"tables":[{"checks":[],"columns":[{"default":null,"hasDefault":false,"maximum":"1","minimum":"0","name":"id","nullable":false,"type":"int64"}],"foreignKeys":[],"indexes":[],"name":"core_flag","primaryKey":["id"],"uniqueKeys":[]}]}],"storageModel":"sqlite-vitality-1"}
+            {"applicationModel":"campaign-spaces-3","declarationVersion":1,"dialect":"sqlite-strict-1","implementationContract":"sqlite-vitality-schema-1","modules":[{"dependsOn":[],"id":"core","seeds":[{"rows":[{"id":"0"}],"table":"core_flag"}],"tables":[{"checks":[],"columns":[{"default":null,"hasDefault":false,"maximum":"1","minimum":"0","name":"id","nullable":false,"type":"int64"}],"foreignKeys":[],"indexes":[],"name":"core_flag","primaryKey":["id"],"uniqueKeys":[]}]}],"storageModel":"sqlite-campaign-3"}
             """.strip();
         StoragePlan plan = read(minimal).plan(Set.of("core"));
         assertEquals(canonical, plan.canonicalPlan());
-        assertEquals("f0b3a6f3c2db1a8a7b66c5a24a92ba3ea2edd3f870cad540fc5f37f8f7e12862", plan.digest());
+        assertEquals("5cb9a8712bfc965a6d10b07ebd1e2103f76c92754433f6163e15846c08e55b2f", plan.digest());
     }
 
     @Test

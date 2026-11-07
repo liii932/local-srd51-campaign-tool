@@ -13,12 +13,12 @@
 
 | 边界 | 实际入口与当前选择 |
 |---|---|
-| 准确规则材料 | `BundledCampaignRules` 生产读取四个内置原 ZIP、compose；`CampaignDomainData.Material` 保存 members/rules/entries/chains，四集合逐项精确比对本版已验证固定投影 |
+| 准确规则材料 | `LocalRuleLibrary` 保管原包、导入及本机接受。`CampaignRuleSupport` 校验组合的应用资格，`CampaignDomainData.Material` 保存解释、准确绑定、全部规则行、条目和来源链 |
 | 应用结构 | `storage/campaign-schema.json` → `StorageSchemaCatalog` → `StoragePlan`/`SqliteSchemaCompiler`；`SqliteSchemaVerifier` 核现有结构和 seed |
 | 业务执行 | `CampaignDomainCommands` 与无连接 `CampaignDomainEngine`，复用现有纯领域规则；自由卡用独立 DM-managed typed 领域 |
 | 共同事务 | `CampaignStorageService` 持根/目录锁、串行接纳，`BEGIN IMMEDIATE` 一次提交全部聚合/关系投影、根子历史、revision 和接受 |
 | 文档/关系存储 | `CampaignDomainRepository` 写 closed typed TEXT 和关系投影，调用方拥有事务；读取逐行核验，不修复坏索引 |
-| 文件 | `CampaignCodec`、`CampaignDomainCodec/Validation` 保存完整 material/链、初始/当前/全历史/pending；当前不需来源 MySQL |
+| 文件 | `CampaignCodec`、`CampaignDomainCodec/Validation` 保存 `RULE_BOUND_CAMPAIGN` format 3，包含全部空间、唯一安置、焦点和各 pending。打开复核本机原包及接受，活动和同版残留使用冻结规则 |
 | 原 MySQL/来源服务 | 原 SQL/迁移/读写/账号职责保留；来源安装接受、内部快照与旧格式入口有独立范围，不成为当前有限 SQLite 调用路径 |
 
 ## 当前物理分片与唯一状态 owner
@@ -29,21 +29,19 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 
 | 分片/表 | 内容、owner 与文件落点 |
 |---|---|
-| `core`：core_control/core_storage_module/core_command/core_save/core_constant | 实际本地 run、模型/计划/模块、epoch/revision、业务接受和保存控制；Service/Repository 协调；技术控制不入文件 |
-| `rules`：rules_binding/rules_vitality | 准确应用模块及基础生命值规则；文件 rules 对照当前支持材料 |
-| `characters`/`history`/`health`：characters_character/history_event/history_character_created/health_healing | 基础 HP 记录范围的 current/创建/治疗全历史及外层根摘要；runtime 不混入另一份基础 HP owner |
+| `core`：core_control/core_storage_module/core_command/core_save/core_player_control | 本地 run、模型、计划、模块、epoch、revision、业务接受、保存和玩家安全控制。Service 与 Repository 协调，技术控制留在工作库 |
 | `rules-runtime`：rules_runtime_material | 完整 production Material；文件 domains.material 同时保留准确成员、最终规则、entries 和完整链 |
 | `characters-runtime`：characters_runtime_character | Character 的名称/类型/active、InitialPlan、完整 History/current；角色 typed 聚合拥有全部成长/HP/生命骰/资源/装备/书籍/休息事实 |
-| `scenes`：scenes_world | 当前节点/位置/简单物品及独立 manual 世界领域的严格聚合；文件 domains 的相应世界字段 |
+| `scenes`：scenes_world/scenes_space/scenes_clock/scenes_placement | 严格世界聚合及场景、时钟和唯一安置的核验投影。文件保存节点、位置、简单物品、焦点及各空间事实 |
 | `combat`：combat_scene | 完整场景/战斗 History/current；含原骰/先攻/轮回合、部署、唯一动作树/窗口、施法/效果/区域、怪物及全部历史依赖 |
-| `history-runtime`：history_runtime_root | 连续战役根、原操作/意图、subject、typed 前后事实、角色子操作和场景因果；文件 domains.roots，外层 history 是核验摘要 |
+| `history-runtime`：history_runtime_root | 连续战役根、原操作与意图、subject、typed 前后事实、角色子操作和场景因果。文件 `domains.roots` 保存全部根，`campaign.eventTail` 核对数量 |
 | `resources`：resources_character | 角色 current 资源准确身份/余额/上限/无限标记的关系投影；生命骰/休息及完整资源历史仍在所属角色聚合 |
 | `equipment`：equipment_instance | 角色装备实例/持有/穿戴/地面 typed 投影，与角色 current/历史逐行核对 |
 | `spellcasting`：spellcasting_book | 角色真实已学/准备/恢复事实投影，不从法术目录补人物状态 |
 | `actions`：actions_frame | 场景的完整 flow 帧关系投影；父子/返回点/窗口/已消费成本/唯一继续点保留在场景聚合与全历史 |
 | `effects`：effects_instance | 场景持续效果投影，完整来源/目标/压制/专注/终结历史由场景聚合拥有 |
-| `monsters`：monsters_instance | 场景怪物当前投影，健康/动作/充能/休息/共享伤害历史仍随场景完整保存 |
-| `manual`：manual_character/manual_encounter | 独立 DM-managed 自由卡/简单遭遇的 typed 聚合及核验投影；不自动转化/改写 schema-2 角色，具体字段/历史接合与本次证据见接合表 |
+| `monsters`：monsters_campaign/monsters_instance | 战役怪物当前事实及场景实例的核验投影。动作、休息及共享伤害历史随场景完整保存 |
+| `manual`：manual_character | 独立 DM-managed 自由卡的核验投影。自由卡与规则角色共享空间安置，DM 裁定场景的模式和占位归空间领域 |
 | `runtime`：runtime_profile | 当前有限运行范围的根/静态支持标记，依赖上述完整未来写入足迹，不随当前有无角色/施法者裁剪 |
 
 所有列/键/约束/索引由应用 JSON 完整声明。正文 codec 登记闭合 record/enum，拒绝动态类、
@@ -69,10 +67,9 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 | 节点/位置/简单物品/profile/消息 | 世界字段、根 typed 前后事实和 manual 独立模型 | 精确邻接/归属/数量，检定消息归原根，不用 NOTE 代替未知类型 |
 | 全部根子历史 | roots 与角色/场景/manual 已记录业务事实 | 连续根、唯一子归属、完整 before/after/原骰；不按 UI 近期列表截断 |
 
-当前完整文件携 frozen material/完整链，既不是只携规则指纹，也不携 DDL/结构计划或本地
-执行收据。Material.restore 对四个完整字段集合逐项精确比对本版固定投影，该投影的
-composition/final/chain 已经生产 reader/compose 验证；不能只核文件自报摘要。
-未来自定义包的准确接受/独立发布须另交付；不能从文件自报资格或有型正文推导任意机制可执行。
+当前文件保存完整冻结材料、解释和来源链。`Material.restore` 从冻结行重建投影并核对准确指纹及
+机制闭包。新打开时再用本机原包重组合，逐项核对文件冻结材料和本机接受。DDL、结构计划与本地
+执行收据由私有工作库独立保管。
 
 ## 原 MySQL 清单的用途与接合差异
 
@@ -81,7 +78,7 @@ composition/final/chain 已经生产 reader/compose 验证；不能只核文件�
 
 | 原责任 | 当前接合/保管方向 |
 |---|---|
-| 规则目录/语言工具/PARTITION/内部快照 | 当前四包完整 material/链由本版内置路线固定；原来源/迁移/接受服务继续独立保管 |
+| 规则目录/语言工具/PARTITION/内部快照 | SQLite 冻结完整组合与链。本机规则库保管准确原包和接受，原 MySQL 来源、迁移和接受服务独立保管 |
 | 原角色自由字段/职业等级/熟练/Manual/普通save/简易遭遇名单/阵营 | 独立 DM-managed typed 领域逐项接合，不能文档排除或伪装成 schema-2 构筑；最终差异/本次证据见接合表 |
 | schema-2 角色/资源/装备/健康/书籍/休息叶表 | 原纯规则/完整 typed History 复用到角色聚合，同根/事务/文件，不复制第二条 MySQL 服务事务 |
 | schema-2 战斗/动作/效果/怪物叶表 | 完整场景 History 聚合及关系投影，同一角色健康/资源 owner；保留全部已完成/未决事实 |
@@ -106,23 +103,22 @@ composition/final/chain 已经生产 reader/compose 验证；不能只核文件�
    下载/打开/删除/discard/恢复/准确清理必须逐窗口验证。每命令工作库耐久不是省略完整
    文件的理由；当前无需周期 AUTO 才运行，也不能因此推迟领域 END/故障闭包。
 6. **后续自动检查点/玩家步骤。** 先测量完整规则/历史/pending、库/journal、各档案/临时/
-   墓碑和内存/时延峰值，再确定阈值/增长/保留并实现。玩家步骤和任意外部规则/完整 SRD
+   墓碑和内存/时延峰值，再确定阈值/增长/保留并实现。玩家步骤、新机制和完整 SRD
    另有产品/机制门，不从当前存储完成推导。
 7. **默认切换与退役。** 只有完整当前用户能力和两类恢复/文件/运维证据满足才单独决定
    默认切换/旧装配退役；当前 MySQL 默认保留，不双写、不变更外部账号/数据或历史。
 
 ## 配置、测试、打包与实际数据
 
-当前只有 DND_STORAGE_ROOT 选择 SQLite 私有根，由应用管理 runs/saves，不从请求取路径。
-尚未采用的 DndToolRules 新 JNDI、两根目录变量或 CampaignStoreProvider 类不能写成启动
-要求。未来开放外部来源时再协调其连接/账号/装配/诊断，不静默借旧凭据或回退。
+`DND_STORAGE_ROOT` 选择 SQLite 私有根，应用管理 `runs/`、`saves/` 和独立 `rule-library/`。
+本机规则库与运行工作库使用各自的存储和事务。
 
 当前测试入口包括结构/引擎、BundledCampaignRules、CampaignDomainEngine、共享 SQLite
 域/战斗/文件/生命周期、HTTP/安全和进程故障族；manual/check-effects 的精确新增类及
 本次观察结果登记在接合表。类存在不证明通过；来源/旧 MySQL 测试不代替 SQLite 或平台
 锁/刷盘/低磁盘验证。可重复命令见[测试指南](../../testing.md)。
 
-WAR 必含应用结构、严格聚合/领域代码、SQLite JDBC、Host 页面/脚本及 storage/rules 四包。
+WAR 必含应用结构、严格聚合与领域代码、SQLite JDBC、Host 页面与脚本及 `storage/rules/` 的五份原包。
 其他作者源/来源SQL/离线写入类、真实库/journal/存档、秘密/日志/机器路径仍排除。生产
 资源变化须审计 WAR 字节/SHA-256/条目和内容；实际部署按[唯一部署流程](../../deployment.md)。
 

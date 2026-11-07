@@ -120,6 +120,42 @@ class CampaignDomainEngineTest {
                 f.combatId, root, Schema2CombatState.Command.attack(f.a, f.b, f.items.get(f.a)), NO_DICE));
     }
 
+    @Test void spatialRosterUsesActualVersionsAndPreservesEarlierMovement() {
+        Fixture f = new Fixture();
+        CharacterRecord a = f.characters.getFirst();
+        CharacterRecord b = f.characters.getLast();
+        History older = f.engine.executeCharacter(f.material, a.initial(), a.history(),
+                CampaignDomainEngine.spaceTimeCommand(a.history().current(), 10), UUID.randomUUID(), NO_DICE);
+        a = new CharacterRecord(a.name(), a.kind(), a.initial(), older);
+        var aPlace = new Deployment(f.a, new Position(0, 0), 0);
+        var bPlace = new Deployment(f.b, new Position(1, 0), 1);
+        var opened = f.engine.executeScene(f.material, List.of(a, b), null, f.campaign, f.combatId, 90,
+                UUID.randomUUID(), Schema2CombatState.Command.openScene(List.of(aPlace, bPlace), List.of()), NO_DICE);
+        assertEquals(Status.EXPLORATION, opened.history().current().status());
+        assertTrue(opened.history().current().initiative().isEmpty());
+        var moved = f.engine.executeScene(f.material, opened.characters(), opened.history(), f.campaign, f.combatId, 90,
+                UUID.randomUUID(), Schema2CombatState.Command.exploreMove(f.a, List.of(new Position(0, 1))), NO_DICE);
+        assertEquals(6, moved.elapsedSeconds());
+        assertEquals(10, moved.characters().getFirst().history().current().rest().minute());
+        assertEquals(0, moved.characters().getLast().history().current().rest().minute());
+        assertTrue(moved.characters().stream().allMatch(record -> record.history().current().rest().second() == 6));
+        var departed = f.engine.executeScene(f.material, moved.characters(), moved.history(), f.campaign, f.combatId, 96,
+                UUID.randomUUID(), Schema2CombatState.Command.sceneRoster(List.of(bPlace)), NO_DICE);
+        var later = f.engine.executeScene(f.material, List.of(departed.characters().getLast()), departed.history(),
+                f.campaign, f.combatId, 96, UUID.randomUUID(),
+                Schema2CombatState.Command.exploreMove(f.b, List.of(new Position(2, 0))), NO_DICE);
+        assertEquals(f.combatId, later.history().current().combatId());
+        assertEquals(List.of(f.b), later.history().current().combatants().stream().map(Combatant::characterId).toList());
+        assertEquals(2, later.history().current().flows().size());
+        assertEquals(moved.history().current().flows().getFirst(), later.history().current().flows().getFirst());
+        assertEquals(List.of(f.b), later.history().events().getLast().dependencies().stream()
+                .map(Schema2CombatHistory.Dependency::characterId).toList());
+        var records = List.of(departed.characters().getFirst(), later.characters().getFirst());
+        f.engine.validateCampaign(f.material, records, List.of(later.history()));
+        assertEquals(6, f.engine.validateSceneEvent(f.material, records, later.history(), later.history().events().get(1), 90));
+        assertEquals(6, f.engine.validateSceneEvent(f.material, records, later.history(), later.history().events().getLast(), 96));
+    }
+
     private static final class Fixture {
         final CampaignDomainEngine engine = new CampaignDomainEngine();
         final ProductionSchema2Projection material = Schema2CombatTestFixture.material();

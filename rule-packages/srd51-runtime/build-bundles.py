@@ -7,7 +7,8 @@ from pathlib import Path
 import zipfile
 
 
-PACKAGES = ("srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules")
+PACKAGES = ("srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules",
+            "dm-runtime-check-variant")
 
 
 def archive(directory: Path, notice: bytes, guide: bytes) -> bytes:
@@ -37,18 +38,22 @@ def main() -> None:
     source = Path(__file__).resolve().parent
     output = source.parent.parent / "src/main/resources/storage/rules"
     notice = (source / "notice.md").read_bytes()
-    guide = (source / "package-guide.md").read_bytes()
     if not args.check:
         output.mkdir(parents=True, exist_ok=True)
     for name in PACKAGES:
-        expected = archive(source / name, notice, guide)
+        directory = source / name
+        guide = directory / "package-guide.md"
+        if not guide.is_file():
+            guide = source / "package-guide.md"
+        expected = archive(directory, notice, guide.read_bytes())
         target = output / (name + ".zip")
+        if target.is_file() and target.read_bytes() == expected:
+            continue
         if args.check:
-            if not target.is_file() or target.read_bytes() != expected:
-                raise SystemExit("Bundled resource differs from author source: " + str(target))
-        else:
-            target.write_bytes(expected)
-    print("Verified four deterministic rule bundles" if args.check else "Built four finite rule bundles")
+            raise SystemExit("Bundled resource differs from author source: " + str(target))
+        target.write_bytes(expected)
+    action = "Verified" if args.check else "Built"
+    print(f"{action} {len(PACKAGES)} deterministic rule bundles")
 
 
 if __name__ == "__main__":

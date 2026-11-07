@@ -26,7 +26,7 @@ final class Schema2SavingThrowRules {
             return new Basis(ability,mod,bonuses.isEmpty()?0:bonuses.getFirst().bonus()-mod,dex&&actor.dodging()&&m.hitPoints()>0&&block.walkSpeedFeet()>0,false,dex&&m.hitPoints()==0,null);
         }
         var c=roster.get(subject.creatureId());if(c==null)throw invalid("ACTION_FLOW_TARGET_MISMATCH");
-        Schema2SpellRules.requireSupportedFeatures(c.material(),c.character(),"S2_CHECK_EFFECT_UNSUPPORTED");
+        Schema2SpellRules.requireSupportedFeatures(c.material(), c.character(), "S2_CHECK_EFFECT_UNSUPPORTED");
         int mod=Math.floorDiv(c.character().abilities().get(ability)-10,2);var derived=new Schema2CharacterEquipmentRules().derive(c.material(),c.character());
         var bless=Schema2SpellRules.blessing(battle,subject.creatureId());
         return new Basis(ability,mod,proficiency(c,ability),dex&&actor.dodging()&&c.character().hitPoints()>0&&new Schema2CombatRules().speed(c)>0,

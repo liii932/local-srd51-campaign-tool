@@ -2,6 +2,7 @@ package com.dndtool.web;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.dndtool.service.storage.CampaignRuleFixtures;
 import com.dndtool.service.storage.CampaignStorageService;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -22,14 +23,19 @@ final class StorageReadinessTest {
     @TempDir Path temporary;
 
     @Test void idleAndActiveReadinessInspectActualPrivateStoreWithoutCreatingBusinessState() throws Exception {
-        try (CampaignStorageService service = new CampaignStorageService(temporary.resolve("store"))) {
+        Path root = temporary.resolve("store");
+        try (CampaignStorageService service = new CampaignStorageService(root)) {
             Fixture idle = check(service);
             assertEquals(200, idle.status);
             assertEquals("SQLITE", idle.body().get("mode").getAsString());
             assertTrue(idle.body().get("ready").getAsBoolean());
             assertEquals("IDLE", idle.body().get("state").getAsString());
             assertEquals(0, service.status().epoch());
-            service.create("Readiness", List.of("srd51-vitality@1"));
+            Path library = root.resolve("rule-library");
+            assertFalse(Files.exists(library));
+            CampaignRuleFixtures.create(service, "Readiness");
+            Files.move(library, root.resolve("retained-rules"));
+            Files.writeString(library, "unavailable rule library");
             long revision = service.current().revision();
             Fixture active = check(service);
             assertEquals(200, active.status);
@@ -42,7 +48,7 @@ final class StorageReadinessTest {
         Path root = temporary.resolve("store");
         String runId;
         try (CampaignStorageService service = new CampaignStorageService(root)) {
-            service.create("Readiness", List.of("srd51-vitality@1"));
+            CampaignRuleFixtures.create(service, "Readiness");
             runId = service.status().runId();
         }
         try (CampaignStorageService service = new CampaignStorageService(root)) {
@@ -68,7 +74,7 @@ final class StorageReadinessTest {
     @Test void unreadableActiveDatabaseIsBlockedAndDoesNotClaimPlayableReadiness() throws Exception {
         Path root = temporary.resolve("store");
         try (CampaignStorageService service = new CampaignStorageService(root)) {
-            service.create("Readiness", List.of("srd51-vitality@1"));
+            CampaignRuleFixtures.create(service, "Readiness");
             Path database = root.resolve("runs").resolve(service.status().runId()).resolve("run.db");
             Files.write(database, new byte[] {1, 2, 3});
             Fixture result = check(service);

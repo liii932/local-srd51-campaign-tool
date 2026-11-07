@@ -26,7 +26,8 @@ import org.apache.tomcat.util.net.SSLHostConfigCertificate;
 public final class PlayerLoopLauncher implements AutoCloseable {
     private static final List<String> RUNTIME_RESOURCES = List.of("/storage/campaign-schema.json",
             "/storage/rules/srd51-runtime.zip", "/storage/rules/srd51-characters.zip",
-            "/storage/rules/srd51-magic.zip", "/storage/rules/dm-runtime-house-rules.zip");
+            "/storage/rules/srd51-magic.zip", "/storage/rules/dm-runtime-house-rules.zip",
+            "/storage/rules/dm-runtime-check-variant.zip");
     private final Tomcat tomcat;
     private final Context context;
     private final Path base;
@@ -159,7 +160,6 @@ public final class PlayerLoopLauncher implements AutoCloseable {
                 // Recovery-required stores still need the Host UI; business write guards remain
                 // authoritative for RESIDUAL, BLOCKED and SEALED runs.
                 storage.status();
-                storage.catalog();
             }
         } catch (RuntimeException | LinkageError unavailable) {
             throw problem("ISOLATED_STORAGE_UNAVAILABLE", "The campaign service is unavailable. Check exclusive root ownership and prepared runtime resources; retain the supplied store for diagnosis.");

@@ -1,11 +1,11 @@
 package com.dndtool.persistence;
 
-import com.dndtool.service.Schema2RuntimeFactsException;
-import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2PreparationIdentity;
+import com.dndtool.service.Schema2RuntimeFactsException;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.*;

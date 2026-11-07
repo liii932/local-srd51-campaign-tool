@@ -1,5 +1,7 @@
 package com.dndtool.module.composition;
 
+import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CombatTestFixture;
 import com.google.gson.*;

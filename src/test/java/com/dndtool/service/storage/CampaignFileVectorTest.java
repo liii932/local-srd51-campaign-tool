@@ -1,33 +1,28 @@
 package com.dndtool.service.storage;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
-import java.util.List;
-
-import static com.dndtool.service.storage.CampaignData.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CampaignFileVectorTest {
-    @Test void completeFileMatchesIndependentlyCalculatedCanonicalBytesAndDigests() throws Exception {
-        // The checked-in vector was constructed from the file contract with Python json/hashlib,
-        // without invoking CampaignCodec, CampaignJson or CampaignRules for its expected bytes.
-        byte[] fixture;
-        try (var input = getClass().getResourceAsStream("/storage/vitality-known-file.json")) {
-            assertNotNull(input);
-            fixture = input.readAllBytes();
-        }
-        assertEquals('\n', fixture[fixture.length - 1]);
-        byte[] canonical = Arrays.copyOf(fixture, fixture.length - 1);
-        String character = "00000000-0000-4000-8000-000000000002";
-        Document expected = new Document("00000000-0000-4000-8000-000000000003",
-                new Snapshot("00000000-0000-4000-8000-000000000001", "测试",
-                        List.of("srd51-vitality@1", "srd51-healing@1"),
-                        List.of(new CharacterFact(character, "角色", 20, 11)),
-                        List.of(new EventFact(1, "CHARACTER_CREATED", character, 3, 3, 0, 0, "角色", 20),
-                                new EventFact(2, "HEALED", character, 3, 11, 8, 8, "", 0))));
+    @Test void completeFileMatchesIndependentCanonicalEnvelopeAndDigest() throws Exception {
+        var snapshot = CampaignLifecycleFixture.snapshot();
+        var document = new CampaignData.Document(CampaignLifecycleFixture.FILE, snapshot);
+        String unsigned = "{\"applicationModel\":\"campaign-spaces-3\",\"campaign\":{\"campaignKey\":\""
+                + CampaignLifecycleFixture.CAMPAIGN + "\",\"eventTail\":\"2\",\"name\":\"测试\"},\"domains\":"
+                + CampaignDomainCodec.text(snapshot.domains()) + ",\"fileKey\":\"" + CampaignLifecycleFixture.FILE
+                + "\",\"fileKind\":\"RULE_BOUND_CAMPAIGN\",\"formatVersion\":3";
+        MessageDigest sha = MessageDigest.getInstance("SHA-256");
+        sha.update("DND-CAMPAIGN-FILE\0".getBytes(StandardCharsets.US_ASCII));
+        sha.update("1\0".getBytes(StandardCharsets.US_ASCII));
+        String digest = HexFormat.of().formatHex(sha.digest((unsigned + "}").getBytes(StandardCharsets.UTF_8)));
+        byte[] canonical = (unsigned + ",\"integrity\":{\"algorithm\":\"SHA-256\",\"canonicalVersion\":1,\"digest\":\""
+                + digest + "\"}}").getBytes(StandardCharsets.UTF_8);
         CampaignCodec codec = new CampaignCodec();
-        assertEquals(expected, codec.decode(fixture));
-        assertArrayEquals(canonical, codec.encode(expected));
+        assertEquals(document, codec.decode(canonical));
+        assertArrayEquals(canonical, codec.encode(document));
     }
 }

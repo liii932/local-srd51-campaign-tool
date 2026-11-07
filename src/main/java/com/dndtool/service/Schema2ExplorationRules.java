@@ -9,7 +9,7 @@ import java.util.*;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static com.dndtool.service.Schema2CombatState.*;
 
-/** Finite scene-owner plans; character health and the existing shared character clocks stay authoritative. */
+/** Finite scene-owner plans; the scene clock determines effect deadlines and each character retains experienced time. */
 public final class Schema2ExplorationRules {
     public record TimePlan(int seconds,List<HealthChange> changes,Map<UUID,Context> after) {
         public TimePlan {changes=List.copyOf(changes);after=Map.copyOf(after);}
@@ -27,11 +27,17 @@ public final class Schema2ExplorationRules {
         if(seconds<1||seconds>60||roster.isEmpty()) throw invalid("S2_EXPLORATION_TIME_INPUT");
         Long now=null;
         for(Context context:roster.values()) {
-            var state=context.character();long value=Schema2SpellRules.second(state);
+            var state=context.character();long value=context.sceneSecond();
             if(now!=null&&value!=now) throw invalid("S2_COMBAT_CLOCK_MISMATCH");now=value;
+            requireSceneTime(value,seconds);
             if(state.hitPoints()==0&&!state.health().stable()&&!state.health().dead()) throw invalid("S2_EXPLORATION_UNSTABLE_CHARACTER");
             Schema2CombatTimeRules.advanceSeconds(context.material(),state,seconds);
         }
+    }
+
+    static void requireSceneTime(long before, int seconds) {
+        if (before < 0 || before > Schema2CharacterRestRules.MAX_MINUTE * 60 - seconds)
+            throw invalid("S2_COMBAT_TIME_CAPACITY");
     }
 
     public static TimePlan advanceTime(Map<UUID,Context> roster,int seconds,UUID frameKey) {
@@ -42,7 +48,7 @@ public final class Schema2ExplorationRules {
             var next=Schema2CombatTimeRules.advanceSeconds(context.material(),before,seconds);
             changes.add(new HealthChange(id,before,next,frameKey,0,false,
                     new HealthResult(List.of(),null,null,0,(int)Math.max(0,next.hitPoints()-before.hitPoints())),false,true,seconds));
-            after.put(id,new Context(context.material(),context.initial(),next));
+            after.put(id,context.after(next,seconds));
         }
         return new TimePlan(seconds,changes,after);
     }

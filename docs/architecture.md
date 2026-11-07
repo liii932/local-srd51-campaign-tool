@@ -73,20 +73,24 @@ DM 访问 http://127.0.0.1:8080/host
 重启残留经完整核验和查证后可显式继续、救援或精确放弃；见[完整文件](design/v2/save-and-recovery.md)
 及[模组接口](design/v2/module-interface-baseline.md)。
 当前以独立应用模型接合[有限 SQLite 战役运行](storage-vitality-loop.md)：
-`BundledCampaignRules` 经生产 reader/compose 加载四个有限规则包；`CampaignDomainEngine`
-在不借连接的前提下执行现有纯领域规则；`CampaignDomainData` 和严格
-`CampaignDomainCodec` 保存完整类型化聚合。`CampaignDomainRepository` 写入聚合及关系
+`LocalRuleLibrary` 保管准确原包与独立接受，`BundledCampaignRules` 仅提供显式导入候选；
+新建和文件打开重新读取、组合并校验接受材料，释放规则库读取守卫后再分配私有运行。
+文件打开还逐项比对重组结果与全部冻结材料。`CampaignRuleContext`
+从战役自己的解释合同、绑定、规则和来源链恢复，统一提供创建、候选与查询依据。角色运行、
+战斗历史与准备身份由 `Schema2CharacterRuntime`、`Schema2CombatHistory` 和
+`Schema2PreparationIdentity` 拥有，结构校验和容量预检也在领域侧；JDBC 适配这些类型。
+`CampaignDomainEngine`
+在不借连接的前提下执行现有纯领域规则。`CampaignSpaceData` 与 `CampaignSpaceCommands`
+协调世界节点、场景、唯一安置、独立空间钟和单一焦点。场景时间用于效果和战斗，
+受影响角色累加其实际经历。`CampaignDomainData` 与严格 `CampaignDomainCodec` 保存完整类型化聚合。`CampaignDomainRepository` 写入聚合及关系
 投影；`CampaignStorageService` 在一个 SQLite 事务中统一领域后果、根历史、revision 和
 请求结果，提交后才向页面发布。独占根锁和一个 `BEGIN IMMEDIATE` 同时接纳并提交，
 没有独立 C0 或 NOT_COMMITTED 裁定；未知 commit/rollback 阻断新写，经完整库/历史/收据
-核验后显式恢复新 epoch，不重播未持久意图。根与子事件、原骰、初始/当前状态及 pending 共同进入
-完整文件，打开和恢复直接核验事实而不重放。显式模式使用自己的服务与 epoch，关闭旧
+核验后显式恢复新 epoch。完整文件保存根与子事件、原骰、初始/当前状态和所有场景
+pending。打开和恢复以原意图和保留骰纯核验历史前缀，再直接装载已记录事实；后台时钟和
+未决动作保持原态。显式模式使用自己的服务与 epoch，关闭旧
 MySQL 读写路由；未配置时仍使用原模式。它不等同完整 SRD 或通用完整 format 2 发布。
-角色命令、角色状态、战斗历史与准备身份由 `Schema2CharacterRuntime`、`Schema2CombatHistory`
-和 `Schema2PreparationIdentity` 定义。领域层校验事实形状、历史邻接和容量；JDBC 仓储
-适配类型化行，SQLite 仓储保存严格聚合，两个存储入口复用同一事实合同。
-
-下述 INTERNAL MySQL 来源/快照/历史实现说明的是原服务边界。SQLite 路线复用其
+下述 INTERNAL MySQL 来源/快照/历史实现说明的是原服务边界；新的 SQLite 路线复用其
 纯规则消费者，不调用它们另开 MySQL 事务。schema-2 prepared 身份与历史 version 是
 保留的业务关系，本地 core run/epoch/HTTP 收据另建且不入文件。每命令 SQLite 耐久和
 INITIAL/MANUAL/FINAL 承担当前保存责任，周期 AUTO 是后续容量测量目标。
@@ -212,7 +216,7 @@ DM 对玩家文字提议可拒绝、叙事回复或执行有理由的属性检�
 
 - 全局玩家账号、多位独立 DM、匿名旁观、聊天和投票；
 - 玩家管理存档、导入/导出完整战役、任意角色状态修改或绕过批准取得控制权；
-- 页面中的模组上传、安装、规则正文编辑、内容更新和在线下载；
+- 页面中的规则正文编辑、自动内容更新和在线下载；
 - 运行时 Java、JavaScript、SQL 或其他脚本插件；
 - 运行时动态 DDL 和 MySQL JSON 列；
 - WebSocket、SSE、推送、点对点通信和自动匹配；
@@ -221,8 +225,8 @@ DM 对玩家文字提议可拒绝、叙事回复或执行有理由的属性检�
 - 战役 ZIP 存档、自动/增量备份和角色级选择性合并；
 - 云端多租户、公网开放和跨主机协作。
 
-已安装模组的组合选择、预设与独立规则 ZIP 制品属于上述 v2 模组目标，尚未接入现行 Host；
-它们不改变战役文件与规则制品分别保管的边界。
+SQLite Host 已提供原包导入、独立审阅接受、原字节导出与准确有序选择/预览，最多八包。
+可编辑预设和重建索引仍是后续目标；战役文件与规则制品分别保管。
 
 ### 3.5 当前发布与原型演进边界
 
@@ -306,6 +310,28 @@ Servlet 不直接执行 SQL，Repository 不决定业务权限，JSP 不保存�
 失败时不继续下游规则读取，不执行迁移、安装或业务写入。
 当前诊断仍在启动及每次 Host 诊断请求时重新检查原单库，不要求第二 JNDI。
 这项分层不改变现有命令事务所有权，也不表示 v2 准备/执行上下文已接入。
+
+### 模组分层的目标边界
+
+新目标按[模组分层](design/v2/module-layering.md)拆分四项责任：运行核心提供身份、接纳、
+权限、共同事务、幂等、随机与恢复保障；应用机制解释规则并维护唯一领域事实；模组
+提供严格类型化声明、有限参数与稳定引用；界面负责呈现和有限意图。`base` 与扩展使用
+同一接口，模组不获得脚本执行、状态写入或数据库结构权限。
+
+单 DM 同时运行一个战役；[本机规则库](design/v2/local-rule-library.md)用不可变原包与
+SQLite 接受账本准备准确组合，运行使用私有 SQLite 冻结副本。新建/文件打开核本机原包
+与接受，活动/残留不回源。不同角色可处于多个场景，但只有一个权威焦点。背景空间钟、
+个人经历和普通操作冻结。登记的被动因果可借入背景，先证明真实距离等依赖和全部后果，
+在同一应用阶段提交前后台伤害，防御、反应、选择及后继由原因果作用域的受限叶子执行。
+后台原 flow 保留已提交前缀并在继续时重验，文件保存作用域和全部叶子。
+[空间与跨空间因果](design/v2/world-and-scene-spaces.md#causal-scope)
+
+当前已采用战役规则上下文、领域类型/校验、本机规则库和多场景单焦点。所有新战役
+使用已接受的完整组合，外部内容受当前机制与创建模板闭包约束。现行空间使用二维网格。
+目标的三维几何与安置、独立日历与期限、物件互动与魔法资源各由其权威合同规定，
+地形、跨空间作用与完整 SRD 按实际消费者扩展。当前采用范围见
+[领域接合表](design/v2/domain-integration.md)。
+[空间与区域](design/v2/spatial-and-area-contract.md) · [时间与日历](design/v2/time-and-calendar.md) · [物件与魔法物品](design/v2/objects-and-magic-items.md)
 
 ### 4.2 根上下文和路由
 
@@ -571,7 +597,7 @@ Java 使用 `MessageDigest` 计算 64 字符小写 SHA-256，并与应用随附�
 ### 7.1 主机页面
 
 SQLite 模式的 `/host` 进入 `/host/storage`，同一受保护操作台提供规则选择、角色卡、
-已接合领域动作、保存/结束、文件列表/下载/导入与残留处置。具体表单及限制见
+空间浏览与焦点切换、已接合领域动作、保存/结束、文件列表/下载/导入与残留处置。具体表单及限制见
 [运行合同](storage-vitality-loop.md)；以下旧页面只在未启用该模式时使用。
 
 - `/host`：当前战役总览；
@@ -648,8 +674,11 @@ epoch、revision 与角色/场景版本仍分别校验。文件下载是读取�
 新目标按应用当前 JSON 结构在新私有库中初始化，同版残留核验已存模型、计划和真实结构，
 不重跑 DDL/seed。同一运行固定规则解释，不引入规则热重载或跨库分布式事务。
 当前可选 SQLite 由 `DND_STORAGE_ROOT` 显式选择，经 `StorageApplicationListener` 和
-`CampaignStorageService` 装配。它不读取外部自定义规则来源，不连接来源 MySQL，也不使用
-新的来源 JNDI。完整文件携带准确冻结 material/链，按内置四包固定投影逐项核验。
+`CampaignStorageService` 装配。本机规则库使用独立 SQLite 账本和原包文件，不连接来源 MySQL
+或来源 JNDI。导入与接受各自持久保留原操作意图、不可变业务记录及收据；未知结果在独立写锁
+下查证，未决时阻断库写入及新绑定，不影响健康活动运行。完整文件携带解释合同、准确绑定、
+冻结规则与完整链，运行恢复独立核验全部材料和当前支持范围。最多两份已核验上下文
+缓存按完整材料区分，缓存丢失仍从冻结事实恢复，不用默认包替换。
 具体装配边界见[配置说明](configuration.md#sqlite-装配与运行身份)；启用 SQLite 不表示
 已有 MySQL 数据已经迁移。
 
@@ -659,8 +688,10 @@ epoch、revision 与角色/场景版本仍分别校验。文件下载是读取�
 
 当前 SQLite 的完整文件和导入/打开/下载/删除/残留责任按
 [运行合同](storage-vitality-loop.md#完整文件与直接恢复)执行；它包含有限运行的全部历史、
-初始/当前事实与 pending，采用独立 `VITALITY_CAMPAIGN` 模型。下面的 released dispatcher、
-旧 archive format 1 和 MySQL 确认事务不用于该路径；通用完整 format 2 的采用门仍独立。
+初始/当前事实、全部场景 pending、唯一安置、焦点及各空间时钟。它使用
+`RULE_BOUND_CAMPAIGN` 格式 3、`campaign-spaces-3` 应用模型和 `sqlite-campaign-3` 私有存储。
+以下 released dispatcher、archive format 1、通用 archive format 2 采用门与 MySQL 确认事务
+属于独立的 MySQL 路径。
 
 主机导出单个 UTF-8 `campaign-save.json`，最大 16 MiB，不使用 ZIP。存档包含：
 

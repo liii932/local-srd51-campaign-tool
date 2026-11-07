@@ -27,7 +27,7 @@ class CampaignWindowsFilesystemTest {
     @Test void newlyCreatedTreeAndAllLiveFilesHaveOnlyTheCurrentAccountAcl() throws Exception {
         Path root = temporary.resolve("managed");
         try (var service = new CampaignStorageService(root)) {
-            service.create("Windows 权限", List.of(CampaignRules.BASE, CampaignRules.HEALING));
+            CampaignRuleFixtures.create(service, "Windows 权限");
             try (var paths = Files.walk(root)) {
                 for (Path path : paths.toList()) {
                     if (Files.isDirectory(path)) ManagedCampaignFiles.privateDirectory(path);
@@ -59,7 +59,7 @@ class CampaignWindowsFilesystemTest {
 
     @Test void widenedResidualDirectoryAclIsRejectedBeforeDatabaseAdoption() throws Exception {
         Path root = temporary.resolve("managed"); String run;
-        try (var service = new CampaignStorageService(root)) { service.create("私有运行", List.of(CampaignRules.BASE)); run = service.status().runId(); }
+        try (var service = new CampaignStorageService(root)) { CampaignRuleFixtures.create(service, "私有运行"); run = service.status().runId(); }
         Path directory = root.resolve("runs").resolve(run);
         var view = Files.getFileAttributeView(directory, AclFileAttributeView.class); var entries = new ArrayList<>(view.getAcl());
         UserPrincipal everyone = root.getFileSystem().getUserPrincipalLookupService().lookupPrincipalByName("Everyone");
@@ -73,7 +73,7 @@ class CampaignWindowsFilesystemTest {
 
     @Test void independentProcessRunLockPreventsRecoveryAndReleasesAtExit() throws Exception {
         Path root = temporary.resolve("managed"); String run;
-        try (var service = new CampaignStorageService(root)) { service.create("锁", List.of(CampaignRules.BASE)); run = service.status().runId(); }
+        try (var service = new CampaignStorageService(root)) { CampaignRuleFixtures.create(service, "锁"); run = service.status().runId(); }
         Process child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp", classpath(),
                 RunLockChild.class.getName(), root.resolve("runs").resolve(run).resolve("run.lock").toString()).redirectErrorStream(true).start();
         try {

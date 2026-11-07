@@ -1,6 +1,7 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.nio.file.Path;
@@ -147,7 +148,7 @@ class PlayerParticipationAcceptanceTest {
             UUID pc = f.character("移动的战士", "PC"), npc = f.character("隐藏借机攻击者", "NPC");
             f.acquire(pc, true); f.acquire(npc, true);
             Seat player = f.approve("玩家"); f.assign(pc, player.member);
-            f.combat(null, Command.start(List.of(new Deployment(pc, new Position(0, 0), 0), new Deployment(npc, new Position(1, 0), 1)), List.of(pc, npc)));
+            PlayerSpaceFixture.beginBattle(f.storage, pc, npc);
             Battle battle = f.battle(); if (battle.activeActor().equals(npc)) f.combat(battle, Command.action(Kind.END_TURN, npc));
             f.takeover(player);
             JsonObject movement = f.command(player, f.option(player, "向西移动一格"));
@@ -178,11 +179,11 @@ class PlayerParticipationAcceptanceTest {
         String invitation;
         Fixture(String name) throws Exception {
             storage = new CampaignStorageService(temporary.resolve(name));
-            storage.create("玩家边界验收", List.of(CampaignRules.BASE, CampaignRules.HEALING, CampaignRules.RUNTIME));
+            CampaignRuleFixtures.create(storage, "玩家边界验收");
             gateway = new PlayerGatewayService(storage, clock); invitation = host("invite", object()).get("invitation").getAsString();
         }
         JsonObject host(String action, JsonObject input) { var current = storage.current(); return gateway.hostCommand(action, input, uuid(), current.epoch(), current.revision()); }
-        CampaignStorageService.CampaignView send(String action, JsonObject input) { var current = storage.current(); return storage.domainCommand(uuid(), current.epoch(), current.revision(), action, input); }
+        CampaignStorageService.CampaignView send(String action, JsonObject input) { return PlayerSpaceFixture.send(storage, action, input); }
         Seat approve(String name) { return approve(name, null); }
         Seat approve(String name, UUID existing) {
             var anonymous = gateway.read(null, null, true);
@@ -203,8 +204,9 @@ class PlayerParticipationAcceptanceTest {
         UUID manual(String name, String kind) { send("manual-create", object("name", name, "kind", kind, "template", "blank")); return storage.accessSnapshot().snapshot().domains().manual().characters().stream().filter(character -> character.current().name().equals(name)).findFirst().orElseThrow().id(); }
         void assign(UUID pc, UUID member) { var control = storage.accessSnapshot().snapshot().domains().participation().control(pc); host("control", object("payload", object("characterId", pc.toString(), "memberId", member.toString(), "controlVersion", control == null ? "0" : Long.toString(control.version())).toString())); }
         void permit(UUID pc) {
+            UUID node = PlayerSpaceFixture.placeAtWorld(storage, pc);
             long version = storage.accessSnapshot().snapshot().domains().participation().exploration().stream().filter(permission -> permission.characterId().equals(pc)).mapToLong(Exploration::version).findFirst().orElse(0);
-            JsonObject input = object("characterId", pc.toString(), "permissionVersion", Long.toString(version)); input.add("sceneId", JsonNull.INSTANCE); input.addProperty("active", true);
+            JsonObject input = object("characterId", pc.toString(), "permissionVersion", Long.toString(version)); input.addProperty("sceneId", node.toString()); input.addProperty("active", true);
             JsonArray actions = new JsonArray(); actions.add("CHARACTER_COMMAND"); input.add("actions", actions); host("exploration", object("payload", input.toString()));
         }
         void share(ShareKind kind, UUID subject, boolean active) {
@@ -215,7 +217,7 @@ class PlayerParticipationAcceptanceTest {
         }
         void acquire(UUID pc, boolean equip) {
             var command = new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
-                    new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
+                    new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), CampaignRuleFixtures.rules().rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
             characterCommand(pc, command);
             if (equip) {
                 UUID item = storage.accessSnapshot().snapshot().domains().characters().stream().filter(character -> character.id().equals(pc)).findFirst().orElseThrow().history().current().equipment().getFirst().itemId();
@@ -227,9 +229,9 @@ class PlayerParticipationAcceptanceTest {
         JsonObject characterInput(UUID pc) { var state = storage.accessSnapshot().snapshot().domains().characters().stream().filter(character -> character.id().equals(pc)).findFirst().orElseThrow().history().current(); return object("characterId", pc.toString(), "characterVersion", Long.toString(state.version())); }
         JsonObject check(UUID pc) {
             JsonObject input = characterInput(pc); input.add("command", CampaignDomainCodec.toJson(new Schema2CharacterRuntime.Command("CHECK_RESOLVED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null,
-                    new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定验收检定")))); return input;
+                    new Schema2CharacterRuntime.CheckInput(CampaignRuleFixtures.rules().rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定验收检定")))); return input;
         }
-        void combat(Battle previous, Command command) { JsonObject input = object("combatVersion", previous == null ? "-1" : Long.toString(previous.version())); input.add("combatId", previous == null ? JsonNull.INSTANCE : new JsonPrimitive(previous.combatId().toString())); input.add("command", CampaignDomainCodec.toJson(command)); send("combat-command", input); }
+        void combat(Battle previous, Command command) { PlayerSpaceFixture.combat(storage, previous, command); }
         Battle battle() { return storage.accessSnapshot().snapshot().domains().combats().getFirst().current(); }
         @Override public void close() throws Exception { storage.close(); }
     }

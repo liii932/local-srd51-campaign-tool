@@ -16,15 +16,8 @@ public final class CampaignAdjudicationCommands {
                 CampaignJson.string(input,"proposalText"), CampaignJson.string(input,"reason"), Type.valueOf(CampaignJson.string(input,"type")), CampaignCheckEffects.read(CampaignJson.object(input,"check")));
         requireUndecided(snapshot.domains().roots(), decision.proposalId());
         validateProvenance(snapshot.domains().participation(), decision);
-        var result = CampaignCheckEffects.resolve(snapshot, CampaignJson.object(input,"check"), operation, dice);
+        var result = CampaignCheckEffects.resolve(snapshot.domains(), decision.check(), operation, dice);
         return new Result(result.state(), result.subjectId(), new Audit(decision, result.audit()));
-    }
-    public static void validateAudit(State state, Root root, Audit audit, CampaignParticipationData.State participation,
-            Map<UUID,Node> nodes, Map<UUID,Item> items, Map<UUID,Position> positions) {
-        requireUndecided(state.roots().subList(0, Math.toIntExact(root.sequence() - 1)), audit.decision().proposalId());
-        validateProvenance(participation, audit.decision());
-        if (!root.actor().equals(CampaignParticipationData.Actor.dm(audit.decision().check().characterId(), audit.decision().memberId()))) throw CampaignJson.bad("Adjudication actual DM actor differs from represented player");
-        CampaignCheckEffects.validateAudit(state, root, audit.result(), nodes, items, positions, "adjudicated-check", CampaignDomainCodec.text(audit));
     }
     private static void requireUndecided(List<Root> roots, UUID proposalId) {
         for (Root earlier : roots) if (earlier.kind().equals("adjudicated-check")) {

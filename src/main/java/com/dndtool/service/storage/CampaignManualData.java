@@ -7,7 +7,6 @@ import java.util.*;
 public final class CampaignManualData {
     private CampaignManualData() { }
     public static final List<String> TIERS = List.of("NONE", "HALF", "FULL", "EXPERTISE");
-    public static final List<String> SIDES = List.of("ALLY", "ENEMY", "NEUTRAL");
     public static final List<String> CLASSES = List.of("barbarian", "bard", "cleric", "druid", "fighter", "monk", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard").stream().map(c -> "class." + c).toList();
     public static final List<String> ABILITIES = List.of("strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma").stream().map(a -> "ability." + a).toList();
     private static final String[][] SKILL_ROWS = {{"acrobatics","dexterity","体操"},{"animal_handling","wisdom","驯兽"},{"arcana","intelligence","奥秘"},{"athletics","strength","运动"},{"deception","charisma","欺瞒"},{"history","intelligence","历史"},{"insight","wisdom","洞悉"},{"intimidation","charisma","威吓"},{"investigation","intelligence","调查"},{"medicine","wisdom","医药"},{"nature","intelligence","自然"},{"perception","wisdom","察觉"},{"performance","charisma","表演"},{"persuasion","charisma","游说"},{"religion","intelligence","宗教"},{"sleight_of_hand","dexterity","巧手"},{"stealth","dexterity","隐匿"},{"survival","wisdom","求生"}};
@@ -25,7 +24,7 @@ public final class CampaignManualData {
                 List.of(new Entry("blank", "空白"), new Entry("commoner", "平民"), new Entry("guard", "守卫"), new Entry("wolf", "狼")),
                 List.of(new ItemTemplate("item.backpack", "背包", "用于携带物品的普通背包"), new ItemTemplate("item.rope_hempen_50ft", "50 英尺麻绳", "普通麻绳"), new ItemTemplate("item.torch", "火把", "普通照明用火把")),
                 List.of("NORMAL", "ADVANTAGE", "DISADVANTAGE"), List.of("MANUAL", "ABILITY", "SKILL", "SAVING_THROW"),
-                List.of("HP", "GRANT_MODULE_ITEM", "GRANT_TEMPORARY_ITEM", "POSITION", "MESSAGE"), SIDES);
+                List.of("HP", "GRANT_MODULE_ITEM", "GRANT_TEMPORARY_ITEM", "MESSAGE"));
     }
     public record Field(String key, String name, int minimum, int maximum, int defaultValue) { }
     public record Entry(String key, String name) { }
@@ -33,7 +32,7 @@ public final class CampaignManualData {
     public record ItemTemplate(String key, String name, String description) { }
     public record Catalog(List<Field> fields, List<Entry> classes, List<Proficiency> skills, List<Proficiency> saves,
                           List<String> tiers, List<Entry> templates, List<ItemTemplate> items, List<String> rollModes,
-                          List<String> checkKinds, List<String> effectKinds, List<String> sides) { }
+                          List<String> checkKinds, List<String> effectKinds) { }
     public static Catalog catalog() { return CATALOG; }
     public record Card(UUID id, String name, String kind, boolean active, Map<String,Integer> fields,
                        Map<String,Integer> classes, Map<String,String> skills, Map<String,String> saves, long version) {
@@ -55,22 +54,13 @@ public final class CampaignManualData {
         public ManualCharacter { if (initial == null || current == null || !initial.id().equals(current.id()) || initial.version() != 0) throw CampaignJson.bad("Invalid manual initial/current identity"); }
         public UUID id() { return current.id(); }
     }
-    public record Participant(UUID characterId, String side) { public Participant { uuid(characterId); if (!SIDES.contains(side)) throw CampaignJson.bad("Unknown encounter side"); } }
-    public record Deployment(UUID characterId, String side, UUID nodeId) { public Deployment { uuid(characterId); uuid(nodeId); if (!SIDES.contains(side)) throw CampaignJson.bad("Unknown encounter side"); } }
-    public record Encounter(UUID id, String status, List<Participant> participants) {
-        public Encounter {
-            uuid(id); participants = List.copyOf(participants);
-            if (!Set.of("ACTIVE", "CLOSED").contains(status) || participants.isEmpty() || participants.size() > 10000
-                    || new HashSet<>(participants.stream().map(Participant::characterId).toList()).size() != participants.size()) throw CampaignJson.bad("Invalid simple encounter");
-        }
-    }
-    public record State(List<ManualCharacter> characters, List<Encounter> encounters, UUID partyNodeId) {
+    public record State(List<ManualCharacter> characters) {
         public State {
-            characters = List.copyOf(characters); encounters = List.copyOf(encounters); if (partyNodeId != null) uuid(partyNodeId);
-            if (characters.size() > 10000 || encounters.size() > 10000 || new HashSet<>(characters.stream().map(ManualCharacter::id).toList()).size() != characters.size()
-                    || new HashSet<>(encounters.stream().map(Encounter::id).toList()).size() != encounters.size() || encounters.stream().filter(e -> e.status().equals("ACTIVE")).count() > 1) throw CampaignJson.bad("Manual domain capacity or identity conflict");
+            characters = List.copyOf(characters);
+            if (characters.size() > 10000 || new HashSet<>(characters.stream().map(ManualCharacter::id).toList()).size() != characters.size())
+                throw CampaignJson.bad("Manual domain capacity or identity conflict");
         }
-        public static State empty() { return new State(List.of(), List.of(), null); }
+        public static State empty() { return new State(List.of()); }
     }
     public static Card initial(UUID id, String name, String kind, String template) {
         Map<String,Integer> fields = new TreeMap<>(); FIELDS.forEach(f -> fields.put(f.key(), f.defaultValue()));
@@ -80,14 +70,13 @@ public final class CampaignManualData {
         Map<String,String> skills = new TreeMap<>(), saves = new TreeMap<>(); SKILLS.forEach(p -> skills.put(p.key(), "NONE")); SAVES.forEach(p -> saves.put(p.key(), "NONE"));
         return new Card(id, name, kind, true, fields, Map.of(), skills, saves, 0);
     }
-    public static boolean active(State state) { return state.encounters().stream().anyMatch(e -> e.status().equals("ACTIVE")); }
     public static State touch(State state,UUID id) {
         List<ManualCharacter> changed=new ArrayList<>();boolean found=false;
         for(ManualCharacter c:state.characters())if(c.id().equals(id)){
             Card v=c.current();if(!v.active())throw CampaignJson.bad("Inactive manual owner");
             changed.add(new ManualCharacter(c.initial(),new Card(v.id(),v.name(),v.kind(),v.active(),v.fields(),v.classes(),v.skills(),v.saves(),v.version()+1)));found=true;
         }else changed.add(c);
-        return found?new State(changed,state.encounters(),state.partyNodeId()):state;
+        return found?new State(changed):state;
     }
     public static void uuid(UUID id) { if (id == null) throw CampaignJson.bad("Missing UUID"); CampaignJson.uuid(id.toString()); }
     public static String text(String value, int minimum, int maximum) {

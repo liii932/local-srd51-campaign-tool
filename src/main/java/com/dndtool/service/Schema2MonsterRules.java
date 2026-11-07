@@ -11,7 +11,10 @@ final class Schema2MonsterRules {
     private Schema2MonsterRules() { }
     static ProductionSchema2Projection material(Map<UUID,Context> roster) { return roster.values().iterator().next().material(); }
     static MonsterDefinition definition(Map<UUID,Context> roster,RuleIdentity identity) {
-        var definitions=material(roster).projection().rules().stream().filter(FinalMonster.class::isInstance)
+        return definition(material(roster),identity);
+    }
+    static MonsterDefinition definition(ProductionSchema2Projection material,RuleIdentity identity) {
+        var definitions=material.projection().rules().stream().filter(FinalMonster.class::isInstance)
                 .map(FinalMonster.class::cast).filter(r->r.enabled()&&r.identity().equals(identity)).toList();
         if(definitions.size()!=1)throw invalid("S2_MONSTER_RULE_UNSUPPORTED");
         var definition=definitions.getFirst().definition();validateScope(definition.statBlock());return definition;
@@ -29,7 +32,9 @@ final class Schema2MonsterRules {
                 .map(FinalEntry::entry).filter(MonsterActionEntry.class::isInstance).map(MonsterActionEntry.class::cast)
                 .filter(e->e.identity().equals(identity)).toList();
         if(entries.size()!=1||!identity.collectionKey().equals("actions"))throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
-        var p=entries.getFirst().actionProfile();
+        return validateAction(entries.getFirst().actionProfile());
+    }
+    private static MonsterActionProfile validateAction(MonsterActionProfile p) {
         if(p.mode()!=MonsterActionMode.SAVE_DAMAGE_BATCH_V1||!Objects.equals(p.mechanism(),"HELL_HOUND_FIRE_BREATH_V1")
                 ||!new MonsterSavePolicy("ability.dexterity","FIXED_DC",12,"FULL","HALF").equals(p.savePolicy())
                 ||!new MonsterDamageProfile(6,6,DamageType.FIRE,"OTHER_DELIVERY","NO_ABILITY_MODIFIER").equals(p.damageProfile())
@@ -37,17 +42,28 @@ final class Schema2MonsterRules {
                 ||!new MonsterRecharge(6,5,true,true,true).equals(p.recharge()))throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
         return p;
     }
+    static void validateFrozenSupport(ProductionSchema2Projection material) {
+        for (FinalRule row : material.projection().rules()) if (row instanceof FinalMonster monster && monster.enabled()) {
+            validateScope(monster.definition().statBlock());
+            initialActions(material, monster.identity());
+        }
+    }
     static MonsterInstance initial(Map<UUID,Context> roster,MonsterDeployment deployment) {
-        var d=definition(roster,deployment.monster());
-        // A point represents the complete supported occupied volume. Other sizes require a volume owner.
-        if(d.statBlock().size()!=MonsterSize.MEDIUM&&d.statBlock().size()!=MonsterSize.SMALL)throw invalid("S2_MONSTER_SPACE_UNSUPPORTED");
+        return initial(material(roster), deployment);
+    }
+    static MonsterInstance initial(ProductionSchema2Projection material,MonsterDeployment deployment) {
+        var d=definition(material,deployment.monster());
+        return new MonsterInstance(deployment.monsterId(), deployment.monster(), d.statBlock().hitPoints(), false,
+                initialActions(material, deployment.monster()));
+    }
+    private static List<MonsterActionUse> initialActions(ProductionSchema2Projection material, RuleIdentity monster) {
         List<MonsterActionUse> actions=new ArrayList<>();
-        for(var row:material(roster).projection().entries())if(row.enabled()&&row.entry() instanceof MonsterActionEntry entry
-                &&entry.identity().rule().equals(deployment.monster())&&entry.actionProfile().mode()==MonsterActionMode.SAVE_DAMAGE_BATCH_V1) {
-            action(roster,entry.identity());actions.add(new MonsterActionUse(entry.identity(),true));
+        for(var row:material.projection().entries())if(row.enabled()&&row.entry() instanceof MonsterActionEntry entry
+                &&entry.identity().rule().equals(monster)&&entry.actionProfile().mode()==MonsterActionMode.SAVE_DAMAGE_BATCH_V1) {
+            validateAction(entry.actionProfile());actions.add(new MonsterActionUse(entry.identity(),true));
         }
         if(actions.size()>16)throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");
-        return new MonsterInstance(deployment.monsterId(),deployment.monster(),d.statBlock().hitPoints(),false,actions);
+        return actions;
     }
     static MonsterInstance instance(Battle battle,UUID id) {return battle.monsters().stream().filter(m->m.monsterId().equals(id)).findFirst().orElseThrow(()->invalid("S2_MONSTER_NOT_FOUND"));}
     static boolean isMonster(Battle battle,UUID id) {return battle.monsters().stream().anyMatch(m->m.monsterId().equals(id));}

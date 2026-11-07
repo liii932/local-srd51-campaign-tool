@@ -26,7 +26,9 @@ public final class Schema2CompositionKernel {
     public static final String HEADER_PATH = "author-package.json";
     public static final String CANONICAL_PROFILE = "validation-json-1";
     public static final String COMPOSITION_ALGORITHM = "validation-schema2-projection-1";
-    public static final int MAX_PACKAGES = 4;
+    public static final int MAX_PACKAGES = 8;
+    private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
+    private static final int MAX_RUNTIME_CHAINS = 3072, MAX_RUNTIME_STEPS = 4096;
     public static final int MAX_AUTHOR_FILES = 16;
     public static final int MAX_HEADER_BYTES = 16384;
     public static final int MAX_FILE_BYTES = 65536;
@@ -467,8 +469,9 @@ public final class Schema2CompositionKernel {
                                     List<FinalEntry> entries, List<FieldChain> chains) {
         Location source = new Location(null, null, null, "$runtime", "", null);
         if (members == null || members.isEmpty() || members.size() > MAX_PACKAGES || rules == null
-                || entries == null || chains == null || rules.size() > 256 || entries.size() > 512
-                || chains.size() > 3072) throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid stored projection budget", source);
+                || entries == null || chains == null || rules.size() > MAX_RUNTIME_RULES
+                || entries.size() > MAX_RUNTIME_ENTRIES || chains.size() > MAX_RUNTIME_CHAINS)
+            throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid stored projection budget", source);
         Set<String> modules = new HashSet<>();
         for (int i = 0; i < members.size(); i++) {
             var member = members.get(i);
@@ -520,7 +523,7 @@ public final class Schema2CompositionKernel {
             int previousIndex = -1;
             for (int n = 0; n < chain.steps().size(); n++) {
                 ChainStep step = chain.steps().get(n);
-                if (++stepCount > 4096 || step.loadIndex() < 0 || step.loadIndex() >= members.size()
+                if (++stepCount > MAX_RUNTIME_STEPS || step.loadIndex() < 0 || step.loadIndex() >= members.size()
                         || step.loadIndex() <= previousIndex || !previous.equals(step.before()))
                     throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid stored chain continuity", source);
                 var member = members.get(step.loadIndex());
@@ -868,6 +871,10 @@ public final class Schema2CompositionKernel {
                 .sorted(Comparator.<Map.Entry<FieldKey, List<ChainStep>>, Identity>comparing(e -> e.getKey().target, IDENTITY_ORDER)
                         .thenComparing(e -> e.getKey().field.key()))
                 .map(e -> new FieldChain(e.getKey().target, e.getKey().field, e.getValue())).toList();
+        if (rules.size() > MAX_RUNTIME_RULES || entries.size() > MAX_RUNTIME_ENTRIES
+                || completeChains.size() > MAX_RUNTIME_CHAINS
+                || completeChains.stream().mapToInt(chain -> chain.steps().size()).sum() > MAX_RUNTIME_STEPS)
+            throw fail("S2_BUDGET", Stage.FINAL, "Combined rule, entry or provenance budget exceeded");
         Object configuration = json("author_schema_version", 2, "canonical_profile", CANONICAL_PROFILE,
                 "composition_algorithm", COMPOSITION_ALGORITHM, "members", selected.stream().map(pack ->
                         json("module_key", pack.moduleKey, "release_version", pack.releaseVersion,
@@ -1414,7 +1421,8 @@ public final class Schema2CompositionKernel {
 
     private static Set<String> executionAlgorithms(FeatureExecution mode) {
         return switch (mode) {
-            case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1", "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1");
+            case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1",
+                    "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1");
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
             case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
         };
