@@ -167,7 +167,7 @@ final class Schema2SaveDamageRules {
             packets.add(new DamagePacket(packet,i,batch.sharedRoll().rollKey(),i,hp,temp,max,defenses,amount,Math.min(temp,amount),afterHp,afterTemp,dead));
         }
         b=Schema2MonsterRules.with(b,monsters,b.saveDamageBatches());
-        for(HealthChange change:changes) {var old=roster.get(change.characterId());roster.put(change.characterId(),new Context(old.material(),old.initial(),change.after()));}
+        for(HealthChange change:changes) {var old=roster.get(change.characterId());roster.put(change.characterId(),old.after(change.after(),0));}
         // All health facts exist before any holder or contribution is ended.
         List<Combatant> actors=new ArrayList<>(b.combatants());
         for(DamagePacket packet:packets)if(packet.afterHitPoints()==0) {

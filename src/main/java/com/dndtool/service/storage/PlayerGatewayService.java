@@ -1,6 +1,7 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.service.CharacterNamePolicy;
 import com.dndtool.service.storage.CampaignParticipationData.*;
 import com.dndtool.service.storage.CampaignStorageService.AccessSnapshot;
@@ -119,6 +120,7 @@ public final class PlayerGatewayService {
                     if (!same(session.precondition, precondition) || session.candidateRevision != access.revision()) throw denied(409, "PLAYER_VIEW_EXPIRED");
                     PlayerCandidateFactory.Candidate candidate = session.candidates.get(candidateId);
                     if (candidate == null) throw denied(409, "PLAYER_VIEW_EXPIRED");
+                    requireCandidateFocus(access, candidate);
                     UUID character = UUID.fromString(candidate.characterId());
                     if (!session.member.equals(access.snapshot().domains().participation().controller(character))) throw denied(403, "PLAYER_CONTROL_REQUIRED");
                     JsonObject local = access.localControl().deepCopy(); JsonArray attempts = array(local, "attempts");
@@ -130,7 +132,10 @@ public final class PlayerGatewayService {
                     attempts.add(attempt); local.add("attempts", attempts); storage.updateLocalPlayerControl(local);
                     try {
                         storage.domainCommand(requestId, access.epoch(), access.revision(), candidate.action(), candidate.input(), Actor.player(session.member, character),
-                                current -> { validateCurrent(session, writer, precondition, current); });
+                                current -> {
+                                    validateCurrent(session, writer, precondition, current);
+                                    requireCandidateFocus(current, candidate);
+                                });
                     } catch (StorageException rejected) {
                         if (Set.of("COMMIT_UNKNOWN", "RUN_BLOCKED").contains(rejected.code())) throw denied(503, "PLAYER_RESULT_UNVERIFIED");
                         throw denied(409, "PLAYER_COMMAND_REJECTED");
@@ -271,12 +276,13 @@ public final class PlayerGatewayService {
                     requireMember(access,proposal.memberId);
                     var character=access.snapshot().domains().characters().stream().filter(c->c.id().equals(proposal.characterId)&&c.active()&&c.kind().equals("PC")).findFirst().orElseThrow(()->denied(409,"PLAYER_ADJUDICATION_UNSUPPORTED"));
                     var command=new Schema2CharacterRuntime.Command("CHECK_RESOLVED",null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,
-                            new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check","check.srd2014"),"ABILITY",ability,null,dc,false,false,reason));
+                            new Schema2CharacterRuntime.CheckInput(access.snapshot().domains().material().restore().checkRule(),"ABILITY",ability,null,dc,false,false,reason));
                     JsonObject check=new JsonObject();check.addProperty("characterId",proposal.characterId.toString());check.addProperty("characterVersion",Long.toString(character.history().current().version()));check.add("command",CampaignDomainCodec.toJson(command));
                     for(String branch:List.of("success","failure")) {
-                        JsonObject effect=new JsonObject();effect.addProperty("targetId",proposal.characterId.toString());effect.add("healthEffect",JsonNull.INSTANCE);effect.add("itemId",JsonNull.INSTANCE);effect.addProperty("itemDelta","0");effect.add("nodeId",JsonNull.INSTANCE);effect.addProperty("message",branch.equals("success")?"检定成功":"检定失败");check.add(branch,effect);
+                        JsonObject effect=new JsonObject();effect.addProperty("targetId",proposal.characterId.toString());effect.add("healthEffect",JsonNull.INSTANCE);effect.add("itemId",JsonNull.INSTANCE);effect.addProperty("itemDelta","0");effect.addProperty("message",branch.equals("success")?"检定成功":"检定失败");check.add(branch,effect);
                     }
                     JsonObject decision=new JsonObject();decision.addProperty("proposalId",proposal.id);decision.addProperty("memberId",proposal.memberId.toString());decision.addProperty("proposalText",proposal.text);decision.addProperty("reason",reason);decision.addProperty("type","ABILITY_CHECK");decision.add("check",check);
+                    decision.add("focus", CampaignSpaceCommands.focusPayload(access.snapshot().domains()));
                     storage.domainCommand(requestId,expectedEpoch,revision,"adjudicated-check",decision);
                     var accepted=access().snapshot().domains();var root=accepted.roots().stream().filter(r->r.operationId().toString().equals(requestId)).findFirst().orElseThrow();
                     var result=accepted.characters().stream().flatMap(c->c.history().events().stream()).filter(e->root.characterOperations().contains(e.operationId())&&e.checkResult()!=null).findFirst().orElseThrow().checkResult();
@@ -316,6 +322,13 @@ public final class PlayerGatewayService {
     private void validateCurrent(Session session, String writer, String precondition, AccessSnapshot current) {
         authorize(session, true); requireWriter(session, writer);
         if (!same(session.precondition, precondition) || session.candidateRevision != current.revision()) throw denied(409, "PLAYER_VIEW_EXPIRED");
+    }
+    private static void requireCandidateFocus(AccessSnapshot current, PlayerCandidateFactory.Candidate candidate) {
+        var domain = current.snapshot().domains();
+        try { CampaignSpaceCommands.requireFocus(domain, candidate.input()); }
+        catch (StorageException stale) { throw denied(409, "PLAYER_VIEW_EXPIRED"); }
+        if (!CampaignSpaceCommands.focused(domain, UUID.fromString(candidate.characterId())))
+            throw denied(409, "PLAYER_VIEW_EXPIRED");
     }
     private void requireWriter(Session session, String connection) {
         Writer writer = writers.get(session.member);

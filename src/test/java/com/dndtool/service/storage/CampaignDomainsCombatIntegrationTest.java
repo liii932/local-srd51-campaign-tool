@@ -1,6 +1,7 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
 import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
@@ -18,20 +19,19 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Production bundles, public campaign commands, real SQLite and the normal complete-file lifecycle. */
 class CampaignDomainsCombatIntegrationTest {
     @TempDir Path temporary;
-    private static final List<String> FULL = List.of(CampaignRules.BASE, CampaignRules.HEALING, CampaignRules.RUNTIME);
     private static final Gson VIEW = new Gson();
 
     @Test void pendingOpportunitySurvivesEndAndOpenThenMovementAndAttackUseTheSameHealthOwner() throws Exception {
         try (var service = new CampaignStorageService(temporary.resolve("opportunity"))) {
-            service.create("真实战斗", FULL);
+            CampaignRuleFixtures.create(service, "真实战斗");
             UUID first = character(service, "甲", "fighter"), second = character(service, "乙", "fighter");
             Map<UUID, UUID> swords = Map.of(first, equip(service, first, "item.longsword", "MAIN_HAND"),
                     second, equip(service, second, "item.longsword", "MAIN_HAND"));
-            combat(service, Command.start(List.of(new Deployment(first, new Position(0, 0), 0),
-                    new Deployment(second, new Position(1, 0), 1)), List.of(first, second)));
+            startScene(service, List.of(new Deployment(first, new Position(1, 0), 0),
+                    new Deployment(second, new Position(2, 0), 1)), List.of());
             UUID mover = battle(service).activeActor(), defender = mover.equals(first) ? second : first;
             Position original = actor(battle(service), mover).position();
-            Position away = new Position(mover.equals(first) ? -1 : 2, 0);
+            Position away = new Position(mover.equals(first) ? 0 : 3, 0);
             combat(service, Command.move(mover, List.of(away)));
             Flow pending = battle(service).activeFlow();
             assertNotNull(pending); assertEquals(WindowStatus.OPEN, pending.windows().getLast().status());
@@ -70,18 +70,18 @@ class CampaignDomainsCombatIntegrationTest {
 
     @Test void realBlessCostAndSharedMonsterDamageSurviveTheRolledPendingCheckpoint() throws Exception {
         try (var service = new CampaignStorageService(temporary.resolve("breath"))) {
-            service.create("共享伤害", FULL);
+            CampaignRuleFixtures.create(service, "共享伤害");
             UUID cleric = character(service, "牧师", "cleric"), fighter = character(service, "战士", "fighter");
             UUID focus = equip(service, cleric, "item.holy_symbol", "OFF_HAND");
             UUID hound = UUID.randomUUID();
-            var monster = BundledCampaignRules.rule("adventure.monster", "monster.hell_hound");
-            combat(service, Command.start(List.of(new Deployment(cleric, new Position(1, 0), 0),
+            var monster = CampaignRuleFixtures.rules().rule("adventure.monster", "monster.hell_hound");
+            startScene(service, List.of(new Deployment(cleric, new Position(1, 0), 0),
                             new Deployment(fighter, new Position(2, 0), 0)),
-                    List.of(new MonsterDeployment(hound, monster, new Position(0, 0), 1)), List.of(cleric, fighter, hound)));
+                    List.of(new MonsterDeployment(hound, monster, new Position(0, 0), 1)));
             advanceTo(service, cleric);
             long slots = clericSlots(service, cleric);
-            combat(service, Command.cast(cleric, new CastInput(BundledCampaignRules.rule("character.spellcasting", "spellcasting.life_domain"),
-                    BundledCampaignRules.rule("adventure.spell", "spell.bless"), List.of(cleric, fighter), focus)));
+            combat(service, Command.cast(cleric, new CastInput(CampaignRuleFixtures.rules().rule("character.spellcasting", "spellcasting.life_domain"),
+                    CampaignRuleFixtures.rules().rule("adventure.spell", "spell.bless"), List.of(cleric, fighter), focus)));
             assertEquals(slots - 1, clericSlots(service, cleric)); assertEquals(1, battle(service).ongoingEffects().size());
             advanceTo(service, hound);
             combat(service, Command.breath(hound, new EntryIdentity(monster, "actions", monster.moduleKey(), "fire_breath"), 0));
@@ -120,7 +120,8 @@ class CampaignDomainsCombatIntegrationTest {
     }
     private static void command(CampaignStorageService service, String action, JsonObject input) { command(service, uuid(), action, input); }
     private static void command(CampaignStorageService service, String request, String action, JsonObject input) {
-        var current = service.current(); service.domainCommand(request, current.epoch(), current.revision(), action, input);
+        var current = service.current(); input.add("focus", CampaignSpaceCommands.focusPayload(service.accessSnapshot().snapshot().domains()));
+        service.domainCommand(request, current.epoch(), current.revision(), action, input);
     }
     private static UUID character(CampaignStorageService service, String name, String profession) {
         command(service, "character-create", input("name", name, "kind", "PC", "classKey", profession, "backgroundKey", "acolyte"));
@@ -134,7 +135,7 @@ class CampaignDomainsCombatIntegrationTest {
     private static UUID equip(CampaignStorageService service, UUID character, String item, String location) {
         UUID operation = UUID.randomUUID();
         characterCommand(service, character, new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null,
-                GrowthChoices.EMPTY, null, null, new EquipmentInput(operation, BundledCampaignRules.rule("equipment.item", item), "CARRIED", "DM确认物品归属。"), null), operation.toString());
+                GrowthChoices.EMPTY, null, null, new EquipmentInput(operation, CampaignRuleFixtures.rules().rule("equipment.item", item), "CARRIED", "DM确认物品归属。"), null), operation.toString());
         characterCommand(service, character, new Schema2CharacterRuntime.Command("ITEM_EQUIPPED", null, 0, null, null, null,
                 GrowthChoices.EMPTY, null, null, new EquipmentInput(operation, null, location, "DM确认非战斗装备准备。"), null), uuid());
         return operation;
@@ -153,14 +154,33 @@ class CampaignDomainsCombatIntegrationTest {
             combat(service, Command.action(Kind.END_TURN, battle(service).activeActor()));
         assertEquals(actor, battle(service).activeActor());
     }
+    private static void startScene(CampaignStorageService service, List<Deployment> characters, List<MonsterDeployment> monsters) {
+        String node = uuid(), scene = uuid();
+        command(service, node, "node-create", input("name", "场景入口"));
+        JsonObject target = new JsonObject(); target.add("target", CampaignSpaceCommands.refJson(CampaignSpaceData.Ref.world(UUID.fromString(node))));
+        command(service, "focus-set", target);
+        JsonArray subjects = new JsonArray();
+        for (var character : characters) {
+            command(service, "position", input("characterId", character.characterId().toString(), "nodeId", node));
+            subjects.add(input("id", character.characterId().toString(), "version", "0", "x", Integer.toString(character.position().x()), "y", Integer.toString(character.position().y()), "side", Integer.toString(character.side())));
+        }
+        for (var monster : monsters) {
+            JsonObject create = input("name", "猎犬"); create.add("monster", CampaignDomainCodec.toJson(monster.monster()));
+            command(service, monster.monsterId().toString(), "monster-create", create);
+            subjects.add(input("id", monster.monsterId().toString(), "version", "0", "x", Integer.toString(monster.position().x()), "y", Integer.toString(monster.position().y()), "side", Integer.toString(monster.side())));
+        }
+        command(service, scene, "scene-create", input("name", "局部场景", "nodeId", node, "width", "20", "height", "20", "resolution", "RULES"));
+        JsonObject enter = input("sceneId", scene); enter.add("subjects", subjects); command(service, "scene-enter", enter);
+        List<UUID> ties = new ArrayList<>(); characters.forEach(c -> ties.add(c.characterId())); monsters.forEach(m -> ties.add(m.monsterId()));
+        combat(service, Command.reenter(characters.getFirst().characterId(), ties));
+    }
     private static void combat(CampaignStorageService service, Command command) {
-        JsonArray scenes = service.current().domain().getAsJsonArray("combats"); JsonObject input = new JsonObject();
-        if (scenes.isEmpty()) { input.add("combatId", JsonNull.INSTANCE); input.addProperty("combatVersion", "-1"); }
-        else { Battle current = battle(service); input.addProperty("combatId", current.combatId().toString()); input.addProperty("combatVersion", Long.toString(current.version())); }
+        Battle current = battle(service);
+        JsonObject input = input("combatId", current.combatId().toString(), "combatVersion", Long.toString(current.version()));
         input.add("command", CampaignDomainCodec.toJson(command)); command(service, "combat-command", input);
     }
     private static long clericSlots(CampaignStorageService service, UUID id) {
-        var resource = BundledCampaignRules.rule("character.resource", "resource.cleric.slot1");
+        var resource = CampaignRuleFixtures.rules().rule("character.resource", "resource.cleric.slot1");
         return card(service, id).getAsJsonObject("state").getAsJsonArray("resources").asList().stream().map(JsonElement::getAsJsonObject)
                 .filter(r -> r.getAsJsonObject("identity").get("ruleKey").getAsString().equals(resource.ruleKey())).findFirst().orElseThrow().get("current").getAsLong();
     }

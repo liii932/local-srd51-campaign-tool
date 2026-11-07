@@ -1,6 +1,7 @@
 package com.dndtool.web;
 
 import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.service.storage.*;
 import com.google.gson.*;
 import java.io.*;
@@ -39,7 +40,16 @@ class PlayerProcessRecoveryIntegrationTest {
             HttpClient device = playerClient(first, deviceCookies);
             phase = "creating disposable campaign and exact legal candidate through Host HTTP";
             Map<String,List<String>> create = form("name", "独立进程恢复验收");
-            create.put("modules", List.of(CampaignRules.BASE, CampaignRules.HEALING, CampaignRules.RUNTIME));
+            var library = ok(get(dm, HOST + "/api/host/storage/rule-library"), null).getAsJsonObject("result");
+            var members = RuleHttpFixture.members(library, BundledCampaignRules.STANDARD);
+            for (var member : members) {
+                String tuple = RuleHttpFixture.tuple(member);
+                hostPost(dm, "rule-import-bundled", form("member", tuple), false);
+                String query = "?moduleKey=" + member.get("moduleKey").getAsString() + "&releaseVersion=" + member.get("releaseVersion").getAsString();
+                var review = ok(get(dm, HOST + "/api/host/storage/rule-review" + query), null).getAsJsonObject("result");
+                hostPost(dm, "rule-accept", form("member", tuple, "reviewProtocol", review.get("reviewProtocol").getAsString()), false);
+            }
+            create.put("members", members.stream().map(RuleHttpFixture::tuple).toList());
             hostPost(dm, "create", create, false);
             JsonObject created = hostPost(dm, "domain", form("action", "character-create", "payload",
                     object("name", "重连的战士", "kind", "PC", "classKey", "fighter", "backgroundKey", "acolyte").toString()), false);
@@ -47,10 +57,16 @@ class PlayerProcessRecoveryIntegrationTest {
             String pc = card.get("id").getAsString();
             var acquire = new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null,
                     Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
-                    new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
+                    new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), CampaignRuleFixtures.rules().rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
             JsonObject equipment = object("characterId", pc, "characterVersion", card.get("version").getAsString());
             equipment.add("command", CampaignDomainCodec.toJson(acquire));
             hostPost(dm, "domain", form("action", "character-command", "payload", equipment.toString()), false);
+            JsonObject nodeCreated = hostPost(dm, "domain", form("action", "node-create", "payload", object("name", "重连营地").toString()), false);
+            String node = nodeCreated.getAsJsonObject("campaign").getAsJsonObject("domain").getAsJsonArray("nodes").get(0).getAsJsonObject().get("id").getAsString();
+            JsonObject focus = new JsonObject();
+            focus.add("target", object("kind", "WORLD", "id", node));
+            hostPost(dm, "domain", form("action", "focus-set", "payload", focus.toString()), false);
+            hostPost(dm, "domain", form("action", "position", "payload", object("characterId", pc, "nodeId", node).toString()), false);
 
             JsonObject anonymous = ok(get(device, PLAYER + "/api/player/session"), deviceCookies);
             String invitation = hostPost(dm, "invite", form(), true).get("invitation").getAsString(); secrets.add(invitation);
@@ -61,7 +77,7 @@ class PlayerProcessRecoveryIntegrationTest {
             String member = approved.getAsJsonObject("session").get("playerKey").getAsString();
             hostPost(dm, "control", form("payload", object("characterId", pc, "memberId", member, "controlVersion", "0").toString()), true);
             JsonObject permission = object("characterId", pc, "permissionVersion", "0");
-            permission.add("sceneId", JsonNull.INSTANCE); permission.addProperty("active", true);
+            permission.addProperty("sceneId", node); permission.addProperty("active", true);
             JsonArray actions = new JsonArray(); actions.add("CHARACTER_COMMAND"); permission.add("actions", actions);
             hostPost(dm, "exploration", form("payload", permission.toString()), true);
             JsonObject takeover = playerPost(device, deviceCookies, "takeover", csrf(approved), object());
@@ -192,6 +208,15 @@ class PlayerProcessRecoveryIntegrationTest {
         JsonObject state = ok(get(dm, HOST + "/api/host/storage/state"), null);
         String epoch = state.getAsJsonObject("storage").get("epoch").getAsString();
         String revision = state.get("campaign").isJsonNull() ? "0" : state.getAsJsonObject("campaign").get("revision").getAsString();
+        if (!participation && action.equals("domain")) {
+            var current = state.getAsJsonObject("campaign").getAsJsonObject("domain").getAsJsonObject("space").getAsJsonObject("focus");
+            var focus = new JsonObject();
+            focus.add("space", current.get("space"));
+            focus.addProperty("generation", current.get("generation").getAsString());
+            var payload = JsonParser.parseString(fields.get("payload").getFirst()).getAsJsonObject();
+            payload.add("focus", focus);
+            fields = form("action", fields.get("action").getFirst(), "payload", payload.toString());
+        }
         String name = (participation ? "players/" : "") + action;
         List<String> values = new ArrayList<>(); for (var field : new TreeMap<>(fields).entrySet()) for (String value : field.getValue()) values.add(encode(field.getKey()) + "=" + encode(value));
         HttpRequest request = HttpRequest.newBuilder(URI.create(HOST + "/api/host/storage/" + name)).timeout(HTTP_TIMEOUT)

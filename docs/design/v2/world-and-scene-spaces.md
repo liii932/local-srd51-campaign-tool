@@ -1,9 +1,10 @@
 # v2 世界节点、局部场景与战役时间
 
-本文规定[模组分层设计](module-layering.md)下的位置、执行焦点和跨空间接纳目标。战役
+本文规定[模组分层设计](module-layering.md)下的位置、执行焦点和跨空间接纳合同。一个战役
 可以保留多个有参与者和未完进度的场景，普通游戏执行集中在一处焦点。第四阶段目标增加
-有界三维空间证明及受限跨空间被动结算。距离、区域和安置见[空间证明](spatial-and-area-contract.md)，
-日历与期限见[时间合同](time-and-calendar.md)，实际采用见[领域接合表](domain-integration.md)。
+有界三维空间证明及受限跨空间被动结算；距离/区域/安置由[空间证明](spatial-and-area-contract.md)
+规定，日历与期限由[时间合同](time-and-calendar.md)规定。当前二维运行及其绝对后台冻结
+仍见本文的当前采用范围和[领域接合表](domain-integration.md)，目标合同不表示已经实施。
 
 ## 世界位置与局部坐标
 
@@ -164,7 +165,7 @@ APPLY 后才有语义依据的专注豁免/伤害后反应可以成为后续阶�
 phase, ordinal)`，一次边只消费一次；保存、重新求值、请求重发不建立新 occurrence。
 同一攻击的多个有意义伤害分量与另一次真实伤害事件分开，不能过度去重吞掉合法第二次伤害。
 
-创建/变更关系和根预检都检查有向因果图。目标跨空间损伤传播要求在同一阶段形成
+创建/变更关系和根预检都检查有向因果图。当前支持的跨空间损伤传播要求在同一阶段形成
 可拓扑排序的有向无环依赖；层内按稳定源/主体身份排序，规则规定的先后优先。
 其他机制只有给出严格下降的有限度量及对应消费者时才可加入本次闭包；不能仅以“最多
 循环十次”丢弃仍应发生的后果。无终止证明的循环返回 `CAUSAL_CYCLE_UNSUPPORTED`，保持
@@ -200,3 +201,28 @@ phase, ordinal)`，一次边只消费一次；保存、重新求值、请求重�
 | 专注及后继 | 两侧 APPLY 后的专注/归零后果都在 scope 中结清；任一结束再影响另一侧时保留真实 cause 边，不脱离根 |
 | 后台旧动作 | 后台原攻击在等待中被打至失能，原攻击骰/成本保留；scope 结束后切回，后缀依当前资格合法失效，不重掷攻击 |
 | 越权/重复/故障 | 后台 MOVE 或推进自己旧 flow 拒绝；重复传伤身份只读原结果；末尾后台落库失败不留下前台半次伤害 |
+
+## 当前采用范围
+
+SQLite `campaign-spaces-3` 以 `CampaignSpaceData` 维护锚点、焦点、空间时钟和稳定怪物事实，
+以 `CampaignDomainData.Position` 保存唯一安置。`CampaignSpaceCommands` 核验焦点代次、落位、
+有向路线、目标占位及适用的交接义务，并在同一根提交安置、时钟和场景变更。
+[空间命令](../../../src/main/java/com/dndtool/service/storage/CampaignSpaceCommands.java)
+
+规则场景在进入后可独立开始和结束战斗。场景历史按每次执行时的成员和版本核验；
+已离场者的终结事件仍保留。自动规则使用实际规则角色和怪物，读取同一网格中的阻挡；
+DM 裁定场景显式切换探索与战斗，支持自由卡和规则角色共享网格。场景固定 5 尺格与创建
+时的矩形边界。规则探索推进、回合边界和法术期限使用场景秒；世界或场景推进只累加
+当时受影响角色的实际经历。地形数据、分阶段旅行和跨空间持续影响仍须相应机制接入。
+[领域引擎](../../../src/main/java/com/dndtool/service/CampaignDomainEngine.java)
+
+`RULE_BOUND_CAMPAIGN` format 3 保存所有空间当前事实和完整历史。校验用保留的原请求、
+骰子边数与结果纯核对每个已提交前缀及空间审计。直接装载已核验事实，不消耗实时随机性，
+不执行任何待继续后缀。MySQL INTERNAL 仍使用同场景角色同秒的既有入口。
+
+验收入口为 `CampaignSpacesIntegrationTest`、`CampaignSpaceTimeBoundaryTest`、
+`CampaignMonsterSpaceIntegrationTest`、`CampaignDomainsCombatIntegrationTest` 与
+`CampaignDomainRootValidationTest`。空间闭环覆盖两个规则场景各有未决动作、过期焦点零
+RNG 和零写入、FINAL 重开、切回继续原后缀、结束战斗后局部探索和通过锚点离场。
+另按[测试指南](../../testing.md#sqlite-结构完整文件与运行验收)核错锚点、非法格位和路径、
+跨空间影响、事务失败与提交未知。对每次候选按实际执行结果确认范围。

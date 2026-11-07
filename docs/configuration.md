@@ -65,16 +65,15 @@ Windows 部署须先用 `DriveInfo.DriveType` 核对根所在盘为本机固定�
 显式提供该配置时，`/host` 进入 `/host/storage`，安全 epoch 从 SQLite 服务读取，旧 MySQL
 读写路由关闭，启动不查 JNDI；空值、空白、控制字符、相对路径或其他无效根均保持此模式
 不可用，不能回退到 MySQL。环境与 context parameter 均未配置
-时使用原 MySQL 功能。当前 SQLite 运行规则由 WAR 内的四个有限 schema-2 原包交付，
-新建/重开通过生产 reader 与准确投影核验，无需数据库凭据或来源 MySQL 在线。目录包含
-生命值基础、治疗和依赖二者的 `srd51-runtime@1`；选择 runtime 后仍沿同一受控根保存全部
-领域事实。准确内容/限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
+时使用原 MySQL 功能。SQLite 规则库接受外部作者 ZIP，WAR 内五个原包只是导入候选。
+两类包都须明确导入、审阅和接受。新建/文件打开核验准确原字节、接受记录及重组投影，
+无需数据库凭据或来源 MySQL。所有新战役使用完整领域模型，简单角色由自由卡承担。准确内容/限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
 切换启动模式前须保管两侧真实数据与残留，不自动搬移、转换或删除它们。
 
 ## SQLite 装配与运行身份
 
 当前 SQLite 由 `StorageApplicationListener` 装配 `CampaignStorageService`；
-`DND_STORAGE_ROOT` 是此模式唯一的存储根输入，应用在根内分开管理运行与保存目录，
+`DND_STORAGE_ROOT` 是此模式唯一的存储根输入，应用在根内分开管理 `runs/`、`saves/` 和 `rule-library/`，
 不需要另配来源 JNDI、运行连接池或两套根变量。[ROOT 示例](../config/tomcat/ROOT.xml.example)
 显式选择 SQLite，未解析的环境占位符也会失败关闭。
 [MySQL ROOT 示例](../config/tomcat/ROOT-mysql.xml.example)、`web.xml` 的 `jdbc/DndToolSE`
@@ -87,13 +86,16 @@ Windows 服务不执行该批处理，须在服务的真实运行身份、环境
 根路径不是秘密，但不得把数据库口令加入 JVM 参数。
 
 SQLite 驱动和受审 JSON 声明随应用打包；本地连接核验 DELETE/EXTRA、外键和事务配置。
-四个内置原包由生产 reader/compose 建立固定投影，完整文件携带准确 material/链并逐字段
-比对此投影。外部来源离线不影响当前新建、打开、运行、保存、结束或同版恢复。
+规则库在 `rule-library/originals/` 按真实原包摘要保管 ZIP，在 `ledger.db` 登记导入、接受及
+原操作结果。文件与账本沿用受控根的本机权限、禁止符号链接和 SQLite 耐久要求。备份规则库
+须共同保管原包与账本。移机打开文件须在新机重新导入并接受准确原包。
+完整文件携带解释合同、绑定、规则与完整链；活动运行、保存、结束及同版残留恢复从冻结
+材料核验，规则库不可用不改变这些运行资格。未决规则库操作需按原 UUID 查证，不能换键跳过。
 
-当前装配不读取外部自定义规则包或来源 JNDI。MySQL 模式的迁移、账号及真实数据仍独立
+装配不使用来源 JNDI。MySQL 模式的迁移、账号及真实数据仍独立
 保管，不因启用 SQLite 而自动退役或删除。
 
-迁移存储根是独立停机维护：共同保管全部残留、分配/清理材料、数据库/journal 和保存文件，
+迁移存储根是独立停机维护：共同保管规则库原包与账本、全部残留、分配/清理材料、数据库/journal 和保存文件，
 不能改根后忽略原残留而宣称空闲；部署更新不会自动移动、转换或删除它们。
 
 ## Web Connector

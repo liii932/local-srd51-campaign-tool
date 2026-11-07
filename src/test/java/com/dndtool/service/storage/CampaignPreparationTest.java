@@ -12,7 +12,6 @@ import org.junit.jupiter.api.io.TempDir;
 class CampaignPreparationTest {
     @TempDir Path temporary;
     private Path root() { return temporary.resolve("managed"); }
-    private static final List<String> RULES = List.of(CampaignRules.BASE, CampaignRules.HEALING);
 
     @Test void unknownPreparationEntryPreventsRecoveryAndDiscardBeforeAnyMutation() throws Exception {
         Path preparation = interrupted(Boundary.AFTER_INPUT_WRITE);
@@ -40,8 +39,7 @@ class CampaignPreparationTest {
 
     @Test void completeForeignDocumentInPartialSlotCannotBeDiscardedAsTruncation() throws Exception {
         Path preparation = interrupted(Boundary.DURING_INPUT_WRITE);
-        byte[] foreign;
-        try (var in = getClass().getResourceAsStream("/storage/vitality-known-file.json")) { foreign = in.readAllBytes(); }
+        byte[] foreign = CampaignLifecycleFixture.fileBytes();
         Files.write(preparation.resolve("input.part"), foreign);
         try (var service = new CampaignStorageService(root())) {
             String id = service.status().residualRunIds().getFirst();
@@ -113,7 +111,7 @@ class CampaignPreparationTest {
 
     private Path interrupted(Boundary target) throws Exception {
         try (var service = new CampaignStorageService(root(), boundary -> { if (boundary == target) throw new IllegalStateException("injected"); })) {
-            assertThrows(IllegalStateException.class, () -> service.create("原始输入", RULES));
+            assertThrows(IllegalStateException.class, () -> CampaignRuleFixtures.create(service, "原始输入"));
             try (var entries = Files.list(root().resolve("runs"))) { return entries.findFirst().orElseThrow(); }
         }
     }

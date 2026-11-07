@@ -8,7 +8,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const {chromium} = require('playwright');
 const HTTP_TIMEOUT = 120000;
-const { observeStorageAction } = require('./browser-action.cjs');
+const { observeStorageAction, waitForExactText } = require('./browser-action.cjs');
+const { selectStandardRules } = require('./browser-rule-library.cjs');
+const { createNode, focusSpace, placeAtFocus, beginBattle } = require('./browser-spaces.cjs');
 const ORIGIN = 'http://127.0.0.1:8080';
 const NAME = '装备与生命法术验收';
 const KNOWN = new Set(['浏览器验收营地', '基础生命值验收', '完整领域浏览器验收', '奥术回想浏览器验收']);
@@ -86,13 +88,12 @@ async function main() {
   }
   try {
     await page.goto(ORIGIN + '/host/storage', {waitUntil: 'networkidle'});
-    await page.waitForFunction(() => document.querySelector('#storage-message').textContent.trim() === '创建、打开或恢复一个战役。');
+    await waitForExactText(page, '#storage-message', '创建、打开或恢复一个战役。');
     const response = await context.request.get(ORIGIN + '/api/host/storage/state', {timeout: HTTP_TIMEOUT}); assert.equal(response.status(), 200);
     const initial = await response.json(); assert.equal(initial.storage.state, 'IDLE'); assert.equal(initial.campaign, null);
     assert.equal(initial.storage.residualRunIds.length, 0);
     assert.ok(initial.savedCampaigns.every(save => KNOWN.has(save.name)), 'Refusing saves outside the primary smoke fixture whitelist');
-    await page.locator('#storage-modules input[value="srd51-healing@1"]').check();
-    await page.locator('#storage-modules input[value="srd51-runtime@1"]').check();
+    await selectStandardRules(page);
     await form('storage-create').locator('[name="name"]').fill(NAME);
     await action('create', () => form('storage-create').getByRole('button', {name: '创建战役', exact: true}).click()); owned = true;
     for (const [name, kind, characterClass] of [['治疗牧师', 'PC', 'class.cleric'], ['持剑战士', 'PC', 'class.fighter']]) {
@@ -122,6 +123,9 @@ async function main() {
     await form('domain-equipment').locator('[name="kind"]').selectOption('ITEM_EQUIPPED');
     await form('domain-equipment').locator('[name="itemId"]').selectOption(mace.itemId);
     await action('domain', () => form('domain-equipment').getByRole('button', {name: '应用装备操作', exact: true}).click());
+    const anchor = await createNode(page, action, '战前营地');
+    await focusSpace(page, action, 'WORLD', anchor);
+    await placeAtFocus(page, action, [clericId, fighterId]);
     await page.locator('[data-pane="magic"]').click();
     await form('domain-health').locator('[name="characterId"]').selectOption(fighterId);
     await form('domain-health').locator('[name="kind"]').selectOption('HEALTH_EFFECT_RESOLVED');
@@ -134,16 +138,9 @@ async function main() {
     await action('domain', () => form('domain-health').getByRole('button', {name: '应用健康操作', exact: true}).click());
     assert.equal(card('治疗牧师').state.health.temporaryHitPoints, 5);
     console.log('Combat browser phase: dagger/mace equipped; fighter HP6 and cleric tempHP5 recorded');
-    await page.locator('[data-pane="combat"]').click();
-    for (const row of await form('domain-deployments').locator('[data-character]').all()) {
-      const id = await row.getAttribute('data-character');
-      await row.locator('[name="side"]').fill(id === clericId ? '1' : '0');
-      await row.locator('[name="x"]').fill(id === clericId ? '1' : '0');
-      await row.locator('[name="y"]').fill('0');
-    }
-    await action('domain', () => form('domain-combat-start').getByRole('button', {name: '开始战斗', exact: true}).click());
+    await beginBattle(page, action, [[fighterId, 1, 0, 0], [clericId, 2, 0, 1]]);
     await endUntil(fighterId);
-    for (const x of ['-1', '0']) {
+    for (const x of ['0', '1']) {
       await form('domain-combat').locator('[name="kind"]').selectOption('MOVE');
       await form('domain-combat').locator('[name="x"]').fill(x); await form('domain-combat').locator('[name="y"]').fill('0');
       await action('domain', () => form('domain-combat').getByRole('button', {name: '执行战斗行动', exact: true}).click()); await settle();

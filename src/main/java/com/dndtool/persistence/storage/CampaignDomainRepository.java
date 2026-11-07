@@ -1,6 +1,7 @@
 package com.dndtool.persistence.storage;
 
 import com.dndtool.service.Schema2CombatHistory;
+
 import com.dndtool.service.storage.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
@@ -10,8 +11,8 @@ import com.dndtool.service.storage.CampaignDomainData.Character;
 
 /** Caller-owned transaction leaves for typed aggregates and independently checked relational projections. */
 public final class CampaignDomainRepository {
-    private static final List<String> TABLES = List.of("rules_runtime_material", "characters_runtime_character", "scenes_world", "combat_scene", "history_runtime_root",
-            "resources_character", "equipment_instance", "spellcasting_book", "actions_frame", "effects_instance", "monsters_instance", "manual_character", "manual_encounter", "participation_state", "participation_member", "participation_control", "participation_share", "participation_exploration");
+    private static final List<String> TABLES = List.of("rules_runtime_material", "characters_runtime_character", "scenes_world", "scenes_space", "scenes_clock", "scenes_placement", "monsters_campaign", "combat_scene", "history_runtime_root",
+            "resources_character", "equipment_instance", "spellcasting_book", "actions_frame", "effects_instance", "monsters_instance", "manual_character", "participation_state", "participation_member", "participation_control", "participation_share", "participation_exploration");
 
     public void write(Connection connection, State state) throws SQLException {
         // CampaignStorageService owns an explicit SQLite BEGIN IMMEDIATE. Xerial's
@@ -39,7 +40,7 @@ public final class CampaignDomainRepository {
         List<Character> characters = documents(connection, "characters_runtime_character", "character_id", Character.class);
         List<Schema2CombatHistory.History> combats = documents(connection, "combat_scene", "combat_id", Schema2CombatHistory.History.class);
         List<Root> roots = documents(connection, "history_runtime_root", "sequence", Root.class);
-        State state = new State(material, characters, combats, world.nodes(), world.positions(), world.items(), roots, world.manual(), one(connection, "participation_state", CampaignParticipationData.State.class));
+        State state = new State(material, characters, combats, world.nodes(), world.positions(), world.items(), roots, world.manual(), one(connection, "participation_state", CampaignParticipationData.State.class), world.space());
         // Check every projected value and every row; recovery never silently rebuilds a damaged index.
         Map<String, List<List<Object>>> expected = rows(state);
         for (String table : TABLES) {
@@ -87,7 +88,11 @@ public final class CampaignDomainRepository {
     private static Map<String, List<List<Object>>> rows(State state) {
         Map<String, List<List<Object>>> data = new LinkedHashMap<>(); TABLES.forEach(table -> data.put(table, new ArrayList<>()));
         add(data, "rules_runtime_material", 1L, CampaignDomainCodec.text(state.material()));
-        add(data, "scenes_world", 1L, CampaignDomainCodec.text(new World(state.nodes(), state.positions(), state.items(), state.manual())));
+        add(data, "scenes_world", 1L, CampaignDomainCodec.text(new World(state.nodes(), state.positions(), state.items(), state.manual(), state.space())));
+        for (var scene : state.space().scenes()) add(data, "scenes_space", scene.id(), scene.nodeId(), scene.resolution(), scene.mode(), scene.version(), CampaignDomainCodec.text(scene));
+        for (var clock : state.space().clocks()) add(data, "scenes_clock", clock.space().kind(), clock.space().id(), clock.second(), clock.version());
+        for (var position : state.positions()) add(data, "scenes_placement", position.characterId(), position.space().kind(), position.space().id(), position.version(), CampaignDomainCodec.text(position));
+        for (var monster : state.space().monsters()) add(data, "monsters_campaign", monster.id(), (long) monster.hitPoints(), monster.version(), CampaignDomainCodec.text(monster));
         add(data, "participation_state", 1L, CampaignDomainCodec.text(state.participation()));
         for (var member : state.participation().members()) add(data, "participation_member", member.id(), member.active() ? 1L : 0L, member.version(), CampaignDomainCodec.text(member));
         for (var control : state.participation().controls()) add(data, "participation_control", control.characterId(), control.memberId(), control.version(), CampaignDomainCodec.text(control));
@@ -97,8 +102,6 @@ public final class CampaignDomainRepository {
             var current = character.current();
             add(data, "manual_character", current.id(), current.name(), current.kind(), current.active() ? 1L : 0L, current.version(), CampaignDomainCodec.text(character));
         }
-        for (var encounter : state.manual().encounters())
-            add(data, "manual_encounter", encounter.id(), encounter.status(), CampaignDomainCodec.text(encounter));
         for (Character character : state.characters()) {
             var c = character.history().current(); UUID id = character.id();
             add(data, "characters_runtime_character", id, character.name(), character.kind(), character.active() ? 1L : 0L, c.version(), c.hitPoints(), c.maximumHitPoints(), CampaignDomainCodec.text(character));

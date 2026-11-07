@@ -42,13 +42,26 @@ class Schema2CharacterAdvancementAndRestServiceTest {
         assertEquals(3, resource(fixture.state, LATER).maximum()); assertEquals(2, resource(fixture.state, LATER).current());
         assertEquals(3, resource(fixture.state, EXT_ENERGY).maximum()); assertEquals(2, resource(fixture.state, EXT_ENERGY).current());
         fixture.commit(advance(ALT_CLASS, GrowthChoices.EMPTY)); fixture.commit(advance(ALT_CLASS, GrowthChoices.EMPTY));
-        Request featRequest = fixture.request(advance(ALT_CLASS, new GrowthChoices(null, Map.of(), GRAPPLER, Map.of())));
-        Result gained = fixture.execute(featRequest); committed(gained);
-        assertEquals(10, fixture.state.level()); assertEquals(4, fixture.state.proficiencyBonus());
-        assertEquals(1, fixture.state.feats().size()); assertEquals(GRAPPLER, fixture.state.feats().getFirst().feat());
-        assertEquals(76, fixture.state.hitPoints());
+        History before = fixture.service.read(CHARACTER);
         int writes = fixture.runtime.writes;
-        assertEquals(Status.REPLAYED, fixture.service.execute(featRequest).status());
+        Request featRequest = fixture.request(new Command("CHARACTER_ADVANCED", null, 0, null, "SERVER_ROLL",
+                ALT_CLASS, new GrowthChoices(null, Map.of(), GRAPPLER, Map.of())));
+        Result rejected = fixture.service.execute(featRequest);
+        assertEquals(Status.REJECTED, rejected.status(), rejected.code());
+        assertEquals("S2_GROWTH_FEAT_UNSUPPORTED", rejected.code());
+        assertEquals(before, fixture.service.read(CHARACTER));
+        assertEquals(writes, fixture.runtime.writes);
+        assertEquals(0, fixture.rolls);
+
+        Request improvement = fixture.request(advance(ALT_CLASS,
+                new GrowthChoices(null, Map.of("ability.wisdom", 2), null, Map.of())));
+        committed(fixture.execute(improvement));
+        assertEquals(10, fixture.state.level()); assertEquals(4, fixture.state.proficiencyBonus());
+        assertEquals(10, fixture.state.abilities().get("ability.wisdom"));
+        assertTrue(fixture.state.feats().isEmpty());
+        assertEquals(76, fixture.state.hitPoints());
+        writes = fixture.runtime.writes;
+        assertEquals(Status.REPLAYED, fixture.service.execute(improvement).status());
         assertEquals(writes, fixture.runtime.writes); assertEquals(0, fixture.rolls);
         History history = fixture.service.read(CHARACTER);
         Fixture restored = new Fixture(); restored.source.unavailable(true);

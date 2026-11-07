@@ -23,24 +23,49 @@ public final class Schema2CombatHistory {
         public History { members = List.copyOf(members); events = List.copyOf(events); }
     }
 
+    public static boolean spatial(History history) {
+        return history != null && !history.events().isEmpty() && history.events().getFirst().command() != null
+                && history.events().getFirst().command().kind() == Kind.OPEN_SCENE;
+    }
 
-    public static void validate(History history){
-        require(history!=null&&!history.events().isEmpty()&&history.events().size()<=MAX_EVENTS&&history.members().size()>=2&&history.members().size()<=MAX_CHARACTER_MEMBERS);
+    public static void validate(History history) {
+        require(history!=null&&!history.events().isEmpty()&&history.events().size()<=MAX_EVENTS&&history.members().size()<=MAX_CHARACTER_MEMBERS);
+        boolean spatial=spatial(history);
+        require(spatial || history.members().size()>=2);
         List<UUID> members=history.members().stream().map(Member::characterId).toList();require(new HashSet<>(members).size()==members.size()&&members.equals(members.stream().sorted(UUID_ORDER).toList()));
-        for(Member m:history.members()){uuid(m.characterId());uuid(m.identity().runId());uuid(m.identity().snapshotId());uuid(m.preparationOperationId());}
-        Set<UUID> operations=new HashSet<>(),children=new HashSet<>();Battle previous=null;long rows=0;
-        for(Event e:history.events()){
+        for(Member m:history.members()) {uuid(m.characterId());uuid(m.identity().runId());uuid(m.identity().snapshotId());uuid(m.preparationOperationId());}
+        Set<UUID> operations=new HashSet<>(),children=new HashSet<>(), knownCharacters=new HashSet<>();
+        Map<UUID,RuleIdentity> knownMonsters=new HashMap<>();
+        Battle previous=null;long rows=0;
+        for(Event e:history.events()) {
             uuid(e.operationId());require(operations.add(e.operationId())&&e.requestDigest()!=null&&e.requestDigest().matches("[0-9a-f]{64}")&&e.command()!=null&&e.resolution()!=null&&Objects.equals(previous,e.before()));
             validateCommand(e.command());
-            require(e.after().version()==(previous==null?0:previous.version()+1));validateState(e.after(),members);
-            require(previous==null?e.command().kind()==Kind.START:e.command().kind()!=Kind.START&&previous.combatId().equals(e.after().combatId())&&previous.campaignId().equals(e.after().campaignId())&&previous.combatRule().equals(e.after().combatRule()));
-            require(e.dependencies().stream().map(Dependency::characterId).toList().equals(members));
-            if(e.command().castInput()!=null)require(members.containsAll(e.command().castInput().targets()));
+            require(e.after().version()==(previous==null?0:previous.version()+1));
+            require(previous==null?e.command().kind()==(spatial?Kind.OPEN_SCENE:Kind.START)
+                    :e.command().kind()!=Kind.START&&e.command().kind()!=Kind.OPEN_SCENE&&previous.status()!=Status.ENDED
+                    &&previous.combatId().equals(e.after().combatId())&&previous.campaignId().equals(e.after().campaignId())&&previous.combatRule().equals(e.after().combatRule()));
+            List<UUID> dependencies=e.dependencies().stream().map(Dependency::characterId).toList();
+            require(dependencies.equals(members.stream().filter(dependencies::contains).toList()));
+            if(!spatial) require(dependencies.equals(members) && !Schema2CombatRules.placementCommand(e.command()));
+            knownCharacters.addAll(dependencies);
+            for (MonsterInstance monster : e.after().monsters()) {
+                RuleIdentity rule = knownMonsters.putIfAbsent(monster.monsterId(), monster.monster());
+                require(!members.contains(monster.monsterId()) && (rule == null || rule.equals(monster.monster())));
+            }
+            List<UUID> currentMembers = spatial && Schema2CombatRules.placementCommand(e.command())
+                    ? e.command().deployments().stream().map(Deployment::characterId).sorted(UUID_ORDER).toList()
+                    : dependencies;
+            Set<UUID> expectedDependencies = new HashSet<>(currentMembers);
+            if (previous != null) previous.combatants().stream().map(Combatant::characterId)
+                    .filter(knownCharacters::contains).forEach(expectedDependencies::add);
+            require(expectedDependencies.equals(new HashSet<>(dependencies)));
+            validateState(e.after(),currentMembers,knownCharacters,knownMonsters);
+            if(e.command().castInput()!=null)require(dependencies.containsAll(e.command().castInput().targets()));
             for(Dependency d:e.dependencies())require(d.version()>=0&&d.version()<Schema2CharacterRuntime.MAX_EVENTS);
             require(e.characterOperations().size()==e.resolution().healthChanges().size()&&e.characterOperations().size()<=MAX_COMBATANTS * 2);
-            for(UUID child:e.characterOperations()){uuid(child);require(children.add(child)&&!operations.contains(child));}
+            for(UUID child:e.characterOperations()) {uuid(child);require(children.add(child)&&!operations.contains(child));}
             for(HealthChange change:e.resolution().healthChanges()) {
-                uuid(change.frameKey()); require(members.contains(change.characterId()) && change.before()!=null && change.after()!=null
+                uuid(change.frameKey()); require(dependencies.contains(change.characterId()) && change.before()!=null && change.after()!=null
                         && change.characterId().equals(change.before().characterId()) && change.characterId().equals(change.after().characterId())
                         && change.after().version()==change.before().version()+1 && change.damageAmount()>=0 && change.damageAmount()<=65535);
                 require(change.resource()!=null ? change.resource().ruleType().equals("character.resource") && change.resourceAmount()>=1
@@ -51,11 +76,12 @@ public final class Schema2CombatHistory {
             }
             validateCastResults(e);validateExtendedTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
-            for(Roll r:e.resolution().rolls()){uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
+            for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
             for(CombatFact f:e.resolution().facts())require(token(f.kind())&&(f.reason()==null||token(f.reason())));
-            rows+=eventFactCount(e);previous=e.after();
+            rows += eventFactCount(e); previous = e.after();
         }
-        require(previous.equals(history.current())&&Collections.disjoint(operations,children)&&rows<=MAX_HISTORY_CHILD_ROWS);
+        require(previous.equals(history.current())&&knownCharacters.equals(new HashSet<>(members))
+                &&Collections.disjoint(operations,children)&&rows<=MAX_HISTORY_CHILD_ROWS);
     }
     private static void validateCastResults(Event event) {
         Map<UUID,CastAttempt> retained=new HashMap<>();
@@ -97,7 +123,7 @@ public final class Schema2CombatHistory {
     /** Reserves the complete mandatory suffix before an accepted prefix consumes any die. */
     public static void checkReservedCapacity(History previous, Battle before, int suffixEvents,
             int rosterSize, int remainingPath) {
-        if (suffixEvents < 0 || rosterSize < 2 || rosterSize > MAX_COMBATANTS || remainingPath < 0 || remainingPath > 64
+        if (suffixEvents < 0 || rosterSize < 0 || rosterSize > MAX_COMBATANTS || remainingPath < 0 || remainingPath > 64
                 || (previous == null ? 0 : previous.events().size()) + 1L + suffixEvents > MAX_EVENTS)
             throw new Schema2RuntimeFactsException("S2_COMBAT_CAPACITY");
         long retained = historyFactCount(previous);
@@ -110,12 +136,16 @@ public final class Schema2CombatHistory {
         if (retained + (suffixEvents + 1L) * perEvent > MAX_HISTORY_CHILD_ROWS)
             throw new Schema2RuntimeFactsException("S2_COMBAT_CAPACITY");
     }
-    private static void validateState(Battle b,List<UUID> characterMembers){
-        List<UUID> members=validateMonsterState(b,characterMembers);
-        uuid(b.combatId());uuid(b.campaignId());require(b.combatRule()!=null&&b.combatRule().ruleType().equals("adventure.combat")&&b.status()!=null&&b.round()>=1&&b.turnNumber()>=1&&b.activeOrdinal()>=0&&b.activeOrdinal()<members.size()&&b.version()>=0);
-        require(b.combatants().stream().map(Combatant::characterId).toList().equals(members)&&b.initiative().size()==members.size());
-        Set<UUID> initiative=new HashSet<>();for(int i=0;i<b.initiative().size();i++){Initiative n=b.initiative().get(i);require(initiative.add(n.characterId())&&members.contains(n.characterId())&&n.ordinal()==i&&n.d20()>=1&&n.d20()<=20&&n.dexterityModifier()>=-5&&n.dexterityModifier()<=10&&n.total()==n.d20()+n.dexterityModifier());}
-        for(Combatant c:b.combatants()){require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0);if(c.sequence()!=null){AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
+    private static void validateState(Battle b,List<UUID> characterMembers,Set<UUID> knownCharacters,Map<UUID,RuleIdentity> knownMonsters) {
+        List<UUID> currentMembers=validateMonsterState(b,characterMembers,knownCharacters,knownMonsters);
+        List<UUID> members=new ArrayList<>(knownCharacters);
+        members.addAll(knownMonsters.keySet());
+        uuid(b.combatId());uuid(b.campaignId());require(b.combatRule()!=null&&b.combatRule().ruleType().equals("adventure.combat")&&b.status()!=null&&b.round()>=1&&b.turnNumber()>=1&&b.version()>=0);
+        require(b.combatants().stream().map(Combatant::characterId).toList().equals(currentMembers)
+                && (b.initiative().isEmpty() ? b.status()!=Status.ACTIVE && b.activeOrdinal()==0
+                    : b.activeOrdinal()>=0 && b.activeOrdinal()<currentMembers.size() && b.initiative().size()==currentMembers.size()));
+        Set<UUID> initiative=new HashSet<>();for(int i=0;i<b.initiative().size();i++) {Initiative n=b.initiative().get(i);require(initiative.add(n.characterId())&&currentMembers.contains(n.characterId())&&n.ordinal()==i&&n.d20()>=1&&n.d20()<=20&&n.dexterityModifier()>=-5&&n.dexterityModifier()<=10&&n.total()==n.d20()+n.dexterityModifier());}
+        for(Combatant c:b.combatants()) {require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0);if(c.sequence()!=null) {AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
         require(b.ongoingEffects().size()<=128);Set<UUID> effectKeys=new HashSet<>();
         for(OngoingEffect effect:b.ongoingEffects()) {
             uuid(effect.effectKey()); require(effectKeys.add(effect.effectKey()) && ruleType(effect.spell(),"adventure.spell") && members.contains(effect.casterId())
@@ -124,14 +154,14 @@ public final class Schema2CombatHistory {
                     && effect.status()!=null && (effect.status()==EffectStatus.ACTIVE ? effect.endReason()==null : token(effect.endReason())));
         }
         require(b.flows().size()<=128&&b.flows().stream().filter(f->f.status()==FlowStatus.ACTIVE).count()<=1);Set<UUID> keys=new HashSet<>();
-        for(Flow f:b.flows()){
+        for(Flow f:b.flows()) {
             uuid(f.flowKey());require(keys.add(f.flowKey())&&f.frames().size()>=1&&f.frames().size()<=1024&&f.windows().size()<=1024&&f.attacks().size()<=1024&&f.casts().size()<=1024&&f.savingThrows().size()<=1024);
-            Map<UUID,Frame> frames=new HashMap<>();for(Frame r:f.frames()){uuid(r.frameKey());uuid(r.ownerKey());require(keys.add(r.frameKey())&&frames.put(r.frameKey(),r)==null&&r.kind()!=null&&r.status()!=null&&r.invocation()!=null&&r.stage()!=null);}
+            Map<UUID,Frame> frames=new HashMap<>();for(Frame r:f.frames()) {uuid(r.frameKey());uuid(r.ownerKey());require(keys.add(r.frameKey())&&frames.put(r.frameKey(),r)==null&&r.kind()!=null&&r.status()!=null&&r.invocation()!=null&&r.stage()!=null);}
             Frame root=frames.get(f.rootFrameKey());require(root!=null&&root.parentFrameKey()==null);require(f.status()==FlowStatus.ACTIVE?frames.containsKey(f.leafFrameKey()):f.leafFrameKey()==null);
-            for(Frame r:f.frames()){Set<UUID> chain=new HashSet<>();Frame cursor=r;while(cursor.parentFrameKey()!=null){require(chain.add(cursor.frameKey())&&chain.size()<=32);cursor=frames.get(cursor.parentFrameKey());require(cursor!=null);}require(cursor.frameKey().equals(f.rootFrameKey()));}
-            Set<UUID> windows=new HashSet<>();for(Window w:f.windows()){uuid(w.windowKey());require(keys.add(w.windowKey())&&windows.add(w.windowKey())&&frames.containsKey(w.ownerFrameKey())&&w.checkpointOrdinal()>=0&&w.checkpointOrdinal()<64&&w.boundaryIndex()>=0&&w.boundaryIndex()<64&&w.opportunities().size()<=128);Set<UUID>actors=new HashSet<>();
-                for(int i=0;i<w.opportunities().size();i++){Opportunity o=w.opportunities().get(i);uuid(o.opportunityKey());require(keys.add(o.opportunityKey())&&actors.add(o.actorId())&&members.contains(o.actorId())&&o.priority()==i&&o.options().size()>=1&&o.options().size()<=32&&new HashSet<>(o.options()).size()==o.options().size()&&(o.selectionFrameKey()==null?o.status()==OpportunityStatus.PENDING:frames.containsKey(o.selectionFrameKey()))&&(o.attackFrameKey()==null||frames.containsKey(o.attackFrameKey()))&&(o.reason()==null||token(o.reason())));for(ReactionOption option:o.options())validateOption(option);}}
-            for(Movement m:f.movements()){uuid(m.movementKey());require(members.contains(m.actorId())&&m.path().size()>=1&&m.path().size()<=64&&m.cursor()>=0&&m.cursor()<=m.path().size()&&m.spent()>=0&&m.status()!=null&&(m.stopReason()==null||token(m.stopReason())));}
+            for(Frame r:f.frames()) {Set<UUID> chain=new HashSet<>();Frame cursor=r;while(cursor.parentFrameKey()!=null) {require(chain.add(cursor.frameKey())&&chain.size()<=32);cursor=frames.get(cursor.parentFrameKey());require(cursor!=null);}require(cursor.frameKey().equals(f.rootFrameKey()));}
+            Set<UUID> windows=new HashSet<>();for(Window w:f.windows()) {uuid(w.windowKey());require(keys.add(w.windowKey())&&windows.add(w.windowKey())&&frames.containsKey(w.ownerFrameKey())&&w.checkpointOrdinal()>=0&&w.checkpointOrdinal()<64&&w.boundaryIndex()>=0&&w.boundaryIndex()<64&&w.opportunities().size()<=128);Set<UUID>actors=new HashSet<>();
+                for(int i=0;i<w.opportunities().size();i++) {Opportunity o=w.opportunities().get(i);uuid(o.opportunityKey());require(keys.add(o.opportunityKey())&&actors.add(o.actorId())&&members.contains(o.actorId())&&o.priority()==i&&o.options().size()>=1&&o.options().size()<=32&&new HashSet<>(o.options()).size()==o.options().size()&&(o.selectionFrameKey()==null?o.status()==OpportunityStatus.PENDING:frames.containsKey(o.selectionFrameKey()))&&(o.attackFrameKey()==null||frames.containsKey(o.attackFrameKey()))&&(o.reason()==null||token(o.reason())));for(ReactionOption option:o.options())validateOption(option);}}
+            for(Movement m:f.movements()) {uuid(m.movementKey());require(members.contains(m.actorId())&&m.path().size()>=1&&m.path().size()<=64&&m.cursor()>=0&&m.cursor()<=m.path().size()&&m.spent()>=0&&m.status()!=null&&(m.stopReason()==null||token(m.stopReason())));}
             for(AttackAttempt t:f.attacks())require(frames.containsKey(t.frameKey())&&members.contains(t.actorId())&&members.contains(t.targetId())&&!t.actorId().equals(t.targetId())&&t.firstD20()>=1&&t.firstD20()<=20&&(t.secondD20()==null||t.secondD20()>=1&&t.secondD20()<=20)&&t.selectedD20()>=1&&t.selectedD20()<=20&&t.damageDice().size()<=40&&t.damageDice().stream().allMatch(v->v!=null&&v>=1&&v<=12)&&t.damageAmount()>=0&&validBlessing(t.blessingEffectKey(),t.blessingD4()));
             Set<UUID> castFrames=new HashSet<>();
             for(CastAttempt cast:f.casts()) {
@@ -208,6 +238,13 @@ public final class Schema2CombatHistory {
         if(b.status()==Status.ENDED)require(holders.isEmpty()&&b.activeFlow()==null&&b.ongoingEffects().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.shields().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)&&b.environmentZones().stream().allMatch(z->z.endedOperationId()!=null)&&b.suppressionCauses().stream().allMatch(c->c.releasedOperationId()!=null));
     }
     private static void validateCommand(Command c) {
+        if (Schema2CombatRules.placementCommand(c)) {
+            Command expected = c.kind()==Kind.OPEN_SCENE ? Command.openScene(c.deployments(), c.monsterDeployments())
+                    : c.kind()==Kind.SET_SCENE_ROSTER ? Command.sceneRoster(c.deployments(), c.monsterDeployments())
+                    : Command.action(Kind.CLOSE_SCENE, null);
+            require(expected.equals(c));
+            return;
+        }
         require(c.kind()!=null);boolean start=c.kind()==Kind.START,reenter=c.kind()==Kind.REENTER_COMBAT;
         boolean move=c.kind()==Kind.MOVE||c.kind()==Kind.EXPLORATION_MOVE,attack=c.kind()==Kind.ATTACK,health=c.kind()==Kind.EXPLORATION_HEALTH;
         boolean reaction=Set.of(Kind.DECLARE_OPPORTUNITY_ATTACK,Kind.DECLARE_SHIELD,Kind.DECLARE_COUNTERSPELL,Kind.RELEASE_READY,Kind.PASS_REACTION,Kind.ADVANCE_WINDOW).contains(c.kind());
@@ -258,8 +295,8 @@ public final class Schema2CombatHistory {
                 && rule.ruleKey()!=null && rule.ruleKey().length()<=128 && rule.ruleKey().matches(prefix+"[.][a-z][a-z0-9_]*([.][a-z0-9_]+)*");
     }
 
-    private static List<UUID> validateMonsterState(Battle state,List<UUID> characters) {
-        Set<UUID> ids=new HashSet<>(characters);require(state.monsters().size()+characters.size()<=64);
+    private static List<UUID> validateMonsterState(Battle state,List<UUID> characters,Set<UUID> knownCharacters,Map<UUID,RuleIdentity> knownMonsters) {
+        Set<UUID> ids=new HashSet<>(characters);require(state.monsters().size()+characters.size()<=MAX_COMBATANTS);
         for(var m:state.monsters()) {
             require(m.monsterId()!=null&&m.monsterId().version()==4&&m.monsterId().variant()==2&&ids.add(m.monsterId())
                     &&validRule(m.monster(),"adventure.monster")&&m.hitPoints()>=0&&m.hitPoints()<=65535&&m.dead()==(m.hitPoints()==0)&&m.actionUses().size()<=16);
@@ -267,7 +304,8 @@ public final class Schema2CombatHistory {
         }
         require(state.monsterRests().size()<=128);Set<UUID> rests=new HashSet<>(),resting=new HashSet<>();
         for(var r:state.monsterRests()) {
-            require(r.restKey()!=null&&r.restKey().version()==4&&rests.add(r.restKey())&&state.monsters().stream().anyMatch(m->m.monsterId().equals(r.monsterId()))
+            require(r.restKey()!=null&&r.restKey().version()==4&&rests.add(r.restKey())&&knownMonsters.containsKey(r.monsterId())
+                    &&(r.status()!=MonsterRestStatus.ACTIVE||state.monsters().stream().anyMatch(m->m.monsterId().equals(r.monsterId())))
                     &&r.kind()!=null&&r.status()!=null&&r.startedAtSecond()>=0&&r.completesAtSecond()-r.startedAtSecond()==(r.kind()==MonsterRestKind.SHORT?3600:28800)
                     &&(r.status()==MonsterRestStatus.ACTIVE?r.finishedOperationId()==null&&resting.add(r.monsterId()):r.finishedOperationId()!=null));
         }
@@ -275,21 +313,22 @@ public final class Schema2CombatHistory {
         for(var batch:state.saveDamageBatches()) {
             require(batch.batchKey()!=null&&batch.batchKey().version()==4&&batchKeys.add(batch.batchKey())&&batch.releasedTurnNumber()>=1
                     &&batch.releaseOperationId()!=null&&batch.releaseOperationId().version()==4&&batch.status()!=null);
-            if(batch.spellSource()==null)require(validAction(batch.action())&&state.monsters().stream().anyMatch(m->m.monsterId().equals(batch.sourceId())&&m.monster().equals(batch.action().rule())));
+            if(batch.spellSource()==null)require(validAction(batch.action())&&batch.action().rule().equals(knownMonsters.get(batch.sourceId())));
             else {
                 var source=batch.spellSource();require(batch.action()==null&&validRule(source.spell(),"adventure.spell")&&source.slotLevel()>=1&&source.slotLevel()<=3&&source.abilityModifier()>=-5&&source.abilityModifier()<=10&&source.proficiencyBonus()>=2&&source.proficiencyBonus()<=3);
                 var casts=state.flows().stream().flatMap(f->f.casts().stream()).filter(c->c.frameKey().equals(source.castFrameKey())).toList();require(casts.size()==1);
-                var cast=casts.getFirst();require(cast.actorId().equals(batch.sourceId())&&characters.contains(batch.sourceId())&&cast.spell().equals(source.spell())&&cast.slotLevel()==source.slotLevel()
+                var cast=casts.getFirst();require(cast.actorId().equals(batch.sourceId())&&knownCharacters.contains(batch.sourceId())&&cast.spell().equals(source.spell())&&cast.slotLevel()==source.slotLevel()
                         &&Objects.equals(cast.coneDirection(),batch.targetProof().direction()));
             }
             List<Frame> frames=state.flows().stream().flatMap(f->f.frames().stream()).filter(f->f.frameKey().equals(batch.frameKey())).toList();
             require(frames.size()==1&&frames.getFirst().kind()==FrameKind.SAVE_DAMAGE&&frames.getFirst().ownerKey().equals(batch.batchKey()));
             var proof=batch.targetProof();require(proof!=null&&proof.policy()!=null&&proof.policy().matches("[A-Z][A-Z0-9_]{0,63}")&&proof.rosterVersion()>=0&&proof.rosterVersion()<=state.version()
-                    &&proof.origin()!=null&&proof.direction()>=0&&proof.direction()<8&&proof.candidates().size()==ids.size()&&proof.targets().size()<=64);
+                    &&proof.origin()!=null&&proof.direction()>=0&&proof.direction()<8&&proof.candidates().size()<=MAX_COMBATANTS&&proof.targets().size()<=64
+                    &&(batch.status()!=BatchStatus.ROLLED||proof.candidates().size()==ids.size()));
             Set<CreatureRef> candidates=new HashSet<>();List<CreatureRef> included=new ArrayList<>();
             for(var c:proof.candidates()) {
-                require(c.creature()!=null&&candidates.add(c.creature())&&ids.contains(c.creature().creatureId())&&c.position()!=null&&c.reason()!=null&&c.reason().matches("[A-Z][A-Z0-9_]{0,63}")
-                        &&(characters.contains(c.creature().creatureId())?c.creature().kind()==CreatureKind.CHARACTER:c.creature().kind()==CreatureKind.MONSTER));
+                require(c.creature()!=null&&candidates.add(c.creature())&&(batch.status()!=BatchStatus.ROLLED||ids.contains(c.creature().creatureId()))&&c.position()!=null&&c.reason()!=null&&c.reason().matches("[A-Z][A-Z0-9_]{0,63}")
+                        &&(c.creature().kind()==CreatureKind.CHARACTER?knownCharacters.contains(c.creature().creatureId()):knownMonsters.containsKey(c.creature().creatureId())));
                 if(c.included())included.add(c.creature());
             }
             included.sort(Comparator.comparing((CreatureRef c)->c.kind().name()).thenComparing(c->c.creatureId().toString()));
@@ -325,7 +364,7 @@ public final class Schema2CombatHistory {
                     &&p.saveCheckIndex()>=0&&p.saveCheckIndex()<batch.checks().size());
             var save=batch.checks().get(p.saveCheckIndex());require(save.purpose().equals(batch.spellSource()==null?"BREATH_DEX":"SPELL_DEX")&&save.targetOrdinal()==i&&save.difficultyClass()==batch.difficultyClass());
             require(p.maximumHitPoints()>=1&&p.maximumHitPoints()<=65535&&p.beforeHitPoints()>=0&&p.beforeHitPoints()<=p.maximumHitPoints()&&p.beforeTemporaryHitPoints()>=0&&p.beforeTemporaryHitPoints()<=65535&&p.defenses().size()<=32);
-            Set<String> kinds=new HashSet<>();for(var d:p.defenses()){require(d.source()!=null&&Set.of("IMMUNITY","RESISTANCE","VULNERABILITY").contains(d.kind()));kinds.add(d.kind());}
+            Set<String> kinds=new HashSet<>();for(var d:p.defenses()) {require(d.source()!=null&&Set.of("IMMUNITY","RESISTANCE","VULNERABILITY").contains(d.kind()));kinds.add(d.kind());}
             int damage=save.success()?batch.sharedRoll().effectiveTotal()/2:batch.sharedRoll().effectiveTotal();
             if(kinds.contains("IMMUNITY"))damage=0;else {if(kinds.contains("RESISTANCE"))damage/=2;if(kinds.contains("VULNERABILITY"))damage*=2;}
             require(p.damageAmount()==damage&&p.absorbedTemporaryHitPoints()==Math.min(p.beforeTemporaryHitPoints(),damage)

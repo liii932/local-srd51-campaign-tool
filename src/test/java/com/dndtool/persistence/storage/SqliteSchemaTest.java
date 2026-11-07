@@ -180,7 +180,7 @@ class SqliteSchemaTest {
     @Test
     void declaredDeferredCyclesAreSupportedButImmediateCycleIsRejectedBeforeDdl() throws Exception {
         String cycle = """
-            {"declarationVersion":1,"applicationModel":"srd51-vitality-1","storageModel":"sqlite-vitality-1","dialect":"sqlite-strict-1","modules":[
+            {"declarationVersion":1,"applicationModel":"campaign-spaces-3","storageModel":"sqlite-campaign-3","dialect":"sqlite-strict-1","modules":[
               {"id":"core","dependsOn":[],"tables":[
                 {"name":"core_b","columns":[{"name":"id","type":"uuid","nullable":false}],"primaryKey":["id"],"uniqueKeys":[],"foreignKeys":[{"name":"fk_core_b_a","columns":["id"],"references":{"table":"core_a","columns":["id"]},"onDelete":"NO_ACTION","onUpdate":"NO_ACTION","deferred":true}],"checks":[],"indexes":[]},
                 {"name":"core_a","columns":[{"name":"id","type":"uuid","nullable":false}],"primaryKey":["id"],"uniqueKeys":[],"foreignKeys":[{"name":"fk_core_a_b","columns":["id"],"references":{"table":"core_b","columns":["id"]},"onDelete":"NO_ACTION","onUpdate":"NO_ACTION","deferred":true}],"checks":[],"indexes":[]}
@@ -218,8 +218,8 @@ class SqliteSchemaTest {
 
     @Test
     void bundledProductionClosureCompilesAndVerifiesUsingActualDriver() throws Exception {
-        StoragePlan plan = StorageSchemaCatalog.bundled().plan(Set.of("health"));
-        assertTrue(plan.moduleIds().containsAll(Set.of("core", "rules", "characters", "history", "health")));
+        StoragePlan plan = StorageSchemaCatalog.bundled().plan(Set.of("runtime"));
+        assertTrue(plan.moduleIds().containsAll(Set.of("core", "rules-runtime", "characters-runtime", "history-runtime", "runtime")));
         try (Connection connection = open("jdbc:sqlite::memory:")) {
             execute(connection, "BEGIN IMMEDIATE"); plan.create(connection); plan.verify(connection); execute(connection, "ROLLBACK");
             assertEquals("0", scalar(connection, "SELECT count(*) FROM sqlite_schema"));

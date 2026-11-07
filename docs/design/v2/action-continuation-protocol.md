@@ -7,9 +7,11 @@ Bless/Cure Wounds、Shield/Counterspell 真实反应链及封闭触发的 Ready 
 真实成本、原骰、父子帧、专注与领域后果随类型化场景历史直接恢复。施法资格限该合同的
 生命领域一级角色与单职业 Wizard 1—5 级学习／准备模型。
 本协议属于应用规则机制层，为各领域共享动作继续、窗口和结算时机。运行核心提供绑定、
-权限、事务、幂等、预算与恢复保障。下文的目标协议以[焦点空间](world-and-scene-spaces.md#执行焦点与冻结)
-的当前叶子推进。跨空间因果后继由同一流的 [CausalScope](world-and-scene-spaces.md#causal-scope)
-当前叶子承载。各新增分支按[采用边界](adoption-boundaries.md)独立验收。
+权限、事务、幂等、预算与恢复保障。SQLite 当前有限机制采用
+[单焦点空间合同](world-and-scene-spaces.md#执行焦点与冻结)，规则场景可分别保留未决流。
+目标协议以焦点流的当前叶子推进，跨空间因果后继由同一流的
+[`CausalScope`](world-and-scene-spaces.md#causal-scope) 当前叶子承载。MySQL INTERNAL
+仍按其单场景运行合同执行。
 它遵循[模组接口基线](module-interface-baseline.md)、[机制接入责任清单](mechanism-integration-checklist.md)、
 [运行与事务](runtime-and-transactions.md)、[保存与恢复](save-and-recovery.md)及
 [玩家步骤](player-steps-and-auto-save.md)。legacy RELEASED v1、DRAFT 状态和 archive format 2

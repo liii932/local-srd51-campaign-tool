@@ -87,7 +87,7 @@ async function expect(path, status, method, headers, body) {
   await expect('/api/host/storage/create', 409, 'POST', { ...commandHeaders,
     'X-Host-State-Epoch': before.storage.epoch === '0' ? '1' : '0' });
   const digest = await expect('/api/host/storage/create', 400, 'POST', commandHeaders,
-    'name=Rejected&modules=srd51-vitality%401');
+    'name=Rejected&members=invalid');
   assert.equal(JSON.parse(digest.text).code, 'INVALID_REQUEST_DIGEST');
   for (const value of ['localhost:8080', '[::1]:8080', 'invalid.example']) {
     await expect('/host', 404, 'GET', { Host: value });

@@ -22,18 +22,19 @@ class PlayerHttpIntegrationTest {
 
     @Test void trustedHttpsApplicationApprovalSingleWriterAndExactReceiptUseTheRealBoundary() throws Exception {
         try (var launcher = PlayerLoopLauncher.start(temporary.resolve("store"))) {
-            var storage = launcher.storage(); storage.create("玩家原型",List.of(CampaignRules.BASE,CampaignRules.HEALING,CampaignRules.RUNTIME));
+            var storage = launcher.storage(); CampaignRuleFixtures.create(storage, "玩家原型");
             domain(storage,"character-create",json("name","自己的战士","kind","PC","classKey","fighter","backgroundKey","acolyte"));
             UUID pc = storage.accessSnapshot().snapshot().domains().characters().getFirst().id();
             domain(storage,"character-create",json("name","秘密守卫","kind","NPC","classKey","fighter","backgroundKey","acolyte"));
             var equip = new Command("ITEM_ACQUIRED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,
-                    new EquipmentInput(UUID.randomUUID(),BundledCampaignRules.rule("equipment.item","item.longsword"),"CARRIED","主持准备"),null);
+                    new EquipmentInput(UUID.randomUUID(),CampaignRuleFixtures.rules().rule("equipment.item","item.longsword"),"CARRIED","主持准备"),null);
             JsonObject payload=json("characterId",pc.toString(),"characterVersion","0"); payload.add("command",CampaignDomainCodec.toJson(equip)); domain(storage,"character-command",payload);
+            UUID node = PlayerSpaceFixture.placeAtWorld(storage, pc);
 
             HttpClient trusted = client(launcher); HttpClient second = client(launcher);
             assertThrows(SSLException.class,()->HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(PLAYER+"/player")).GET().build(),HttpResponse.BodyHandlers.ofString()));
             assertEquals(200,get(trusted,PLAYER+"/player").statusCode());
-            for(String path:List.of("/","/health","/host/storage","/api/host/storage/state","/host/assets/host-storage.js","/WEB-INF/player.html"))
+            for(String path:List.of("/","/health","/host/storage","/api/host/storage/state","/api/host/storage/rule-library","/api/host/storage/rule-download","/host/assets/host-storage.js","/WEB-INF/player.html"))
                 assertEquals(404,get(trusted,PLAYER+path).statusCode(),path);
             assertEquals(404,get(dm,HOST+"/player").statusCode());
             assertEquals(404,get(trusted,PLAYER+"/player?invitation=secret").statusCode());
@@ -52,7 +53,7 @@ class PlayerHttpIntegrationTest {
             assertNotEquals(csrf,csrf(first)); assertFalse(ok(get(second,PLAYER+"/api/player/state")).has("view"));
             String member=first.getAsJsonObject("session").get("playerKey").getAsString();
             host("control",Map.of("payload",json("characterId",pc.toString(),"memberId",member,"controlVersion","0").toString()));
-            JsonObject permission=json("characterId",pc.toString(),"permissionVersion","0");permission.add("sceneId",JsonNull.INSTANCE);permission.addProperty("active",true);JsonArray operations=new JsonArray();operations.add("CHARACTER_COMMAND");permission.add("actions",operations);
+            JsonObject permission=json("characterId",pc.toString(),"permissionVersion","0");permission.addProperty("sceneId",node.toString());permission.addProperty("active",true);JsonArray operations=new JsonArray();operations.add("CHARACTER_COMMAND");permission.add("actions",operations);
             host("exploration",Map.of("payload",permission.toString()));
             first=ok(get(trusted,PLAYER+"/api/player/state")); assertFalse(first.toString().contains("秘密守卫")); assertFalse(first.toString().contains("epoch")); assertFalse(first.toString().contains("preparationOperationId"));
             first=ok(post(trusted,"takeover",csrf(first),new JsonObject(),null,PLAYER)); String oldWriter=first.get("connectionId").getAsString();
@@ -91,5 +92,5 @@ class PlayerHttpIntegrationTest {
     private static String csrf(JsonObject body) { return body.getAsJsonObject("session").get("csrf").getAsString(); }
     private static String encode(String value) { return URLEncoder.encode(value,StandardCharsets.UTF_8); }
     private static JsonObject json(String...values) { JsonObject o=new JsonObject();for(int i=0;i<values.length;i+=2)o.addProperty(values[i],values[i+1]);return o; }
-    private static void domain(CampaignStorageService storage,String action,JsonObject input) { var v=storage.current();storage.domainCommand(UUID.randomUUID().toString(),v.epoch(),v.revision(),action,input); }
+    private static void domain(CampaignStorageService storage,String action,JsonObject input) { PlayerSpaceFixture.send(storage, action, input); }
 }

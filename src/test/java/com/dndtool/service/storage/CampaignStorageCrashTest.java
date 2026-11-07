@@ -1,11 +1,11 @@
 package com.dndtool.service.storage;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static com.dndtool.service.storage.CampaignLifecycleFixture.*;
 
 import com.dndtool.service.storage.CampaignStorageService.Boundary;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +30,7 @@ class CampaignStorageCrashTest {
             String run = onlyResidual(service);
             assertEquals("RESIDUAL", service.status().state());
             assertEquals("PREPARATION_INCOMPLETE", assertThrows(StorageException.class, () -> service.recover(run)).code());
-            assertEquals("RESIDUAL_RUN", assertThrows(StorageException.class, () -> service.create("other", rules())).code());
+            assertEquals("RESIDUAL_RUN", assertThrows(StorageException.class, () -> service.create("other", CampaignRuleFixtures.rules().binding().members())).code());
             service.discardResidual(run);
             assertEquals("IDLE", service.status().state());
             assertTrue(service.status().saveFiles().isEmpty());
@@ -63,11 +63,11 @@ class CampaignStorageCrashTest {
         Path root = crash(Boundary.AFTER_DDL);
         try (var service = new CampaignStorageService(root)) {
             assertEquals("RESIDUAL", service.status().state());
-            assertThrows(StorageException.class, () -> service.create("other", rules()));
+            assertThrows(StorageException.class, () -> service.create("other", CampaignRuleFixtures.rules().binding().members()));
             var restored = service.recover(onlyResidual(service));
             assertEquals("林间营地", restored.name());
             assertEquals(0, restored.revision());
-            assertTrue(restored.characters().isEmpty());
+            assertTrue(cards(restored) == 0);
             assertEquals(1, service.status().saveFiles().size());
             assertEquals("ACTIVE", service.status().state());
         }
@@ -96,37 +96,37 @@ class CampaignStorageCrashTest {
         }
     }
 
-    @Test void killedHealingBeforeCommitLeavesNoPartialHpHistoryOrReceipt() throws Exception {
+    @Test void killedFieldEditBeforeCommitLeavesNoPartialHpHistoryOrReceipt() throws Exception {
         Path root = crash(Boundary.AFTER_CHARACTER_UPDATE);
         try (var service = noMoreDdl(root)) {
             var restored = service.recover(onlyResidual(service));
             assertEquals(1, restored.revision());
-            assertEquals(4, restored.characters().getFirst().currentHp());
-            assertEquals(1, restored.characters().getFirst().version());
+            assertEquals(11, hp(restored));
+            assertEquals(0, version(restored));
             assertEquals(1, restored.history().size());
-            var retried = service.heal(COMMAND, restored.epoch(), 1,
-                    restored.characters().getFirst().id(), 1, 5);
-            assertEquals(9, retried.characters().getFirst().currentHp());
+            var retried = setHp(service, COMMAND, restored.epoch(), 1,
+                    cardId(restored), 0, 9);
+            assertEquals(9, hp(retried));
             assertEquals(2, retried.revision());
             assertEquals(2, retried.history().size());
         }
     }
 
-    @Test void killedResponseAfterCommitReplaysOriginalReceiptWithoutHealingAgain() throws Exception {
+    @Test void killedResponseAfterCommitReplaysOriginalReceiptWithoutApplyingAgain() throws Exception {
         Path root = crash(Boundary.AFTER_BUSINESS_COMMIT);
         try (var service = noMoreDdl(root)) {
             var restored = service.recover(onlyResidual(service));
             assertEquals(2, restored.revision());
-            assertEquals(9, restored.characters().getFirst().currentHp());
-            var replayed = service.heal(COMMAND, restored.epoch(), 1,
-                    restored.characters().getFirst().id(), 1, 5);
-            assertEquals(9, replayed.characters().getFirst().currentHp());
+            assertEquals(9, hp(restored));
+            var replayed = setHp(service, COMMAND, restored.epoch(), 1,
+                    cardId(restored), 0, 9);
+            assertEquals(9, hp(replayed));
             assertEquals(2, replayed.revision());
             assertEquals(2, replayed.history().size());
             assertTrue(replayed.lastCommand().replayed());
             assertEquals(2, replayed.lastCommand().acceptedRevision());
-            assertEquals(4, replayed.lastCommand().beforeHp());
-            assertEquals(9, replayed.lastCommand().afterHp());
+            assertEquals(cardId(restored), replayed.lastCommand().subjectId());
+            assertEquals(1, version(replayed));
         }
     }
 
@@ -138,7 +138,7 @@ class CampaignStorageCrashTest {
             assertEquals("RESIDUAL", service.status().state());
             assertTrue(service.status().saveFiles().isEmpty());
             var restored = service.recover(onlyResidual(service));
-            assertEquals(9, restored.characters().getFirst().currentHp());
+            assertEquals(9, hp(restored));
             assertEquals(2, restored.history().size());
             var receipt = service.save(SAVE, restored.epoch(), 2);
             assertTrue(published.contains(receipt.fileKey() + ".json"));
@@ -179,7 +179,6 @@ class CampaignStorageCrashTest {
         return residuals.getFirst();
     }
 
-    private static List<String> rules() { return List.of(CampaignRules.BASE, CampaignRules.HEALING); }
 
     private static Set<String> savedNames(Path root) throws Exception {
         try (var entries = Files.list(root.resolve("saves"))) {
@@ -194,13 +193,13 @@ class CampaignStorageCrashTest {
             try (var service = new CampaignStorageService(Path.of(args[0]), boundary -> {
                 if (armed.get() && boundary == target) Runtime.getRuntime().halt(73);
             })) {
-                var created = service.create("林间营地", rules());
-                var added = service.addCharacter(UUID.randomUUID().toString(), created.epoch(), 0, "林间向导", 12, 4);
+                var created = CampaignRuleFixtures.create(service, "林间营地");
+                var added = addCard(service, UUID.randomUUID().toString(), created.epoch(), 0, "林间向导");
                 if (target == Boundary.AFTER_CHARACTER_UPDATE || target == Boundary.AFTER_BUSINESS_COMMIT) armed.set(true);
-                var healed = service.heal(COMMAND, added.epoch(), 1, added.characters().getFirst().id(), 1, 5);
+                var edited = setHp(service, COMMAND, added.epoch(), 1, cardId(added), 0, 9);
                 if (target == Boundary.AFTER_P2) {
                     armed.set(true);
-                    service.save(SAVE, healed.epoch(), 2);
+                    service.save(SAVE, edited.epoch(), 2);
                 }
                 throw new AssertionError("Requested process boundary was never reached");
             }

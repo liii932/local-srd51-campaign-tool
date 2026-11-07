@@ -32,7 +32,10 @@ public final class CampaignDomainEngine {
                 throw rejected("CAMPAIGN_CHARACTER_RECORD");
         }
     }
-    public record CombatResult(Schema2CombatHistory.History history, List<CharacterRecord> characters) {
+    public record CombatResult(Schema2CombatHistory.History history, List<CharacterRecord> characters, int elapsedSeconds) {
+        public CombatResult(Schema2CombatHistory.History history, List<CharacterRecord> characters) {
+            this(history, characters, 0);
+        }
         public CombatResult { characters = List.copyOf(characters); }
     }
 
@@ -77,14 +80,30 @@ public final class CampaignDomainEngine {
         validateCampaign(material, supplied, combats);
         if (combats.stream().anyMatch(combat -> combat.current().status() != Status.ENDED))
             throw rejected("S2_CHARACTER_COMBAT_ACTIVE");
+        if (supplied.stream().map(record -> seconds(record.history().current())).distinct().count() > 1)
+            throw rejected("S2_COMBAT_CLOCK_MISMATCH");
+        Set<UUID> retainedSceneOperations = new HashSet<>();
+        for (var combat : combats) for (var event : combat.events()) retainedSceneOperations.add(event.operationId());
+        var result = executeSpaceCharacter(material, supplied, targetId, command, operationId, dice, retainedSceneOperations);
+        validateCampaign(material, result, combats);
+        return result;
+    }
+
+    /** Only occupants of the executing space accrue the accepted elapsed time. */
+    public List<CharacterRecord> executeSpaceCharacter(ProductionSchema2Projection material,
+            List<CharacterRecord> supplied, UUID targetId, Schema2CharacterRuntime.Command command,
+            UUID operationId, IntUnaryOperator dice) {
+        return executeSpaceCharacter(material, supplied, targetId, command, operationId, dice, Set.of());
+    }
+
+    private List<CharacterRecord> executeSpaceCharacter(ProductionSchema2Projection material,
+            List<CharacterRecord> supplied, UUID targetId, Schema2CharacterRuntime.Command command,
+            UUID operationId, IntUnaryOperator dice, Set<UUID> reservedOperations) {
         var all = records(material, supplied); var target = all.get(targetId);
         if (target == null) throw rejected("S2_CHARACTER_NOT_FOUND");
         long beforeSecond = seconds(target.history().current());
-        if (all.values().stream().anyMatch(record -> seconds(record.history().current()) != beforeSecond))
-            throw rejected("S2_COMBAT_CLOCK_MISMATCH");
-        Set<UUID> existing = new HashSet<>();
+        Set<UUID> existing = new HashSet<>(reservedOperations);
         for (var record : supplied) for (var event : record.history().events()) existing.add(event.operationId());
-        for (var combat : combats) for (var event : combat.events()) existing.add(event.operationId());
         if (!existing.add(operationId)) throw rejected("S2_CHARACTER_OPERATION_CONFLICT");
         // This retained-rule minimum branch proves all time/capacity obligations before real RNG.
         History candidate = executeCharacter(material, target.initial(), target.history(), command, operationId, sides -> 1);
@@ -95,20 +114,21 @@ public final class CampaignDomainEngine {
             UUID id = record.history().current().characterId(); if (id.equals(targetId)) continue;
             UUID child = campaignTimeChildOperation(operationId, id);
             if (!existing.add(child)) throw rejected("S2_CHARACTER_OPERATION_CONFLICT");
-            var active = record.history().current().rest().active();
-            String activity = active == null ? "NONE" : "LIGHT";
-            var time = new Schema2CharacterRuntime.Command("TIME_ADVANCED", null, 0, null, null, null,
-                    GrowthChoices.EMPTY, new RestInput(null, activity, delta / 60, 0, Map.of()));
+            var time = spaceTimeCommand(record.history().current(), delta / 60);
             synchronizedHistories.put(id, executeCharacter(material, record.initial(), record.history(), time, child,
                     sides -> { throw rejected("CAMPAIGN_TIME_RANDOMNESS"); }));
         }
         History actual = executeCharacter(material, target.initial(), target.history(), command, operationId, dice);
         if (seconds(actual.current()) != seconds(candidate.current())) throw rejected("S2_COMBAT_CLOCK_MISMATCH");
         synchronizedHistories.put(targetId, actual);
-        var result = supplied.stream().map(record -> new CharacterRecord(record.name(), record.kind(), record.initial(),
+        return supplied.stream().map(record -> new CharacterRecord(record.name(), record.kind(), record.initial(),
                 synchronizedHistories.getOrDefault(record.history().current().characterId(), record.history()))).toList();
-        validateCampaign(material, result, combats);
-        return result;
+    }
+
+    public static Schema2CharacterRuntime.Command spaceTimeCommand(State state, long minutes) {
+        String activity = state.rest().active() == null ? "NONE" : "LIGHT";
+        return new Schema2CharacterRuntime.Command("TIME_ADVANCED", null, 0, null, null, null,
+                GrowthChoices.EMPTY, new RestInput(null, activity, minutes, 0, Map.of()));
     }
 
     /** Stable causal key; the campaign root records this child together with the target operation. */
@@ -179,16 +199,48 @@ public final class CampaignDomainEngine {
     public CombatResult executeCombat(ProductionSchema2Projection material, List<CharacterRecord> supplied,
             Schema2CombatHistory.History previous, UUID combatId, UUID operationId,
             Schema2CombatState.Command command, IntUnaryOperator dice) {
-        var all = records(material, supplied);
+        if (supplied == null || supplied.size() < 2 || Schema2CombatRules.placementCommand(command))
+            throw rejected("S2_COMBAT_ROSTER");
         if (previous != null) validateCombat(material, supplied, previous);
-        UUID campaign = supplied.getFirst().initial().campaignId();
-        List<Member> members = previous == null
-                ? supplied.stream().map(record -> new Member(record.history().current().characterId(),
-                    record.history().current().identity(), record.history().current().preparationOperationId()))
-                    .sorted(Comparator.comparing(Member::characterId, Schema2CombatHistory.UUID_ORDER)).toList()
-                : previous.members();
-        if (!new HashSet<>(members.stream().map(Member::characterId).toList()).equals(all.keySet()))
+        var result = executeCombat(material, supplied, previous, supplied.getFirst().initial().campaignId(),
+                combatId, null, operationId, command, Map.of(), dice);
+        validateCombat(material, result.characters(), result.history());
+        return result;
+    }
+
+    public CombatResult executeScene(ProductionSchema2Projection material, List<CharacterRecord> supplied,
+            Schema2CombatHistory.History previous, UUID campaignId, UUID sceneId, long sceneSecond, UUID operationId,
+            Schema2CombatState.Command command, IntUnaryOperator dice) {
+        return executeScene(material, supplied, previous, campaignId, sceneId, sceneSecond, operationId, command, Map.of(), dice);
+    }
+
+    public CombatResult executeScene(ProductionSchema2Projection material, List<CharacterRecord> supplied,
+            Schema2CombatHistory.History previous, UUID campaignId, UUID sceneId, long sceneSecond, UUID operationId,
+            Schema2CombatState.Command command, Map<UUID,MonsterInstance> arrivingMonsters, IntUnaryOperator dice) {
+        Schema2ExplorationRules.requireSceneTime(sceneSecond, 0);
+        if (previous == null ? command.kind() != Kind.OPEN_SCENE : !Schema2CombatHistory.spatial(previous))
             throw rejected("S2_COMBAT_BINDING");
+        return executeCombat(material, supplied, previous, campaignId, sceneId, sceneSecond, operationId,
+                command, arrivingMonsters, dice);
+    }
+
+    public MonsterInstance initialMonster(ProductionSchema2Projection material, MonsterDeployment deployment) {
+        return Schema2MonsterRules.initial(material, deployment);
+    }
+
+    private CombatResult executeCombat(ProductionSchema2Projection material, List<CharacterRecord> supplied,
+            Schema2CombatHistory.History previous, UUID campaign, UUID combatId, Long sceneSecond, UUID operationId,
+            Schema2CombatState.Command command, Map<UUID,MonsterInstance> arrivingMonsters, IntUnaryOperator dice) {
+        var all = records(material, supplied);
+        List<Member> members = supplied.stream().map(record -> new Member(record.history().current().characterId(),
+                record.history().current().identity(), record.history().current().preparationOperationId()))
+                .sorted(Comparator.comparing(Member::characterId, Schema2CombatHistory.UUID_ORDER)).toList();
+        Map<UUID,Member> retainedMembers = new TreeMap<>(Schema2CombatHistory.UUID_ORDER);
+        if (previous != null) previous.members().forEach(member -> retainedMembers.put(member.characterId(), member));
+        for (Member member : members) {
+            Member old = retainedMembers.putIfAbsent(member.characterId(), member);
+            if (old != null && !old.equals(member)) throw rejected("S2_COMBAT_BINDING");
+        }
         if (previous != null && previous.events().stream().anyMatch(e -> e.operationId().equals(operationId)))
             throw rejected("S2_COMBAT_OPERATION_CONFLICT");
         if (all.values().stream().anyMatch(record -> record.history().events().stream()
@@ -198,18 +250,31 @@ public final class CampaignDomainEngine {
         Map<UUID,Long> versions = new LinkedHashMap<>();
         all.forEach((id, record) -> versions.put(id, record.history().current().version()));
         var request = new Schema2CombatRuntimeService.Request(operationId, combatId, campaign, Schema2RulesBinding.from(material),
-                members, previous == null ? -1 : previous.current().version(), versions, command);
-        var contexts = contexts(members, histories, versions, materials);
-        var prepared = combatRules.preflight(operationId, combatId, campaign, contexts,
-                previous == null ? null : previous.current(), command);
-        reserve(previous, prepared, histories, contexts, request);
-        Set<UUID> retainedOperations = new HashSet<>();
-        for (var history : histories.values()) for (var event : history.events()) retainedOperations.add(event.operationId());
-        if (previous != null) for (var event : previous.events()) retainedOperations.add(event.operationId());
-        for (UUID target : prepared.possibleHealthTargets()) for (int ordinal = 0; ordinal < Schema2CombatRules.MAX_COMBATANTS * 2; ordinal++)
-            if (retainedOperations.contains(Schema2CombatCharacterFacts.childOperation(operationId, target, ordinal)))
-                throw rejected("S2_COMBAT_OPERATION_CONFLICT");
-        Resolution resolution = combatRules.resolve(prepared, Objects.requireNonNull(dice));
+                members, previous == null ? -1 : previous.current().version(), versions, command, sceneSecond != null);
+        var contexts = contexts(members, histories, versions, materials, sceneSecond);
+        Battle beforeBattle = previous == null ? null : previous.current();
+        Resolution resolution;
+        if (Schema2CombatRules.placementCommand(command)) {
+            resolution = combatRules.place(material, operationId, combatId, campaign, contexts, beforeBattle, command, arrivingMonsters);
+            if (command.kind() != Kind.CLOSE_SCENE) {
+                int closeEvents = resolution.after().combatants().isEmpty() ? 1 : 2;
+                try { Schema2CombatHistory.checkReservedCapacity(previous, beforeBattle, closeEvents,
+                        resolution.after().combatants().size(), 0); }
+                catch (Schema2RuntimeFactsException exhausted) { throw rejected("S2_COMBAT_CAPACITY"); }
+            }
+        } else {
+            if (!arrivingMonsters.isEmpty()) throw rejected("S2_COMBAT_DEPLOYMENT");
+            if (sceneSecond != null && command.kind() == Kind.CLOSE_SCENE) throw rejected("S2_COMBAT_COMMAND");
+            var prepared = combatRules.preflight(operationId, combatId, campaign, contexts, beforeBattle, command);
+            reserve(previous, prepared, histories, contexts, request);
+            Set<UUID> retainedOperations = new HashSet<>();
+            for (var history : histories.values()) for (var event : history.events()) retainedOperations.add(event.operationId());
+            if (previous != null) for (var event : previous.events()) retainedOperations.add(event.operationId());
+            for (UUID target : prepared.possibleHealthTargets()) for (int ordinal = 0; ordinal < Schema2CombatRules.MAX_COMBATANTS * 2; ordinal++)
+                if (retainedOperations.contains(Schema2CombatCharacterFacts.childOperation(operationId, target, ordinal)))
+                    throw rejected("S2_COMBAT_OPERATION_CONFLICT");
+            resolution = combatRules.resolve(prepared, Objects.requireNonNull(dice));
+        }
         List<UUID> children = new ArrayList<>();
         for (var change : resolution.healthChanges()) {
             UUID child = Schema2CombatCharacterFacts.childOperation(operationId, change.characterId(), children.size());
@@ -231,11 +296,17 @@ public final class CampaignDomainEngine {
                 dependencies, children, previous == null ? null : previous.current(), resolution);
         var events = new ArrayList<Schema2CombatHistory.Event>(previous == null ? List.of() : previous.events());
         events.add(event);
-        var combat = new Schema2CombatHistory.History(resolution.after(), members, events);
+        var combat = new Schema2CombatHistory.History(resolution.after(), List.copyOf(retainedMembers.values()), events);
         var updated = supplied.stream().map(record -> new CharacterRecord(record.name(), record.kind(), record.initial(),
                 histories.get(record.history().current().characterId()))).toList();
-        validateCombat(material, updated, combat);
-        return new CombatResult(combat, updated);
+        try { Schema2CombatHistory.validate(combat); }
+        catch (Schema2RuntimeFactsException invalid) { throw rejected(invalid.getMessage()); }
+        return new CombatResult(combat, updated, elapsedSeconds(resolution));
+    }
+
+    private static int elapsedSeconds(Resolution resolution) {
+        return resolution.healthChanges().stream().filter(HealthChange::timeAdvance)
+                .mapToInt(HealthChange::seconds).max().orElse(0);
     }
 
     public void validateCombat(ProductionSchema2Projection material, List<CharacterRecord> supplied,
@@ -257,24 +328,23 @@ public final class CampaignDomainEngine {
     /** Complete closed-graph validation, including children whose owner scene has already ended. */
     public void validateCampaign(ProductionSchema2Projection material, List<CharacterRecord> supplied,
             List<Schema2CombatHistory.History> combats) {
-        if (supplied != null && supplied.isEmpty()) {
-            if (combats == null || !combats.isEmpty()) throw rejected("S2_COMBAT_ROSTER");
-            Schema2RulesBinding.from(Objects.requireNonNull(material)).verify(material);
-            return;
-        }
         var all = records(material, supplied);
-        long clock = seconds(supplied.getFirst().history().current());
-        if (supplied.stream().anyMatch(record -> seconds(record.history().current()) != clock))
-            throw rejected("S2_COMBAT_CLOCK_MISMATCH");
         Map<UUID,Schema2CombatHistory.Event> owners = new HashMap<>();
         Set<UUID> sceneIds = new HashSet<>(), eventIds = new HashSet<>();
-        if (combats == null || combats.stream().filter(combat -> combat.current().status() != Status.ENDED).count() > 1)
-            throw rejected("S2_COMBAT_BINDING");
+        if (combats == null) throw rejected("S2_COMBAT_BINDING");
         for (var combat : combats) {
             if (!sceneIds.add(combat.current().combatId())) throw rejected("S2_COMBAT_BINDING");
             var members = combat.members().stream().map(m -> all.get(m.characterId())).toList();
             if (members.stream().anyMatch(Objects::isNull)) throw rejected("S2_COMBAT_CHARACTER_NOT_FOUND");
-            validateCombat(material, members, combat);
+            if (Schema2CombatHistory.spatial(combat)) {
+                try { Schema2CombatHistory.validate(combat); }
+                catch (Schema2RuntimeFactsException invalid) { throw rejected("S2_COMBAT_HISTORY_CORRUPT"); }
+                for (Member member : combat.members()) {
+                    State state = all.get(member.characterId()).history().current();
+                    if (!member.identity().equals(state.identity()) || !member.preparationOperationId().equals(state.preparationOperationId()))
+                        throw rejected("S2_COMBAT_BINDING");
+                }
+            } else validateCombat(material, members, combat);
             for (var event : combat.events()) {
                 if (!eventIds.add(event.operationId())) throw rejected("S2_COMBAT_OPERATION_CONFLICT");
                 for (UUID child : event.characterOperations()) if (owners.putIfAbsent(child, event) != null)
@@ -294,7 +364,8 @@ public final class CampaignDomainEngine {
     }
 
     private Map<UUID,CharacterRecord> records(ProductionSchema2Projection material, List<CharacterRecord> supplied) {
-        if (supplied == null || supplied.isEmpty()) throw rejected("S2_COMBAT_ROSTER");
+        if (supplied == null) throw rejected("S2_COMBAT_ROSTER");
+        if (supplied.isEmpty()) Schema2RulesBinding.from(Objects.requireNonNull(material)).verify(material);
         Map<UUID,CharacterRecord> all = new LinkedHashMap<>(); UUID campaign = null;
         for (var record : supplied) {
             if (record == null) throw rejected("CAMPAIGN_CHARACTER_RECORD");
@@ -379,6 +450,7 @@ public final class CampaignDomainEngine {
     }
 
     private Schema2CharacterProgressionRules.PreparedAdvance prepareAdvance(Material material, State before, Schema2CharacterRuntime.Command command) {
+        if (command.growthChoices().feat() != null) throw rejected("S2_GROWTH_FEAT_UNSUPPORTED");
         spellbooks.requireLearningCompleteBeforeAdvance(material.projection(),before);
         var prepared = rules.prepareAdvance(material.projection(), before,
                 command.kind().equals("CHARACTER_ADVANCED") ? command.targetClass() : before.characterClass(),
@@ -392,46 +464,104 @@ public final class CampaignDomainEngine {
     Map<UUID,Schema2CombatRules.Context> contexts(List<Member> members,
             Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Long> versions,
             Map<UUID,Schema2CharacterRuntimeService.Material> materials) {
+        return contexts(members, histories, versions, materials, null);
+    }
+
+    private Map<UUID,Schema2CombatRules.Context> contexts(List<Member> members,
+            Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Long> versions,
+            Map<UUID,Schema2CharacterRuntimeService.Material> materials, Long sceneSecond) {
         Map<UUID,Schema2CombatRules.Context> result=new LinkedHashMap<>();
         for (Member member:members) {
             var history=histories.get(member.characterId()); Long version=versions.get(member.characterId());
             if (history==null||version==null||version<0||version>=history.events().size()) throw rejected("S2_COMBAT_STALE_CHARACTER");
             var state=history.events().get(Math.toIntExact(version)).after();
             var material=materials.get(member.characterId());
-            result.put(member.characterId(),new Schema2CombatRules.Context(material.projection(),material.initial(),state));
+            result.put(member.characterId(),new Schema2CombatRules.Context(material.projection(),material.initial(),state,
+                    sceneSecond == null ? seconds(state) : sceneSecond));
         }
         return result;
     }
+    /** Revalidates one spatial event using the clock and monster facts at its campaign root prefix. */
+    public int validateSceneEvent(ProductionSchema2Projection material, List<CharacterRecord> records,
+            Schema2CombatHistory.History history, Schema2CombatHistory.Event event, long sceneSecond) {
+        return validateSceneEvent(material, records, history, event, sceneSecond, Map.of());
+    }
+
+    public int validateSceneEvent(ProductionSchema2Projection material, List<CharacterRecord> records,
+            Schema2CombatHistory.History history, Schema2CombatHistory.Event event, long sceneSecond,
+            Map<UUID,MonsterInstance> arrivingMonsters) {
+        Schema2ExplorationRules.requireSceneTime(sceneSecond, 0);
+        if (!Schema2CombatHistory.spatial(history) || !history.events().contains(event)) throw rejected("S2_COMBAT_BINDING");
+        Map<UUID,CharacterRecord> retained = new HashMap<>();
+        records.forEach(record -> retained.put(record.history().current().characterId(), record));
+        Map<UUID,Member> identities = new HashMap<>();
+        history.members().forEach(member -> identities.put(member.characterId(), member));
+        Map<UUID,Long> versions = new LinkedHashMap<>();
+        Map<UUID,CharacterRecord> participants = new LinkedHashMap<>();
+        List<Member> members = new ArrayList<>();
+        for (Dependency dependency : event.dependencies()) {
+            UUID id = dependency.characterId();
+            Member member = identities.get(id);
+            CharacterRecord record = retained.get(id);
+            if (member == null || record == null || versions.putIfAbsent(id, dependency.version()) != null)
+                throw rejected("S2_COMBAT_DEPENDENCY_HISTORY");
+            members.add(member);
+            participants.put(id, record);
+        }
+        var histories = histories(participants);
+        var roster = contexts(members, histories, versions, materials(material, participants), sceneSecond);
+        verifyCombatEvent(history, event, histories, roster, members, versions, material, arrivingMonsters);
+        return elapsedSeconds(event.resolution());
+    }
+
     void validateCombatEvents(Schema2CombatHistory.History history,Map<UUID,Schema2CharacterRuntime.History> all,
             Map<UUID,Schema2CharacterRuntimeService.Material> materials) throws Schema2RuntimeFactsException {
         try {
+            if (Schema2CombatHistory.spatial(history)) throw rejected("S2_COMBAT_BINDING");
             Map<UUID,Long> preceding=null;
             for (Schema2CombatHistory.Event event:history.events()) {
                 Map<UUID,Long> versions=new LinkedHashMap<>(); event.dependencies().forEach(d->versions.put(d.characterId(),d.version()));
                 if (preceding!=null&&!preceding.equals(versions)) throw rejected("S2_COMBAT_DEPENDENCY_HISTORY");
                 // Materials were physically verified for this validation call. Only character state varies by event.
                 var roster=contexts(history.members(),all,versions,materials);
-                var binding=Schema2RulesBinding.from(roster.values().iterator().next().material());
-                Schema2CombatRuntimeService.Request request=new Schema2CombatRuntimeService.Request(event.operationId(),history.current().combatId(),history.current().campaignId(),binding,
-                        history.members(),event.before()==null?-1:event.before().version(),versions,event.command());
-                if (!request.digest().equals(event.requestDigest())) throw rejected("S2_COMBAT_REQUEST_HISTORY");
-                combatRules.verify(event.operationId(),request.combatId(),request.campaignId(),roster,event.before(),event.command(),event.resolution());
-                for (int i=0;i<event.resolution().healthChanges().size();i++) {
-                    var change=event.resolution().healthChanges().get(i);
-                    UUID child=Schema2CombatCharacterFacts.childOperation(event.operationId(),change.characterId(),i);
-                    if (!event.characterOperations().get(i).equals(child)) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
-                    var actual=all.get(change.characterId()).events().get(Math.toIntExact(change.after().version()));
-                    var childCommand=Schema2CombatCharacterFacts.command(roster.get(change.characterId()).material(),request.combatId(),event.operationId(),
-                            event.command().actorId()==null?change.characterId():event.command().actorId(),change);
-                    if (!actual.operationId().equals(child)||!actual.command().equals(childCommand)||!actual.before().equals(change.before())
-                            ||!actual.after().equals(change.after())||!Objects.equals(actual.healthResult(),change.healthResult())) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
-                    versions.put(change.characterId(),change.after().version());
-                }
+                verifyCombatEvent(history, event, all, roster, history.members(), versions,
+                        roster.values().iterator().next().material(), Map.of());
                 preceding=versions;
             }
             if (history.current().status()!=Schema2CombatState.Status.ENDED) for (var entry:all.entrySet())
                 if (entry.getValue().current().version()!=preceding.get(entry.getKey())) throw rejected("S2_COMBAT_DEPENDENCY_HISTORY");
         } catch (IllegalArgumentException|IndexOutOfBoundsException invalid) { throw new Schema2RuntimeFactsException("S2_COMBAT_HISTORY_CORRUPT",invalid); }
+    }
+
+    private void verifyCombatEvent(Schema2CombatHistory.History history, Schema2CombatHistory.Event event,
+            Map<UUID,History> histories, Map<UUID,Schema2CombatRules.Context> roster, List<Member> members,
+            Map<UUID,Long> versions, ProductionSchema2Projection material, Map<UUID,MonsterInstance> arrivingMonsters) {
+        var request = new Schema2CombatRuntimeService.Request(event.operationId(), history.current().combatId(),
+                history.current().campaignId(), Schema2RulesBinding.from(material), members,
+                event.before() == null ? -1 : event.before().version(), versions, event.command(), Schema2CombatHistory.spatial(history));
+        if (!request.digest().equals(event.requestDigest())) throw rejected("S2_COMBAT_REQUEST_HISTORY");
+        if (Schema2CombatRules.placementCommand(event.command())) {
+            var rebuilt = combatRules.place(material, event.operationId(), request.combatId(), request.campaignId(),
+                    roster, event.before(), event.command(), arrivingMonsters);
+            if (!rebuilt.equals(event.resolution())) throw rejected("S2_COMBAT_HISTORY_CORRUPT");
+        } else {
+            if (!arrivingMonsters.isEmpty() || Schema2CombatHistory.spatial(history) && event.command().kind() == Kind.CLOSE_SCENE)
+                throw rejected("S2_COMBAT_HISTORY_CORRUPT");
+            combatRules.verify(event.operationId(), request.combatId(), request.campaignId(), roster, event.before(),
+                    event.command(), event.resolution());
+        }
+        for (int i=0;i<event.resolution().healthChanges().size();i++) {
+            var change=event.resolution().healthChanges().get(i);
+            UUID child=Schema2CombatCharacterFacts.childOperation(event.operationId(),change.characterId(),i);
+            if (!event.characterOperations().get(i).equals(child)) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
+            var actual=histories.get(change.characterId()).events().get(Math.toIntExact(change.after().version()));
+            var childCommand=Schema2CombatCharacterFacts.command(material,request.combatId(),event.operationId(),
+                    event.command().actorId()==null?change.characterId():event.command().actorId(),change);
+            if (!actual.operationId().equals(child)||!actual.command().equals(childCommand)||!actual.before().equals(change.before())
+                    ||!actual.after().equals(change.after())||!Objects.equals(actual.healthResult(),change.healthResult()))
+                throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
+            versions.put(change.characterId(),change.after().version());
+        }
     }
     void reserve(Schema2CombatHistory.History previous,Schema2CombatRules.Prepared prepared,
             Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Schema2CombatRuntimeService.Request request) {
@@ -439,6 +569,7 @@ public final class CampaignDomainEngine {
             Battle before=prepared.before(); Schema2CombatState.Command command=request.command();
             int suffix=prepared.requiredSuffixEvents(); boolean closing=command.kind()==Kind.CLOSE_SCENE;
             int closeEvents=closing?0:1; // explicit terminal scene close
+            if (!closing && request.spaceOwned()) closeEvents++; // explicit departure before close
             if(!closing && (before==null || before.status()==Schema2CombatState.Status.ACTIVE))closeEvents++;
             if(!closing && before!=null) {
                 closeEvents+=(int)before.monsterRests().stream().filter(r->r.status()==MonsterRestStatus.ACTIVE).count();

@@ -10,7 +10,7 @@ import java.util.*;
 public final class Schema2CombatState {
     private Schema2CombatState() { }
     public enum Status { ACTIVE, EXPLORATION, ENDED }
-    public enum Kind { START, MONSTER_BREATH, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, STAND_UP, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
+    public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, STAND_UP, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
         ADVANCE_WINDOW, CONTINUE_MOVEMENT, CONTINUE_FLOW, CAST, READY_ATTACK, READY_MOVE, READY_SPELL,
         CREATE_ENVIRONMENT_ZONE, END_ENVIRONMENT_ZONE, EXPLORATION_HEALTH, EXPLORATION_ADVANCE_TIME, EXPLORATION_MOVE, REENTER_COMBAT, CLOSE_SCENE, END_CONCENTRATION, END_COMBAT }
@@ -86,6 +86,18 @@ public final class Schema2CombatState {
         }
         public static Command cast(UUID actor, CastInput input) { return new Command(Kind.CAST,actor,null,null,List.of(),List.of(),List.of(),null,null,null,null,input); }
         public static Command start(List<Deployment> deployments, List<UUID> ties) { return new Command(Kind.START,null,null,null,List.of(),deployments,ties,null,null,null,null); }
+        public static Command openScene(List<Deployment> deployments, List<MonsterDeployment> monsters) {
+            return scene(Kind.OPEN_SCENE, deployments, monsters);
+        }
+        public static Command sceneRoster(List<Deployment> deployments) {
+            return sceneRoster(deployments, List.of());
+        }
+        public static Command sceneRoster(List<Deployment> deployments, List<MonsterDeployment> monsters) {
+            return scene(Kind.SET_SCENE_ROSTER, deployments, monsters);
+        }
+        private static Command scene(Kind kind, List<Deployment> deployments, List<MonsterDeployment> monsters) {
+            return new Command(kind,null,null,null,List.of(),deployments,List.of(),null,null,null,null,null,null,null,null,null,null,0,monsters,null);
+        }
         public static Command action(Kind kind, UUID actor) { return new Command(kind,actor,null,null,List.of(),List.of(),List.of(),null,null,null,null); }
         public static Command attack(UUID actor, UUID target, UUID item) { return new Command(Kind.ATTACK,actor,target,item,List.of(),List.of(),List.of(),null,null,null,null); }
         public static Command move(UUID actor, List<Position> path) { return new Command(Kind.MOVE,actor,null,null,path,List.of(),List.of(),null,null,null,null); }
@@ -351,7 +363,7 @@ public final class Schema2CombatState {
             this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,List.of());
         }
         public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses);monsters=List.copyOf(monsters);saveDamageBatches=List.copyOf(saveDamageBatches);monsterRests=List.copyOf(monsterRests); }
-        public UUID activeActor() { return initiative.get(activeOrdinal).characterId(); }
+        public UUID activeActor() { return initiative.isEmpty() ? null : initiative.get(activeOrdinal).characterId(); }
         public Flow activeFlow() { return flows.stream().filter(f -> f.status() == FlowStatus.ACTIVE).findFirst().orElse(null); }
     }
     public record Roll(String purpose, UUID subjectId, int sides, int value) { }
