@@ -204,7 +204,7 @@ public final class CampaignRuleContext {
                 interpretation(), binding, catalog, List.of(
                     "Standard-array application characters; racial ability increases and full racial traits are unavailable.",
                     "Fighter levels 1–6, Life-domain cleric level 1, Wizard levels 1–5; this is not complete SRD class support.",
-                    "Fighter Extra Attack remains catalog-only metadata; an Attack action allows one supported melee attack.",
+                    "An acquired Fighter Extra Attack allows up to two melee attacks within the Attack action on that fighter's turn.",
                     "Background sources currently grant languages/tools, without background skills, features or starting gear.",
                     "Unimplemented fighter features, Evocation Savant and Sculpt Spells remain catalog-only OPTION metadata and are not acquired; Grappler is blocked acquisition metadata.",
                     "Only Bless, Cure Wounds, Shield, Counterspell and Burning Hands have bounded casting consumers; other spells are metadata.",

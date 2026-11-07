@@ -51,7 +51,7 @@
 | [V01](#v01) Bardic Inspiration | 攻击 d20 后、判定前选择消费灵感 | P，限攻击分支 | P | 未接入掷后选择 |
 | [V02](#v02) Sneak Attack | 命中后的额外骰、暴击与每 turn 用量 | P | P | 未接入 |
 | [V03](#v03) Divine Smite | 最终近战命中后选法术位，追加异类型伤害 | P | P | 未接入 |
-| [V04](#v04) Grapple + Extra Attack | 一击改为技能对抗，拖带与无动作释放 | U | P | 未接入；当前攻击序列额度为 1 |
+| [V04](#v04) Grapple + Extra Attack | 一击改为技能对抗，拖带与无动作释放 | U | P | 单职业战士 5–6 级两击已接入；擒抱、挣脱、拖带和释放仍未实现 |
 | [V05](#v05) Counterspell | 已知瞬时法术的嵌套反制及原前缀恢复 | P | P | 有限子集已接入 |
 | [V06](#v06) Fireball + Evasion | 完整目标已确定后的共享伤害、逐目标减免与专注 | P，限伤害分派片段 | P | 未接入 Fireball/Evasion；已有 Burning Hands 相邻链路 |
 | [V07](#v07) Spirit Guardians | 明确进入、同 turn 重进、以后 turn 的 START | P，限明确触发片段 | P | 未接入 |
@@ -155,9 +155,14 @@ DEX(Acrobatics) 对抗，替代 Attack 动作中的一击。拖带通常使速�
 许可也未闭合。目标选技能时的保存须保留原 ordinal 与选择权，不能另建普通检定而丢掉序列。
 新增替代 attempt 或联动移动接口后只能验证新设计。
 
-**程序。** [BEGIN_ATTACK](../../../src/main/java/com/dndtool/service/Schema2CombatRules.java)
-当前额度为 1；[角色包](../../../rule-packages/srd51-runtime/srd51-characters/rules.json)
-的 Extra Attack 执行标记为 `BLOCKED`。
+**程序。** 有限[战士 Extra Attack](../../rules/schema-2-extra-attack.md)现经严格作者声明、
+本机规则库准确接受和战役冻结、正常 5 级成长授予，接入
+[BEGIN_ATTACK](../../../src/main/java/com/dndtool/service/Schema2CombatRules.java)；
+支持范围内单职业战士 4 级额度为 1，取得特性的 5–6 级本人 Attack 动作额度为 2。
+两击、移动/反应、目标变化、放弃、原骰/成本及首击后的完整文件恢复由
+`CampaignExtraAttackIntegrationTest` 和 `browser-extra-attack.cjs` 验证，详见
+[验证入口](../../testing.md#extra-attack-verification)。这仅覆盖本例的攻击额度前提；
+擒抱替代、挣脱、拖带和释放仍分别未实现，原 V04 的整条轨迹及纸面判定不因此改为程序通过。
 
 <a id="v05"></a>
 ### V05：嵌套 Counterspell
@@ -441,7 +446,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 | G01.1 普通能力检定、技能对抗 | U→P | d20=10、+4 与 d8=3 得 17；普通 DC 15 成功，对抗胜 total 16，双方结清前无胜负。保存的是 14 和可选骰，错 choice 零新骰。[检定阶段](action-continuation-protocol.md#check-stages) | [V01](#v01)；有限独立检定无该 choice |
 | G01.2 普通属性及专注豁免 | U→P | DEX DC 15 或实伤 30 的 CON DC 15，同一 14→17 通过；自动失败仅保存真实条件，零 d20。专注结束消费准确 holder 义务，重复不得重扣灵感。[检定阶段](action-continuation-protocol.md#check-stages)、[专注 cut](multi-target-save-damage.md#typed-damage-application) | [V01](#v01)；有限 save 无该续接 |
 | G01.3 死亡豁免 | U→P | 0 HP 且未稳定时 8+3=11 记一次成功；自然 1 仍两次失败，20 走恢复 1 HP 分支。坏当前生命状态或过期叶子不产生新骰或计数。[死亡向量](action-continuation-protocol.md#check-and-attack-vectors) | [V01](#v01)；当前死亡骰无该选择 |
-| G04.1 攻击替代及强制技能选择 | U→P | 5 级两击，首 ordinal 先保留唯一擒抱 attempt。选择技能点无攻击骰/伤害；无手、过大、越距拒绝整次新 attempt。[擒抱替代](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；额度 1，Extra Attack 阻断 |
+| G04.1 攻击替代及强制技能选择 | U→P | 5 级两击，首 ordinal 先保留唯一擒抱 attempt。选择技能点无攻击骰/伤害；无手、过大、越距拒绝整次新 attempt。[擒抱替代](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；有限 Extra Attack 两击已接入，擒抱替代与强制技能选择仍未实现 |
 | G04.2 对抗、平局与挣脱 | U→P | 16>14 建关系；初次 17 平局消费首 ordinal、无 Grappled。后续花动作挣脱平 14，状态不变；恢复不补另一笔 action。[擒抱替代](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；无此对抗 owner |
 | G04.3 拖带 | U→P | 尺寸差不足两级时主速度 30→15，否则维持 30。真实 OA 在离开前，被拖者不耗移动且无自身 OA；配对第二端失败时两端位置与 spent 同回滚。[联动步段](action-continuation-protocol.md#coupled-move) | [V04](#v04)；现行移动为单主体 |
 | G04.4 无动作释放及失效 | U→P | 当前等待期间释放只结束准确关系与手位。重复释放不多消条件；联动等待恢复后只停后缀，已走位置、原骰不倒改。[释放写门](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；无关系或例外写门 |
@@ -535,9 +540,10 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 
 ## 证据与复验边界
 
-本页结论来自逐例语义、相关 SRD 原文、现有设计条款和当前源码的纸面核对。源码中的测试
-只用于辨别现有分支，不把其存在或过去结果当作本轮运行证据。未执行 Maven、应用命令、
-真实数据库或部署；文档检查只能证明内容/链接/格式，不授予运行或规则发布资格。
+本页设计结论来自逐例语义、相关 SRD 原文、现有设计条款和当前源码的纸面核对。
+除 V04 程序列单独关联的有限 Extra Attack 实现与验证入口外，其余原轨迹未取得这里
+声明的运行通过结论。测试源码、过去结果与文档检查不能代替实际运行证据，也不授予规则
+发布、真实数据库变更或部署资格。
 
 程序列区分有限 INTERNAL 场景消费者和当前 SQLite 可移植 `RULE_BOUND_CAMPAIGN`
 format 3。后者的原有运行、检查点与直接打开证据仍按[采用边界](adoption-boundaries.md)

@@ -176,6 +176,7 @@ public final class Schema2CombatRules {
             if (!before.combatId().equals(combatId) || !before.campaignId().equals(campaignId))
                 throw invalid("ACTION_FLOW_TARGET_MISMATCH");
             Schema2MonsterRules.validate(roster,before);
+            validateAttackAllowances(roster,before);
             validateOngoing(roster,before);
             if (before.status() == Status.ENDED) throw invalid("S2_COMBAT_ENDED");
             if(before.status()==Status.EXPLORATION && !worldCommand(command.kind()) && !Schema2MonsterRestRules.handles(command.kind()) && command.kind()!=Kind.CAST && command.kind()!=Kind.END_CONCENTRATION && !Schema2ActionFlowRules.continuation(command.kind()))throw invalid("S2_COMBAT_REQUIRED");
@@ -352,6 +353,7 @@ public final class Schema2CombatRules {
             case DASH, DISENGAGE, DODGE, BEGIN_ATTACK -> {
                 if (!actor.actionAvailable()) throw invalid("S2_COMBAT_ACTION_UNAVAILABLE");
                 if (command.kind() == Kind.BEGIN_ATTACK && actor.sequence() != null && !actor.sequence().closed()) throw invalid("S2_COMBAT_SEQUENCE_ACTIVE");
+                if (command.kind() == Kind.BEGIN_ATTACK) attackAllowance(p.roster.get(actor.characterId()));
             }
             case FORFEIT_ATTACKS -> { if (actor.sequence() == null || actor.sequence().closed()) throw invalid("S2_COMBAT_SEQUENCE_UNAVAILABLE"); }
             case STAND_UP -> {
@@ -434,7 +436,9 @@ public final class Schema2CombatRules {
                     battle=copy(battle,Status.EXPLORATION,battle.round(),battle.turnNumber(),battle.activeOrdinal(),battle.combatants().stream().map(Schema2CombatRules::closeSequence).toList(),battle.flows());
                 }
                 case DASH, DISENGAGE, DODGE, BEGIN_ATTACK -> {
-                    AttackSequence sequence = p.command.kind() == Kind.BEGIN_ATTACK ? new AttackSequence(key(p.operationId,"sequence"),1,0,0,false) : actor.sequence();
+                    AttackSequence sequence = p.command.kind() == Kind.BEGIN_ATTACK
+                            ? new AttackSequence(key(p.operationId,"sequence"),attackAllowance(p.roster.get(actor.characterId())),0,0,false)
+                            : actor.sequence();
                     battle = replaceActor(battle,new Combatant(actor.characterId(),actor.position(),actor.side(),false,actor.reactionAvailable(),actor.movementSpentHalfFeet(),
                             actor.movementBonus() + (p.command.kind() == Kind.DASH ? speed(p.roster,battle,actor.characterId()) : 0),
                             actor.disengaged() || p.command.kind() == Kind.DISENGAGE,actor.dodging() || p.command.kind() == Kind.DODGE,sequence,actor.prone()));
@@ -619,6 +623,18 @@ public final class Schema2CombatRules {
     private static Battle appendFlow(Battle b,Flow flow) {var flows=new ArrayList<>(b.flows());flows.add(flow);return copy(b,b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants(),flows);}
 
     public void validateState(Battle state) { Schema2CombatStateValidator.validate(state); }
+    private static int attackAllowance(Context context) {
+        return Schema2FeatureSupport.attacksPerAttackAction(context.material(),context.character());
+    }
+    private static void validateAttackAllowances(Map<UUID,Context> roster,Battle battle) {
+        for (Combatant actor : battle.combatants()) {
+            AttackSequence sequence = actor.sequence();
+            if (sequence == null || sequence.closed()) continue;
+            Context context = roster.get(actor.characterId());
+            if (context == null || sequence.limit() != attackAllowance(context))
+                throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+        }
+    }
     private void validateOngoing(Map<UUID,Context> roster,Battle battle) {
         Schema2OngoingEffectRules.validate(roster,battle);
         for(Flow flow:battle.flows())for(CastAttempt cast:flow.casts()) {
@@ -628,7 +644,7 @@ public final class Schema2CombatRules {
                     throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
                 continue;
             }
-            Schema2SpellRules.requireSupportedFeatures(source.material(),source.character(),"ACTION_FLOW_FROZEN_DATA_INVALID");
+            Schema2FeatureSupport.requireSupportedFeatures(source.material(),source.character(),"ACTION_FLOW_FROZEN_DATA_INVALID");
             var definitions=source.material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).filter(r->r.enabled()&&r.identity().equals(cast.spell())).toList();
             if(definitions.size()!=1)throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");String algorithm=definitions.getFirst().definition().algorithm();
             if(cast.castingRule().ruleType().equals("character.spellcasting")) {

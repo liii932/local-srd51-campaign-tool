@@ -11,13 +11,13 @@ The campaign freezes the complete typed projection, identities and field chains.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `2` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
-| `srd51_characters` version `2` | extension | `srd51_runtime=2` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat |
-| `srd51_magic` version `2` | extension | `srd51_runtime=2`, `srd51_characters=2` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `3` | extension | `srd51_runtime=2` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `3` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
+| `srd51_characters` version `3` | extension | `srd51_runtime=3` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat and Fighter Extra Attack |
+| `srd51_magic` version `3` | extension | `srd51_runtime=3`, `srd51_characters=3` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `5` | extension | `srd51_runtime=3` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `4` as its
+first three members and selects `dm_runtime_house_rules` version `6` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -30,6 +30,10 @@ starting class skill/save/armor/weapon training, later HP, ASI, subclass
 acquisition, finite resource capacities and multiclass prerequisites use the
 real typed consumers. Fighter ASI levels are 4 and 6; Wizard ASI is level 4.
 Multiclass acquisition uses its own restricted proficiency declarations.
+
+Normal fighter advancement to class level 5 grants the frozen Extra Attack
+feature. A single-class fighter at level 5 or 6 with that grant can make up to
+two supported melee attacks in one Attack action on the fighter's own turn.
 
 Human sources grant Common and one standard language. Dwarf sources also
 demonstrate a real artisan-tool choice. Acolyte grants two standard language
@@ -66,7 +70,7 @@ traits, dwarf poison defenses or its heavy-armor speed exception, background
 skill/feature effects, starting equipment packages, cantrips, general cleric
 preparation, spell transcription, versatile/thrown weapon modes or full class
 feature execution. Fighter Fighting Style, Second Wind, Action Surge and
-Extra Attack and Champion Improved Critical are catalog-only `OPTION` metadata. Fighter resources track uses and
+Champion Improved Critical are catalog-only `OPTION` metadata. Fighter resources track uses and
 recovery without executing those effects. Evocation Savant and Sculpt Spells
 are also catalog-only `OPTION` metadata and are not acquired, while the
 Evocation subclass identity is retained. Grappler is blocked acquisition

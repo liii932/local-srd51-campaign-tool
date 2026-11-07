@@ -534,8 +534,9 @@
       const executing = battle.combatId === activeBattle?.combatId;
       text(box, 'h3', `${spaceName({kind: 'SCENE', id: battle.combatId})} · ${battleStatus(battle.status)} · ${executing ? '焦点' : '后台'}`);
       if (active && executing && battle.status === 'ACTIVE') text(box, 'p', `第 ${battle.round} 轮 · 当前 ${personName(active)}`);
-      table(box, ['参与者', '格位', '阵营', '动作', '反应'], battle.combatants.map(actor => [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
-        actor.actionAvailable ? '可用' : '已用', actor.reactionAvailable ? '可用' : '已用']));
+      table(box, ['参与者', '格位', '阵营', '动作', '反应', '攻击动作'], battle.combatants.map(actor => [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
+        actor.actionAvailable ? '可用' : '已用', actor.reactionAvailable ? '可用' : '已用',
+        actor.sequence ? `已攻击 ${actor.sequence.performed}/${actor.sequence.limit} · 剩余 ${actor.sequence.limit - actor.sequence.performed - actor.sequence.forfeited}${actor.sequence.forfeited ? ` · 已放弃 ${actor.sequence.forfeited}` : ''}` : '未开始']));
       for (const effect of battle.ongoingEffects || []) text(box, 'p', `效果：${ruleName(effect.spell || effect.rule)} · ${effect.status === 'ACTIVE' ? '生效' : '已结束'}`);
       for (const zone of battle.environmentZones || []) if (!zone.endedOperationId) text(box, 'p', `环境区域：${ruleName(zone.rule)} · 中心 ${zone.center.x}, ${zone.center.y}`);
       for (const monster of battle.monsters || []) text(box, 'p', `${ruleName(monster.monster)} · 生命值 ${monster.hitPoints}${monster.dead ? ' · 已死亡' : ''}`);
@@ -622,8 +623,8 @@
     const kind = form.elements.kind.value;
     byId('domain-combat-note').textContent = pending ? '请先在上方处理反应或继续结算，再进行下一次行动。'
       : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
-      : kind === 'BEGIN_ATTACK' ? '先开始攻击动作，再选择“攻击”、目标与已装备武器。'
-      : kind === 'ATTACK' ? '先开始攻击动作，再选择触及范围内的目标和已装备武器。'
+      : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列，再选择“攻击”、目标与已装备武器。'
+      : kind === 'ATTACK' ? '每次消耗当前序列的一次攻击；两击之间可合法移动或更换目标，也可放弃剩余攻击。'
       : battle.status === 'EXPLORATION' ? '当前为探索状态，可移动、推进时间，或重新进入战斗。' : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';
     for (const name of ['targetId', 'itemId', 'x', 'y', 'seconds']) {
       const input = form.elements[name];

@@ -26,6 +26,7 @@ public final class Schema2CompositionKernel {
     public static final String HEADER_PATH = "author-package.json";
     public static final String CANONICAL_PROFILE = "validation-json-1";
     public static final String COMPOSITION_ALGORITHM = "validation-schema2-projection-1";
+    public static final String FIGHTER_EXTRA_ATTACK_ALGORITHM = "SRD_2014_FIGHTER_EXTRA_ATTACK_V1";
     public static final int MAX_PACKAGES = 8;
     private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
     private static final int MAX_RUNTIME_CHAINS = 3072, MAX_RUNTIME_STEPS = 4096;
@@ -1393,9 +1394,14 @@ public final class Schema2CompositionKernel {
         if (identity.ruleType().equals("character.feat")) {
             return new FeatDefinition(identity, name, description, page, prerequisite(row.get("prerequisite"), source.child("prerequisite")), mode, algorithm, note);
         }
-        return new FeatureDefinition(identity, name, description, page,
-                typedReference(row.get("owner"), "character.class|character.subclass", source.child("owner")),
-                integer(row.get("level"), 1, 20, source.child("level")), enumValue(FeatureKind.class, row.get("feature_kind"), source.child("feature_kind")), mode, algorithm, note);
+        RuleIdentity owner = typedReference(row.get("owner"), "character.class|character.subclass", source.child("owner"));
+        int level = integer(row.get("level"), 1, 20, source.child("level"));
+        FeatureKind kind = enumValue(FeatureKind.class, row.get("feature_kind"), source.child("feature_kind"));
+        if (FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(algorithm)
+                && (kind != FeatureKind.FEATURE || level != 5 || page != 25
+                    || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.fighter")))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Fighter Extra Attack requires a fifth-level Fighter feature from SRD page 25", source);
+        return new FeatureDefinition(identity, name, description, page, owner, level, kind, mode, algorithm, note);
     }
 
     private static String abilityKey(Object value, Location source) {
@@ -1422,7 +1428,7 @@ public final class Schema2CompositionKernel {
     private static Set<String> executionAlgorithms(FeatureExecution mode) {
         return switch (mode) {
             case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1",
-                    "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1");
+                    "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", FIGHTER_EXTRA_ATTACK_ALGORITHM);
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
             case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
         };
@@ -2126,6 +2132,7 @@ public final class Schema2CompositionKernel {
         Map<RuleIdentity, Map<Integer, Boolean>> levels = new HashMap<>();
         Map<RuleIdentity, Integer> subclassSelectionLevels = new HashMap<>();
         int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
+        boolean extraAttackEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
@@ -2164,6 +2171,11 @@ public final class Schema2CompositionKernel {
                 if (checked instanceof FinalFeature feature) {
                     MutableObject owner = objects.get(feature.definition().owner());
                     if (owner == null) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Feature owner is missing", object.source);
+                    if (feature.enabled() && FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
+                        if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Fighter Extra Attack requires its enabled class", object.source);
+                        if (extraAttackEnabled) throw fail("S2_EXTRA_ATTACK_AMBIGUOUS", Stage.FINAL, "Only one Fighter Extra Attack may be enabled", object.source);
+                        extraAttackEnabled = true;
+                    }
                     if (feature.definition().owner().ruleType().equals("character.subclass")
                             && feature.definition().level() < ((IntegerValue) owner.fields.get(Field.SELECTION_LEVEL).value()).value())
                         throw fail("S2_TYPE", Stage.FINAL, "Subclass feature predates subclass selection", object.source);
