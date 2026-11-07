@@ -25,6 +25,7 @@
 | 任务关键词 | 先读合同的相关部分 | 生产入口 / 测试定位 |
 |---|---|---|
 | SRD 5.1 原文、规则条款、章节与页码 | 先用[本地主题索引与分页文本](references/srd-5.1/README.md)，按主题或搜索结果只读相关页；歧义核对[本地 PDF](references/srd-5.1.pdf) | 重建与官方回源条件见[参考说明](references/README.md)；原文不替代冻结合同或证明项目已实现 |
+| SRD 5.1 English semantic definitions and source coverage | [Semantic specification](semantics/srd-5.1/README.md), [coverage and review](semantics/srd-5.1/coverage.md) | Source behavior and labeled interpretations; semantic completeness and source review are independent of application contracts and runtime support |
 | 产品范围、v2 总体设计、规则版本与存储方向 | [产品说明](product.md)、[v2 设计导航](design/v2/README.md)；按主题选一篇 | 区分当前设计选择、待细化与实际实现；按需求证据修订，不从设计记录推断迁移、发布或部署已完成 |
 | v2 模组接口、组合、依赖、覆盖与支持资格 | [模组接口基线](design/v2/module-interface-baseline.md)、[采用边界](design/v2/adoption-boundaries.md) | 公共合同为正式目标；现行作者 schema 1 与语言/工具 PARTITION 不代表通用组合平台已实现 |
 | v2 schema 2 作者包、最小组合链路、字段覆盖与失败向量 | [最小组合链路验证](design/v2/schema-2-composition-validation.md)，再读模组接口基线 | `module/composition/Schema2CompositionKernel.java`；测试在 `module/composition/`，独立向量在 `src/test/resources/schema2-composition/`；有限纯内核不授予安装或运行资格 |
