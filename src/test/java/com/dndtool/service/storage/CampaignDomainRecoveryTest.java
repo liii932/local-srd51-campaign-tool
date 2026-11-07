@@ -15,7 +15,6 @@ import static com.dndtool.service.storage.CampaignStorageService.Boundary;
 
 class CampaignDomainRecoveryTest {
     @TempDir Path temporary;
-    private static final List<String> FULL = List.of(CampaignRules.BASE, CampaignRules.HEALING, CampaignRules.RUNTIME);
     private static String id() { return UUID.randomUUID().toString(); }
     private static JsonObject character() {
         JsonObject input = new JsonObject(); input.addProperty("name", "原角色"); input.addProperty("kind", "PC");
@@ -28,7 +27,7 @@ class CampaignDomainRecoveryTest {
         try (var service = new CampaignStorageService(root, boundary -> {
             if (fail.compareAndSet(boundary, null)) throw new IllegalStateException("injected");
         })) {
-            assertThrows(RuntimeException.class, () -> service.create("完整领域", FULL)); run = service.status().runId();
+            assertThrows(RuntimeException.class, () -> CampaignRuleFixtures.create(service, "完整领域")); run = service.status().runId();
         }
         try (var service = new CampaignStorageService(root, boundary -> {
             if (fail.compareAndSet(boundary, null)) throw new IllegalStateException("injected");
@@ -52,20 +51,21 @@ class CampaignDomainRecoveryTest {
     @Test void validButRewrittenImportedRootIsRejectedAgainstTheRetainedInput() throws Exception {
         Path root = temporary.resolve("import-binding"); String run;
         try (var service = new CampaignStorageService(root)) {
-            var current = service.create("初始绑定", FULL);
+            var current = CampaignRuleFixtures.create(service, "初始绑定");
             current = service.domainCommand(id(), current.epoch(), 0, "character-create", character());
             String file = service.end(id(), current.epoch(), current.revision()).fileKey(); service.open(file); run = service.status().runId();
         }
         try (var connection = DriverManager.getConnection("jdbc:sqlite:" + root.resolve("runs").resolve(run).resolve("run.db"));
              var sql = connection.createStatement()) {
-            var original = new CampaignRepository().snapshot(connection); var state = original.domains(); var character = state.characters().getFirst();
-            var rewritten = new CampaignDomainData.Character("改写过去", character.kind(), character.active(), character.initial(), character.history());
-            var first = state.roots().getFirst(); var roots = new ArrayList<>(state.roots());
-            roots.set(0, new Root(first.sequence(), first.operationId(), first.kind(), first.subjectId(), first.intent(), first.before(),
-                    CampaignDomainCodec.text(new Profile(character.id(), rewritten.name(), character.kind(), character.active())), first.characterOperations(), first.combatId(), first.actor()));
-            var changed = new State(state.material(), List.of(rewritten), state.combats(), state.nodes(), state.positions(), state.items(), roots, state.manual());
-            assertDoesNotThrow(() -> CampaignData.validate(new CampaignData.Snapshot(original.campaignId(), original.name(), original.rules(),
-                    List.of(), roots.stream().map(CampaignDomainValidation::summary).toList(), changed)));
+            var original = new CampaignRepository().snapshot(connection);
+            var state = original.domains();
+            var first = state.roots().getFirst();
+            var input = character();
+            input.addProperty("name", "改写过去");
+            var empty = new CampaignData.Snapshot(original.campaignId(), original.name(), State.initial(state.material().restore().projection()));
+            var changed = new CampaignDomainCommands().apply(empty, first.kind(), input, first.operationId(), first.intent(),
+                    sides -> { throw new AssertionError("Character creation requested a die"); });
+            assertDoesNotThrow(() -> CampaignData.validate(new CampaignData.Snapshot(original.campaignId(), original.name(), changed)));
             sql.execute("PRAGMA foreign_keys=ON"); sql.execute("BEGIN IMMEDIATE"); new CampaignDomainRepository().write(connection, changed); sql.execute("COMMIT");
         }
         try (var service = new CampaignStorageService(root)) {

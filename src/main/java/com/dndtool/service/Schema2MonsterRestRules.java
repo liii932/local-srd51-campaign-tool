@@ -15,13 +15,13 @@ final class Schema2MonsterRestRules {
         if(c.actorId()==null||c.monsterRestInput()==null||!c.monsterDeployments().isEmpty()||c.breathInput()!=null||c.targetId()!=null||c.itemId()!=null||!c.path().isEmpty()||!c.deployments().isEmpty()||!c.tieBreakOrder().isEmpty()
                 ||c.flowKey()!=null||c.leafKey()!=null||c.windowKey()!=null||c.opportunityKey()!=null||c.castInput()!=null||c.readyInput()!=null||c.readyKey()!=null||c.zoneInput()!=null||c.zoneKey()!=null||c.healthInput()!=null||c.seconds()!=0)throw invalid("S2_MONSTER_REST_COMMAND");
         var monster=Schema2MonsterRules.instance(b,c.actorId());if(monster.dead())throw invalid("S2_COMBAT_ACTOR_INACTIVE");
-        long now=Schema2SpellRules.second(roster.values().iterator().next().character());
+        long now=roster.values().iterator().next().sceneSecond();
         for(var context:roster.values()) {
             var state=context.character();if(state.hitPoints()==0&&!state.health().stable()&&!state.health().dead())throw invalid("S2_EXPLORATION_UNSTABLE_CHARACTER");
         }
         if(c.kind()==Kind.BEGIN_MONSTER_REST) {
             if(c.monsterRestInput().restKey()!=null||b.monsterRests().size()>=128||b.monsterRests().stream().anyMatch(r->r.monsterId().equals(c.actorId())&&r.status()==MonsterRestStatus.ACTIVE))throw invalid("S2_MONSTER_REST_COMMAND");
-            if(now+duration(c.monsterRestInput().kind())>Schema2CharacterRestRules.MAX_MINUTE*60)throw invalid("S2_COMBAT_TIME_CAPACITY");
+            Schema2ExplorationRules.requireSceneTime(now,duration(c.monsterRestInput().kind()));
             for(var context:roster.values())Schema2CombatTimeRules.advanceRestSeconds(context.material(),context.character(),duration(c.monsterRestInput().kind()));
         } else {
             var rest=rest(b,c);int seconds=Math.toIntExact(Math.max(0,rest.completesAtSecond()-now));
@@ -34,7 +34,7 @@ final class Schema2MonsterRestRules {
     }
     static Resolution execute(UUID operation,Map<UUID,Context> roster,Battle b,Command c) {
         List<MonsterRest> rests=new ArrayList<>(b.monsterRests());List<HealthChange> changes=new ArrayList<>();List<CombatFact> facts=new ArrayList<>();
-        long now=Schema2SpellRules.second(roster.values().iterator().next().character());UUID restKey;
+        long now=roster.values().iterator().next().sceneSecond();UUID restKey;
         if(c.kind()==Kind.BEGIN_MONSTER_REST) {
             restKey=key(operation,"monster-rest");rests.add(new MonsterRest(restKey,c.actorId(),c.monsterRestInput().kind(),now,now+duration(c.monsterRestInput().kind()),MonsterRestStatus.ACTIVE,null));
         } else {

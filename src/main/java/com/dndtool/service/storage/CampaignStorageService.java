@@ -2,7 +2,8 @@ package com.dndtool.service.storage;
 
 import com.dndtool.persistence.storage.*;
 import com.dndtool.persistence.storage.CampaignRepository.*;
-import com.dndtool.service.Schema2CharacterHealthRules;
+import com.dndtool.module.composition.ProductionSchema2Projection;
+import com.dndtool.module.composition.ProductionSchema2Projection.StoredMember;
 import com.google.gson.*;
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -24,13 +25,11 @@ public final class CampaignStorageService implements AutoCloseable {
     }
     @FunctionalInterface public interface CommandGuard { void validate(AccessSnapshot current); }
     public record Status(String state, long epoch, String runId, List<String> residualRunIds, List<String> saveFiles) { }
-    public record CharacterView(String id, String name, long maximumHp, long currentHp, long version) { }
-    public record EventView(long sequence, String type, String characterId, long beforeHp, long afterHp,
-                            long amount, long applied, String name, long maximumHp) { }
+    public record EventView(long sequence, String operationId, String kind, String subjectId) { }
     public record CommandResult(String requestId, boolean replayed, long acceptedRevision, long sequence,
-                                String characterId, long beforeHp, long afterHp) { }
-    public record CampaignView(String campaignId, String name, long revision, long epoch, List<String> rules,
-                               List<CharacterView> characters, List<EventView> history, CommandResult lastCommand, JsonObject domain) { }
+                                String subjectId) { }
+    public record CampaignView(String campaignId, String name, long revision, long epoch,
+                               List<EventView> history, CommandResult lastCommand, JsonObject domain) { }
     public record SaveResult(String fileKey, long revision, String sha256) { }
     public record ImportResult(String fileKey, String name, long eventTail, String sha256) { }
     public record SavedCampaign(String fileKey, String name, long eventTail) { }
@@ -51,6 +50,8 @@ public final class CampaignStorageService implements AutoCloseable {
     private final CampaignCodec codec = new CampaignCodec();
     private final StorageSchemaCatalog catalog;
     private final FaultInjector faults;
+    private final java.util.function.IntUnaryOperator dice;
+    private final LocalRuleLibrary ruleLibrary;
     private Active active;
     private boolean closed;
 
@@ -65,13 +66,17 @@ public final class CampaignStorageService implements AutoCloseable {
 
     public CampaignStorageService(Path root) throws IOException { this(root, NO_FAULTS); }
     public CampaignStorageService(Path root, FaultInjector faults) throws IOException {
+        this(root, faults, sides -> new SecureRandom().nextInt(sides) + 1);
+    }
+    CampaignStorageService(Path root, FaultInjector faults, java.util.function.IntUnaryOperator dice) throws IOException {
         if (root == null || !root.isAbsolute()) throw new IOException("Managed storage root must be absolute");
         if (ManagedCampaignFiles.windows() && root.getRoot().toString().startsWith("\\\\"))
             throw new IOException("Managed storage requires a local Windows drive; UNC roots are unsupported");
         for (Path ancestor = root.normalize(); ancestor != null; ancestor = ancestor.getParent()) {
             if (Files.exists(ancestor.resolve(".git"), LinkOption.NOFOLLOW_LINKS) || Files.exists(ancestor.resolve("WEB-INF"), LinkOption.NOFOLLOW_LINKS)) throw new IOException("Managed storage must be outside Git and deployed application trees: " + ancestor);
         }
-        this.root = root.toAbsolutePath().normalize(); this.faults = Objects.requireNonNull(faults);
+        this.root = root.toAbsolutePath().normalize(); this.faults = Objects.requireNonNull(faults); this.dice = Objects.requireNonNull(dice);
+        this.ruleLibrary = new LocalRuleLibrary(this.root);
         ensureDirectory(this.root); ManagedCampaignFiles.privateDirectory(this.root); runs = this.root.resolve("runs"); saves = this.root.resolve("saves");
         ensureDirectory(runs); ensureDirectory(saves);
         for (Path privateDirectory : List.of(this.root, runs, saves)) ManagedCampaignFiles.privateDirectory(privateDirectory);
@@ -84,7 +89,7 @@ public final class CampaignStorageService implements AutoCloseable {
         }
     }
 
-    public synchronized List<CampaignRules.RuleModule> catalog() { ensureOpen(); return CampaignRules.CATALOG; }
+    public synchronized LocalRuleLibrary ruleLibrary() { ensureOpen(); return ruleLibrary; }
     public synchronized List<SavedCampaign> savedCampaigns() {
         ensureOpen();
         try {
@@ -119,12 +124,33 @@ public final class CampaignStorageService implements AutoCloseable {
         catch (RuntimeException e) { active.blocked = "INTEGRITY"; throw e; }
     }
 
-    public synchronized CampaignView create(String name, List<String> ruleIds) {
+    public synchronized CampaignView create(String name, List<StoredMember> members) {
         ensureIdle();
-        List<String> selected = CampaignRules.validate(ruleIds);
-        Snapshot input = CampaignData.validate(new Snapshot(newId(), CampaignJson.name(name), selected, List.of(), List.of(),
-                selected.contains(CampaignRules.RUNTIME) ? CampaignDomainData.State.initial(BundledCampaignRules.projection()) : null));
+        String checkedName = CampaignJson.name(name);
+        CampaignRuleContext rules = prepareRules(members);
+        Snapshot input = CampaignData.validate(new Snapshot(newId(), checkedName,
+                CampaignDomainData.State.initial(rules.projection())));
         return initialize(input);
+    }
+
+    public synchronized CampaignRuleContext.Metadata previewRules(List<StoredMember> members) {
+        ensureOpen(); return prepareRules(members).metadata();
+    }
+
+    private CampaignRuleContext prepareRules(List<StoredMember> members) {
+        // The library closes its read guard before any private run allocation or transaction.
+        var originalArtifacts = ruleLibrary.readAccepted(members);
+        var projection = ProductionSchema2Projection.compose(originalArtifacts);
+        CampaignRuleContext context;
+        try { context = CampaignRuleSupport.validate(projection); }
+        catch (IllegalArgumentException unsupported) {
+            throw new LocalRuleLibraryException("RULE_COMPOSITION_UNSUPPORTED", unsupported.getMessage(),
+                    new LocalRuleLibraryException.Issue("SUPPORT", null, null, null, null), unsupported);
+        }
+        codec.encode(new Document("10000000-0000-4000-8000-000000000001",
+                new Snapshot("10000000-0000-4000-8000-000000000002", "Rule preview",
+                        CampaignDomainData.State.initial(context.projection()))));
+        return context;
     }
 
     public synchronized CampaignView open(String fileKey) {
@@ -132,6 +158,10 @@ public final class CampaignStorageService implements AutoCloseable {
         try {
             Path file = checkedSavePath(fileKey); Document input = codec.decode(readBounded(file));
             if (!input.fileKey().equals(fileKey)) throw new StorageException("INVALID_FILE", "Filename and portable file identity differ");
+            var frozen = input.snapshot().domains().material();
+            var prepared = prepareRules(frozen.binding().members());
+            if (!frozen.equals(CampaignDomainData.Material.of(prepared.projection())))
+                throw new StorageException("RULE_COMPOSITION_MISMATCH", "The original packages differ from the complete frozen campaign material");
             return initialize(input.snapshot());
         } catch (IOException e) { throw io("Cannot read the selected campaign file", e); }
     }
@@ -253,7 +283,8 @@ public final class CampaignStorageService implements AutoCloseable {
                 || !CampaignJson.string(allocation, "storageModel").equals(CampaignCodec.STORAGE_MODEL)) throw new StorageException("UNSUPPORTED_RUN", "Residual allocation does not belong to this application and run");
         byte[] input = readBounded(directory.resolve("input.json"));
         if (!CampaignJson.sha256(input).equals(CampaignJson.string(allocation, "inputDigest"))) throw new StorageException("STORAGE_INTEGRITY", "Residual input differs from its allocation");
-        StoragePlan plan = catalog.plan(CampaignRules.roots(codec.decode(input).snapshot().rules()));
+        if (!codec.decode(input).fileKey().equals(runId)) throw new StorageException("STORAGE_INTEGRITY", "Residual input identity differs");
+        StoragePlan plan = catalog.plan(Set.of("runtime"));
         JsonArray modules = new JsonArray(); plan.moduleIds().forEach(modules::add);
         if (!plan.digest().equals(CampaignJson.string(allocation, "planDigest")) || !modules.equals(CampaignJson.array(allocation, "modules"))) throw new StorageException("STORAGE_INTEGRITY", "Residual allocation plan differs");
         JsonObject marker = new JsonObject(); marker.addProperty("runId", runId); marker.addProperty("applicationModel", CampaignCodec.APPLICATION_MODEL);
@@ -324,7 +355,7 @@ public final class CampaignStorageService implements AutoCloseable {
     }
 
     private CampaignView initialize(Snapshot input) {
-        StoragePlan plan = catalog.plan(CampaignRules.roots(input.rules()));
+        StoragePlan plan = catalog.plan(Set.of("runtime"));
         String runId = newId(); byte[] inputBytes = codec.encode(new Document(runId, input));
         Path directory = runs.resolve(".prepare-" + runId + "_" + CampaignJson.sha256(inputBytes) + "_" + plan.digest() + "_" + inputBytes.length);
         // Atomic mkdir publishes the complete ownership binding before any preparation byte or DB exists.
@@ -391,7 +422,7 @@ public final class CampaignStorageService implements AutoCloseable {
             Path path = prep.directory().resolve(name);
             if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) continue;
             if (full == null) throw new StorageException("STORAGE_INTEGRITY", "Allocation exists before a complete bound input");
-            Snapshot snapshot = codec.decode(full).snapshot(); StoragePlan plan = catalog.plan(CampaignRules.roots(snapshot.rules()));
+            Snapshot snapshot = codec.decode(full).snapshot(); StoragePlan plan = catalog.plan(Set.of("runtime"));
             byte[] expected = CampaignJson.canonical(allocation(prep.runId(), plan, prep.inputDigest()));
             byte[] actual = readPreparationPartial(path);
             if (!(name.endsWith(".part") ? prefix(actual, expected) : Arrays.equals(actual, expected))) throw new StorageException("STORAGE_INTEGRITY", "Allocation differs from its preparation binding");
@@ -410,7 +441,7 @@ public final class CampaignStorageService implements AutoCloseable {
         if (bytes.length != prep.inputLength() || !CampaignJson.sha256(bytes).equals(prep.inputDigest())) throw new StorageException("STORAGE_INTEGRITY", "Preparation input digest differs");
         Document document = codec.decode(bytes);
         if (!document.fileKey().equals(prep.runId())) throw new StorageException("STORAGE_INTEGRITY", "Preparation input identity differs");
-        StoragePlan plan = catalog.plan(CampaignRules.roots(document.snapshot().rules()));
+        StoragePlan plan = catalog.plan(Set.of("runtime"));
         if (!plan.digest().equals(prep.planDigest())) throw new StorageException("STORAGE_INTEGRITY", "Preparation plan identity differs");
         return document.snapshot();
     }
@@ -423,7 +454,7 @@ public final class CampaignStorageService implements AutoCloseable {
             validatePreparationInput(prep, readBounded(partial)); Files.createLink(input, partial); forceDirectory(prep.directory());
         }
         Snapshot snapshot = validatePreparationInput(prep, readBounded(input));
-        StoragePlan plan = catalog.plan(CampaignRules.roots(snapshot.rules()));
+        StoragePlan plan = catalog.plan(Set.of("runtime"));
         Path marker = prep.directory().resolve("allocation.json"), markerPartial = prep.directory().resolve("allocation.part");
         byte[] expected = CampaignJson.canonical(allocation(prep.runId(), plan, prep.inputDigest()));
         if (!Files.exists(marker, LinkOption.NOFOLLOW_LINKS)) {
@@ -482,55 +513,6 @@ public final class CampaignStorageService implements AutoCloseable {
         } catch (IOException e) { active.blocked = "UNKNOWN"; throw io("Initialization committed; its completion marker requires explicit recovery", e); }
     }
 
-    public synchronized CampaignView addCharacter(String requestId, long epoch, long expectedRevision, String name, long maximumHp, long currentHp) {
-        ensureActive(true); CampaignJson.uuid(requestId); CampaignJson.name(name); CampaignRules.hp(maximumHp, currentHp);
-        String intent = intent("ADD_CHARACTER", expectedRevision, name, maximumHp, currentHp);
-        CommandResult command = transaction(c -> {
-            Snapshot before = verifiedSnapshot(c); Control control = repository.control(c);
-            if (before.domains() != null) throw new StorageException("DOMAIN_COMMAND_REQUIRED", "Use the complete character creation command");
-            if (control.epoch() != epoch) throw new StorageException("STALE_EPOCH", "Refresh the current Host epoch");
-            CommandReceipt replay = replay(c, requestId, intent, "ADD_CHARACTER");
-            if (replay != null) return result(replay, true);
-            requireGate(c, control, epoch, expectedRevision);
-            if (before.characters().size() >= 10000 || before.history().size() >= 100000) throw new StorageException("CAPACITY", "Campaign fact budget reached");
-            String id = newId(); long sequence = before.history().size() + 1L;
-            repository.insertCharacter(c, new CharacterRow(new CharacterFact(id, name, maximumHp, currentHp), currentHp, 1, sequence));
-            faults.at(Boundary.AFTER_CHARACTER_UPDATE);
-            EventFact event = new EventFact(sequence, "CHARACTER_CREATED", id, currentHp, currentHp, 0, 0, name, maximumHp);
-            repository.insertEvent(c, event);
-            repository.acceptCommand(c, requestId, intent, "ADD_CHARACTER", expectedRevision, event);
-            codec.encode(new Document(newId(), repository.snapshot(c)));
-            return result(repository.command(c, requestId), false);
-        });
-        afterBusinessCommit(!command.replayed()); return current(command);
-    }
-
-    public synchronized CampaignView heal(String requestId, long epoch, long expectedRevision, String characterId, long expectedCharacterVersion, long amount) {
-        ensureActive(true); CampaignJson.uuid(requestId); CampaignJson.uuid(characterId);
-        if (amount < 0 || amount > 65535) throw new StorageException("INVALID_AMOUNT", "Healing amount must be an integer between 0 and 65535");
-        String intent = intent("HEAL", expectedRevision, characterId, expectedCharacterVersion, amount);
-        CommandResult command = transaction(c -> {
-            Snapshot before = verifiedSnapshot(c); Control control = repository.control(c);
-            if (before.domains() != null) throw new StorageException("DOMAIN_COMMAND_REQUIRED", "Use the complete character health command");
-            if (control.epoch() != epoch) throw new StorageException("STALE_EPOCH", "Refresh the current Host epoch");
-            CommandReceipt replay = replay(c, requestId, intent, "HEAL");
-            if (replay != null) return result(replay, true);
-            requireGate(c, control, epoch, expectedRevision);
-            if (!before.rules().contains(CampaignRules.HEALING)) throw new StorageException("RULE_NOT_SELECTED", "The exact healing module is not selected");
-            if (before.history().size() >= 100000) throw new StorageException("CAPACITY", "History budget reached");
-            CharacterRow row = repository.characters(c).stream().filter(r -> r.fact().id().equals(characterId)).findFirst().orElseThrow(() -> new StorageException("CHARACTER_NOT_FOUND", "Character does not exist in this run"));
-            if (row.version() != expectedCharacterVersion) throw new StorageException("STALE_CHARACTER", "Character version changed");
-            var resolution = Schema2CharacterHealthRules.heal(row.fact().currentHp(), row.fact().maximumHp(), amount);
-            repository.updateCharacterHp(c, characterId, expectedCharacterVersion, resolution.after()); faults.at(Boundary.AFTER_CHARACTER_UPDATE);
-            EventFact event = new EventFact(before.history().size() + 1L, "HEALED", characterId, resolution.before(), resolution.after(), resolution.requested(), resolution.applied(), "", 0);
-            repository.insertEvent(c, event);
-            repository.acceptCommand(c, requestId, intent, "HEAL", expectedRevision, event);
-            codec.encode(new Document(newId(), repository.snapshot(c)));
-            return result(repository.command(c, requestId), false);
-        });
-        afterBusinessCommit(!command.replayed()); return current(command);
-    }
-
     public synchronized AccessSnapshot accessSnapshot() {
         ensureActive(true);
         try (Connection c = connect(active.database)) { return accessSnapshot(c); }
@@ -580,7 +562,6 @@ public final class CampaignStorageService implements AutoCloseable {
             AccessSnapshot access = accessSnapshot(c); Snapshot before = access.snapshot(); Control control = repository.control(c);
             if (control.epoch() != epoch) throw new StorageException("STALE_EPOCH", "Refresh the current Host epoch");
             guard.validate(access);
-            if (before.domains() == null) throw new StorageException("RULE_NOT_SELECTED", "Select the current campaign runtime module");
             CampaignParticipationData.Actor actor = requestedActor == null ? CampaignParticipationCommands.actualActor(before.domains(), action, input) : requestedActor;
             CampaignParticipationCommands.validateActor(before.domains(), action, input, actor);
             String intent = domainIntent(expectedRevision, action, input, actor);
@@ -590,15 +571,14 @@ public final class CampaignStorageService implements AutoCloseable {
             CampaignDomainData.State domains;
             try {
                 domains = new CampaignDomainCommands().apply(before, action, input, UUID.fromString(requestId), intent,
-                        sides -> new SecureRandom().nextInt(sides) + 1, actor);
+                        dice, actor);
             } catch (IllegalArgumentException invalid) {
                 throw new StorageException("DOMAIN_REJECTED", invalid.getMessage() == null ? "Invalid domain request" : invalid.getMessage(), invalid);
             }
-            Snapshot after = CampaignData.validate(new Snapshot(before.campaignId(), before.name(), before.rules(), List.of(),
-                    domains.roots().stream().map(CampaignDomainValidation::summary).toList(), domains));
+            Snapshot after = CampaignData.validate(new Snapshot(before.campaignId(), before.name(), domains));
             codec.encode(new Document(newId(), after));
             new CampaignDomainRepository().write(c, domains); faults.at(Boundary.AFTER_CHARACTER_UPDATE);
-            repository.acceptCommand(c, requestId, intent, "DOMAIN_COMMAND", expectedRevision, CampaignDomainValidation.summary(domains.roots().getLast()));
+            repository.acceptCommand(c, requestId, intent, "DOMAIN_COMMAND", expectedRevision, domains.roots().getLast());
             if (!after.equals(repository.snapshot(c))) throw new StorageException("STORAGE_INTEGRITY", "Domain transaction readback differs");
             return result(repository.command(c, requestId), false);
         });
@@ -666,10 +646,12 @@ public final class CampaignStorageService implements AutoCloseable {
     private CampaignView view(Connection c) throws SQLException { return view(c, null); }
     private CampaignView view(Connection c, CommandResult command) throws SQLException {
         Snapshot snapshot = verifiedSnapshot(c); Control control = repository.control(c);
-        List<CharacterView> characters = repository.characters(c).stream().map(r -> new CharacterView(r.fact().id(), r.fact().name(), r.fact().maximumHp(), r.fact().currentHp(), r.version())).toList();
-        return new CampaignView(snapshot.campaignId(), snapshot.name(), control.revision(), control.epoch(), snapshot.rules(), characters,
-                snapshot.history().stream().map(e -> new EventView(e.sequence(), e.type(), e.characterId(), e.beforeHp(), e.afterHp(), e.amount(), e.applied(), e.name(), e.maximumHp())).toList(), command,
-                domainView(snapshot.domains()));
+        return new CampaignView(snapshot.campaignId(), snapshot.name(), control.revision(), control.epoch(),
+                historyView(snapshot), command, domainView(snapshot.domains()));
+    }
+
+    private static List<EventView> historyView(Snapshot snapshot) {
+        return snapshot.history().stream().map(r -> new EventView(r.sequence(), r.operationId().toString(), r.kind(), r.subjectId().toString())).toList();
     }
 
     private static JsonObject domainView(CampaignDomainData.State state) {
@@ -688,8 +670,21 @@ public final class CampaignStorageService implements AutoCloseable {
         result.add("positions", json.toJsonTree(state.positions())); result.add("items", json.toJsonTree(state.items())); result.add("roots", json.toJsonTree(state.roots()));
         JsonObject manual = json.toJsonTree(state.manual()).getAsJsonObject();
         manual.add("catalog", json.toJsonTree(CampaignManualData.catalog())); result.add("manual", manual);
+        result.add("space", json.toJsonTree(state.space()));
+        JsonArray deadlines = new JsonArray();
+        for (var character : state.characters()) {
+            var current = character.history().current();
+            if (!current.health().stable()) continue;
+            var placement = CampaignSpaceCommands.position(state, character.id());
+            if (placement == null) continue;
+            long deadline = Math.addExact(Math.multiplyExact(current.health().stableRecoveryMinute(), 60), current.health().stableRecoverySecond());
+            long personal = Math.addExact(Math.multiplyExact(current.rest().minute(), 60), current.rest().second());
+            deadlines.add(json.toJsonTree(new CampaignSpaceData.Deadline(character.id(), placement.space(), deadline,
+                    Math.addExact(state.space().clock(placement.space()).second(), deadline - personal))));
+        }
+        result.add("deadlines", deadlines);
         result.add("participation", json.toJsonTree(state.participation()));
-        result.add("rules", json.toJsonTree(BundledCampaignRules.metadata())); return result;
+        result.add("rules", json.toJsonTree(state.material().restore().metadata())); return result;
     }
 
     private Snapshot verifiedSnapshot(Connection c) throws SQLException {
@@ -701,11 +696,10 @@ public final class CampaignStorageService implements AutoCloseable {
     }
     private static void verifyInitialBinding(Control control, Snapshot snapshot, Snapshot initial) {
         int prefix = initial.history().size();
-        if (!snapshot.campaignId().equals(initial.campaignId()) || !snapshot.name().equals(initial.name()) || !snapshot.rules().equals(initial.rules())
+        if (!snapshot.campaignId().equals(initial.campaignId()) || !snapshot.name().equals(initial.name())
                 || snapshot.history().size() < prefix || control.revision() != snapshot.history().size() - (long) prefix
                 || !snapshot.history().subList(0, prefix).equals(initial.history())) throw new StorageException("STORAGE_INTEGRITY", "Current run differs from its exact initialization identity, baseline or history prefix");
-        if ((snapshot.domains() == null) != (initial.domains() == null)) throw new StorageException("STORAGE_INTEGRITY", "Domain initialization profile changed");
-        if (initial.domains() != null) {
+        {
             var current = snapshot.domains(); var origin = initial.domains();
             if (!current.material().equals(origin.material()) || current.roots().size() < origin.roots().size()
                     || !current.roots().subList(0, origin.roots().size()).equals(origin.roots())) throw new StorageException("STORAGE_INTEGRITY", "Imported domain root prefix changed");
@@ -716,7 +710,7 @@ public final class CampaignStorageService implements AutoCloseable {
             }
             for (var old : origin.combats()) {
                 var now = current.combats().stream().filter(c -> c.current().combatId().equals(old.current().combatId())).findFirst().orElseThrow(() -> new StorageException("STORAGE_INTEGRITY", "Imported scene disappeared"));
-                if (!now.members().equals(old.members()) || now.events().size() < old.events().size()
+                if (!now.members().containsAll(old.members()) || now.events().size() < old.events().size()
                         || !now.events().subList(0, old.events().size()).equals(old.events())) throw new StorageException("STORAGE_INTEGRITY", "Imported scene facts changed");
             }
             for (var old : origin.manual().characters()) {
@@ -737,7 +731,7 @@ public final class CampaignStorageService implements AutoCloseable {
         return receipt;
     }
     private static CommandResult result(CommandReceipt receipt, boolean replayed) {
-        return new CommandResult(receipt.requestId(), replayed, receipt.resultRevision(), receipt.sequence(), receipt.characterId(), receipt.beforeHp(), receipt.afterHp());
+        return new CommandResult(receipt.requestId(), replayed, receipt.resultRevision(), receipt.sequence(), receipt.subjectId());
     }
     private void requireGate(Connection c, Control control, long epoch, long revision) throws SQLException {
         if (control.sealed() || !control.firstSaved()) throw new StorageException("RUN_BLOCKED", "The run has no execution qualification");
@@ -850,7 +844,7 @@ public final class CampaignStorageService implements AutoCloseable {
             if (!CampaignJson.string(marker, "runId").equals(runId) || !CampaignJson.string(marker, "applicationModel").equals(CampaignCodec.APPLICATION_MODEL) || !CampaignJson.string(marker, "storageModel").equals(CampaignCodec.STORAGE_MODEL)) throw new StorageException("UNSUPPORTED_RUN", "Residual run uses another application or storage model");
             byte[] inputBytes = readBounded(directory.resolve("input.json"));
             if (!CampaignJson.sha256(inputBytes).equals(CampaignJson.string(marker, "inputDigest"))) throw new StorageException("STORAGE_INTEGRITY", "Original initialization input differs from its allocation marker");
-            Snapshot original = codec.decode(inputBytes).snapshot(); StoragePlan plan = catalog.plan(CampaignRules.roots(original.rules()));
+            Snapshot original = codec.decode(inputBytes).snapshot(); StoragePlan plan = catalog.plan(Set.of("runtime"));
             List<String> markedModules = new ArrayList<>();
             for (JsonElement e : CampaignJson.array(marker, "modules")) {
                 if (!e.isJsonPrimitive() || !e.getAsJsonPrimitive().isString()) throw new StorageException("STORAGE_INTEGRITY", "Invalid marked storage module");
@@ -916,7 +910,7 @@ public final class CampaignStorageService implements AutoCloseable {
                     if (bytes.length != receipt.byteSize() || !CampaignJson.sha256(bytes).equals(receipt.rawDigest())) throw new StorageException("STORAGE_INTEGRITY", "Accepted save bytes are missing or changed");
                     Document document = codec.decode(bytes); Snapshot saved = document.snapshot();
                     long expectedEvents = snapshot.history().size() - control.revision() + receipt.revision();
-                    if (!document.fileKey().equals(receipt.fileKey()) || !saved.campaignId().equals(snapshot.campaignId()) || !saved.rules().equals(snapshot.rules()) || !saved.name().equals(snapshot.name()) || saved.history().size() != expectedEvents || saved.history().size() > snapshot.history().size() || !snapshot.history().subList(0, saved.history().size()).equals(saved.history())) throw new StorageException("STORAGE_INTEGRITY", "Accepted checkpoint identity or history differs from its exact live-source revision");
+                    if (!document.fileKey().equals(receipt.fileKey()) || !saved.campaignId().equals(snapshot.campaignId()) || !saved.domains().material().equals(snapshot.domains().material()) || !saved.name().equals(snapshot.name()) || saved.history().size() != expectedEvents || saved.history().size() > snapshot.history().size() || !snapshot.history().subList(0, saved.history().size()).equals(saved.history())) throw new StorageException("STORAGE_INTEGRITY", "Accepted checkpoint identity or history differs from its exact live-source revision");
                     if (receipt.purpose().equals("INITIAL")) acceptedInitial = true;
                     if (receipt.purpose().equals("FINAL")) acceptedFinal = true;
                 }
@@ -973,7 +967,7 @@ public final class CampaignStorageService implements AutoCloseable {
         if (!CampaignJson.sha256(bytes).equals(CampaignJson.string(marker, "rawDigest"))) throw new StorageException("STORAGE_INTEGRITY", "Cleanup's exact final artifact differs");
         Document finalDocument = codec.decode(bytes);
         if (!finalDocument.fileKey().equals(fileKey)) throw new StorageException("STORAGE_INTEGRITY", "Final artifact identity differs");
-        StoragePlan plan = catalog.plan(CampaignRules.roots(finalDocument.snapshot().rules()));
+        StoragePlan plan = catalog.plan(Set.of("runtime"));
         if (active == null) active = lockRun(runId, directory, plan);
         active.plan = plan;
         active.blocked = "CLEANUP";
@@ -1005,11 +999,8 @@ public final class CampaignStorageService implements AutoCloseable {
             ManagedCampaignFiles.moveDirectory(directory, tombstoneDirectory); forceDirectory(runs);
         }
         Files.delete(tombstoneDirectory.resolve("cleanup.json")); Files.delete(tombstoneDirectory); forceDirectory(runs);
-        Snapshot s = finalDocument.snapshot(); Map<String, Long> versions = new HashMap<>();
-        for (EventFact event : s.history()) versions.merge(event.characterId(), 1L, Long::sum);
-        return new CampaignView(s.campaignId(), s.name(), revision, 0, s.rules(),
-                s.characters().stream().map(c -> new CharacterView(c.id(), c.name(), c.maximumHp(), c.currentHp(), versions.get(c.id()))).toList(),
-                s.history().stream().map(e -> new EventView(e.sequence(), e.type(), e.characterId(), e.beforeHp(), e.afterHp(), e.amount(), e.applied(), e.name(), e.maximumHp())).toList(), null, domainView(s.domains()));
+        Snapshot s = finalDocument.snapshot();
+        return new CampaignView(s.campaignId(), s.name(), revision, 0, historyView(s), null, domainView(s.domains()));
     }
 
     @FunctionalInterface private interface Work<T> { T run(Connection connection) throws SQLException; }

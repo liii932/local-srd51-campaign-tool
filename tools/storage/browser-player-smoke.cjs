@@ -8,6 +8,8 @@ const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {chromium} = require('playwright');
 const {observeStorageAction} = require('./browser-action.cjs');
+const {selectStandardRules} = require('./browser-rule-library.cjs');
+const {createNode, focusSpace, placeAtFocus} = require('./browser-spaces.cjs');
 const [output, acknowledgement, storageRoot] = process.argv.slice(2);
 const resumeAfterRoster = acknowledgement === '--resume-after-roster';
 assert.ok(process.argv.length === 5 && (acknowledgement === '--fresh-root' || resumeAfterRoster) && path.isAbsolute(output || '') && path.isAbsolute(storageRoot || ''),
@@ -52,8 +54,8 @@ async function main(){
   await host.locator('#storage-workspace:not([disabled])').waitFor();
   if(!resumeAfterRoster){
   assert.equal(initialState.storage.state,'IDLE');await host.locator('#storage-create [name="name"]').fill('玩家入席验证战役');
-  for(const key of ['srd51-healing@1','srd51-runtime@1'])await host.locator(`#storage-modules input[value="${key}"]`).check();
-  await hostAction('create',()=>host.locator('#storage-create button').click());
+  await selectStandardRules(host);
+  await hostAction('create',()=>host.locator('#storage-create button[type="submit"]').click());
   for(const [name,kind]of [[PC,'PC'],[OTHER,'PC'],[SECRET,'NPC']]){await host.locator('#domain-create [name="name"]').fill(name);await host.locator('#domain-create [name="kind"]').selectOption(kind);await rule('#domain-create [name="classKey"]','class.fighter');await hostAction('domain',()=>host.locator('#domain-create button').click());}
   }else{
     assert.equal(initialState.storage.state,'ACTIVE');assert.equal(initialState.campaign.name,'玩家入席验证战役');assert.equal(initialState.campaign.revision,4);
@@ -66,6 +68,9 @@ async function main(){
   await pane('actions');await host.locator('#domain-equipment [name="characterId"]').selectOption(pcId);await host.locator('#domain-equipment [name="kind"]').selectOption('ITEM_ACQUIRED');await rule('#domain-equipment [name="item"]','item.dagger');await hostAction('domain',()=>host.locator('#domain-equipment button').click());
   report.checks.push('Fresh disposable campaign, two rule PCs and a hidden NPC created by real Host forms');
   }else report.checks.push('Exact existing roster/equipment checkpoint verified; completed preparation was not replayed');
+  const anchor=await createNode(host,hostAction,'玩家探索营地');
+  await focusSpace(host,hostAction,'WORLD',anchor);
+  await placeAtFocus(host,hostAction,[pcId,otherId]);
   phase='two independent same-name applications';
   await host.locator('#host-players-content').waitFor();await playerSetting('invite',()=>host.locator('#host-players-invite').click());const invitationUrl=await host.locator('#host-player-link').getAttribute('href');assert.ok(invitationUrl.startsWith(PLAYER+'/player#invite='));
   assert.equal(await host.locator('#host-player-qr svg').count(),1,'Local QR must render');

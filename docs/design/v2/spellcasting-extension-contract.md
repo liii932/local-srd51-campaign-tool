@@ -2,8 +2,10 @@
 
 本文定义从有限职业 profile 走向可扩展施法入口的**目标语义合同**。新增类型和行为尚未
 接入实际作者、执行或文件读写。现行施法见[施法作者来源](../../rules/schema-2-spell-authoring.md)
-及[有限施法合同](../../rules/schema-2-spells.md)。新增机制需连同规则支持门、实际消费者及
-完整文件生命周期分别采用。[采用边界](adoption-boundaries.md) · [领域接合表](domain-integration.md)
+及[有限施法合同](../../rules/schema-2-spells.md)。SQLite 已用本机接受的准确规则组合运行
+现行有限机制，并通过 `RULE_BOUND_CAMPAIGN` format 3 保存与恢复这些机制的完整业务事实。
+新增机制需连同规则支持门、实际消费者及完整文件生命周期分别采用。[采用边界](adoption-boundaries.md)
+· [领域接合表](domain-integration.md)
 
 公共身份、准确版本、覆盖链和机制支持沿用[模组接口基线](module-interface-baseline.md)；
 暂停、反应、一次继续沿用[动作继续协议](action-continuation-protocol.md)；实例、压制、
@@ -186,7 +188,7 @@ V/S/M 需求、持续/专注政策及准确效果规格引用。学派只作为�
 action 法术绕过。限制不按 round 泛化：在别人 turn 的 reaction 使用那个 turn 的历史。
 合法接受后被反制仍留作已施放声明事实，不抹去成本/turn 限制；无资格请求不写此事实。
 
-现有 INTERNAL 施法核验同场景各角色共同秒值。
+MySQL INTERNAL 仍核验同场景各角色共同秒值，现行 SQLite 已维护各空间时钟和角色累计秒。
 目标的工作与时长由[时间 owner](time-and-calendar.md)按具体机制的空间、个人经历或
 回合边界计量，沿持续协议的 occurrence/cursor 与准确待处理余集逐截止边界结清义务。
 背景空间的施法工作、Ready、专注与时间保留原进度，切回以新焦点代次重验资格和后续依赖。

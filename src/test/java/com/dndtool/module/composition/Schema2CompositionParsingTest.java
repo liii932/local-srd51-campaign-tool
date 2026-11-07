@@ -103,7 +103,7 @@ class Schema2CompositionParsingTest {
         for(String path:List.of("author-package.json","rules.json")) {
             var p=packages();pad(p,0,path,path.equals("author-package.json")?16385:65537);rejected("S2_BUDGET","PARSE",p);
         }
-        var p=packages();while(p.size()<5)p.add(p.getFirst());rejected("S2_BUDGET","PARSE",p);
+        var p=packages();while(p.size()<=Schema2CompositionKernel.MAX_PACKAGES)p.add(p.getFirst());rejected("S2_BUDGET","PARSE",p);
         p=packages();for(int i=0;i<17;i++)p.getFirst().put("extra"+i+".json",new byte[0]);rejected("S2_BUDGET","PARSE",p);
         p=packages();p.getFirst().clear();p.getFirst().put("author-package.json",new byte[16384]);for(int i=0;i<16;i++)p.getFirst().put("file"+i+".json",new byte[65536]);rejected("S2_BUDGET","PARSE",p);
         // Raw-length preflight precedes JSON parsing across every file, including invalid earlier JSON.

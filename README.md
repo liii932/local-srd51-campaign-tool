@@ -18,18 +18,22 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
 首次体验可按[短冒险流程](./docs/storage-vitality-loop.md#跑一段短冒险)完成建队、探索、战斗和保存后继续；
 隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
-选择 `srd51-vitality@1`、`srd51-healing@1`、`srd51-runtime@1` 的准确有序组合后，可以：
+在“本机规则库”导入原包，分别审阅并明确接受，再选择准确有序成员并预览组合后，可以：
 
 - 创建标准数组的有限 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史；
 - 由现有纯规则消费者执行已接入的成长/ASI/多职业、熟练、检定、装备、健康、休息与资源命令；
 - 使用有限普通战斗、移动、机会攻击、反应/继续、Bless、Cure Wounds、Shield、Counterspell、Burning Hands、法师书/准备和奥术回想；
-- 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、节点位置、简单物品、角色状态与消息根历史；
+- 建立世界节点、路线及有界网格场景，显式入退场、旅行与切换唯一执行焦点；后台时钟、角色、效果与未决动作冻结；
+- 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、唯一安置、简单物品、角色状态与消息根历史；
 - 管理独立的 DM-managed 自由卡、基础字段、职业等级和熟练，执行 MANUAL/SAVING_THROW、
-  有序检定效果与简易遭遇名单/阵营；
+  有序检定效果，并在共享网格上使用 DM 裁定战斗和阵营；
 - 在一个 SQLite 事务提交完整领域后果、历史、版本与幂等结果；保存初始及当前完整 JSON，下载/上传导入、同版重开，显式恢复或精确放弃残留。
 
-有限规则角色能力使用应用随版本交付的[四个 schema-2 包](./rule-packages/srd51-runtime/package-guide.md)，
-经过生产 ZIP reader、组合及完整类型化投影核验。它们不是完整 SRD `RELEASED` 发布，
+本机规则库支持外部作者 ZIP 与应用交付候选，所有包均须单独导入和接受。组合最多八包，
+经过严格生产 reader、依赖/覆盖组合及当前机制与创建模板的完整支持校验。标准组合见[包指南](./rule-packages/srd51-runtime/package-guide.md)，第二组合见
+[家规说明](./rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)：运动改用感知、
+固定直接伤害为 3、工匠初始语言改为侏儒语。创建、候选、结算、来源展示和恢复使用同一战役
+冻结上下文；不能在活动战役中切换。它们不是完整 SRD `RELEASED` 发布，
 不借用旧完整规则族的 `DRAFT` 身份。Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、
 Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授予。
 准确领域覆盖、现行能力差异及剩余采用门见[领域接合表](./docs/design/v2/domain-integration.md)。
@@ -62,8 +66,13 @@ DM-managed 自由卡与有限规则角色各自校验，不自动互相转换；
 本文所列目标不是对当前版本已完成功能的声明。
 
 [产品说明](./docs/product.md)区分当前行为和 v2 使用流程；[v2 设计导航](./docs/design/v2/README.md)
-记录[模组接口与组合](./docs/design/v2/module-interface-baseline.md)、[私有运行存储](./docs/design/v2/rule-storage-and-versioning.md)、
+记录[四层职责与执行](./docs/design/v2/module-layering.md)、[模组接口与组合](./docs/design/v2/module-interface-baseline.md)、
+[本机规则库](./docs/design/v2/local-rule-library.md)、[私有运行存储](./docs/design/v2/rule-storage-and-versioning.md)、
 [完整战役文件](./docs/design/v2/save-and-recovery.md)及[生命周期](./docs/design/v2/runtime-and-transactions.md)。
+当前 SQLite 运行按[世界与场景](./docs/design/v2/world-and-scene-spaces.md)维护每个空间的
+逻辑时钟及唯一安置。DM 裁定本次旅行耗时，角色恢复资格按累计实际经历时间计算。
+完整文件 `RULE_BOUND_CAMPAIGN` format 3 保存各场景时钟、焦点及全部待继续事项。
+新建和文件打开核验本机准确原包与接受，活动运行、保存及本机残留恢复使用冻结材料。
 目标以应用随版本交付的[JSON 表结构声明](./docs/design/v2/storage-schema-and-planning.md)，
 按规则、机制、历史与未决状态闭包建立每次打开独占的 SQLite 运行空间，使用完整 JSON
 保存与同版残留显式恢复。[数据覆盖与替换路线](./docs/design/v2/storage-data-map-and-rollout.md)
@@ -225,6 +234,13 @@ tracks semantic drafting and source review separately from implementation.
 | [SQLite 当前有限战役](./docs/storage-vitality-loop.md) | 规则选择、领域运行、严格完整文件与显式恢复 |
 | [领域接合表](./docs/design/v2/domain-integration.md) | 当前实际覆盖、旧能力差异和剩余接合门 |
 | [v2 设计基线](./docs/design/v2/README.md) | 已确定的目标设计、实现差异和采用前提 |
+| [模组分层与执行架构](./docs/design/v2/module-layering.md) | 核心/机制/规则内容/UI、接口、事实 owner 与分步端到端验收 |
+| [规则行为接口验证](./docs/design/v2/rule-behavior-interface-validation.md) | 16 个 SRD 样例、原接口判定、修订合同的纸面复验与当前程序支持 |
+| [本机规则库](./docs/design/v2/local-rule-library.md) | 准确原包、独立接受、组合准备及移机打开 |
+| [世界与场景焦点](./docs/design/v2/world-and-scene-spaces.md) | 当前节点与二维网格、单焦点和全状态恢复，及跨空间被动因果目标 |
+| [时间与日历](./docs/design/v2/time-and-calendar.md) | 目标空间钟、自然日和黎明、个人经历与期限迁移 |
+| [空间与区域](./docs/design/v2/spatial-and-area-contract.md) | 目标三维体积、范围证明、联动移动和生成/返回安置 |
+| [物件与魔法物品](./docs/design/v2/objects-and-magic-items.md) | 目标物件身份、同调、魔杖充能、符文条件与直接恢复 |
 | [局域网玩家参与](./docs/design/v2/player-participation.md) | 玩家参与设计与原型采用边界 |
 | [JSON 结构声明与战役建库](./docs/design/v2/storage-schema-and-planning.md) | 有限声明格式、依赖闭包、确定性计划、示例、初始化与结构恢复 |
 | [存储数据覆盖与替换路线](./docs/design/v2/storage-data-map-and-rollout.md) | 当前表组/领域/所有者映射、公共接口、配置切换、实施步骤与验收 |

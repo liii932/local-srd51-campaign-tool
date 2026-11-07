@@ -13,16 +13,57 @@
 <body>
 <main>
   <header><p class="eyebrow">LOCAL 5E CAMPAIGN TOOL</p><h1>战役工作台</h1>
-    <p>选择规则，管理角色、场景和战斗，保存完整战役并继续游戏。也可选择基础生命值战役。</p></header>
+    <p>从本机已接受的规则原包选择组合，管理规则角色、自由卡、场景和战斗，保存完整战役并继续游戏。</p></header>
   <p id="storage-message" role="status" aria-live="polite">正在读取战役…</p>
   <fieldset id="storage-workspace" aria-busy="true" disabled>
     <legend class="visually-hidden">战役操作</legend>
+  <details id="rule-library">
+    <summary>本机规则库</summary>
+    <fieldset id="rule-library-controls">
+      <legend>原包与本机接受</legend>
+      <p>导入后审阅准确版本、依赖和规则声明，再逐个明确接受。接受记录保存在本机。</p>
+      <p id="rule-library-message" role="status" aria-live="polite"></p>
+      <button id="rule-library-refresh" type="button">刷新规则库</button>
+      <div class="columns">
+        <form id="rule-library-import">
+          <h3>导入原 ZIP</h3>
+          <label>规则原包<input name="file" type="file" accept=".zip,application/zip" required></label>
+          <button type="submit">导入原包</button>
+        </form>
+        <section><h3>应用交付的导入候选</h3><ul id="rule-bundled"></ul></section>
+      </div>
+      <h3>已导入版本</h3><ul id="rule-inventory"></ul>
+      <section id="rule-review" hidden>
+        <h3 id="rule-review-title"></h3><p id="rule-review-status"></p>
+        <a id="rule-download" class="button" download>下载此原 ZIP</a>
+        <pre id="rule-review-declaration" class="rule-document" tabindex="0"></pre>
+        <button id="rule-accept" type="button">接受所审阅的准确版本</button>
+      </section>
+      <section id="rule-operation" hidden>
+        <h3>查证未确认的规则库操作</h3><p id="rule-operation-info"></p>
+        <div class="actions">
+          <button id="rule-operation-inspect" type="button">读取操作状态</button>
+          <button id="rule-operation-recover" type="button">查证提交结果</button>
+          <button id="rule-operation-retry" type="button" disabled>重提准确原操作</button>
+        </div>
+        <p>若原操作为上传，请重新选择同一个原 ZIP。</p>
+      </section>
+    </fieldset>
+  </details>
   <section id="storage-idle" hidden>
     <h2>开始战役</h2>
     <form id="storage-create">
       <label>战役名称<input name="name" required maxlength="160" autocomplete="off"></label>
-      <fieldset><legend>规则模块</legend><div id="storage-modules"></div></fieldset>
-      <button type="submit">创建战役</button>
+      <fieldset><legend>按加载顺序选择已接受的规则</legend>
+        <p>先添加一个基础包，再按依赖顺序添加所需版本。调整顺序后重新预览。</p>
+        <button id="rule-members-load" type="button">打开规则库并读取候选</button>
+        <label>已接受版本<select id="rule-member-choice" disabled></select></label>
+        <button id="rule-member-add" type="button" disabled>添加到组合</button>
+        <ol id="rule-members"></ol>
+        <button id="rule-preview" type="button" disabled>核验并预览组合</button>
+        <pre id="rule-preview-result" class="rule-document" tabindex="0" hidden></pre>
+      </fieldset>
+      <button type="submit" disabled>创建战役</button>
     </form>
     <div class="columns">
       <form id="storage-open"><h3>已存战役</h3><label>战役文件<select name="fileKey" id="storage-files" required></select></label><div class="actions"><button type="submit">打开战役</button><a id="storage-download" class="button" download hidden>下载文件</a><button id="storage-delete" type="button" class="danger">删除文件</button></div></form>
@@ -33,25 +74,13 @@
   <section id="storage-active" hidden>
     <div class="heading"><div><p class="eyebrow">当前战役</p><h2 id="storage-campaign-name"></h2></div><div class="actions"><button id="storage-save" type="button">保存</button><a id="storage-last-download" class="button" download hidden>下载刚保存的文件</a><button id="storage-end" type="button">保存并结束</button></div></div>
     <p>保存会建立独立的完整文件；保存并结束后，会选中本次结束文件供你再次打开。直接关闭浏览器不会结束战役，再次进入可继续当前进度。</p>
-    <div class="columns" id="storage-vitality">
-      <form id="storage-character"><h3>创建角色</h3>
-        <label>角色名称<input name="name" required maxlength="160" autocomplete="off"></label>
-        <label>生命值上限<input name="maximumHp" type="number" min="1" max="65535" value="12" required></label>
-        <label>当前生命值<input name="currentHp" type="number" min="1" max="65535" value="5" required></label>
-        <button type="submit">创建角色</button>
-      </form>
-      <form id="storage-heal"><h3>治疗角色</h3>
-        <label>角色<select id="storage-heal-character" name="characterId" required></select></label>
-        <label>治疗量<input name="amount" type="number" min="1" max="65535" value="4" required></label>
-        <p id="storage-healing-note"></p><button type="submit">应用治疗</button>
-      </form>
-    </div>
     <section id="storage-domain" hidden>
+      <p id="domain-focus-current" aria-live="polite"></p>
       <nav class="tabs" aria-label="战役管理">
-        <button type="button" data-pane="people" aria-pressed="true">规则角色</button><button type="button" data-pane="manual">自由卡与简易遭遇</button><button type="button" data-pane="growth">成长与休息</button><button type="button" data-pane="actions">装备与检定</button><button type="button" data-pane="magic">健康与法术</button><button type="button" data-pane="world">场景与物品</button><button type="button" data-pane="combat">战斗</button><button type="button" data-pane="rules">规则目录</button>
+        <button type="button" data-pane="people" aria-pressed="true">规则角色</button><button type="button" data-pane="manual">自由卡</button><button type="button" data-pane="growth">成长与休息</button><button type="button" data-pane="actions">装备与检定</button><button type="button" data-pane="magic">健康与法术</button><button type="button" data-pane="world">世界与场景</button><button type="button" data-pane="combat">战斗</button><button type="button" data-pane="rules">规则目录</button>
       </nav>
       <section data-panel="people">
-        <p>规则角色使用当前有限规则范围：战士、生命领域牧师或法师。请在推进时间前建齐整支队伍；初始装备为空，开战前到“装备与检定”取得并装备武器。完整限制见“规则目录”。</p>
+        <p>规则角色使用当前有限规则范围：战士、生命领域牧师或法师。新角色从未安置状态开始；到“世界与场景”安置后即可行动。初始装备为空，可先到“装备与检定”取得并装备武器。完整限制见“规则目录”。</p>
         <p id="domain-roster-note" role="status"></p>
         <div class="columns">
           <form id="domain-create"><h3>创建角色 / NPC</h3><label>名称<input name="name" required maxlength="160"></label><label>类型<select name="kind"><option value="PC">玩家角色</option><option value="NPC">NPC</option></select></label><label>职业<select name="classKey" data-rules="character.class" required></select></label><label>背景<select name="backgroundKey" data-rules="character.background" required></select></label><button>创建完整角色</button></form>
@@ -59,7 +88,7 @@
         </div>
       </section>
       <section data-panel="manual" hidden>
-        <p>自由卡由 DM 维护属性与数值；选择技能和豁免熟练后，检定仍由服务器计算并掷骰。</p>
+        <p>自由卡与规则角色共享世界和网格。自由卡参与战斗时由 DM 明确裁定移动与数值，规则战斗的自动动作使用规则角色和怪物事实。</p>
         <div class="columns">
           <form id="manual-create"><h3>新建自由角色 / NPC</h3><label>名称<input name="name" maxlength="160" required></label><label>类型<select name="kind"><option value="PC">玩家角色</option><option value="NPC">NPC</option></select></label><label>数值模板<select name="template" id="manual-template" required></select></label><p>创建后可逐项编辑六属性、生命值、防护等级、速度、职业等级和熟练。</p><button>创建自由卡</button></form>
           <form id="manual-card-load"><h3>编辑自由卡</h3><label>角色<select name="characterId" class="manual-character-choice" required></select></label><button>查看与编辑</button></form>
@@ -69,17 +98,14 @@
         <div class="columns">
           <form id="manual-check"><h3>自由卡检定</h3><label>执行者<select name="characterId" class="manual-character-choice" required></select></label><label>检定类型<select name="checkType"><option value="ABILITY">属性检定</option><option value="SKILL">技能检定</option><option value="SAVING_THROW">豁免</option><option value="MANUAL">手动调整值检定</option></select></label><label>属性 / 技能 / 豁免<select name="modifierSource" id="manual-check-source"></select></label><label>手动调整值<input name="manualModifier" type="number" value="0"></label><label>手动检定名称<input name="manualName" maxlength="80" value="DM 检定"></label><label>掷骰模式<select name="rollMode"><option value="NORMAL">正常</option><option value="ADVANTAGE">优势</option><option value="DISADVANTAGE">劣势</option></select></label><label>DC<input name="difficultyClass" type="number" min="0" max="60" value="10" required></label><fieldset><legend>成功时，按顺序应用</legend><div id="manual-success-effects"></div><button type="button" data-add-manual-effect="success">添加成功后果</button></fieldset><fieldset><legend>失败时，按顺序应用</legend><div id="manual-failure-effects"></div><button type="button" data-add-manual-effect="failure">添加失败后果</button></fieldset><button>服务器掷骰并应用后果</button></form>
           <form id="manual-inventory"><h3>自由卡物品</h3><label>持有人<select name="characterId" class="manual-character-choice" required></select></label><label>已有物品<select name="itemId" id="manual-inventory-item" data-optional></select></label><label>物品来源<select name="sourceKey" id="manual-item-source" data-optional></select></label><label>名称<input name="name" maxlength="160" required></label><label>描述<input name="description" maxlength="1000"></label><label>数量<input name="quantity" type="number" min="1" max="999" value="1" required></label><label><input name="active" type="checkbox" checked> 当前携带</label><button>保存自由卡物品</button></form>
-          <form id="manual-party"><h3>队伍地点</h3><label>地点<select name="nodeId" class="node-choice" required></select></label><button>移动队伍</button></form>
-          <form id="manual-encounter"><h3>简易遭遇</h3><p>记录名单、阵营与地点。勾选参与者，并确认各自的位置。</p><p id="manual-encounter-note"></p><label>已有遭遇<select name="encounterId" class="manual-encounter-choice" data-optional></select></label><label>遭遇地点<select name="nodeId" class="node-choice" required></select></label><div id="manual-encounter-roster"></div><button>开始简易遭遇</button><button id="manual-encounter-end" type="button">结束所选遭遇</button></form>
-          <form id="manual-participant"><h3>遭遇参与者</h3><label>遭遇<select name="encounterId" class="manual-encounter-choice" required></select></label><label>角色<select name="characterId" class="manual-character-choice" required></select></label><label>阵营<select name="side"><option value="ALLY">友方</option><option value="ENEMY">敌方</option><option value="NEUTRAL">中立</option></select></label><label>地点<select name="nodeId" class="node-choice" required></select></label><label>操作<select name="operation"><option value="add">加入</option><option value="remove">移出</option></select></label><button>更新参与者</button></form>
-        </div><div id="manual-encounter-summary"></div>
+        </div>
       </section>
       <section data-panel="growth" hidden><div class="columns">
         <form id="domain-growth"><h3>提升等级</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>职业<select name="class" data-rules="character.class" required></select></label><label>生命值增长<select name="hpChoice"><option value="FIXED_AVERAGE">固定平均值</option><option value="SERVER_ROLL">服务器掷生命骰</option></select></label><label>子职（本级需要时）<select name="subclass" data-rules="character.subclass" data-optional></select></label><label>专长（可选）<select name="feat" data-rules="character.feat" data-optional></select></label><label>属性 +2（与专长择一，本级需要时）<select name="ability" class="ability-choice" data-optional></select></label><button>确认升级</button></form>
         <form id="domain-resource"><h3>使用与恢复资源</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>操作<select name="kind"><option value="RESOURCE_SPENT">消耗资源</option><option value="RESOURCES_RECOVERED">按休息触发恢复</option></select></label><label>资源<select name="resource" data-rules="character.resource" data-optional></select></label><label>数量<input name="amount" type="number" min="1" max="1000000" value="1" required></label><label>恢复触发<select name="recoveryTrigger"><option value="SHORT_REST">短休</option><option value="LONG_REST">长休</option></select></label><button>应用资源操作</button></form>
         <form id="domain-rest"><h3>休息与时间</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>操作<select name="kind"><option value="REST_STARTED">开始休息</option><option value="TIME_ADVANCED">推进时间</option><option value="HIT_DIE_SPENT">花费生命骰</option><option value="REST_COMPLETED">完成休息</option><option value="REST_ENDED">结束休息</option></select></label><label>休息类型<select name="restKind"><option value="SHORT_REST">短休</option><option value="LONG_REST">长休</option></select></label><label>经过分钟<input name="minutes" type="number" min="1" max="1440" value="60"></label><label>活动<select name="activity"><option value="LIGHT">轻度活动</option><option value="SLEEP">睡眠</option><option value="NONE">无活动</option><option value="STRENUOUS">剧烈活动</option></select></label><label>生命骰<select name="hitDieSides"><option value="6">d6</option><option value="8">d8</option><option value="10">d10</option><option value="12">d12</option></select></label><label>长休恢复生命骰数量<input name="recoverDice" type="number" min="0" max="20" value="0"></label>
           <fieldset id="arcane-recovery-fields" hidden disabled><legend>短休奥术回想（可选）</legend>
-            <p>选择已消耗的法术位；全部为 0 表示本次放弃。恢复环级合计最多为法师等级的一半向上取整，每个战役日一次。</p>
+            <p>选择已消耗的法术位；全部为 0 表示本次放弃。恢复环级合计最多为法师等级的一半向上取整，按角色累计经历每满一日获得一次资格。</p>
             <p id="arcane-recovery-status"></p>
             <label hidden>一环恢复数量<input name="recoverSlot1" data-recover-slot="1" type="number" min="0" max="4" step="1" value="0" required disabled></label>
             <label hidden>二环恢复数量<input name="recoverSlot2" data-recover-slot="2" type="number" min="0" max="4" step="1" value="0" required disabled></label>
@@ -99,7 +125,6 @@
             <label>生命值效果（可选）<select name="successEffect" data-rules="adventure.vital_effect" data-optional></select></label>
             <label>已有物品记录（可选）<select name="successItem" class="check-branch-item" data-optional></select></label>
             <label>物品数量变化<input name="successDelta" type="number" min="-1000000" max="1000000" value="0" required></label>
-            <label>移动到地点（可选）<select name="successNode" class="node-choice" data-optional></select></label>
             <label>结果消息（可选）<input name="successMessage" maxlength="4096"></label>
           </fieldset>
           <fieldset data-check-branch="failure" hidden disabled><legend>失败时</legend>
@@ -107,7 +132,6 @@
             <label>生命值效果（可选）<select name="failureEffect" data-rules="adventure.vital_effect" data-optional></select></label>
             <label>已有物品记录（可选）<select name="failureItem" class="check-branch-item" data-optional></select></label>
             <label>物品数量变化<input name="failureDelta" type="number" min="-1000000" max="1000000" value="0" required></label>
-            <label>移动到地点（可选）<select name="failureNode" class="node-choice" data-optional></select></label>
             <label>结果消息（可选）<input name="failureMessage" maxlength="4096"></label>
           </fieldset>
           <button>服务器掷骰检定</button>
@@ -117,23 +141,64 @@
         <form id="domain-health"><h3>健康与定额效果</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>健康规则<select name="rule" data-rules="adventure.health" required></select></label><label>操作<select name="kind"><option value="HEALTH_EFFECT_RESOLVED">应用健康效果</option><option value="DEATH_SAVE_RESOLVED">死亡豁免</option></select></label><label>效果<select name="effect" data-rules="adventure.vital_effect" required></select></label><label>临时生命值冲突<select name="temporaryChoice"><option value="">无冲突</option><option value="REPLACE">使用新值</option><option value="KEEP">保留旧值</option></select></label><label>裁定说明<input name="adjudication" value="DM 健康裁定" required maxlength="160"></label><button>应用健康操作</button></form>
         <form id="domain-spellbook"><h3>法术书与准备</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>施法规则<select name="castingRule" data-rules="character.wizard_spellcasting" required></select></label><label>操作<select name="kind"><option value="SPELLBOOK_INITIALIZED">建立 1 级法术书（6 个）</option><option value="SPELLBOOK_ADVANCED">升级学习（2 个）</option><option value="SPELLBOOK_PREPARED">长休后准备法术</option></select></label><label>本次学习<select name="learned" data-rules="adventure.spell" multiple size="6"></select></label><label>准备法术<select name="prepared" data-rules="adventure.spell" multiple size="6"></select></label><button>确认法术选择</button></form>
       </div></section>
-      <section data-panel="world" hidden><div class="columns">
+      <section data-panel="world" hidden>
+        <div class="card" id="domain-space-browser">
+          <h3>空间与执行焦点</h3>
+          <label>浏览世界节点或局部场景<select id="domain-space-choice"></select></label>
+          <p id="domain-space-description"></p>
+          <button id="domain-focus-set" type="button">将浏览空间设为执行焦点</button>
+          <div id="domain-space-occupants"></div>
+        </div>
+        <div class="columns">
         <form id="domain-node"><h3>新地点</h3><label>地点名称<input name="name" maxlength="160" required></label><button>建立地点</button></form>
-        <form id="domain-link"><h3>连接地点</h3><label>起点<select name="from" class="node-choice" required></select></label><label>终点<select name="to" class="node-choice" required></select></label><button>建立连接</button></form>
-        <form id="domain-position"><h3>角色位置</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>地点<select name="nodeId" class="node-choice" required></select></label><button>移动到地点</button></form>
-        <form id="domain-item"><h3>背包记录</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>记录<select name="itemId" class="world-item-choice" data-optional></select></label><label>物品名称<input name="name" maxlength="160" required></label><label>数量<input name="quantity" type="number" min="0" max="1000000" value="1" required></label><button>保存物品记录</button></form>
+        <form id="domain-link"><h3>连接地点</h3><label>起点<select name="from" class="node-choice" required></select></label><label>终点<select name="to" class="node-choice" required></select></label><button>建立有向连接</button></form>
+        <form id="domain-position"><h3>首次安置到焦点节点</h3><label>尚未安置的角色<select name="characterId" required></select></label><button>安置角色</button></form>
+         <form id="domain-scene-create"><h3>在焦点节点建立场景</h3>
+           <label>名称<input name="name" maxlength="160" required></label>
+           <label>宽（格）<input name="width" type="number" min="1" max="201" value="12" required></label>
+           <label>高（格）<input name="height" type="number" min="1" max="201" value="8" required></label>
+           <label>结算方式<select name="resolution"><option value="RULES">规则场景</option><option value="DM">DM 裁定场景</option></select></label>
+           <button>建立局部场景</button>
+         </form>
+         <form id="domain-travel"><h3>沿路线转移</h3><p>耗时在出发节点结算。参与转移的主体到达后，执行焦点移到目的节点。</p>
+           <label>目的节点<select name="targetNodeId" required></select></label><fieldset id="domain-travel-subjects"><legend>同行主体</legend></fieldset>
+           <label>本次裁定分钟数<input name="minutes" type="number" min="0" max="1440" value="0" required></label>
+           <label>裁定理由<input name="adjudication" maxlength="160" required></label><button>沿路线转移</button>
+         </form>
+         <form id="domain-scene-enter"><h3>从锚点入场</h3>
+           <label>场景<select name="sceneId" required></select></label>
+           <fieldset id="domain-scene-enter-subjects"><legend>勾选主体并填写落位</legend></fieldset><button>入场并切换焦点</button>
+         </form>
+         <form id="domain-scene-leave"><h3>离场回到锚点</h3><fieldset id="domain-scene-leave-subjects"><legend>离场主体</legend></fieldset><button>离场并切换焦点</button></form>
+         <form id="domain-scene-mode"><h3>DM 裁定场景模式</h3><label>模式<select name="mode"><option value="COMBAT">开始裁定战斗</option><option value="EXPLORATION">结束战斗，继续探索</option></select></label><button>确认模式转换</button></form>
+         <form id="domain-scene-close"><h3>关闭空场景</h3><p>角色全部离场并结清场景义务后可以关闭。</p><button>关闭场景并返回锚点</button></form>
+         <form id="domain-space-time"><h3>推进焦点空间时间</h3><label>经过分钟<input name="minutes" type="number" min="1" max="1440" value="1" required></label>
+           <label>裁定理由<input name="adjudication" maxlength="160" required></label><button>推进时间</button>
+         </form>
+         <form id="domain-space-move"><h3>DM 裁定局部移动</h3><label>主体<select name="characterId" required></select></label>
+           <label>路径（每行一格，X,Y）<textarea name="path" rows="3" placeholder="1,0" required></textarea></label>
+           <label>经过分钟<input name="minutes" type="number" min="0" max="1440" value="0" required></label>
+           <label>裁定理由<input name="adjudication" maxlength="160" required></label><button>裁定移动</button>
+         </form>
+        <form id="domain-monster-create"><h3>在焦点节点安置规则怪物</h3>
+           <label>名称<input name="name" maxlength="160" required></label><label>怪物规则<select name="monster" data-rules="adventure.monster" required></select></label><button>创建并安置怪物</button>
+         </form>
+         <form id="domain-space-unplace"><h3>退出可定位范围</h3>
+           <label>主体<select name="characterId" required></select></label>
+           <label>裁定理由<input name="adjudication" maxlength="500" required></label><button>撤除安置</button>
+         </form>
+         <form id="domain-item"><h3>背包记录</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>记录<select name="itemId" class="world-item-choice" data-optional></select></label><label>物品名称<input name="name" maxlength="160" required></label><label>数量<input name="quantity" type="number" min="0" max="1000000" value="1" required></label><button>保存物品记录</button></form>
         <form id="domain-note"><h3>战役便笺</h3><label>内容<textarea name="text" rows="4" maxlength="2000" required></textarea></label><button>记入战役历史</button></form>
       </div><div id="domain-world-summary"></div></section>
       <section data-panel="combat" hidden>
-        <form id="domain-combat-start"><h3>开始战斗</h3><p>当前规则战斗需要全部规则角色在队并参与。PC 默认阵营 0，NPC 默认阵营 1；可调整阵营和格位。至少需要两个参与者且阵营不同；只有 PC 时可加入怪物或调整阵营。先攻由服务器掷骰。</p><p id="domain-combat-start-note"></p><div id="domain-deployments"></div><details><summary>加入一个怪物</summary><label>怪物<select name="monster" data-rules="adventure.monster" data-optional></select></label><label>怪物阵营<input name="monsterSide" type="number" min="0" max="15" value="1"></label><label>怪物 X<input name="monsterX" type="number" min="-10000" max="10000" value="5"></label><label>怪物 Y<input name="monsterY" type="number" min="-10000" max="10000" value="0"></label></details><button>开始战斗</button></form>
         <div id="domain-combat-summary" aria-live="polite"></div>
         <section id="domain-pending-section" aria-labelledby="domain-pending-heading"><h3 id="domain-pending-heading">下一步与反应</h3><div id="domain-pending" aria-live="polite"></div></section>
         <div class="columns">
-          <form id="domain-combat"><h3>战斗与探索行动</h3><p id="domain-combat-note"></p><label>场景<select name="combatId" class="combat-choice" required></select></label><label>行动者<select name="actorId" class="combat-actor-choice" required></select></label><label>行动<select name="kind"><option value="END_TURN">结束回合</option><option value="DASH">疾走</option><option value="DISENGAGE">撤离</option><option value="DODGE">闪避</option><option value="STAND_UP">起身</option><option value="BEGIN_ATTACK">开始攻击动作</option><option value="ATTACK">攻击</option><option value="FORFEIT_ATTACKS">放弃余下攻击</option><option value="MOVE">移动</option><option value="END_CONCENTRATION">结束专注</option><option value="END_COMBAT">结束战斗，进入探索</option><option value="EXPLORATION_MOVE">探索移动</option><option value="EXPLORATION_ADVANCE_TIME">探索推进时间</option><option value="REENTER_COMBAT">重新进入战斗</option><option value="CLOSE_SCENE">关闭场景</option></select></label><label>目标<select name="targetId" class="combat-actor-choice" data-optional></select></label><label>武器<select name="itemId" class="equipment-choice" data-optional></select></label><label>目的格 X<input name="x" type="number" min="-10000" max="10000" value="1"></label><label>目的格 Y<input name="y" type="number" min="-10000" max="10000" value="0"></label><label>探索经过秒数<input name="seconds" type="number" min="1" max="28800" value="60"></label><button>执行战斗行动</button></form>
+          <form id="domain-combat"><h3>战斗与探索行动</h3><p id="domain-combat-note"></p><label>场景<select name="combatId" class="combat-choice" required></select></label><label>行动者<select name="actorId" class="combat-actor-choice" required></select></label><label>行动<select name="kind"><option value="END_TURN">结束回合</option><option value="DASH">疾走</option><option value="DISENGAGE">撤离</option><option value="DODGE">闪避</option><option value="STAND_UP">起身</option><option value="BEGIN_ATTACK">开始攻击动作</option><option value="ATTACK">攻击</option><option value="FORFEIT_ATTACKS">放弃余下攻击</option><option value="MOVE">移动</option><option value="END_CONCENTRATION">结束专注</option><option value="END_COMBAT">结束战斗，进入探索</option><option value="EXPLORATION_MOVE">探索移动</option><option value="EXPLORATION_ADVANCE_TIME">探索推进时间</option><option value="REENTER_COMBAT">开始规则战斗</option></select></label><label>目标<select name="targetId" class="combat-actor-choice" data-optional></select></label><label>武器<select name="itemId" class="equipment-choice" data-optional></select></label><label>目的格 X<input name="x" type="number" min="0" max="10000" value="1"></label><label>目的格 Y<input name="y" type="number" min="0" max="10000" value="0"></label><label>可选连续路径（每行一格，X,Y）<textarea name="path" rows="2"></textarea></label><label>探索经过秒数<input name="seconds" type="number" min="1" max="28800" value="60"></label><button>执行战斗行动</button></form>
           <form id="domain-cast"><h3>施法</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>施法者<select name="actorId" class="combat-actor-choice" required></select></label><label>施法规则<select name="castingRule" data-rules="character.spellcasting,character.wizard_spellcasting" required></select></label><label>法术<select name="spell" data-rules="adventure.spell" required></select></label><label>目标（最多 3 个）<select name="targets" class="combat-actor-choice" multiple size="4"></select></label><label>法术位等级<input name="slotLevel" type="number" min="1" max="9" value="1" required></label><label>材料 / 法器<select name="materialItemId" class="equipment-choice" data-optional></select></label><label>锥形方向（范围法术）<select name="coneDirection"><option value="">指定目标</option><option value="0">东</option><option value="1">东南</option><option value="2">南</option><option value="3">西南</option><option value="4">西</option><option value="5">西北</option><option value="6">北</option><option value="7">东北</option></select></label><button>宣告施法</button></form>
           <form id="domain-monster"><h3>怪物动作与恢复</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>怪物<select name="actorId" class="monster-choice" required></select></label><label>操作<select name="kind"><option value="MONSTER_BREATH">锥形吐息</option><option value="BEGIN_MONSTER_REST">开始休息</option><option value="COMPLETE_MONSTER_REST">完成休息</option></select></label><label>吐息动作<select name="breathAction" class="breath-choice"></select></label><label>方向<select name="direction"><option value="0">东</option><option value="1">东南</option><option value="2">南</option><option value="3">西南</option><option value="4">西</option><option value="5">西北</option><option value="6">北</option><option value="7">东北</option></select></label><label>休息类型<select name="restKind"><option value="SHORT">短休</option><option value="LONG">长休</option></select></label><button>应用怪物操作</button></form>
-          <form id="domain-environment"><h3>环境效果与探索健康</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>发起者<select name="actorId" class="combat-actor-choice" required></select></label><label>操作<select name="kind"><option value="CREATE_ENVIRONMENT_ZONE">建立环境区域</option><option value="END_ENVIRONMENT_ZONE">结束环境区域</option><option value="EXPLORATION_HEALTH">探索中的健康效果</option></select></label><label>环境规则<select name="rule" data-rules="adventure.environment"></select></label><label>已有区域<select name="zoneKey" class="zone-choice" data-optional></select></label><label>区域 X<input name="x" type="number" min="-10000" max="10000" value="0"></label><label>区域 Y<input name="y" type="number" min="-10000" max="10000" value="0"></label><label>健康目标<select name="targetId" class="combat-actor-choice"></select></label><label>健康规则<select name="healthRule" data-rules="adventure.health"></select></label><label>健康效果<select name="effect" data-rules="adventure.vital_effect"></select></label><label>临时生命值冲突<select name="temporaryChoice"><option value="">无冲突</option><option value="REPLACE">使用新值</option><option value="KEEP">保留旧值</option></select></label><label>裁定说明<input name="adjudication" value="DM 环境裁定" maxlength="160" required></label><button>应用环境操作</button></form>
-          <form id="domain-ready"><h3>预备动作</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>行动者<select name="actorId" class="combat-actor-choice" required></select></label><label>预备响应<select name="responseKind"><option value="ATTACK">攻击</option><option value="MOVE">移动</option><option value="SPELL">施法</option></select></label><label>触发<select name="triggerKind"><option value="ATTACK_COMPLETED">指定生物完成攻击</option><option value="CAST_COMPLETED">指定生物完成施法</option><option value="CREATURE_ENTER_CELL_AFTER">指定生物进入格位</option><option value="MONSTER_ACTION_COMPLETED">指定怪物完成动作</option></select></label><label>触发生物<select name="subjectId" class="combat-actor-choice" required></select></label><label>响应目标<select name="targetId" class="combat-actor-choice" data-optional></select></label><label>武器 / 法器<select name="itemId" class="equipment-choice" data-optional></select></label><label>响应或触发格 X<input name="x" type="number" min="-10000" max="10000" value="1"></label><label>响应或触发格 Y<input name="y" type="number" min="-10000" max="10000" value="0"></label><label>施法规则<select name="castingRule" data-rules="character.spellcasting,character.wizard_spellcasting"></select></label><label>预备法术<select name="spell" data-rules="adventure.spell"></select></label><label>法术位等级<input name="slotLevel" type="number" min="1" max="9" value="1"></label><button>预备响应</button></form>
+          <form id="domain-environment"><h3>环境效果与探索健康</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>发起者<select name="actorId" class="combat-actor-choice" required></select></label><label>操作<select name="kind"><option value="CREATE_ENVIRONMENT_ZONE">建立环境区域</option><option value="END_ENVIRONMENT_ZONE">结束环境区域</option><option value="EXPLORATION_HEALTH">探索中的健康效果</option></select></label><label>环境规则<select name="rule" data-rules="adventure.environment"></select></label><label>已有区域<select name="zoneKey" class="zone-choice" data-optional></select></label><label>区域 X<input name="x" type="number" min="0" max="10000" value="0"></label><label>区域 Y<input name="y" type="number" min="0" max="10000" value="0"></label><label>健康目标<select name="targetId" class="combat-actor-choice"></select></label><label>健康规则<select name="healthRule" data-rules="adventure.health"></select></label><label>健康效果<select name="effect" data-rules="adventure.vital_effect"></select></label><label>临时生命值冲突<select name="temporaryChoice"><option value="">无冲突</option><option value="REPLACE">使用新值</option><option value="KEEP">保留旧值</option></select></label><label>裁定说明<input name="adjudication" value="DM 环境裁定" maxlength="160" required></label><button>应用环境操作</button></form>
+          <form id="domain-ready"><h3>预备动作</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>行动者<select name="actorId" class="combat-actor-choice" required></select></label><label>预备响应<select name="responseKind"><option value="ATTACK">攻击</option><option value="MOVE">移动</option><option value="SPELL">施法</option></select></label><label>触发<select name="triggerKind"><option value="ATTACK_COMPLETED">指定生物完成攻击</option><option value="CAST_COMPLETED">指定生物完成施法</option><option value="CREATURE_ENTER_CELL_AFTER">指定生物进入格位</option><option value="MONSTER_ACTION_COMPLETED">指定怪物完成动作</option></select></label><label>触发生物<select name="subjectId" class="combat-actor-choice" required></select></label><label>响应目标<select name="targetId" class="combat-actor-choice" data-optional></select></label><label>武器 / 法器<select name="itemId" class="equipment-choice" data-optional></select></label><label>响应或触发格 X<input name="x" type="number" min="0" max="10000" value="1"></label><label>响应或触发格 Y<input name="y" type="number" min="0" max="10000" value="0"></label><label>施法规则<select name="castingRule" data-rules="character.spellcasting,character.wizard_spellcasting"></select></label><label>预备法术<select name="spell" data-rules="adventure.spell"></select></label><label>法术位等级<input name="slotLevel" type="number" min="1" max="9" value="1"></label><button>预备响应</button></form>
         </div>
       </section>
       <section data-panel="rules" hidden><h3>本战役规则</h3><p id="domain-limitations"></p><div id="domain-rule-catalog"></div></section>
@@ -149,7 +214,7 @@
       <div class="player-control-strip"><div><strong id="host-players-state">玩家操作已关闭</strong><p id="host-players-state-note">在活动战役中开放加入，逐人核对身份。</p></div><div class="actions"><button id="host-players-invite" type="button">开放加入 / 更换邀请</button><button id="host-players-close" type="button" class="player-secondary">关闭新申请</button><button id="host-players-pause" type="button" class="player-secondary">暂停玩家操作</button></div></div>
       <section id="host-player-invitation" class="player-invitation" hidden><div id="host-player-qr" class="player-qr"></div><div class="player-invitation-copy"><h3>邀请玩家入席</h3><p>玩家使用同一局域网和受信任的 HTTPS 地址申请，随后由你逐人核对。</p><a id="host-player-link" target="_blank" rel="noopener noreferrer"></a><div class="actions"><button id="host-player-copy" type="button">复制完整邀请</button></div><p id="host-player-invitation-expiry" class="player-small"></p><p class="player-small">关闭新申请不影响已批准成员。更换邀请会使旧邀请码失效。</p></div></section>
       <div class="player-management-grid"><section class="player-management-panel"><h3>等待核对 <span id="host-player-application-count" class="player-count">0</span></h3><div id="host-player-applications"></div></section><section class="player-management-panel"><h3>已批准成员</h3><div id="host-player-members"></div></section></div>
-      <details class="player-settings"><summary>角色控制与探索许可</summary><div class="columns"><form id="host-player-control-form"><h3>分配玩家角色</h3><label>玩家<select name="memberId" class="player-member-choice" required></select></label><label>角色<select name="characterId" class="player-pc-choice" required></select></label><label>操作<select name="operation"><option value="assign">分配给该成员</option><option value="revoke">撤回角色控制</option></select></label><p class="player-small">只分配 PC。每个 PC 同时只能由一名玩家控制；一个玩家可以控制多个 PC。转交会立即使旧操作选项失效。</p><button>更新角色控制</button></form><form id="host-player-exploration-form"><h3>探索许可</h3><label>角色<select name="characterId" class="player-pc-choice" required></select></label><fieldset><legend>允许的操作范围</legend><label><input name="allowedAction" type="checkbox" value="CHARACTER_COMMAND" checked> 自身装备与资源操作</label><label><input name="allowedAction" type="checkbox" value="EXPLORATION_MOVE" checked> 当前场景中的探索移动</label><label><input name="allowedAction" type="checkbox" value="END_CONCENTRATION" checked> 结束本人专注</label></fieldset><label>许可<select name="enabled"><option value="true">开放当前探索范围</option><option value="false">撤回许可</option></select></label><p class="player-small">只开放所选范围内已支持的自身操作。许可不会绕过未决反应或选择。</p><button>更新探索许可</button></form></div></details>
+      <details class="player-settings"><summary>角色控制与探索许可</summary><div class="columns"><form id="host-player-control-form"><h3>分配玩家角色</h3><label>玩家<select name="memberId" class="player-member-choice" required></select></label><label>角色<select name="characterId" class="player-pc-choice" required></select></label><label>操作<select name="operation"><option value="assign">分配给该成员</option><option value="revoke">撤回角色控制</option></select></label><p class="player-small">只分配 PC。每个 PC 同时只能由一名玩家控制；一个玩家可以控制多个 PC。转交会立即使旧操作选项失效。</p><button>更新角色控制</button></form><form id="host-player-exploration-form"><h3>探索许可</h3><label>角色<select name="characterId" class="player-pc-choice" required></select></label><fieldset><legend>允许的操作范围</legend><label><input name="allowedAction" type="checkbox" value="CHARACTER_COMMAND" checked> 世界中的装备与资源操作，或场景探索施法</label><label><input name="allowedAction" type="checkbox" value="EXPLORATION_MOVE" checked> 当前场景中的探索移动</label><label><input name="allowedAction" type="checkbox" value="END_CONCENTRATION" checked> 结束本人专注</label></fieldset><label>许可<select name="enabled"><option value="true">开放当前探索范围</option><option value="false">撤回许可</option></select></label><p class="player-small" id="host-player-exploration-note"></p><button>更新探索许可</button></form></div></details>
       <details class="player-settings"><summary>共享给谁看</summary><form id="host-player-share-form"><h3>持续共享政策</h3><label>共享内容<select name="kind"><option value="CARD">队友概况</option><option value="SCENE">场景与可见战斗</option><option value="LOG">行动记录</option></select></label><label>具体内容<select name="subjectId" required></select></label><label>受众<select name="audience"><option value="ALL">全体已批准成员（包括以后加入者）</option><option value="SELECTED">指定成员</option><option value="NONE">撤回共享</option></select></label><fieldset id="host-player-share-members" hidden><legend>指定接收成员</legend></fieldset><p class="player-small">玩家默认只见本人角色卡。共享只发送获准字段；撤回后停止分发并清除应用内旧视图。</p><button>更新共享政策</button></form></details>
       <section class="player-management-panel player-proposals"><h3>等待裁定的提案</h3><p class="player-small">提案仅表达意图，尚未掷骰或消耗资源。选择明确支持的裁定类型并点击执行，才会产生游戏结果。</p><div id="host-player-proposals"></div></section>
       <details class="player-settings"><summary>玩家连接与证书信任</summary><p>确认玩家设备与主机在同一局域网，使用显示的完整 HTTPS 地址。设备应先信任 DM 提供的证书，证书 SAN 必须匹配该地址。</p><p>如有证书警告，请核对地址、证书与设备信任设置后重连。不要忽略证书错误，不要回退 HTTP。此页面不会替你开放监听器或防火墙。</p></details>

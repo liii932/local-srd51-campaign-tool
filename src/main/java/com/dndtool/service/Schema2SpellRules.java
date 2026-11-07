@@ -94,7 +94,7 @@ public final class Schema2SpellRules {
     public Prepared prepare(Map<UUID,Context> roster, Battle battle, UUID actor, CastInput input, boolean reaction) {
         Context context = roster.get(actor);
         if (context==null || input==null) throw invalid("S2_SPELL_COMMAND");
-        State caster=context.character(); requireSupportedFeatures(context.material(),caster,"S2_SPELL_EFFECT_UNSUPPORTED");
+        State caster=context.character(); Schema2SpellRules.requireSupportedFeatures(context.material(),caster,"S2_SPELL_EFFECT_UNSUPPORTED");
         Schema2OngoingEffectRules.requireCastingAllowed(roster,battle,actor);
         if(input.castingRule().ruleType().equals("character.wizard_spellcasting"))return prepareWizard(roster,battle,actor,input,reaction);
         if(reaction || input.slotLevel()!=1 || input.targetCastFrameKey()!=null || input.coneDirection()!=null)throw invalid("S2_SPELL_UNAVAILABLE");
@@ -122,7 +122,7 @@ public final class Schema2SpellRules {
                     && i.item().equals(profile.materialItem()) && Set.of("MAIN_HAND","OFF_HAND").contains(i.location())))
                 throw invalid("S2_SPELL_COMPONENT");
             if (battle.ongoingEffects().size()>=MAX_ONGOING_EFFECTS) throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");
-            if (second(caster)>Schema2CharacterRestRules.MAX_MINUTE*60-(battle.status()==Status.EXPLORATION?66:60)) throw invalid("S2_SPELL_TIME_CAPACITY");
+            if (context.sceneSecond()>Schema2CharacterRestRules.MAX_MINUTE*60-(battle.status()==Status.EXPLORATION?66:60)) throw invalid("S2_SPELL_TIME_CAPACITY");
         } else if (!free || input.materialItemId()!=null) throw invalid("S2_SPELL_COMPONENT");
         if (input.targets().isEmpty() || input.targets().size()>(bless?3:1) || new HashSet<>(input.targets()).size()!=input.targets().size())
             throw invalid("S2_SPELL_TARGET");
@@ -132,7 +132,7 @@ public final class Schema2SpellRules {
             if (destination==null || origin.position().distanceFeet(member(battle,id).position())>(bless?30:5)) throw invalid("S2_SPELL_TARGET");
             if (cure && destination.character().health().dead()) throw invalid("S2_HEALTH_DEAD");
             if (cure) {
-                requireSupportedFeatures(destination.material(),destination.character(),"S2_HEALTH_EFFECT_UNSUPPORTED");
+                Schema2SpellRules.requireSupportedFeatures(destination.material(),destination.character(),"S2_HEALTH_EFFECT_UNSUPPORTED");
                 if (destination.character().version()>=Schema2CharacterRuntime.MAX_EVENTS-(id.equals(actor)?2:1))
                     throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
             }

@@ -1,15 +1,16 @@
 # 模组分层与应用执行架构
 
-本文规定模组与运行架构的目标职责、接口、事实归属和分步采用顺序。
-当前运行范围见[领域接合表](domain-integration.md)和[采用边界](adoption-boundaries.md)。
-同一受支持版本内须保证准确规则、状态、历史、事务和直接恢复一致。真实资料的保管与处置
-分别授权。
+本文规定模组与运行架构的职责、接口、事实归属和可独立采用的闭环。当前 SQLite 接合本机
+准确接受、有限外部组合及战役冻结规则。各领域实际范围和后续资格分别见
+[领域接合表](domain-integration.md)与[采用边界](adoption-boundaries.md)。
+不保留旧设计、旧文件或旧来源库的兼容层；同一受支持应用内仍保证准确规则、状态、历史、
+事务和直接恢复一致。真实资料保管与处置授权不因设计替换改变。
 
-## 目标范围
+## 已选范围
 
 - 一个本机 DM，同一时刻一个活动战役；可保管多个完整战役文件，封闭原运行后切换。
-- 每次新建或文件打开建立私有 SQLite。目标规则库保管原包及本机接受事实。新建与
-  文件打开复核准确原包及接受，活动运行和同版残留恢复直接读取冻结材料。
+- 每次新建或文件打开建立私有 SQLite。原包和准确接受事实由[本机规则库](local-rule-library.md)
+  保管。新建和文件打开须具备本机准确原包及接受，活动和同版残留恢复直接读取冻结材料。
 - 一个战役可有多个场景，只有一个权威焦点；后台时钟、个人经历与普通行动暂停，切回不补算。
   目标仅允许[登记的跨空间因果链](world-and-scene-spaces.md#causal-scope)结算必要被动后果，
   前后台同阶段共同提交，所需选择沿原链受限继续。世界节点、局部空间和焦点由空间合同规定；
@@ -170,16 +171,29 @@ flowchart LR
 筛选和更换布局只是展示操作。影响距离、遮挡、地形、路径、目标或计时的编辑必须有
 服务端类型化命令与历史。玩家不能通过完整快照、隐藏候选或规则来源拿到未共享信息。
 
+## 当前采用与后续边界
+
+| 边界 | 当前实现 | 后续采用责任 |
+|---|---|---|
+| 准确组合 | DM 从本机已接受材料中选择 1–8 个有序准确成员。内置原包可导入，外部包走同一 reader/compose 与应用支持门。现有建卡模板及有限机制的完整性决定可执行范围。[本机规则库](local-rule-library.md)、[CampaignRuleSupport](../../../src/main/java/com/dndtool/service/storage/CampaignRuleSupport.java) | 新机制扩展按消费和恢复闭包验收。存储需求由应用机制映射 |
+| 冻结与恢复 | SQLite 和完整文件保存解释合同、准确成员与摘要、全部最终规则、条目和来源链。打开时复核本机接受并重新组合，逐项与文件材料核对。活动与同版残留重建自身投影，最多共享两份以完整不可变材料为键的已核验上下文。[Material](../../../src/main/java/com/dndtool/service/storage/CampaignDomainData.java)、[CampaignDomainValidation](../../../src/main/java/com/dndtool/service/storage/CampaignDomainValidation.java) | 扩展机制须保留同版解释、完整事实与不回源恢复 |
+| 规则消费 | 创建、初始计划和选择、候选、目录及来源、执行和历史验算使用同一战役冻结材料。[CampaignRuleContext](../../../src/main/java/com/dndtool/service/storage/CampaignRuleContext.java)、[CampaignDomainCommands](../../../src/main/java/com/dndtool/service/storage/CampaignDomainCommands.java) | 新机制沿相同边界登记自己的消费者、状态和恢复闭包 |
+| 领域模型 | 角色事实和历史、战斗历史、准备身份由领域类型拥有。领域验证结构和规则语义，JDBC 与文件负责读写适配，共同事务由调用方协调。[角色事实](../../../src/main/java/com/dndtool/service/Schema2CharacterRuntime.java)、[战斗历史](../../../src/main/java/com/dndtool/service/Schema2CombatHistory.java)、[准备身份](../../../src/main/java/com/dndtool/service/Schema2PreparationIdentity.java)、[领域引擎](../../../src/main/java/com/dndtool/service/CampaignDomainEngine.java) | 按新机制扩展领域与适配边界，维持原子后果和完整恢复 |
+| 代表检定 | 家规组合用感知处理 Athletics，工匠授予侏儒语，直接伤害定额为 3。标准组合分别使用力量、矮人语与定额 6。两套共享检定机制和两分支预检，实际分支与根子后果随完整事实保存。[检定规则](../../../src/main/java/com/dndtool/service/Schema2CharacterCheckRules.java)、[两分支后果](../../../src/main/java/com/dndtool/service/storage/CampaignCheckEffects.java) | 其他机制各自依真实入口和机制清单验收 |
+| 核心协调 | `CampaignStorageService` 仍集中接纳、随机服务、视图和文件流程。[存储服务](../../../src/main/java/com/dndtool/service/storage/CampaignStorageService.java) | 共同保障继续与具体 D&D 语义分开，保持领域后果、仓储与生命周期闭合 |
+| 空间 | 已采用世界节点、局部 5 尺网格、多场景单焦点、后台冻结、源空间旅行与个人经历；format 3 保存全部空间和 pending。[空间合同的当前范围](world-and-scene-spaces.md#当前采用范围) | 接入真实体积、独立日历与受限跨空间被动后果；现有平面格位不证明这些机制已支持 |
+| 规则行为接口 | 原有限消费者的范围由[领域接合表](domain-integration.md)列证 | [行为复验](rule-behavior-interface-validation.md)分别记录原设计、修订设计和程序证据；动作/效果/施法/角色、日历/几何/物件各自拥有正式合同 |
+
 ## 可独立采用的顺序
 
 以下是依赖顺序，不把设计提交称作运行支持；每步都包括代码、受影响合同与验证。
 
-1. **规则绑定与检定闭环。** 创建、候选、展示、检定及两分支后果共享战役上下文和领域类型。
+1. **规则绑定与检定闭环。** 当前创建、候选、展示、检定及两分支后果共享战役上下文和领域类型。
    原骰、来源、完整文件和直接恢复沿共同事务合同。
-2. **本机规则库与外部内容。** 接通原包保管、独立准确接受、有序选择及新建和文件打开复核。
+2. **本机规则库与外部内容。** 当前采用原包保管、独立准确接受、有序选择及新建和文件打开复核。
    外部内容限现有建卡模板与应用已实现机制。原 MySQL 来源独立管理。
-3. **空间与焦点时间。** 接通世界节点、局部网格、多场景单焦点、暂停时间、入退及转移，
-   连同全部冻结 pending 的保存恢复。体积和跨空间效果分别按对应机制采用。
+3. **空间与焦点时间。** 当前已接合世界节点、局部网格、多场景单焦点、暂停时间、入退/
+   转移及全部冻结 pending 的保存恢复；实际有限边界见空间合同，不能由此推导体积或跨空间效果。
 4. **逐机制扩展。** 按时间/跨空间政策 → 检定、替代攻击、联动移动、真实区域与物件 →
    形态、召唤、充能和储存施法的依赖顺序采用正式合同。每个切片闭合消费者、历史和恢复，
    逐项通过机制清单。设计复验不是运行验收；完整 SRD 发布与真实资料处置分别验收和授权。
@@ -201,5 +215,8 @@ flowchart LR
 | 保存任意已提交中途状态 | 所有场景、角色、原骰、资源、根子历史、时钟、焦点和待继续叶子 | 篡改材料/链/状态/历史拒绝；恢复不调用游戏执行或 RNG、不补字段 |
 | 文件移机与本机残留 | 新打开具备准确原包/本机接受；残留直接核本库完整冻结事实 | 文件不能自报接受；缺包阻断新打开，来源离线不阻断活动/残留 |
 
-各阶段应分别取得准确规则、真实领域后果与完整文件恢复证据。定向验证和 WAR 审计见
-[测试指南](../../testing.md)，数据库操作、部署与发布遵守各自检查点。
+规则绑定的定向入口包括 `BundledCampaignRulesTest`、`LocalRuleLibraryTest`、`CampaignRuleSupportTest`、
+`CampaignRuleContextTest` 与 `CampaignRuleBindingIntegrationTest`。规则、领域后果和恢复由 `Schema2CheckCompositionTest`、
+`CampaignDomainEngineTest`、`CampaignCheckEffectsTest`、`CampaignDomainsCombatIntegrationTest`
+与 `CampaignDomainRecoveryTest` 覆盖相关路径。按测试指南运行有关定向测试，生产代码或资源
+变更后执行 WAR 审计。真实数据库操作、部署与发布各守独立检查点。[测试指南](../../testing.md)

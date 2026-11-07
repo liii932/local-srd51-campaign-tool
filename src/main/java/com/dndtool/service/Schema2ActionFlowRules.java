@@ -114,7 +114,7 @@ final class Schema2ActionFlowRules {
             require(battle.concentrationHolders().stream().anyMatch(h->h.actorId().equals(ready.actorId())&&h.kind()==ConcentrationKind.READY_SPELL&&h.sourceKey().equals(ready.readyKey())),"S2_SPELL_CONCENTRATION_UNAVAILABLE");
             CastAttempt held=Schema2SpellRules.findCast(battle,ready.heldCastFrameKey());require(held!=null&&held.status()==CastStatus.HELD,"S2_READY_HELD_SPELL_INVALID");
             Schema2OngoingEffectRules.requireCastingAllowed(roster,battle,ready.actorId());boolean bless=isBless(roster,ready.actorId(),held.spell());
-            if(bless)require(Schema2SpellRules.second(roster.get(ready.actorId()).character())<=Schema2CharacterRestRules.MAX_MINUTE*60-60,"S2_SPELL_TIME_CAPACITY");
+            if(bless)require(roster.get(ready.actorId()).sceneSecond()<=Schema2CharacterRestRules.MAX_MINUTE*60-60,"S2_SPELL_TIME_CAPACITY");
             for(UUID target:held.targets()) {
                 require(actor(battle,ready.actorId()).position().distanceFeet(actor(battle,target).position())<=(bless?30:5),"S2_SPELL_TARGET");
                 if(!bless)require(!roster.get(target).character().health().dead(),"S2_HEALTH_DEAD");
@@ -189,7 +189,7 @@ final class Schema2ActionFlowRules {
         require(bound<=Schema2OngoingEffectRules.MAX_CAUSES,"ACTION_FLOW_LIMIT_EXCEEDED");
     }
     private static void addProspectiveBless(List<OngoingEffect> effects,UUID owner,UUID actor,RuleIdentity spell,List<UUID> targets,Map<UUID,Context> roster) {
-        UUID effect=key(owner,"ongoing-effect");if(effects.stream().anyMatch(e->e.effectKey().equals(effect)))return;long now=Schema2SpellRules.second(roster.get(actor).character());effects.add(new OngoingEffect(effect,spell,actor,targets,now,now+60,EffectStatus.ACTIVE,null));
+        UUID effect=key(owner,"ongoing-effect");if(effects.stream().anyMatch(e->e.effectKey().equals(effect)))return;long now=roster.get(actor).sceneSecond();effects.add(new OngoingEffect(effect,spell,actor,targets,now,now+60,EffectStatus.ACTIVE,null));
     }
     private static boolean isBless(Map<UUID,Context> roster,UUID actor,RuleIdentity spell) {return roster.get(actor).material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).anyMatch(s->s.enabled()&&s.identity().equals(spell)&&Schema2SpellRules.BLESS.equals(s.definition().algorithm()));}
     /** Commands needed to finish by passing every still optional opportunity; each new child reserves its own suffix before acceptance. */
@@ -278,7 +278,7 @@ final class Schema2ActionFlowRules {
         }
         void actor(Combatant value) {boolean moved=!Schema2ActionFlowRules.actor(b,value.characterId()).position().equals(value.position());b=rebuild(b,b.combatants().stream().map(a->a.characterId().equals(value.characterId())?value:a).toList(),b.flows(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.version());if(moved)reconcileBoundary();}
         void reconcileBoundary() {var result=Schema2OngoingEffectRules.reconcile(snapshot(),operation,++boundarySerial);b=Schema2OngoingEffectRules.withCauses(b,result.causes());facts.addAll(result.facts());}
-        void change(HealthChange value) {changes.add(value);Context old=roster.get(value.characterId());roster.put(value.characterId(),new Context(old.material(),old.initial(),value.after()));}
+        void change(HealthChange value) {changes.add(value);Context old=roster.get(value.characterId());roster.put(value.characterId(),old.after(value.after(), value.timeAdvance() ? value.seconds() : 0));}
         void ready(ReadyPreparation value) {List<ReadyPreparation> all=new ArrayList<>(b.readyPreparations());int i=0;while(i<all.size()&&!all.get(i).readyKey().equals(value.readyKey()))i++;if(i==all.size())all.add(value);else all.set(i,value);b=rebuild(b,b.combatants(),b.flows(),all,b.triggerFacts(),b.shields(),b.concentrationHolders(),b.version());}
         void holder(ConcentrationHolder value) {List<ConcentrationHolder> all=new ArrayList<>(b.concentrationHolders().stream().filter(h->!h.actorId().equals(value.actorId())).toList());all.add(value);b=rebuild(b,b.combatants(),b.flows(),b.readyPreparations(),b.triggerFacts(),b.shields(),all,b.version());}
         void endConcentration(UUID subject,String reason) {b=Schema2SpellRules.end(snapshot(),subject,reason,facts);}
@@ -379,7 +379,7 @@ final class Schema2ActionFlowRules {
             CastAttempt c=cast(id);
             if(!release&&get(id).parentFrameKey()==null&&b.status()==Status.EXPLORATION) {
                 var time=Schema2ExplorationRules.advanceTime(roster,6,id);for(HealthChange value:time.changes())change(value);
-                b=Schema2ExplorationRules.expire(b,Schema2SpellRules.second(roster.get(c.actorId()).character()),facts);reconcileBoundary();
+                b=Schema2ExplorationRules.expire(b,roster.get(c.actorId()).sceneSecond(),facts);reconcileBoundary();
                 facts.add(new CombatFact("CAST_TIME_ADVANCED",c.actorId(),id,null));
             }
             if(c.status()==CastStatus.COUNTERED) {
@@ -423,7 +423,7 @@ final class Schema2ActionFlowRules {
                 }
                 if(c.readyKey()!=null)endConcentration(c.actorId(),"READY_RELEASED");
             } else if(Schema2SpellRules.BLESS.equals(algorithm)) {
-                endConcentration(c.actorId(),"REPLACED_BY_CONCENTRATION");effect=key(c.frameKey(),"ongoing-effect");long second=Schema2SpellRules.second(roster.get(c.actorId()).character());
+                endConcentration(c.actorId(),"REPLACED_BY_CONCENTRATION");effect=key(c.frameKey(),"ongoing-effect");long second=roster.get(c.actorId()).sceneSecond();
                 List<OngoingEffect> effects=new ArrayList<>(b.ongoingEffects());effects.add(new OngoingEffect(effect,c.spell(),c.actorId(),c.targets(),second,second+60,EffectStatus.ACTIVE,null));b=Schema2SpellRules.withEffects(b,effects);holder(new ConcentrationHolder(c.actorId(),ConcentrationKind.BLESS_EFFECT,effect));facts.add(new CombatFact("ONGOING_EFFECT_STARTED",c.actorId(),effect,null));
             } else if(Schema2SpellRules.SHIELD.equals(algorithm)) {
                 effect=key(c.frameKey(),"shield");List<ShieldEffect> all=new ArrayList<>(b.shields());int ordinal=b.initiative().stream().filter(i->i.characterId().equals(c.actorId())).findFirst().orElseThrow().ordinal();

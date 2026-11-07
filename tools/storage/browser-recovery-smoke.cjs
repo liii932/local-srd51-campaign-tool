@@ -14,10 +14,11 @@ const { chromium } = require('playwright');
 
 const ORIGIN = 'http://127.0.0.1:8080';
 const HTTP_TIMEOUT = 120000;
-const { observeStorageAction } = require('./browser-action.cjs');
+const { observeStorageAction, waitForExactText, waitForHistoryCount } = require('./browser-action.cjs');
+const { selectStandardRules } = require('./browser-rule-library.cjs');
 const RECOVERY_NAME = '浏览器恢复验收营地';
 const DISCARD_NAME = '浏览器精确放弃验收营地';
-const KNOWN_NAMES = new Set(['浏览器验收营地', '基础生命值验收', '完整领域浏览器验收',
+const KNOWN_NAMES = new Set(['浏览器验收营地', '完整领域浏览器验收',
   '奥术回想浏览器验收', '装备与生命法术验收', RECOVERY_NAME, DISCARD_NAME]);
 const [mode, output] = process.argv.slice(2);
 assert.ok(process.argv.length === 4 && ['prepare', 'recover', 'prepare-discard', 'discard'].includes(mode)
@@ -61,7 +62,7 @@ async function main() {
   outputReady = true;
   let fixture = preparing ? null : JSON.parse(await fs.readFile(manifestPath, 'utf8'));
   if (fixture) {
-    assert.equal(fixture.schema, 1);
+    assert.equal(fixture.schema, 2);
     assert.equal(fixture.origin, ORIGIN);
     assert.equal(fixture.kind, kind, 'The retained prepare stage must match the requested transition');
     assert.equal(fixture.name, fixtureName);
@@ -102,10 +103,7 @@ async function main() {
   });
 
   const form = id => page.locator(`#${id}`);
-  async function equalText(selector, expected) {
-    await page.waitForFunction(({ selector, expected }) =>
-      document.querySelector(selector)?.textContent.trim() === expected, { selector, expected });
-  }
+  const equalText = (selector, expected) => waitForExactText(page, selector, expected);
   async function state() {
     currentPhase = 'http-state';
     const response = await context.request.get(`${ORIGIN}/api/host/storage/state`, { timeout: HTTP_TIMEOUT });
@@ -153,17 +151,19 @@ async function main() {
   async function screenshot(name) {
     await page.screenshot({ path: path.join(output, name), fullPage: true }); report.screenshots.push(name);
   }
-  async function heal(amount) {
-    await form('storage-heal').locator('[name="amount"]').fill(String(amount));
-    await action('heal', () => form('storage-heal').getByRole('button', { name: '应用治疗', exact: true }).click());
+  async function setHpField(field, value) {
+    const row = page.locator(`#manual-card-editor [data-manual-target="${field}"]`);
+    await row.locator('input').fill(String(value));
+    await action('domain', () => row.getByRole('button', {name: '保存', exact: true}).click());
   }
+  const freeHp = campaign => campaign.domain.manual.characters[0].current.fields['hp.current'];
   async function verifyFacts(current, expected) {
     assert.equal(current.storage.state, 'ACTIVE');
     assert.equal(current.storage.runId, fixture.runId, 'Recovery must keep the exact retained run');
     assert.deepEqual(durableCampaign(current.campaign), expected, 'Facts, identities, revision and history must survive unchanged');
     await equalText('#storage-campaign-name', fixtureName);
-    await equalText('#storage-characters .hp', `${expected.characters[0].currentHp} / 12`);
-    await page.waitForFunction(count => document.querySelectorAll('#storage-history > li').length === count, expected.history.length);
+    await equalText('#manual-cards .hp', `${freeHp(expected)} / 12`);
+    await waitForHistoryCount(page, expected.history.length);
   }
 
   try {
@@ -180,35 +180,32 @@ async function main() {
       await readiness('IDLE');
       const baselineFiles = await savedFiles(initial);
       report.checks.push('IDLE root contains only exact known browser fixture names; baseline file identities and bytes retained');
-      await page.locator('#storage-modules input[value="srd51-healing@1"]').check();
-      await page.locator('#storage-modules input[value="srd51-runtime@1"]').uncheck();
+      await selectStandardRules(page);
       await form('storage-create').locator('[name="name"]').fill(fixtureName);
       await action('create', () => form('storage-create').getByRole('button', { name: '创建战役', exact: true }).click());
       const created = await state();
       assert.equal(created.campaign.name, fixtureName);
-      fixture = { schema: 1, origin: ORIGIN, kind, name: fixtureName, runId: created.storage.runId,
+      fixture = { schema: 2, origin: ORIGIN, kind, name: fixtureName, runId: created.storage.runId,
         campaignId: created.campaign.campaignId, epoch: created.storage.epoch, baselineFiles };
       report.ownedFixture = { name: fixtureName, runId: fixture.runId, campaignId: fixture.campaignId };
       await fs.writeFile(path.join(output, 'fixture-progress.json'), json(fixture), { flag: 'wx' });
-      await form('storage-character').locator('[name="name"]').fill('恢复验收艾拉');
-      await form('storage-character').locator('[name="maximumHp"]').fill('12');
-      await form('storage-character').locator('[name="currentHp"]').fill('4');
-      await action('characters', () => form('storage-character').getByRole('button', { name: '创建角色', exact: true }).click());
-      await heal(5);
-      await equalText('#storage-characters .hp', '9 / 12');
+      await page.locator('[data-pane="manual"]').click();
+      await form('manual-create').locator('[name="name"]').fill('恢复验收艾拉');
+      await form('manual-create').locator('[name="template"]').selectOption('blank');
+      await action('domain', () => form('manual-create').getByRole('button', {name: '创建自由卡', exact: true}).click());
+      await setHpField('hp.maximum', 12);
+      await setHpField('hp.current', 4);
+      await setHpField('hp.current', 9);
+      await equalText('#manual-cards .hp', '9 / 12');
       const save = await action('save', () => form('storage-save').click());
       assert.ok(save.body.savedFile);
       fixture.manualSaveFile = save.body.savedFile;
       fixture.savedCampaign = durableCampaign((await state()).campaign);
-      assert.equal(fixture.savedCampaign.history.length, 2);
-      assert.deepEqual(fixture.savedCampaign.rules, ['srd51-vitality@1', 'srd51-healing@1']);
-      assert.equal(fixture.savedCampaign.characters[0].currentHp, 9);
-      assert.equal(fixture.savedCampaign.history[1].beforeHp, 4);
-      assert.equal(fixture.savedCampaign.history[1].afterHp, 9);
-      assert.equal(fixture.savedCampaign.history[1].amount, 5);
-      assert.equal(fixture.savedCampaign.history[1].applied, 5);
+      assert.equal(fixture.savedCampaign.history.length, 4);
+      assert.equal(fixture.savedCampaign.history.at(-1).kind, 'manual-field');
+      assert.equal(freeHp(fixture.savedCampaign), 9);
       // The discard case deliberately leaves progress beyond its accepted manual save.
-      if (kind === 'discard') await heal(1);
+      if (kind === 'discard') await setHpField('hp.current', 10);
       const prepared = await state();
       fixture.expectedCampaign = durableCampaign(prepared.campaign);
       fixture.savedFiles = await savedFiles(prepared);
@@ -217,13 +214,13 @@ async function main() {
       assert.equal(prepared.storage.runId, fixture.runId);
       assert.equal(prepared.storage.epoch, fixture.epoch);
       await verifyFacts(prepared, fixture.expectedCampaign);
-      assert.equal(fixture.expectedCampaign.characters[0].currentHp, kind === 'discard' ? 10 : 9);
-      assert.equal(fixture.expectedCampaign.history.length, kind === 'discard' ? 3 : 2);
+      assert.equal(freeHp(fixture.expectedCampaign), kind === 'discard' ? 10 : 9);
+      assert.equal(fixture.expectedCampaign.history.length, kind === 'discard' ? 5 : 4);
       for (const original of baselineFiles) assert.deepEqual(fixture.savedFiles.find(file => file.fileKey === original.fileKey), original);
       await fs.writeFile(manifestPath, json(fixture), { flag: 'wx' });
       await screenshot(`${mode}-active.png`);
-      report.checks.push('Real forms created 4/12, healed 5, saved 9/12; exact run, epoch, campaign facts/history and all saved bytes retained');
-      if (kind === 'discard') report.checks.push('One additional unsaved heal leaves 10/12 for the discard boundary');
+      report.checks.push('Real free-card forms recorded 4/12 then 9/12 and saved; exact run, epoch, campaign facts/history and all saved bytes retained');
+      if (kind === 'discard') report.checks.push('One additional unsaved free-card edit leaves 10/12 for the discard boundary');
       report.next = `Stop or terminate only the exact external candidate process, restart the same base/root, then run ${kind} with this directory`;
     } else {
       assert.equal(initial.storage.state, 'RESIDUAL');

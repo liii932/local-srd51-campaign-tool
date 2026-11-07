@@ -141,7 +141,7 @@
     const add = (kind, title, text) => { const article = element('article', 'shared-item'); article.append(element('p', 'eyebrow', kind), element('h3', '', title), element('p', '', text)); container.append(article); return article; };
     for (const card of shared.cards || []) add('队友概况', card.name || '已共享角色', card.description || '');
     for (const scene of shared.scenes || []) {
-      const article = add('当前场景', scene.name || '已共享场景', scene.description || '');
+      const article = add(scene.focused ? '执行焦点' : '共享空间', scene.name || '已共享场景', scene.description || '');
       if (scene.turnLabel) article.append(element('p', '', scene.turnLabel));
       if (Array.isArray(scene.participants)) { const list = element('ul', 'mini-list'); for (const person of scene.participants) list.append(element('li', '', [person.name, person.position, person.current ? '当前行动者' : ''].filter(Boolean).join(' · '))); article.append(list); }
     }
@@ -179,7 +179,7 @@
     if (sharedKey !== sharedRenderKey) { sharedRenderKey = sharedKey; renderShared(); }
     if (proposalsKey !== proposalsRenderKey) { proposalsRenderKey = proposalsKey; renderProposals(); }
     const pending = $('player-pending');
-    if (pendingKey !== pendingRenderKey) { pendingRenderKey = pendingKey; pending.replaceChildren(); pending.hidden = !view.pending || view.pending.active === false;
+    if (pendingKey !== pendingRenderKey) { pendingRenderKey = pendingKey; pending.replaceChildren(); pending.hidden = !view.pending?.active && !view.pending?.frozen;
       if (view.pending) pending.append(element('h2', '', view.pending.title || '等待当前行动继续'), element('p', '', view.pending.description || '请按当前允许的机会继续。'));
     }
     $('player-receipt').hidden = !lastReceipt;

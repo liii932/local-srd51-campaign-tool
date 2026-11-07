@@ -112,7 +112,7 @@ class ProductionRuleArtifactTest {
         assertNotEquals(forward.compositionSha256(), reverse.compositionSha256());
         assertNotEquals(forward.chainSha256(), reverse.chainSha256());
         var budgetOnly = new java.util.AbstractList<ProductionRuleArtifact>() {
-            @Override public int size() { return 5; }
+            @Override public int size() { return Schema2CompositionKernel.MAX_PACKAGES + 1; }
             @Override public ProductionRuleArtifact get(int index) { throw new AssertionError("Oversized selection must not be traversed"); }
         };
         var failure = assertThrows(Schema2CompositionKernel.Schema2Exception.class, () -> ProductionSchema2Projection.compose(budgetOnly));

@@ -45,7 +45,7 @@ public final class Schema2CharacterCheckRules {
         }
         // Obtaining a feature/feat is not an execution owner for its check modifiers, rerolls,
         // restrictions or advantage. This slice accepts no acquired unresolved influence.
-        Schema2SpellRules.requireSupportedFeatures(material,before,"S2_CHECK_EFFECT_UNSUPPORTED");
+        Schema2SpellRules.requireSupportedFeatures(material, before, "S2_CHECK_EFFECT_UNSUPPORTED");
         var definitions = material.projection().rules().stream().filter(FinalCheck.class::isInstance)
                 .map(FinalCheck.class::cast).filter(FinalCheck::enabled).toList();
         CheckInput input = command.checkInput();

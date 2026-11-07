@@ -11,6 +11,7 @@
 !/src/main/resources/storage/rules/srd51-characters.zip
 !/src/main/resources/storage/rules/srd51-magic.zip
 !/src/main/resources/storage/rules/dm-runtime-house-rules.zip
+!/src/main/resources/storage/rules/dm-runtime-check-variant.zip
 *.7z
 *.rar
 *.tar

@@ -108,7 +108,7 @@ class PlayerGatewayServiceTest {
     }
     private CampaignStorageService storage() throws Exception {
         CampaignStorageService storage=new CampaignStorageService(temporary.resolve(UUID.randomUUID().toString()));
-        storage.create("玩家安全",List.of(CampaignRules.BASE,CampaignRules.HEALING,CampaignRules.RUNTIME));return storage;
+        CampaignRuleFixtures.create(storage, "玩家安全");return storage;
     }
     private static PlayerGatewayService.Reply apply(PlayerGatewayService gateway,JsonObject invite,String name) {
         var anonymous=gateway.read(null,null,true);

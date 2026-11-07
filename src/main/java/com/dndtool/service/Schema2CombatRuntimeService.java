@@ -17,11 +17,18 @@ public final class Schema2CombatRuntimeService {
     public enum Status { COMMITTED, REPLAYED, REJECTED, UNKNOWN, NOT_COMMITTED }
     public record Result(Status status, String code, Event event) { }
     public record Request(UUID operationId, UUID combatId, UUID campaignId, Schema2RulesBinding rules,
-            List<Member> members, long expectedVersion, Map<UUID,Long> expectedCharacterVersions, Command command) {
+            List<Member> members, long expectedVersion, Map<UUID,Long> expectedCharacterVersions, Command command,
+            boolean spaceOwned) {
+        public Request(UUID operationId, UUID combatId, UUID campaignId, Schema2RulesBinding rules,
+                List<Member> members, long expectedVersion, Map<UUID,Long> expectedCharacterVersions, Command command) {
+            this(operationId, combatId, campaignId, rules, members, expectedVersion, expectedCharacterVersions, command, false);
+        }
         public Request {
             for (UUID id : Arrays.asList(operationId,combatId,campaignId)) uuid(id);
-            if (Set.of(operationId,combatId,campaignId).size()!=3 || rules==null || members==null || command==null
-                    || members.size()<2 || members.size()>Schema2CombatHistory.MAX_CHARACTER_MEMBERS || expectedCharacterVersions==null)
+            if (operationId.equals(campaignId) || combatId.equals(campaignId) || rules==null || members==null || command==null
+                    || operationId.equals(combatId) && (!spaceOwned || command.kind()!=Kind.OPEN_SCENE)
+                    || !spaceOwned && (members.size()<2 || Schema2CombatRules.placementCommand(command))
+                    || members.size()>Schema2CombatHistory.MAX_CHARACTER_MEMBERS || expectedCharacterVersions==null)
                 throw rejected("S2_COMBAT_REQUEST");
             members = members.stream().sorted(Comparator.comparing(Member::characterId, Schema2CombatHistory.UUID_ORDER)).toList();
             Set<UUID> ids = new HashSet<>();
@@ -31,7 +38,7 @@ public final class Schema2CombatRuntimeService {
                 if (!ids.add(member.characterId())) throw rejected("S2_COMBAT_REQUEST");
             }
             if (!ids.equals(expectedCharacterVersions.keySet()) || expectedCharacterVersions.values().stream().anyMatch(v->v==null||v<0||v>=Schema2CharacterRuntime.MAX_EVENTS)
-                    || (command.kind()==Kind.START ? expectedVersion!=-1 : expectedVersion<0)) throw rejected("S2_COMBAT_REQUEST");
+                    || (command.kind()==Kind.START || command.kind()==Kind.OPEN_SCENE ? expectedVersion!=-1 : expectedVersion<0)) throw rejected("S2_COMBAT_REQUEST");
             expectedCharacterVersions = Map.copyOf(expectedCharacterVersions);
         }
         public String digest() { return fingerprint(this); }
@@ -58,6 +65,8 @@ public final class Schema2CombatRuntimeService {
 
     public Result execute(Request request) {
         Objects.requireNonNull(request);
+        if (request.spaceOwned())
+            return new Result(Status.REJECTED,"S2_COMBAT_REQUEST",null);
         return transact(false,request.combatId(),request.digest(),null,connection->{
             History previous=combats.read(connection,request.combatId());
             if (previous!=null) validate(connection,previous);

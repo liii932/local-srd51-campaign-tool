@@ -1,6 +1,7 @@
 package com.dndtool.service.storage;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static com.dndtool.service.storage.CampaignLifecycleFixture.*;
 
 import com.dndtool.service.storage.CampaignStorageService.Boundary;
 import java.nio.channels.FileChannel;
@@ -20,7 +21,6 @@ import org.junit.jupiter.api.io.TempDir;
 /** Precise file ownership, publication, explicit loss and shutdown boundaries. */
 class CampaignStorageLifecycleTest {
     @TempDir Path temporary;
-    private static final List<String> RULES = List.of(CampaignRules.BASE, CampaignRules.HEALING);
     private Path root() { return temporary.resolve("managed"); }
     private static String id() { return UUID.randomUUID().toString(); }
 
@@ -38,6 +38,7 @@ class CampaignStorageLifecycleTest {
             assertTrue(names(root().resolve("runs")).isEmpty());
             assertEquals(Set.of(expected.fileKey() + ".json"), names(root().resolve("saves")));
             assertArrayEquals(bytes, Files.readAllBytes(service.savedFile(expected.fileKey())));
+            CampaignRuleFixtures.install(service);
             var opened = service.open(expected.fileKey());
             assertEquals(expected.snapshot().campaignId(), opened.campaignId());
             assertEquals(expected.snapshot().history().size(), opened.history().size());
@@ -137,7 +138,7 @@ class CampaignStorageLifecycleTest {
 
     @Test void conflictingPublishedContentCannotAuthorizeCleanupOfAnotherCompleteStagingDocument() throws Exception {
         byte[] bytes = fileBytes(); CampaignCodec codec = new CampaignCodec(); var document = codec.decode(bytes); var source = document.snapshot();
-        byte[] different = codec.encode(new CampaignData.Document(document.fileKey(), new CampaignData.Snapshot(source.campaignId(), "另一个同身份内容", source.rules(), source.characters(), source.history(), source.domains())));
+        byte[] different = codec.encode(new CampaignData.Document(document.fileKey(), new CampaignData.Snapshot(source.campaignId(), "另一个同身份内容", source.domains())));
         try (var service = new CampaignStorageService(root())) {
             service.importFile(different);
             Path staging = root().resolve("saves").resolve(document.fileKey() + ".tmp"); Files.write(staging, bytes);
@@ -161,7 +162,7 @@ class CampaignStorageLifecycleTest {
     @Test void importAndSavedFileDeletionRequireNoActiveOrResidualRun() throws Exception {
         byte[] bytes = fileBytes(); String file, run;
         try (var service = new CampaignStorageService(root())) {
-            var created = service.create("受保护运行", RULES); file = service.status().saveFiles().getFirst(); run = service.status().runId();
+            var created = CampaignRuleFixtures.create(service, "受保护运行"); file = service.status().saveFiles().getFirst(); run = service.status().runId();
             assertCode("RUN_EXISTS", () -> service.importFile(bytes));
             assertCode("RUN_EXISTS", () -> service.deleteSavedFile(file));
             assertCode("RUN_EXISTS", () -> service.discardResidual(run));
@@ -202,8 +203,8 @@ class CampaignStorageLifecycleTest {
     @Test void explicitAbandonmentDropsOnlyTheIdentifiedRunAndRetainsEverySavedArtifact() throws Exception {
         String run; Set<String> saves;
         try (var service = new CampaignStorageService(root())) {
-            var created = service.create("明确放弃", RULES);
-            service.addCharacter(id(), created.epoch(), 0, "未保存角色", 12, 4);
+            var created = CampaignRuleFixtures.create(service, "明确放弃");
+            addCard(service, id(), created.epoch(), 0, "未保存角色");
             run = service.status().runId(); saves = names(root().resolve("saves"));
         }
         try (var service = new CampaignStorageService(root())) {
@@ -263,7 +264,7 @@ class CampaignStorageLifecycleTest {
             assertThrows(IllegalStateException.class, () -> service.discardResidual(run));
             assertEquals(List.of(run), service.status().residualRunIds());
             assertCode("RUN_DISCARDED", () -> service.recover(run));
-            assertCode("RESIDUAL_RUN", () -> service.create("不能替代", RULES));
+            assertCode("RESIDUAL_RUN", () -> CampaignRuleFixtures.create(service, "不能替代"));
             assertTrue(Files.exists(root().resolve("runs").resolve(".discard-" + run).resolve("run.db")));
         }
         try (var service = new CampaignStorageService(root())) {
@@ -289,25 +290,22 @@ class CampaignStorageLifecycleTest {
     @Test void shutdownRetainsLatestUnsavedStateForExplicitRecoveryWhileEndCleansNormally() throws Exception {
         String run;
         try (var service = new CampaignStorageService(root())) {
-            var created = service.create("关闭保留", RULES);
-            service.addCharacter(id(), created.epoch(), 0, "角色", 12, 4); run = service.status().runId();
+            var created = CampaignRuleFixtures.create(service, "关闭保留");
+            addCard(service, id(), created.epoch(), 0, "角色"); run = service.status().runId();
         }
         try (var service = new CampaignStorageService(root())) {
             assertEquals("RESIDUAL", service.status().state());
-            var restored = service.recover(run); assertEquals(1, restored.revision()); assertEquals(1, restored.characters().size());
+            var restored = service.recover(run); assertEquals(1, restored.revision()); assertEquals(1, cards(restored));
             service.end(id(), restored.epoch(), restored.revision());
             assertEquals("IDLE", service.status().state()); assertTrue(names(root().resolve("runs")).isEmpty());
         }
     }
 
     private String residual() throws Exception {
-        try (var service = new CampaignStorageService(root())) { service.create("本地残留", RULES); return service.status().runId(); }
+        try (var service = new CampaignStorageService(root())) { CampaignRuleFixtures.create(service, "本地残留"); return service.status().runId(); }
     }
     private CampaignStorageService faultService(AtomicReference<Boundary> fault) throws Exception {
         return new CampaignStorageService(root(), boundary -> { if (fault.compareAndSet(boundary, null)) throw new IllegalStateException("injected " + boundary); });
-    }
-    private static byte[] fileBytes() throws Exception {
-        try (var input = CampaignStorageLifecycleTest.class.getResourceAsStream("/storage/vitality-known-file.json")) { return input.readAllBytes(); }
     }
     private static Set<String> names(Path directory) throws Exception {
         try (var entries = Files.list(directory)) { return entries.map(path -> path.getFileName().toString()).collect(Collectors.toSet()); }

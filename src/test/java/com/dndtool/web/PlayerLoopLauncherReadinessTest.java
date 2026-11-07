@@ -1,7 +1,7 @@
 package com.dndtool.web;
 
 import com.dndtool.service.storage.CampaignStorageService;
-import com.dndtool.service.storage.CampaignRules;
+import com.dndtool.service.storage.CampaignRuleFixtures;
 import jakarta.servlet.ServletContext;
 import java.io.*;
 import java.lang.reflect.Proxy;
@@ -57,7 +57,7 @@ class PlayerLoopLauncherReadinessTest {
     @Test void reopenedResidualStoreKeepsItsExplicitHostRecoveryPathWithoutAdvancingState() throws Exception {
         Path root=temporary.resolve("residual-store");String runId;
         try(CampaignStorageService storage=new CampaignStorageService(root)) {
-            storage.create("需要主持恢复",List.of(CampaignRules.BASE));runId=storage.status().runId();
+            CampaignRuleFixtures.create(storage, "需要主持恢复");runId=storage.status().runId();
         }
         try(CampaignStorageService reopened=new CampaignStorageService(root)) {
             var before=reopened.status();assertEquals("RESIDUAL",before.state());assertEquals(List.of(runId),before.residualRunIds());

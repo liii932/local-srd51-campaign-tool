@@ -1,7 +1,7 @@
 {
   "declarationVersion": 1,
-  "applicationModel": "srd51-vitality-1",
-  "storageModel": "sqlite-vitality-1",
+  "applicationModel": "campaign-spaces-3",
+  "storageModel": "sqlite-campaign-3",
   "dialect": "sqlite-strict-1",
   "modules": [
     {
@@ -139,23 +139,9 @@
               "minimum": "1"
             },
             {
-              "name": "character_id",
+              "name": "subject_id",
               "type": "uuid",
               "nullable": false
-            },
-            {
-              "name": "before_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "0",
-              "maximum": "65535"
-            },
-            {
-              "name": "after_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "0",
-              "maximum": "65535"
             }
           ],
           "primaryKey": [
@@ -232,26 +218,6 @@
           "indexes": []
         },
         {
-          "name": "core_constant",
-          "columns": [
-            {
-              "name": "kind",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 1,
-              "maxCodePoints": 30,
-              "ascii": true
-            }
-          ],
-          "primaryKey": [
-            "kind"
-          ],
-          "uniqueKeys": [],
-          "foreignKeys": [],
-          "checks": [],
-          "indexes": []
-        },
-        {
           "name": "core_player_control",
           "columns": [
             {
@@ -278,427 +244,12 @@
           "indexes": []
         }
       ],
-      "seeds": [
-        {
-          "table": "core_constant",
-          "rows": [
-            {
-              "kind": "vitality-profile-1"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "rules",
-      "dependsOn": [
-        "core"
-      ],
-      "tables": [
-        {
-          "name": "rules_binding",
-          "columns": [
-            {
-              "name": "ordinal",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "0"
-            },
-            {
-              "name": "module_id",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 1,
-              "maxCodePoints": 80,
-              "ascii": true
-            },
-            {
-              "name": "material_digest",
-              "type": "digest256",
-              "nullable": false
-            }
-          ],
-          "primaryKey": [
-            "ordinal"
-          ],
-          "uniqueKeys": [
-            {
-              "name": "rules_module_id_unique",
-              "columns": [
-                "module_id"
-              ]
-            }
-          ],
-          "foreignKeys": [],
-          "checks": [],
-          "indexes": []
-        },
-        {
-          "name": "rules_vitality",
-          "columns": [
-            {
-              "name": "singleton",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "1"
-            },
-            {
-              "name": "algorithm",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 1,
-              "maxCodePoints": 40,
-              "ascii": true
-            },
-            {
-              "name": "maximum_hp_limit",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            },
-            {
-              "name": "minimum_current_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "1"
-            },
-            {
-              "name": "healing_enabled",
-              "type": "boolean",
-              "nullable": false
-            }
-          ],
-          "primaryKey": [
-            "singleton"
-          ],
-          "uniqueKeys": [],
-          "foreignKeys": [],
-          "checks": [],
-          "indexes": []
-        }
-      ],
-      "seeds": []
-    },
-    {
-      "id": "characters",
-      "dependsOn": [
-        "core",
-        "rules"
-      ],
-      "tables": [
-        {
-          "name": "characters_character",
-          "columns": [
-            {
-              "name": "character_id",
-              "type": "uuid",
-              "nullable": false
-            },
-            {
-              "name": "name",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 1,
-              "maxCodePoints": 80,
-              "ascii": false
-            },
-            {
-              "name": "maximum_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            },
-            {
-              "name": "current_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            },
-            {
-              "name": "initial_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            },
-            {
-              "name": "version",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1"
-            },
-            {
-              "name": "created_sequence",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1"
-            }
-          ],
-          "primaryKey": [
-            "character_id"
-          ],
-          "uniqueKeys": [],
-          "foreignKeys": [],
-          "checks": [
-            {
-              "name": "characters_current_le_max",
-              "expression": {
-                "op": "le",
-                "left": {
-                  "column": "current_hp"
-                },
-                "right": {
-                  "column": "maximum_hp"
-                }
-              }
-            },
-            {
-              "name": "characters_initial_le_max",
-              "expression": {
-                "op": "le",
-                "left": {
-                  "column": "initial_hp"
-                },
-                "right": {
-                  "column": "maximum_hp"
-                }
-              }
-            }
-          ],
-          "indexes": []
-        }
-      ],
-      "seeds": []
-    },
-    {
-      "id": "history",
-      "dependsOn": [
-        "characters",
-        "core"
-      ],
-      "tables": [
-        {
-          "name": "history_event",
-          "columns": [
-            {
-              "name": "sequence",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1"
-            },
-            {
-              "name": "event_type",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 1,
-              "maxCodePoints": 20,
-              "ascii": true
-            },
-            {
-              "name": "character_id",
-              "type": "uuid",
-              "nullable": false
-            }
-          ],
-          "primaryKey": [
-            "sequence"
-          ],
-          "uniqueKeys": [],
-          "foreignKeys": [
-            {
-              "name": "history_character_fk",
-              "columns": [
-                "character_id"
-              ],
-              "references": {
-                "table": "characters_character",
-                "columns": [
-                  "character_id"
-                ]
-              },
-              "onDelete": "NO_ACTION",
-              "onUpdate": "NO_ACTION",
-              "deferred": false
-            }
-          ],
-          "checks": [],
-          "indexes": [
-            {
-              "name": "history_character_index",
-              "columns": [
-                "character_id"
-              ],
-              "unique": false
-            }
-          ]
-        },
-        {
-          "name": "history_character_created",
-          "columns": [
-            {
-              "name": "sequence",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1"
-            },
-            {
-              "name": "name",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 1,
-              "maxCodePoints": 80,
-              "ascii": false
-            },
-            {
-              "name": "maximum_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            },
-            {
-              "name": "initial_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            }
-          ],
-          "primaryKey": [
-            "sequence"
-          ],
-          "uniqueKeys": [],
-          "foreignKeys": [
-            {
-              "name": "history_created_event_fk",
-              "columns": [
-                "sequence"
-              ],
-              "references": {
-                "table": "history_event",
-                "columns": [
-                  "sequence"
-                ]
-              },
-              "onDelete": "NO_ACTION",
-              "onUpdate": "NO_ACTION",
-              "deferred": false
-            }
-          ],
-          "checks": [
-            {
-              "name": "history_initial_le_max",
-              "expression": {
-                "op": "le",
-                "left": {
-                  "column": "initial_hp"
-                },
-                "right": {
-                  "column": "maximum_hp"
-                }
-              }
-            }
-          ],
-          "indexes": []
-        }
-      ],
-      "seeds": []
-    },
-    {
-      "id": "health",
-      "dependsOn": [
-        "history",
-        "rules",
-        "characters"
-      ],
-      "tables": [
-        {
-          "name": "health_healing",
-          "columns": [
-            {
-              "name": "sequence",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1"
-            },
-            {
-              "name": "before_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            },
-            {
-              "name": "after_hp",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "1",
-              "maximum": "65535"
-            },
-            {
-              "name": "amount",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "0",
-              "maximum": "65535"
-            },
-            {
-              "name": "applied",
-              "type": "int64",
-              "nullable": false,
-              "minimum": "0",
-              "maximum": "65535"
-            }
-          ],
-          "primaryKey": [
-            "sequence"
-          ],
-          "uniqueKeys": [],
-          "foreignKeys": [
-            {
-              "name": "health_event_fk",
-              "columns": [
-                "sequence"
-              ],
-              "references": {
-                "table": "history_event",
-                "columns": [
-                  "sequence"
-                ]
-              },
-              "onDelete": "NO_ACTION",
-              "onUpdate": "NO_ACTION",
-              "deferred": false
-            }
-          ],
-          "checks": [
-            {
-              "name": "health_nonnegative_change",
-              "expression": {
-                "op": "ge",
-                "left": {
-                  "column": "after_hp"
-                },
-                "right": {
-                  "column": "before_hp"
-                }
-              }
-            }
-          ],
-          "indexes": []
-        }
-      ],
       "seeds": []
     },
     {
       "id": "rules-runtime",
       "dependsOn": [
-        "rules"
+        "core"
       ],
       "tables": [
         {
@@ -837,6 +388,140 @@
           ],
           "primaryKey": [
             "singleton"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "scenes_space",
+          "columns": [
+            {
+              "name": "scene_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "node_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "resolution",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 20,
+              "ascii": true
+            },
+            {
+              "name": "mode",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 20,
+              "ascii": true
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "scene_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "scenes_clock",
+          "columns": [
+            {
+              "name": "space_kind",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 20,
+              "ascii": true
+            },
+            {
+              "name": "space_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "second",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            }
+          ],
+          "primaryKey": [
+            "space_kind",
+            "space_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
+          "name": "scenes_placement",
+          "columns": [
+            {
+              "name": "subject_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "space_kind",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 1,
+              "maxCodePoints": 20,
+              "ascii": true
+            },
+            {
+              "name": "space_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "subject_id"
           ],
           "uniqueKeys": [],
           "foreignKeys": [],
@@ -1312,6 +997,43 @@
       ],
       "tables": [
         {
+          "name": "monsters_campaign",
+          "columns": [
+            {
+              "name": "monster_id",
+              "type": "uuid",
+              "nullable": false
+            },
+            {
+              "name": "hit_points",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "version",
+              "type": "int64",
+              "nullable": false,
+              "minimum": "0"
+            },
+            {
+              "name": "document",
+              "type": "text",
+              "nullable": false,
+              "minCodePoints": 2,
+              "maxCodePoints": 16777216,
+              "ascii": false
+            }
+          ],
+          "primaryKey": [
+            "monster_id"
+          ],
+          "uniqueKeys": [],
+          "foreignKeys": [],
+          "checks": [],
+          "indexes": []
+        },
+        {
           "name": "monsters_instance",
           "columns": [
             {
@@ -1436,47 +1158,6 @@
               "name": "manual_character_ix_0",
               "columns": [
                 "active"
-              ],
-              "unique": false
-            }
-          ]
-        },
-        {
-          "name": "manual_encounter",
-          "columns": [
-            {
-              "name": "encounter_id",
-              "type": "uuid",
-              "nullable": false
-            },
-            {
-              "name": "status",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 1,
-              "maxCodePoints": 20,
-              "ascii": true
-            },
-            {
-              "name": "document",
-              "type": "text",
-              "nullable": false,
-              "minCodePoints": 2,
-              "maxCodePoints": 16777216,
-              "ascii": false
-            }
-          ],
-          "primaryKey": [
-            "encounter_id"
-          ],
-          "uniqueKeys": [],
-          "foreignKeys": [],
-          "checks": [],
-          "indexes": [
-            {
-              "name": "manual_encounter_ix_0",
-              "columns": [
-                "status"
               ],
               "unique": false
             }
@@ -1679,7 +1360,6 @@
         "actions",
         "effects",
         "monsters",
-        "health",
         "participation"
       ],
       "tables": [

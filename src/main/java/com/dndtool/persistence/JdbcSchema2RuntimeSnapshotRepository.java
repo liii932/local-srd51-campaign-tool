@@ -1,8 +1,8 @@
 package com.dndtool.persistence;
 
-import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.ProductionSchema2Projection.StoredMember;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
@@ -10,13 +10,14 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Complete finite INTERNAL material snapshots. Never grants campaign initialization or execution. */
 public final class JdbcSchema2RuntimeSnapshotRepository {
+    private static final int MAX_MYSQL_PACKAGES = 4;
     private static final int MAX_RULES = 256, MAX_ENTRIES = 512, MAX_CHAINS = 3072, MAX_STEPS = 4096;
     private static final String TARGET = "target_kind, rule_module_key, rule_type, rule_key, collection_key, entry_module_key, entry_key";
     private static final String STATE = "state, text_value, integer_value, boolean_value, reference_module_key, reference_rule_key, grant_category, grant_kind, grant_target_module_key, grant_target_rule_key, grant_count, " + JdbcSchema2GrowthSnapshotRows.EXTRA_STATE;
 
     /** Caller owns the transaction and must roll it back on any failure, including later writes. */
     public Snapshot store(Connection connection, Schema2PreparationIdentity identity, ProductionSchema2Projection projection) throws SQLException {
-        require(identity != null && projection != null);
+        require(identity != null && projection != null && projection.members().size() <= MAX_MYSQL_PACKAGES);
         ProductionSchema2Projection expected;
         try {
             expected = ProductionSchema2Projection.restore(projection.members(), projection.projection().rules(),
@@ -147,10 +148,10 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                                 integer(result, "member_count"), integer(result, "rule_count"), integer(result, "entry_count"), integer(result, "chain_count"), integer(result, "step_count"));
                     });
             require(headers.size() == 1); Header header = headers.getFirst();
-            require(header.members >= 1 && header.members <= MAX_PACKAGES && header.rules >= 0 && header.rules <= MAX_RULES
+            require(header.members >= 1 && header.members <= MAX_MYSQL_PACKAGES && header.rules >= 0 && header.rules <= MAX_RULES
                     && header.entries >= 0 && header.entries <= MAX_ENTRIES && header.chains >= 0 && header.chains <= MAX_CHAINS
                     && header.steps >= 0 && header.steps <= MAX_STEPS);
-            List<StoredMember> members = ordered(rows(connection, identity, "s2_runtime_member", "load_index", MAX_PACKAGES, result -> {
+            List<StoredMember> members = ordered(rows(connection, identity, "s2_runtime_member", "load_index", MAX_MYSQL_PACKAGES, result -> {
                 return new Indexed<>(integer(result, "load_index"), new StoredMember(binaryAscii(result, "module_key", 64),
                         binaryAscii(result, "release_version", 64), Role.valueOf(binaryAscii(result, "role", 13)),
                         digest(result, "raw_zip_sha256"), digest(result, "logical_sha256")));
@@ -239,7 +240,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             });
             List<FieldChain> chains = new ArrayList<>(); int cursor = 0;
             for (int i = 0; i < storedChains.size(); i++) {
-                ChainHeader chain = storedChains.get(i); require(chain.count >= 1 && chain.count <= MAX_PACKAGES);
+                ChainHeader chain = storedChains.get(i); require(chain.count >= 1 && chain.count <= MAX_MYSQL_PACKAGES);
                 List<ChainStep> chainSteps = new ArrayList<>();
                 for (int j = 0; j < chain.count; j++) {
                     require(cursor < steps.size()); var step = steps.get(cursor++);

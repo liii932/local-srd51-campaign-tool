@@ -1,6 +1,7 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CharacterRuntime;
+
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CombatState;
@@ -26,32 +27,17 @@ public final class PlayerCampaignProjection {
             JsonObject c = new JsonObject(); c.addProperty("id", id.toString()); c.addProperty("name", characterName(state, id));
             c.addProperty("description", "主持人共享的角色"); summaries.add(c);
         });
-        for (var history : state.combats()) {
-            var battle = history.current();
-            if (battle.status() == Schema2CombatState.Status.ENDED || !shared(state, member, ShareKind.SCENE, battle.combatId())) continue;
-            JsonObject scene = new JsonObject(); scene.addProperty("name", battle.status() == Schema2CombatState.Status.ACTIVE ? "当前战斗" : "探索场景");
-            scene.addProperty("description", "仅显示主持人共享的角色与位置");
-            scene.addProperty("turnLabel", battle.status() == Schema2CombatState.Status.ACTIVE
-                    ? visible.contains(battle.activeActor()) ? characterName(state, battle.activeActor()) + "的回合" : "等待其他行动者" : "探索中");
-            JsonArray participants = new JsonArray();
-            List<UUID> order = battle.status() == Schema2CombatState.Status.ACTIVE
-                    ? battle.initiative().stream().map(Schema2CombatState.Initiative::characterId).toList()
-                    : battle.combatants().stream().map(Schema2CombatState.Combatant::characterId).toList();
-            for (UUID id : order) if (visible.contains(id)) {
-                var combatant = battle.combatants().stream().filter(c -> c.characterId().equals(id)).findFirst().orElseThrow();
-                JsonObject row = new JsonObject(); row.addProperty("name", characterName(state, id));
-                row.addProperty("position", combatant.position().x() + ", " + combatant.position().y());
-                row.addProperty("current", battle.status() == Schema2CombatState.Status.ACTIVE && id.equals(battle.activeActor())); participants.add(row);
-            }
-            scene.add("participants", participants); scenes.add(scene);
+        var focus = state.space().focus().space();
+        for (var local : state.space().scenes()) {
+            if (scenes.size() == 16) break;
+            if (local.mode().equals("CLOSED") || !shared(state, member, ShareKind.SCENE, local.id())) continue;
+            var ref = CampaignSpaceData.Ref.scene(local.id());
+            var battle = state.combats().stream().map(h -> h.current()).filter(b -> b.combatId().equals(local.id())).findFirst().orElse(null);
+            String mode = local.mode().equals("COMBAT") ? "战斗" : "探索";
+            scenes.add(spaceView(state, visible, ref, local.name(), focus, battle, mode));
         }
-        for (var node : state.nodes()) if (scenes.size() < 16 && shared(state, member, ShareKind.SCENE, node.id())) {
-            JsonObject scene = new JsonObject(); scene.addProperty("name", node.name()); scene.addProperty("description", "主持人共享的地点");
-            JsonArray participants = new JsonArray();
-            state.positions().stream().filter(p -> p.nodeId().equals(node.id()) && visible.contains(p.characterId())).limit(64).forEach(p -> {
-                JsonObject c = new JsonObject(); c.addProperty("name", characterName(state, p.characterId())); c.addProperty("position", node.name()); participants.add(c);
-            }); scene.add("participants", participants); scenes.add(scene);
-        }
+        for (var node : state.nodes()) if (scenes.size() < 16 && shared(state, member, ShareKind.SCENE, node.id()))
+            scenes.add(spaceView(state, visible, CampaignSpaceData.Ref.world(node.id()), node.name(), focus, null, "世界节点"));
         List<String> allowedLogs = new ArrayList<>();
         UUID campaign = UUID.fromString(access.snapshot().campaignId());
         for (var root : state.roots()) {
@@ -65,6 +51,34 @@ public final class PlayerCampaignProjection {
         shared.add("cards", summaries); shared.add("scenes", scenes); shared.add("logs", logs); view.add("shared", shared);
         view.add("pending", pending(state, own));
         return view;
+    }
+    private static JsonObject spaceView(CampaignDomainData.State state, Set<UUID> visible, CampaignSpaceData.Ref ref,
+            String name, CampaignSpaceData.Ref focus, Schema2CombatState.Battle battle, String mode) {
+        boolean focused = ref.equals(focus);
+        JsonObject row = new JsonObject();
+        row.addProperty("name", name);
+        row.addProperty("description", mode + (focused ? " · 当前执行空间" : " · 后台冻结"));
+        row.addProperty("focused", focused);
+        List<UUID> order = battle != null && battle.status() == Schema2CombatState.Status.ACTIVE
+                ? battle.initiative().stream().map(Schema2CombatState.Initiative::characterId).toList() : List.of();
+        UUID actor = order.isEmpty() ? null : battle.activeActor();
+        if (focused && actor != null)
+            row.addProperty("turnLabel", visible.contains(actor) ? characterName(state, actor) + "的回合" : "等待其他行动者");
+        List<CampaignDomainData.Position> placements = state.positions().stream()
+                .filter(p -> ref.equals(p.space()) && visible.contains(p.characterId()))
+                .sorted(Comparator.comparingInt(p -> order.contains(p.characterId()) ? order.indexOf(p.characterId()) : order.size()))
+                .limit(64).toList();
+        JsonArray participants = new JsonArray();
+        for (var placement : placements) {
+            JsonObject person = new JsonObject();
+            person.addProperty("name", characterName(state, placement.characterId()));
+            var grid = placement.grid();
+            person.addProperty("position", grid == null ? name : grid.x() + ", " + grid.y());
+            person.addProperty("current", focused && placement.characterId().equals(actor));
+            participants.add(person);
+        }
+        row.add("participants", participants);
+        return row;
     }
 
     public static JsonObject receipt(CampaignStorageService.AccessSnapshot access, UUID member, CampaignDomainData.Root root) {
@@ -121,7 +135,7 @@ public final class PlayerCampaignProjection {
     private static JsonObject ruleCard(CampaignDomainData.State domain, CampaignDomainData.Character c) {
         var state = c.history().current(); JsonObject card = base(c.id(), c.name(), c.kind(), state.hitPoints(), state.maximumHitPoints(), state.level());
         card.addProperty("className", ruleName(domain, state.characterClass())); card.addProperty("proficiencyBonus", state.proficiencyBonus());
-        card.addProperty("armorClass", new Schema2CharacterEquipmentRules().derive(domain.material().restore(), state).armorClass());
+        card.addProperty("armorClass", new Schema2CharacterEquipmentRules().derive(domain.material().restore().projection(), state).armorClass());
         card.add("abilities", abilities(state.abilities()));
         JsonObject health = new JsonObject(); health.addProperty("temporaryHp", state.health().temporaryHitPoints());
         health.addProperty("deathSuccesses", state.health().deathSuccesses()); health.addProperty("deathFailures", state.health().deathFailures());
@@ -165,16 +179,19 @@ public final class PlayerCampaignProjection {
     private static String location(String location) { return switch (location) { case "MAIN_HAND" -> "主手"; case "OFF_HAND" -> "副手"; case "BOTH_HANDS" -> "双手"; case "WORN" -> "穿戴"; case "GROUND" -> "落地"; default -> "携带"; }; }
     private static void effect(JsonArray rows, String label) { JsonObject row = new JsonObject(); row.addProperty("label", label); rows.add(row); }
     private static JsonObject pending(CampaignDomainData.State state, Set<UUID> own) {
-        JsonObject result = new JsonObject(); boolean hasFlow = false, ownChoice = false;
+        JsonObject result = new JsonObject(); boolean hasFlow = false, ownChoice = false, frozen = false;
+        var focus = state.space().focus().space();
         for (var history : state.combats()) {
             var battle = history.current(); var flow = battle.activeFlow();
             if (battle.status() == Schema2CombatState.Status.ENDED || flow == null || battle.combatants().stream().noneMatch(c -> own.contains(c.characterId()))) continue;
+            if (!CampaignSpaceData.Ref.scene(battle.combatId()).equals(focus)) { frozen = true; continue; }
             hasFlow = true;
             ownChoice |= flow.windows().stream().filter(w -> w.status() == Schema2CombatState.WindowStatus.OPEN)
                     .flatMap(w -> w.opportunities().stream()).anyMatch(o -> o.status() == Schema2CombatState.OpportunityStatus.PENDING && Objects.equals(o.selectionFrameKey(), flow.leafFrameKey()) && own.contains(o.actorId()));
         }
-        result.addProperty("active", hasFlow); result.addProperty("own", ownChoice); result.addProperty("title", ownChoice ? "等待你的决定" : hasFlow ? "行动尚未结束" : "当前没有待决选择");
-        result.addProperty("description", ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "按当前可用选项继续；需要他人决定时请等待。" : "可用行动随当前回合与主持人许可更新。");
+        result.addProperty("active", hasFlow); result.addProperty("own", ownChoice); result.addProperty("frozen", frozen);
+        result.addProperty("title", ownChoice ? "等待你的决定" : hasFlow ? "行动尚未结束" : frozen ? "后台行动已冻结" : "当前没有待决选择");
+        result.addProperty("description", ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "按当前可用选项继续；需要他人决定时请等待。" : frozen ? "主持人切回该空间后可继续原行动。" : "可用行动随当前回合与主持人许可更新。");
         return result;
     }
     private static String actionLabel(String action) { return switch (action) { case "combat-command" -> "行动已记录"; case "character-command", "check-effects", "manual-check" -> "角色操作已记录"; default -> "状态已更新"; }; }

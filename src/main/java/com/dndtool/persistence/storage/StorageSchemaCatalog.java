@@ -26,8 +26,8 @@ import java.util.TreeSet;
 
 /** Strict, bounded application-owned schema declarations. This is not a user schema API. */
 public final class StorageSchemaCatalog {
-    public static final String APPLICATION_MODEL = "srd51-vitality-1";
-    public static final String STORAGE_MODEL = "sqlite-vitality-1";
+    public static final String APPLICATION_MODEL = "campaign-spaces-3";
+    public static final String STORAGE_MODEL = "sqlite-campaign-3";
     public static final int MAX_BYTES = 16 * 1024 * 1024;
     static final String DIALECT = "sqlite-strict-1";
     private final Map<String, Module> modules;

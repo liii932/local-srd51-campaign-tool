@@ -59,7 +59,7 @@ public final class Schema2CharacterHealthRules {
     }
 
     public void prepareDamage(ProductionSchema2Projection material, State before) {
-        Schema2SpellRules.requireSupportedFeatures(material,before,"S2_HEALTH_EFFECT_UNSUPPORTED");
+        Schema2SpellRules.requireSupportedFeatures(material, before, "S2_HEALTH_EFFECT_UNSUPPORTED");
         prepareDamageCore(before);
     }
     /** Preflight usable by attack owners before their first random draw. */
@@ -104,7 +104,7 @@ public final class Schema2CharacterHealthRules {
         if (!handles(command) || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1) throw invalid("S2_HEALTH_COMMAND");
         if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
         if (before.rest().active() != null) throw invalid("S2_HEALTH_REST_ACTIVE");
-        Schema2SpellRules.requireSupportedFeatures(material,before,"S2_HEALTH_EFFECT_UNSUPPORTED");
+        Schema2SpellRules.requireSupportedFeatures(material, before, "S2_HEALTH_EFFECT_UNSUPPORTED");
         var owners = material.projection().rules().stream().filter(FinalHealth.class::isInstance).map(FinalHealth.class::cast).filter(FinalHealth::enabled).toList();
         HealthInput input = command.healthInput();
         if (owners.size() != 1 || !owners.getFirst().identity().equals(input.rule())
