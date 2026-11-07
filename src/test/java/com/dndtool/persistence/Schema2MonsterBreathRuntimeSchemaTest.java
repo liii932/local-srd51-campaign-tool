@@ -1,22 +1,32 @@
 package com.dndtool.persistence;
 
+import com.dndtool.module.composition.Schema2RulesBinding;
+import com.dndtool.service.Schema2CombatHistory.Member;
+import com.dndtool.service.Schema2CombatRuntimeService;
+import com.dndtool.service.Schema2CombatRuntimeService.Request;
 import com.dndtool.service.Schema2CombatState;
+import com.dndtool.service.Schema2CombatTestFixture;
 import com.dndtool.service.Schema2CombatTimeRules;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Source/schema contracts only; these assertions never execute a MySQL statement. */
+/** MySQL schema and admission contracts. These tests never open a database connection. */
 class Schema2MonsterBreathRuntimeSchemaTest {
     private static final Path MIGRATION=Path.of("src/main/resources/db/migration/V040__schema2-monster-breath-runtime.sql");
     private static final Path VERIFY=Path.of("database/verify/schema2-monster-breath.sql");
     private static final List<String> ROOT=List.of("combat_id","event_sequence");
     private static final List<String> STATE=List.of("combat_id","event_sequence","phase");
     private static final List<String> BATCH=List.of("combat_id","event_sequence","phase","batch_index");
+    private static final Set<Schema2CombatState.Kind> SQLITE_ONLY_COMMANDS = Set.of(
+            Schema2CombatState.Kind.OPEN_SCENE, Schema2CombatState.Kind.SET_SCENE_ROSTER);
     private record Edge(String table,String parent,List<String> key) { }
     private static final List<Edge> GRAPH=List.of(
         new Edge("s2_combat_monster_deployment","s2_combat_event",ROOT),
@@ -75,7 +85,9 @@ class Schema2MonsterBreathRuntimeSchemaTest {
 
     @Test void sqlAndJavaShareClosedFrameStageTriggerAndCommandDomains()throws Exception {
         String sql=Files.readString(MIGRATION);
-        assertEquals(names(Schema2CombatState.Kind.values()),enumValues(alter(sql,"s2_combat_event"),"command_kind"));
+        Set<String> mysqlCommands = names(Schema2CombatState.Kind.values());
+        SQLITE_ONLY_COMMANDS.forEach(kind -> mysqlCommands.remove(kind.name()));
+        assertEquals(mysqlCommands,enumValues(alter(sql,"s2_combat_event"),"command_kind"));
         assertEquals(names(Schema2CombatState.FrameKind.values()),enumValues(alter(sql,"s2_combat_frame"),"frame_kind"));
         assertEquals(names(Schema2CombatState.Stage.values()),enumValues(alter(sql,"s2_combat_frame"),"stage"));
         for(String table:List.of("s2_combat_ready_input","s2_combat_window_trigger","s2_combat_trigger"))
@@ -84,6 +96,32 @@ class Schema2MonsterBreathRuntimeSchemaTest {
         assertEquals(names(Schema2CombatState.BatchStatus.values()),enumValues(tables.get("s2_combat_save_damage_batch"),"batch_status"));
         assertEquals(names(Schema2CombatState.ConcentrationDamageStatus.values()),enumValues(tables.get("s2_combat_breath_concentration"),"obligation_status"));
         assertEquals(names(Schema2CombatState.MonsterRestStatus.values()),enumValues(tables.get("s2_combat_monster_rest"),"rest_status"));
+    }
+
+    @Test void mysqlRejectsSpatialLifecycleCommandsBeforeDatabaseAccess() {
+        DataSource unreachable = (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(),
+                new Class<?>[]{DataSource.class}, (proxy, method, arguments) -> {
+                    throw new AssertionError("Unexpected MySQL DataSource call: " + method.getName());
+                });
+        var service = new Schema2CombatRuntimeService(unreachable);
+        var binding = Schema2RulesBinding.from(Schema2CombatTestFixture.material());
+        var first = new Member(UUID.randomUUID(), Schema2PreparationIdentity.random(), UUID.randomUUID());
+        var second = new Member(UUID.randomUUID(), Schema2PreparationIdentity.random(), UUID.randomUUID());
+        var members = List.of(first, second);
+        var versions = Map.of(first.characterId(), 0L, second.characterId(), 0L);
+        UUID operation = UUID.randomUUID(), combat = UUID.randomUUID(), campaign = UUID.randomUUID();
+
+        for (var kind : SQLITE_ONLY_COMMANDS) {
+            var command = Schema2CombatState.Command.action(kind, null);
+            long expectedVersion = kind == Schema2CombatState.Kind.OPEN_SCENE ? -1 : 0;
+            var error = assertThrows(IllegalArgumentException.class, () -> new Request(operation, combat, campaign,
+                    binding, members, expectedVersion, versions, command));
+            assertEquals("S2_COMBAT_REQUEST", error.getMessage());
+            var request = new Request(operation, combat, campaign, binding, members, expectedVersion, versions,
+                    command, true);
+            assertEquals(new Schema2CombatRuntimeService.Result(Schema2CombatRuntimeService.Status.REJECTED,
+                    "S2_COMBAT_REQUEST", null), service.execute(request));
+        }
     }
 
     @Test void rawContinuationKeepsItsExactFlowAndLeafWithoutInventingAWindow()throws Exception {
