@@ -6,9 +6,10 @@
 [成长与资源](schema-2-character-statistics.md)、[标准休息](schema-2-character-rest.md)及
 [共同业务事务](business-write-transactions.md)。
 
-当前已接通四类规则的准确运行镜像，以及下述输入、结果、状态和历史的仓储层。
-`JdbcSchema2CharacterRuntimeRepository` 能校验、追加、读回和直接恢复这些封闭事实；
-叶仓储接收已准备的事实，不抽骰、不推导完整规则效果。
+四类规则使用准确运行镜像。`Schema2CharacterRuntime` 定义输入、结果、状态和历史，
+`Schema2PreparationIdentity` 保存准确的 run 与 snapshot 身份。领域模型校验事实形状、
+历史邻接和容量。`JdbcSchema2CharacterRuntimeRepository` 在调用方事务中追加、读回和
+直接恢复这些类型化事实。SQLite 聚合同样使用这套领域类型及结构校验。
 `Schema2CharacterRuntimeService` 复用该仓储执行既有成长/资源/休息以及真实检定、装备和健康命令；
 [角色基础合同](schema-2-character-foundations.md)限定 Check/Equipment/Health 规则消费者、共同前提和历史语义重算。
 结构与算术校验不能替代这些业务校验，仓储可写或恢复本身不授予执行或发布资格。

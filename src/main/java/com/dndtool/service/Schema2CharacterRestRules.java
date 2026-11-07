@@ -3,8 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.ResourceRecoveryProfile;
 import com.dndtool.module.AdvancementValueProfile;
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -23,7 +22,7 @@ public final class Schema2CharacterRestRules {
     /** A supplied roll is a previously drawn server result, never an input accepted by the command. */
     public State apply(ProductionSchema2Projection material, State before, Command command, Integer roll) {
         growth.validateState(material, before); validateState(material, before);
-        if (!handles(command) || before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1)
+        if (!handles(command) || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
             throw invalid("S2_REST_COMMAND");
         RestDefinition definition = definition(material);
         for (ClassLevel characterClass : before.classes()) {

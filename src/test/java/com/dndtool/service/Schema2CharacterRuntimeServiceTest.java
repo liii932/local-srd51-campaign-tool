@@ -3,8 +3,8 @@ package com.dndtool.service;
 import com.dndtool.module.composition.Schema2ProgressionFixtures;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CharacterRuntimeService.*;
 import com.dndtool.testing.IsolatedJvmTest;
 import java.util.*;
@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Real author acceptance, snapshot/plan transfer and command JDBC consumers; no MySQL claim. */
 class Schema2CharacterRuntimeServiceTest {
     private static final UUID PREPARATION = UUID.fromString("01872103-0345-4abc-8def-0123456789ab");
-    private static final Identity IDENTITY = new Identity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
+    private static final Schema2PreparationIdentity IDENTITY = new Schema2PreparationIdentity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
             UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
     private static final UUID CAMPAIGN = UUID.fromString("12345678-1234-4678-8234-123456789abc");
     private static final UUID CHARACTER = UUID.fromString("abcdef12-1234-4678-8234-123456789abc");

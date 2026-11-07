@@ -1,8 +1,8 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.CampaignDomainEngine;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.util.*;
@@ -45,7 +45,7 @@ public final class CampaignDomainCommands {
                 String name = CampaignJson.name(s(input, "name")), kind = s(input, "kind"), classKey = s(input, "classKey");
                 if (!Set.of("PC", "NPC").contains(kind)) throw CampaignJson.bad("Unsupported character kind");
                 subject = UUID.randomUUID();
-                Identity identity = characters.isEmpty() ? new Identity(UUID.randomUUID(), UUID.randomUUID()) : characters.getFirst().initial().character().identity();
+                Schema2PreparationIdentity identity = characters.isEmpty() ? new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()) : characters.getFirst().initial().character().identity();
                 var initial = BundledCampaignRules.initialPlan(UUID.fromString(snapshot.campaignId()), subject, identity, classKey, s(input, "backgroundKey"));
                 Map<String, Integer> abilities = switch (classKey.replace("class.", "")) {
                     case "fighter" -> Map.of("ability.strength", 15, "ability.dexterity", 13, "ability.constitution", 14, "ability.intelligence", 8, "ability.wisdom", 12, "ability.charisma", 10);
@@ -71,11 +71,11 @@ public final class CampaignDomainCommands {
                 subject = id(input, "characterId"); Character target = characters.get(characterIndex(characters, subject));
                 if (!target.active()) throw new StorageException("CHARACTER_INACTIVE", "Restore this character first");
                 if (target.history().current().version() != CampaignJson.integer(input, "characterVersion")) throw new StorageException("STALE_CHARACTER", "Refresh the character card");
-                var command = CampaignDomainCodec.fromJson(input.get("command"), JdbcSchema2CharacterRuntimeRepository.Command.class);
+                var command = CampaignDomainCodec.fromJson(input.get("command"), Schema2CharacterRuntime.Command.class);
                 if (command.kind().equals("ITEM_ACQUIRED")) {
                     var e = command.equipmentInput();
-                    command = new JdbcSchema2CharacterRuntimeRepository.Command(command.kind(), null, 0, null, null, null, command.growthChoices(), null, null,
-                            new JdbcSchema2CharacterRuntimeRepository.EquipmentInput(operationId, e.item(), e.location(), e.adjudication()), null);
+                    command = new Schema2CharacterRuntime.Command(command.kind(), null, 0, null, null, null, command.growthChoices(), null, null,
+                            new Schema2CharacterRuntime.EquipmentInput(operationId, e.item(), e.location(), e.adjudication()), null);
                 }
                 var changed = engine.executeCampaignCharacter(material, CampaignDomainValidation.records(before), before.combats(), subject, command, operationId, dice);
                 characters = merge(characters, changed);
@@ -147,7 +147,7 @@ public final class CampaignDomainCommands {
             default -> throw new StorageException("UNSUPPORTED_COMMAND", "Unsupported campaign command");
         }
         Set<UUID> oldOperations = new HashSet<>(); before.characters().forEach(c -> c.history().events().forEach(e -> oldOperations.add(e.operationId())));
-        List<UUID> childOperations = characters.stream().flatMap(c -> c.history().events().stream()).map(JdbcSchema2CharacterRuntimeRepository.Event::operationId).filter(id -> !oldOperations.contains(id)).sorted(Comparator.comparing(UUID::toString)).toList();
+        List<UUID> childOperations = characters.stream().flatMap(c -> c.history().events().stream()).map(Schema2CharacterRuntime.Event::operationId).filter(id -> !oldOperations.contains(id)).sorted(Comparator.comparing(UUID::toString)).toList();
         List<Root> roots = new ArrayList<>(before.roots()); roots.add(new Root(roots.size() + 1L, operationId, action, subject, intent, oldText, newText, childOperations, combatId, actor));
         characters.sort(Comparator.comparing(c -> c.id().toString())); combats.sort(Comparator.comparing(c -> c.current().combatId().toString()));
         nodes.sort(Comparator.comparing(n -> n.id().toString())); positions.sort(Comparator.comparing(p -> p.characterId().toString())); items.sort(Comparator.comparing(i -> i.id().toString()));

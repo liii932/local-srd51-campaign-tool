@@ -1,9 +1,9 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.EquipmentItem;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthResult;
+import com.dndtool.service.Schema2CharacterRuntime.State;
+import com.dndtool.service.Schema2CharacterRuntime.EquipmentItem;
+import com.dndtool.service.Schema2CharacterRuntime.HealthResult;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.Stage;
 import java.nio.charset.StandardCharsets;
@@ -153,7 +153,7 @@ final class Schema2ActionFlowRules {
             case RELEASE_READY -> {ReadyPreparation ready=ready(b,command.readyKey());if(ready.input().responseKind()==ReadyResponseKind.ATTACK)needed.merge(ready.input().targetId(),1,Integer::sum);if(ready.input().responseKind()==ReadyResponseKind.SPELL&&isAlgorithm(roster,ready.actorId(),ready.input().spell().spell(),Schema2SpellRules.CURE_WOUNDS))needed.merge(ready.input().spell().targets().getFirst(),1,Integer::sum);}
             default -> { }
         }
-        for(var entry:needed.entrySet())if(roster.containsKey(entry.getKey()))require(roster.get(entry.getKey()).character().version()+entry.getValue()<com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS,"ACTION_FLOW_RESERVATION_INSUFFICIENT");
+        for(var entry:needed.entrySet())if(roster.containsKey(entry.getKey()))require(roster.get(entry.getKey()).character().version()+entry.getValue()<com.dndtool.service.Schema2CharacterRuntime.MAX_EVENTS,"ACTION_FLOW_RESERVATION_INSUFFICIENT");
     }
     private static boolean isAlgorithm(Map<UUID,Context> roster,UUID actor,RuleIdentity spell,String algorithm) {return roster.get(actor).material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).anyMatch(s->s.enabled()&&s.identity().equals(spell)&&algorithm.equals(s.definition().algorithm()));}
     private void requireStructureCapacity(Map<UUID,Context> roster,Battle b,Command command) {

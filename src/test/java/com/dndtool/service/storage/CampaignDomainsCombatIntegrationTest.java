@@ -1,9 +1,9 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.EquipmentInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CombatState.*;
 import com.google.gson.*;
 import java.nio.file.Path;
@@ -133,13 +133,13 @@ class CampaignDomainsCombatIntegrationTest {
     }
     private static UUID equip(CampaignStorageService service, UUID character, String item, String location) {
         UUID operation = UUID.randomUUID();
-        characterCommand(service, character, new JdbcSchema2CharacterRuntimeRepository.Command("ITEM_ACQUIRED", null, 0, null, null, null,
+        characterCommand(service, character, new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null,
                 GrowthChoices.EMPTY, null, null, new EquipmentInput(operation, BundledCampaignRules.rule("equipment.item", item), "CARRIED", "DM确认物品归属。"), null), operation.toString());
-        characterCommand(service, character, new JdbcSchema2CharacterRuntimeRepository.Command("ITEM_EQUIPPED", null, 0, null, null, null,
+        characterCommand(service, character, new Schema2CharacterRuntime.Command("ITEM_EQUIPPED", null, 0, null, null, null,
                 GrowthChoices.EMPTY, null, null, new EquipmentInput(operation, null, location, "DM确认非战斗装备准备。"), null), uuid());
         return operation;
     }
-    private static void characterCommand(CampaignStorageService service, UUID character, JdbcSchema2CharacterRuntimeRepository.Command command, String operation) {
+    private static void characterCommand(CampaignStorageService service, UUID character, Schema2CharacterRuntime.Command command, String operation) {
         JsonObject input = input("characterId", character.toString(), "characterVersion", card(service, character).get("version").getAsString());
         input.add("command", CampaignDomainCodec.toJson(command)); command(service, operation, "character-command", input);
     }

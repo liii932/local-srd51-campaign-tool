@@ -1,14 +1,13 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CombatHistory;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.Command;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.Event;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.History;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository;
+import com.dndtool.service.Schema2CharacterRuntime.Command;
+import com.dndtool.service.Schema2CharacterRuntime.Event;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.HealthInput;
+import com.dndtool.service.Schema2CharacterRuntime.History;
 import com.dndtool.service.CampaignDomainEngine;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
@@ -243,12 +242,12 @@ public final class CampaignCheckEffects {
             characters.add(new Character(profile.name(), profile.kind(), profile.active(), retainedCharacter.initial(), new History(events.getLast().after(), events)));
         }
         if (!profiles.isEmpty()) throw CampaignJson.bad("Conditional prefix lacks initial character facts");
-        List<JdbcSchema2CombatRuntimeRepository.History> combats = new ArrayList<>();
+        List<Schema2CombatHistory.History> combats = new ArrayList<>();
         for (var combat : retained.combats()) {
             var events = combat.events().stream().filter(e -> combatOperations.contains(e.operationId())).toList();
             if (!events.isEmpty()) {
                 if (!combat.events().subList(0, events.size()).equals(events)) throw CampaignJson.bad("Conditional scene dependency is not a prefix");
-                combats.add(new JdbcSchema2CombatRuntimeRepository.History(events.getLast().after(), combat.members(), events));
+                combats.add(new Schema2CombatHistory.History(events.getLast().after(), combat.members(), events));
             }
         }
         CampaignManualData.State manual=CampaignManualData.State.empty();

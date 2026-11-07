@@ -1,8 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -22,7 +21,7 @@ public final class Schema2CharacterEquipmentRules {
     public State apply(ProductionSchema2Projection material, State before, Command command, UUID operationId) {
         growth.validateState(material, before); rests.validateState(material, before); validateState(material, before);
         requireCompleteScope(material, before);
-        if (!handles(command) || before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1)
+        if (!handles(command) || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
             throw invalid("S2_EQUIPMENT_COMMAND");
         if (before.hitPoints() == 0 || before.health().dead()) throw invalid("S2_EQUIPMENT_HEALTH");
         if (before.rest().active() != null) throw invalid("S2_EQUIPMENT_REST_ACTIVE");
@@ -33,7 +32,7 @@ public final class Schema2CharacterEquipmentRules {
             definition(material, input.item());
             if (!input.itemId().equals(operationId) || next.stream().anyMatch(value -> value.itemId().equals(input.itemId())))
                 throw invalid("S2_EQUIPMENT_INSTANCE");
-            if (next.size() >= JdbcSchema2CharacterRuntimeRepository.MAX_EQUIPMENT) throw invalid("S2_EQUIPMENT_CAPACITY");
+            if (next.size() >= Schema2CharacterRuntime.MAX_EQUIPMENT) throw invalid("S2_EQUIPMENT_CAPACITY");
             next.add(new EquipmentItem(input.itemId(), input.item(), "CARRIED"));
         } else {
             EquipmentItem existing = next.stream().filter(value -> value.itemId().equals(input.itemId())).findFirst()
@@ -68,7 +67,7 @@ public final class Schema2CharacterEquipmentRules {
     }
 
     public void validateState(ProductionSchema2Projection material, State state) {
-        if (state.equipment().size() > JdbcSchema2CharacterRuntimeRepository.MAX_EQUIPMENT
+        if (state.equipment().size() > Schema2CharacterRuntime.MAX_EQUIPMENT
                 || !state.equipment().equals(state.equipment().stream().sorted(ORDER).toList())) throw invalid("S2_EQUIPMENT_STATE");
         Set<UUID> ids = new HashSet<>(); int armor = 0, shields = 0, main = 0, off = 0;
         for (EquipmentItem instance : state.equipment()) {

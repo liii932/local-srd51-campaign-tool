@@ -1,9 +1,9 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthState;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.State;
+import com.dndtool.service.Schema2CharacterRuntime.HealthState;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.*;
 import java.util.*;
@@ -24,7 +24,7 @@ class Schema2ReadySpellRulesTest {
     final Map<UUID,Context> roster=new HashMap<>();Battle battle;
     Schema2ReadySpellRulesTest() {roster.put(a,context(a));roster.put(b,context(b));}
     Context context(UUID actor) {
-        var plan=fullPlan(material,new Identity(UUID.randomUUID(),UUID.randomUUID()),campaign,actor);State s=new Schema2CharacterProgressionRules().initial(material,plan,UUID.randomUUID(),fullAbilities(),initialChoices());
+        var plan=fullPlan(material,new Schema2PreparationIdentity(UUID.randomUUID(),UUID.randomUUID()),campaign,actor);State s=new Schema2CharacterProgressionRules().initial(material,plan,UUID.randomUUID(),fullAbilities(),initialChoices());
         var eq=new Schema2CharacterEquipmentRules();UUID focus=UUID.randomUUID();s=eq.apply(material,s,equipment("ITEM_ACQUIRED",focus,HOLY_SYMBOL,"CARRIED"),focus);s=eq.apply(material,s,equipment("ITEM_EQUIPPED",focus,null,"OFF_HAND"),UUID.randomUUID());return new Context(material,plan,s);
     }
     UUID arm(UUID actor) {Context c=roster.get(actor);var eq=new Schema2CharacterEquipmentRules();UUID item=UUID.randomUUID();State s=eq.apply(material,c.character(),equipment("ITEM_ACQUIRED",item,ITEM_WEAPON,"CARRIED"),item);s=eq.apply(material,s,equipment("ITEM_EQUIPPED",item,null,"MAIN_HAND"),UUID.randomUUID());roster.put(actor,withState(c,s));return item;}

@@ -1,10 +1,8 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.CampaignDomainEngine.CharacterRecord;
 import com.dndtool.service.Schema2CombatState.*;
 import java.util.*;
@@ -23,7 +21,7 @@ class CampaignDomainEngineTest {
         assertEquals(f.characters.getFirst().history().current().identity(), f.characters.getLast().history().current().identity());
         var record = f.characters.getFirst();
         History spent = f.engine.executeCharacter(f.material, record.initial(), record.history(),
-                new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT", ENERGY, 1, null, null), UUID.randomUUID(), NO_DICE);
+                new Schema2CharacterRuntime.Command("RESOURCE_SPENT", ENERGY, 1, null, null), UUID.randomUUID(), NO_DICE);
         assertEquals(record.history().current().resources().getFirst().current() - 1, spent.current().resources().getFirst().current());
         f.engine.validateCharacter(f.material, record.initial(), spent);
         f.engine.validateCampaign(f.material, f.characters, List.of());
@@ -73,9 +71,9 @@ class CampaignDomainEngineTest {
                 last.hitDieRoll(), last.before(), last.after(), last.checkResult(), last.healthResult()));
         var forged = new History(record.history().current(), events);
         assertThrows(IllegalArgumentException.class, () -> f.engine.executeCharacter(f.material, record.initial(), forged,
-                new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT", ENERGY, 1, null, null), UUID.randomUUID(), NO_DICE));
+                new Schema2CharacterRuntime.Command("RESOURCE_SPENT", ENERGY, 1, null, null), UUID.randomUUID(), NO_DICE));
         assertThrows(IllegalArgumentException.class, () -> f.engine.executeCharacter(f.material, record.initial(), record.history(),
-                new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT", ENERGY, 999, null, null), UUID.randomUUID(), NO_DICE));
+                new Schema2CharacterRuntime.Command("RESOURCE_SPENT", ENERGY, 999, null, null), UUID.randomUUID(), NO_DICE));
         f.start(); var retained = f.combat;
         assertThrows(IllegalArgumentException.class, () -> f.command(Schema2CombatState.Command.move(f.a,
                 List.of(new Position(10000, 10000))), NO_DICE));
@@ -86,12 +84,12 @@ class CampaignDomainEngineTest {
         Fixture f = new Fixture();
         var target = f.characters.getLast();
         var resting = f.engine.executeCharacter(f.material, target.initial(), target.history(),
-                new JdbcSchema2CharacterRuntimeRepository.Command("REST_STARTED", null, 0, null, null, null,
+                new Schema2CharacterRuntime.Command("REST_STARTED", null, 0, null, null, null,
                         GrowthChoices.EMPTY, new RestInput("SHORT_REST", null, 0, 0, Map.of())), UUID.randomUUID(), NO_DICE);
         f.characters = List.of(f.characters.getFirst(), new CharacterRecord(target.name(), target.kind(), target.initial(), resting));
         UUID root = UUID.randomUUID();
         f.characters = f.engine.executeCampaignCharacter(f.material, f.characters, List.of(), f.a,
-                new JdbcSchema2CharacterRuntimeRepository.Command("TIME_ADVANCED", null, 0, null, null, null,
+                new Schema2CharacterRuntime.Command("TIME_ADVANCED", null, 0, null, null, null,
                         GrowthChoices.EMPTY, new RestInput(null, "NONE", 30, 0, Map.of())), root, NO_DICE);
         var first = f.characters.getFirst().history().current(); var second = f.characters.getLast().history().current();
         assertEquals(first.rest().minute(), second.rest().minute());
@@ -102,12 +100,12 @@ class CampaignDomainEngineTest {
         // Close the rest explicitly before battle; time synchronization never grants rest benefits.
         target = f.characters.getLast();
         resting = f.engine.executeCharacter(f.material, target.initial(), target.history(),
-                new JdbcSchema2CharacterRuntimeRepository.Command("REST_ENDED", null, 0, null, null, null,
+                new Schema2CharacterRuntime.Command("REST_ENDED", null, 0, null, null, null,
                         GrowthChoices.EMPTY, new RestInput(null, null, 0, 0, Map.of())), UUID.randomUUID(), NO_DICE);
         f.characters = List.of(f.characters.getFirst(), new CharacterRecord(target.name(), target.kind(), target.initial(), resting));
         f.start();
         assertThrows(IllegalArgumentException.class, () -> f.engine.executeCampaignCharacter(f.material, f.characters,
-                List.of(f.combat), f.a, new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT", ENERGY, 1, null, null), UUID.randomUUID(), NO_DICE));
+                List.of(f.combat), f.a, new Schema2CharacterRuntime.Command("RESOURCE_SPENT", ENERGY, 1, null, null), UUID.randomUUID(), NO_DICE));
     }
 
     @Test void retainedOperationCannotCollideWithFutureCausalChildAfterDice() {
@@ -115,7 +113,7 @@ class CampaignDomainEngineTest {
         UUID collision = Schema2CombatCharacterFacts.childOperation(root, f.b, 0);
         var record = f.characters.getLast();
         History changed = f.engine.executeCharacter(f.material, record.initial(), record.history(),
-                new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT", ENERGY, 1, null, null), collision, NO_DICE);
+                new Schema2CharacterRuntime.Command("RESOURCE_SPENT", ENERGY, 1, null, null), collision, NO_DICE);
         f.characters = List.of(f.characters.getFirst(), new CharacterRecord(record.name(), record.kind(), record.initial(), changed));
         f.start(); f.command(Schema2CombatState.Command.action(Kind.BEGIN_ATTACK, f.a), NO_DICE);
         assertThrows(IllegalArgumentException.class, () -> f.engine.executeCombat(f.material, f.characters, f.combat,
@@ -126,10 +124,10 @@ class CampaignDomainEngineTest {
         final CampaignDomainEngine engine = new CampaignDomainEngine();
         final ProductionSchema2Projection material = Schema2CombatTestFixture.material();
         final UUID campaign = UUID.randomUUID(), a = UUID.randomUUID(), b = UUID.randomUUID(), combatId = UUID.randomUUID();
-        final Identity identity = Identity.random();
+        final Schema2PreparationIdentity identity = Schema2PreparationIdentity.random();
         final Map<UUID, UUID> items = new HashMap<>();
         List<CharacterRecord> characters = new ArrayList<>();
-        JdbcSchema2CombatRuntimeRepository.History combat;
+        Schema2CombatHistory.History combat;
 
         Fixture() {
             for (UUID id : List.of(a, b)) {

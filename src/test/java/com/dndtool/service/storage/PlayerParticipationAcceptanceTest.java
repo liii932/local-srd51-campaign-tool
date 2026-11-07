@@ -1,6 +1,6 @@
 package com.dndtool.service.storage;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.nio.file.Path;
@@ -214,20 +214,20 @@ class PlayerParticipationAcceptanceTest {
             host("share", object("payload", input.toString()));
         }
         void acquire(UUID pc, boolean equip) {
-            var command = new JdbcSchema2CharacterRuntimeRepository.Command("ITEM_ACQUIRED", null, 0, null, null, null, JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null, null,
-                    new JdbcSchema2CharacterRuntimeRepository.EquipmentInput(UUID.randomUUID(), BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
+            var command = new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
+                    new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
             characterCommand(pc, command);
             if (equip) {
                 UUID item = storage.accessSnapshot().snapshot().domains().characters().stream().filter(character -> character.id().equals(pc)).findFirst().orElseThrow().history().current().equipment().getFirst().itemId();
-                characterCommand(pc, new JdbcSchema2CharacterRuntimeRepository.Command("ITEM_EQUIPPED", null, 0, null, null, null, JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null, null,
-                        new JdbcSchema2CharacterRuntimeRepository.EquipmentInput(item, null, "MAIN_HAND", "主持准备"), null));
+                characterCommand(pc, new Schema2CharacterRuntime.Command("ITEM_EQUIPPED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
+                        new Schema2CharacterRuntime.EquipmentInput(item, null, "MAIN_HAND", "主持准备"), null));
             }
         }
-        void characterCommand(UUID pc, JdbcSchema2CharacterRuntimeRepository.Command command) { JsonObject input = characterInput(pc); input.add("command", CampaignDomainCodec.toJson(command)); send("character-command", input); }
+        void characterCommand(UUID pc, Schema2CharacterRuntime.Command command) { JsonObject input = characterInput(pc); input.add("command", CampaignDomainCodec.toJson(command)); send("character-command", input); }
         JsonObject characterInput(UUID pc) { var state = storage.accessSnapshot().snapshot().domains().characters().stream().filter(character -> character.id().equals(pc)).findFirst().orElseThrow().history().current(); return object("characterId", pc.toString(), "characterVersion", Long.toString(state.version())); }
         JsonObject check(UUID pc) {
-            JsonObject input = characterInput(pc); input.add("command", CampaignDomainCodec.toJson(new JdbcSchema2CharacterRuntimeRepository.Command("CHECK_RESOLVED", null, 0, null, null, null, JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null,
-                    new JdbcSchema2CharacterRuntimeRepository.CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定验收检定")))); return input;
+            JsonObject input = characterInput(pc); input.add("command", CampaignDomainCodec.toJson(new Schema2CharacterRuntime.Command("CHECK_RESOLVED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null,
+                    new Schema2CharacterRuntime.CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定验收检定")))); return input;
         }
         void combat(Battle previous, Command command) { JsonObject input = object("combatVersion", previous == null ? "-1" : Long.toString(previous.version())); input.add("combatId", previous == null ? JsonNull.INSTANCE : new JsonPrimitive(previous.combatId().toString())); input.add("command", CampaignDomainCodec.toJson(command)); send("combat-command", input); }
         Battle battle() { return storage.accessSnapshot().snapshot().domains().combats().getFirst().current(); }

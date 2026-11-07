@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 

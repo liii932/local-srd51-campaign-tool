@@ -1,7 +1,7 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JdbcSchema2CombatSnapshotTest {
-    private static final Identity ID=Identity.random();
+    private static final Schema2PreparationIdentity ID=Schema2PreparationIdentity.random();
     private static final ProductionSchema2Projection MATERIAL=Schema2CombatFixtures.projection();
     private static final JdbcSchema2RuntimeSnapshotRepository REPO=new JdbcSchema2RuntimeSnapshotRepository();
     private static final List<String> TABLES=List.of("s2_runtime_combat","s2_runtime_weapon_attack","s2_runtime_movement");

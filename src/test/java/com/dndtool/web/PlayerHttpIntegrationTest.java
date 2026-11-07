@@ -1,7 +1,7 @@
 package com.dndtool.web;
 
 import com.dndtool.service.storage.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.google.gson.*;
 import java.net.*;
 import java.net.http.*;

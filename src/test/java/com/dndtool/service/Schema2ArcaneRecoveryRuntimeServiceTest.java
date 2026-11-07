@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.persistence.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2CharacterRuntimeService.*;
 import com.dndtool.testing.IsolatedJvmTest;
 import java.sql.SQLException;

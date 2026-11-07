@@ -2,7 +2,6 @@ package com.dndtool.service.storage;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
 import com.dndtool.service.*;
 import com.google.gson.*;
 import java.util.*;
@@ -89,9 +88,9 @@ public final class PlayerCandidateFactory {
             List<String> locations = item.location().equals("CARRIED") ? List.of("MAIN_HAND", "OFF_HAND", "BOTH_HANDS", "WORN") : List.of("CARRIED");
             for (String location : locations) {
                 boolean unequip = location.equals("CARRIED");
-                var command = new JdbcSchema2CharacterRuntimeRepository.Command(unequip ? "ITEM_UNEQUIPPED" : "ITEM_EQUIPPED", null, 0, null, null, null,
-                        JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null, null,
-                        new JdbcSchema2CharacterRuntimeRepository.EquipmentInput(item.itemId(), null, unequip ? null : location, "玩家调整自己的装备"), null);
+                var command = new Schema2CharacterRuntime.Command(unequip ? "ITEM_UNEQUIPPED" : "ITEM_EQUIPPED", null, 0, null, null, null,
+                        Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
+                        new Schema2CharacterRuntime.EquipmentInput(item.itemId(), null, unequip ? null : location, "玩家调整自己的装备"), null);
                 try { new Schema2CharacterEquipmentRules().apply(material, state, command, UUID.randomUUID()); }
                 catch (IllegalArgumentException unavailable) { continue; }
                 addCharacter(result, character, command, (unequip ? "卸下 " : "装备 ") + PlayerCampaignProjection.ruleName(domain, item.item()) + (unequip ? "" : " · " + locationLabel(location)));
@@ -100,11 +99,11 @@ public final class PlayerCandidateFactory {
         for (var resource : state.resources()) {
             try { new Schema2CharacterProgressionRules().spend(material, state, resource.identity(), 1); }
             catch (IllegalArgumentException unavailable) { continue; }
-            addCharacter(result, character, new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT", resource.identity(), 1, null, null),
+            addCharacter(result, character, new Schema2CharacterRuntime.Command("RESOURCE_SPENT", resource.identity(), 1, null, null),
                     "使用 1 次 " + PlayerCampaignProjection.ruleName(domain, resource.identity()));
         }
     }
-    private static void addCharacter(List<Candidate> result, CampaignDomainData.Character character, JdbcSchema2CharacterRuntimeRepository.Command command, String label) {
+    private static void addCharacter(List<Candidate> result, CampaignDomainData.Character character, Schema2CharacterRuntime.Command command, String label) {
         JsonObject input = new JsonObject(); input.addProperty("characterId", character.id().toString()); input.addProperty("characterVersion", Long.toString(character.history().current().version()));
         input.add("command", CampaignDomainCodec.toJson(command)); add(result, label, character.id(), "character-command", input);
     }

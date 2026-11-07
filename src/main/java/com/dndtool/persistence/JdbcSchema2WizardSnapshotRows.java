@@ -3,14 +3,14 @@ package com.dndtool.persistence;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Frozen Wizard learning catalogs and fixed environments in the caller-owned snapshot transaction. */
 final class JdbcSchema2WizardSnapshotRows {
     private JdbcSchema2WizardSnapshotRows() { }
     static boolean supports(FinalRule row){return row instanceof FinalWizardSpellcasting||row instanceof FinalEnvironment;}
-    static void store(Connection connection,Identity id,int index,FinalRule row)throws SQLException {
+    static void store(Connection connection,Schema2PreparationIdentity id,int index,FinalRule row)throws SQLException {
         List<Object> values=new ArrayList<>(List.of(id.snapshotBytes(),index,ascii(row.identity().moduleKey()),ascii(row.identity().ruleKey()),row.definition().displayName()));String table,columns;
         if(row instanceof FinalWizardSpellcasting wizard) {
             var d=wizard.definition();table="wizard_spellcasting";columns="owner_class_module_key, owner_class_rule_type, owner_class_rule_key, required_feature_module_key, required_feature_rule_type, required_feature_rule_key, slot_resource_module_key, slot_resource_rule_type, slot_resource_rule_key, rank2_slot_resource_module_key, rank2_slot_resource_rule_type, rank2_slot_resource_rule_key, rank3_slot_resource_module_key, rank3_slot_resource_rule_type, rank3_slot_resource_rule_key, ability_key, algorithm";
@@ -21,13 +21,13 @@ final class JdbcSchema2WizardSnapshotRows {
         Collections.addAll(values,row.definition().authorNote(),row.enabled()?1:0);
         insert(connection,"s2_runtime_"+table,"snapshot_id, rule_index, module_key, rule_key, display_name, description, source_page, "+columns+", author_note, enabled",values);
     }
-    static boolean storeEntry(Connection connection,Identity id,int index,FinalEntry row)throws SQLException {
+    static boolean storeEntry(Connection connection,Schema2PreparationIdentity id,int index,FinalEntry row)throws SQLException {
         if(!(row.entry() instanceof SpellbookEntry entry))return false;
         var k=entry.identity();List<Object> values=new ArrayList<>(List.of(id.snapshotBytes(),index,ascii(k.rule().moduleKey()),ascii(k.rule().ruleKey()),ascii(k.collectionKey()),ascii(k.moduleKey()),ascii(k.entryKey())));
         reference(values,entry.spell());Collections.addAll(values,entry.authorNote(),row.enabled()?1:0);
         insert(connection,"s2_runtime_spellbook_member","snapshot_id, entry_index, rule_module_key, rule_key, collection_key, module_key, entry_key, spell_module_key, spell_rule_type, spell_rule_key, author_note, enabled",values);return true;
     }
-    static Map<Integer,FinalRule> read(Connection connection,Identity id)throws SQLException {
+    static Map<Integer,FinalRule> read(Connection connection,Schema2PreparationIdentity id)throws SQLException {
         Map<Integer,FinalRule> result=new TreeMap<>();
         for(String table:List.of("wizard_spellcasting","environment"))try(var statement=connection.prepareStatement("SELECT * FROM s2_runtime_"+table+" WHERE snapshot_id = ? ORDER BY rule_index LIMIT 257")) {
             statement.setQueryTimeout(5);statement.setMaxRows(257);statement.setBytes(1,id.snapshotBytes());
@@ -46,7 +46,7 @@ final class JdbcSchema2WizardSnapshotRows {
         }
         return result;
     }
-    static Map<Integer,FinalEntry> readEntries(Connection connection,Identity id)throws SQLException {
+    static Map<Integer,FinalEntry> readEntries(Connection connection,Schema2PreparationIdentity id)throws SQLException {
         Map<Integer,FinalEntry> result=new TreeMap<>();
         try(var statement=connection.prepareStatement("SELECT * FROM s2_runtime_spellbook_member WHERE snapshot_id = ? ORDER BY entry_index LIMIT 513")) {
             statement.setQueryTimeout(5);statement.setMaxRows(513);statement.setBytes(1,id.snapshotBytes());
@@ -62,7 +62,7 @@ final class JdbcSchema2WizardSnapshotRows {
         }
         return result;
     }
-    private static void snapshot(ResultSet rows,Identity id)throws SQLException{Object raw=rows.getObject("snapshot_id");require(raw instanceof byte[] bytes&&Arrays.equals(bytes,id.snapshotBytes()));}
+    private static void snapshot(ResultSet rows,Schema2PreparationIdentity id)throws SQLException{Object raw=rows.getObject("snapshot_id");require(raw instanceof byte[] bytes&&Arrays.equals(bytes,id.snapshotBytes()));}
     private static void insert(Connection c,String table,String columns,List<Object> values)throws SQLException {
         try(var s=c.prepareStatement("INSERT INTO "+table+" ("+columns+") VALUES ("+String.join(", ",Collections.nCopies(values.size(),"?"))+")")) {
             s.setQueryTimeout(5);

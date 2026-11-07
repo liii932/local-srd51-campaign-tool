@@ -1,11 +1,11 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2PreparationIdentity;
+import com.dndtool.service.Schema2CombatHistory;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel;
 import com.dndtool.module.composition.Schema2RulesBinding;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository;
 import com.dndtool.service.Schema2CombatState;
 import com.dndtool.service.Schema2InitialCharacterPlanService;
 import com.dndtool.service.Schema2InitialProficiencyRules;
@@ -22,13 +22,13 @@ public final class CampaignDomainCodec {
     static {
         register("rule", Schema2CompositionKernel.class);
         register("material", ProductionSchema2Projection.class);
-        register("character", JdbcSchema2CharacterRuntimeRepository.class);
-        register("battle-history", JdbcSchema2CombatRuntimeRepository.class);
+        register("character", Schema2CharacterRuntime.class);
+        register("battle-history", Schema2CombatHistory.class);
         register("scene", Schema2CombatState.class);
         register("initial", Schema2InitialCharacterPlanService.class);
         register("grants", Schema2InitialProficiencyRules.class);
         type("rules-binding", Schema2RulesBinding.class);
-        type("preparation-identity", JdbcSchema2RuntimeSnapshotRepository.Identity.class);
+        type("preparation-identity", Schema2PreparationIdentity.class);
         register("campaign", CampaignDomainData.class);
         register("participation", CampaignParticipationData.class);
         register("participation-command", CampaignParticipationCommands.class);

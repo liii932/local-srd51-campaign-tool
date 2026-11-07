@@ -1,7 +1,7 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.composition.Schema2ProgressionFixtures;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JdbcSchema2ProgressionSnapshotTest {
     private static final JdbcSchema2RuntimeSnapshotRepository REPOSITORY = new JdbcSchema2RuntimeSnapshotRepository();
-    private static final Identity IDENTITY = Identity.random();
+    private static final Schema2PreparationIdentity IDENTITY = Schema2PreparationIdentity.random();
     @Test void actualTypedRulesAndCompleteOverrideChainsRoundTripAcrossModules() throws Exception {
         var material = Schema2ProgressionFixtures.projection(); var fixture = stored();
         var progression = fixture.rows("s2_runtime_class_progression").getFirst();
@@ -36,7 +36,7 @@ class JdbcSchema2ProgressionSnapshotTest {
         for (String table : List.of("s2_runtime_class_progression", "s2_runtime_resource")) {
             mutations.add(f -> f.rows(table).removeFirst());
             mutations.add(f -> f.rows(table).add(new LinkedHashMap<>(f.rows(table).getFirst())));
-            mutations.add(f -> f.rows(table).getFirst().put("snapshot_id", Identity.random().snapshotBytes()));
+            mutations.add(f -> f.rows(table).getFirst().put("snapshot_id", Schema2PreparationIdentity.random().snapshotBytes()));
             mutations.add(f -> f.rows(table).getFirst().put("owner_class_module", ascii("missing")));
             mutations.add(f -> f.rows(table).getFirst().put("owner_class_type", ascii("character.race")));
         }
@@ -88,7 +88,7 @@ class JdbcSchema2ProgressionSnapshotTest {
         for (String table : tables) {
             mutations.add(f -> f.rows(table).removeFirst());
             mutations.add(f -> f.rows(table).add(new LinkedHashMap<>(f.rows(table).getFirst())));
-            mutations.add(f -> f.rows(table).getFirst().put("snapshot_id", Identity.random().snapshotBytes()));
+            mutations.add(f -> f.rows(table).getFirst().put("snapshot_id", Schema2PreparationIdentity.random().snapshotBytes()));
         }
         mutations.add(f -> f.rows("s2_runtime_rule_prerequisite").getFirst().put("group_index", 4));
         mutations.add(f -> f.rows("s2_runtime_chain_prerequisite").getFirst().put("phase", ascii("BEFORE")));

@@ -1,8 +1,8 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.util.*;
@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class JdbcSchema2CharacterRuntimeRepositoryTest {
     private static final JdbcSchema2CharacterRuntimeRepository REPOSITORY = new JdbcSchema2CharacterRuntimeRepository();
-    private static final Identity IDENTITY = Identity.random();
+    private static final Schema2PreparationIdentity IDENTITY = Schema2PreparationIdentity.random();
     private static final UUID CAMPAIGN = UUID.randomUUID(), CHARACTER = UUID.randomUUID(), PREPARATION = UUID.randomUUID();
     private static final RuleIdentity CLASS = new RuleIdentity("example", "character.class", "class.guard");
     private static final RuleIdentity RESOURCE = new RuleIdentity("example", "character.resource", "resource.energy");

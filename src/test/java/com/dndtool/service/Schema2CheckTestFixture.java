@@ -2,8 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
 import com.dndtool.persistence.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.google.gson.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Original author bytes and real preparation, retained snapshot, initialization and JDBC consumers. */
 final class Schema2CheckTestFixture {
-    static final Identity IDENTITY = new Identity(UUID.fromString("30912233-4455-4677-8899-aabbccddeeff"), UUID.fromString("d0eeddcc-bbaa-4988-8766-554433221100"));
+    static final Schema2PreparationIdentity IDENTITY = new Schema2PreparationIdentity(UUID.fromString("30912233-4455-4677-8899-aabbccddeeff"), UUID.fromString("d0eeddcc-bbaa-4988-8766-554433221100"));
     static final UUID PREPARATION = UUID.fromString("30872103-0345-4abc-8def-0123456789ab");
     static final UUID CAMPAIGN = UUID.fromString("42345678-1234-4678-8234-123456789abc");
     static final UUID CHARACTER = UUID.fromString("cbcdef12-1234-4678-8234-123456789abc");

@@ -2,7 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
 import com.dndtool.persistence.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2CombatRuntimeService.*;
 import com.dndtool.service.Schema2CombatRuntimeService.Status;
 import com.dndtool.service.Schema2CombatState.*;
@@ -28,7 +28,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
                 Map.of(B,CLASS),Map.of(B,Schema2SpellFixtures.initialChoices()));
         if(initialize) {
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(f.characterRequest(f.a,
-                    JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(BURNING))))).status());
+                    Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(BURNING))))).status());
             character(f,f.a,equipment("ITEM_UNEQUIPPED",f.items.get(f.a),null,null));
             UUID focus=Schema2SpellRuntimeServiceTest.focus(B);var owner=f.members.stream().filter(m->m.characterId().equals(B)).findFirst().orElseThrow();
             var acquire=new Schema2CharacterRuntimeService.Request(focus,owner.identity(),f.campaign,B,owner.preparationOperationId(),f.binding,f.character(B).version(),equipment("ITEM_ACQUIRED",focus,Schema2SpellFixtures.HOLY_SYMBOL,"CARRIED"),Map.of());
@@ -99,18 +99,18 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
     }
     static Schema2CombatRuntimeServiceTest.Fixture wizards(boolean sculpt)throws Exception {
         var f=new Schema2CombatRuntimeServiceTest.Fixture(true,spellPackages(sculpt),GrowthChoices.EMPTY,WIZARD);
-        for(UUID actor:List.of(f.a,f.b))character(f,actor,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(actor.equals(f.a)?BURNING:SHIELD))));
+        for(UUID actor:List.of(f.a,f.b))character(f,actor,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(actor.equals(f.a)?BURNING:SHIELD))));
         character(f,f.a,equipment("ITEM_UNEQUIPPED",f.items.get(f.a),null,null));
         return f;
     }
-    static void character(Schema2CombatRuntimeServiceTest.Fixture f,UUID actor,JdbcSchema2CharacterRuntimeRepository.Command command)throws Exception {
+    static void character(Schema2CombatRuntimeServiceTest.Fixture f,UUID actor,Schema2CharacterRuntime.Command command)throws Exception {
         var result=f.characterService.execute(f.characterRequest(actor,command));assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,result.status(),result.code());
     }
     static void grow(Schema2CombatRuntimeServiceTest.Fixture f,UUID actor,int level)throws Exception {
         for(int next=2;next<=level;next++) {
             var choices=next==2?new GrowthChoices(EVOCATION,Map.of(),null,Map.of()):next==4?new GrowthChoices(null,Map.of("ability.intelligence",2),null,Map.of()):GrowthChoices.EMPTY;
-            character(f,actor,new JdbcSchema2CharacterRuntimeRepository.Command("CHARACTER_ADVANCED",null,0,null,"FIXED_AVERAGE",WIZARD,choices));
-            character(f,actor,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_ADVANCED",new SpellbookInput(CASTING,learnedAt(next),f.character(actor).spellbook().prepared())));
+            character(f,actor,new Schema2CharacterRuntime.Command("CHARACTER_ADVANCED",null,0,null,"FIXED_AVERAGE",WIZARD,choices));
+            character(f,actor,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_ADVANCED",new SpellbookInput(CASTING,learnedAt(next),f.character(actor).spellbook().prepared())));
         }
     }
     static void synchronizeClocks(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {
@@ -129,7 +129,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
     @Test void realCounterspellRestoresTheDeclarationWindowWithoutRefundOrInventedBatch()throws Exception {
         var f=wizards(true);grow(f,f.b,5);
         character(f,f.b,Schema2ArcaneRecoveryTestFixture.start("LONG_REST"));character(f,f.b,Schema2ArcaneRecoveryTestFixture.time("SLEEP",480));character(f,f.b,Schema2ArcaneRecoveryTestFixture.finish(Map.of()));
-        character(f,f.b,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(COUNTERSPELL))));
+        character(f,f.b,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(COUNTERSPELL))));
         synchronizeClocks(f);f.nextRolls.addAll(List.of(20,1));f.start();int rolls=f.rolls;Request cast=f.request(burning(f,0,1));f.commit(cast);replay(f,cast);
         assertEquals(1,slots(f));assertTrue(f.battle.saveDamageBatches().isEmpty());assertEquals(rolls,f.rolls);
         Save declaration=f.service.read(f.combat);var target=new Schema2CombatRuntimeServiceTest.Fixture(false,Schema2SpellSaveDamageFixtures.packages(),GrowthChoices.EMPTY,WIZARD);target.source.unavailable(true);
@@ -150,8 +150,8 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
     }
     @Test void metadataAndOccupiedHandsCannotBorrowTheNewExecutableSpellContract()throws Exception {
         var old=new Schema2CombatRuntimeServiceTest.Fixture(true,Schema2WizardFixtures.packages(),GrowthChoices.EMPTY,WIZARD);
-        character(old,old.a,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(BURNING))));
-        character(old,old.b,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(SHIELD))));
+        character(old,old.a,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(BURNING))));
+        character(old,old.b,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(SHIELD))));
         character(old,old.a,equipment("ITEM_UNEQUIPPED",old.items.get(old.a),null,null));old.start();var before=old.service.read(old.combat);int writes=old.runtime.writes,rolls=old.rolls;
         assertEquals("S2_SPELL_UNAVAILABLE",old.service.execute(old.request(burning(old,0,1))).code());assertEquals(before,old.service.read(old.combat));assertEquals(writes,old.runtime.writes);assertEquals(rolls,old.rolls);
         var held=wizards(false);character(held,held.a,equipment("ITEM_EQUIPPED",held.items.get(held.a),null,"MAIN_HAND"));held.start();before=held.service.read(held.combat);writes=held.runtime.writes;rolls=held.rolls;
@@ -165,11 +165,11 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
     static Schema2CombatRuntimeServiceTest.Fixture counterspellWizards(boolean initialize,List<UUID> additional,boolean sculpt)throws Exception {
         var f=new Schema2CombatRuntimeServiceTest.Fixture(initialize,spellPackages(sculpt),GrowthChoices.EMPTY,WIZARD,Map.of(),Map.of(),additional);
         if(initialize) {
-            for(var member:f.members) {UUID actor=member.characterId();character(f,actor,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(actor.equals(f.a)?BURNING:SHIELD))));}
+            for(var member:f.members) {UUID actor=member.characterId();character(f,actor,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(actor.equals(f.a)?BURNING:SHIELD))));}
             character(f,f.a,equipment("ITEM_UNEQUIPPED",f.items.get(f.a),null,null));
             for(UUID actor:List.of(f.b,C)) {
                 grow(f,actor,5);character(f,actor,Schema2ArcaneRecoveryTestFixture.start("LONG_REST"));character(f,actor,Schema2ArcaneRecoveryTestFixture.time("SLEEP",480));character(f,actor,Schema2ArcaneRecoveryTestFixture.finish(Map.of()));
-                character(f,actor,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(COUNTERSPELL))));
+                character(f,actor,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(COUNTERSPELL))));
             }
             synchronizeClocks(f);
         }
@@ -194,7 +194,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
     static Schema2CombatRuntimeServiceTest.Fixture originalShieldScene(int level)throws Exception {
         var f=counterspellWizards(true,List.of(C,D,E),false);grow(f,f.a,level);
         character(f,f.a,Schema2ArcaneRecoveryTestFixture.start("LONG_REST"));character(f,f.a,Schema2ArcaneRecoveryTestFixture.time("SLEEP",480));character(f,f.a,Schema2ArcaneRecoveryTestFixture.finish(Map.of()));
-        character(f,f.a,JdbcSchema2CharacterRuntimeRepository.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(BURNING,SHIELD))));
+        character(f,f.a,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(BURNING,SHIELD))));
         synchronizeClocks(f);return f;
     }
     static Window currentWindow(Schema2CombatRuntimeServiceTest.Fixture f) {
@@ -243,7 +243,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
         int rolls=f.rolls;f.commit(burning(f,0,1));assertEquals(1,slots(f));assertEquals(rolls,f.rolls);assertTrue(f.battle.saveDamageBatches().isEmpty());
     }
     @Test void nestedAttackWithoutShieldSlotsDoesNotSeedOriginalCompletion()throws Exception {
-        var f=originalShieldScene(3);character(f,f.a,new JdbcSchema2CharacterRuntimeRepository.Command("RESOURCE_SPENT",SLOT1,4,null,null));assertEquals(0,slots(f));
+        var f=originalShieldScene(3);character(f,f.a,new Schema2CharacterRuntime.Command("RESOURCE_SPENT",SLOT1,4,null,null));assertEquals(0,slots(f));
         assertTrue(f.character(f.a).spellbook().prepared().contains(SHIELD));
         armedAttackSuccessor(f,new ReadyInput(new ReadyTrigger(TriggerKind.CAST_COMPLETED,f.a,null),ReadyResponseKind.MOVE,null,null,List.of(new Position(1,2)),null));
         int rolls=f.rolls;f.commit(burning(f,0,2));assertEquals(0,slots(f));assertEquals(1,f.character(f.a).resources().stream().filter(r->r.identity().equals(SLOT2)).findFirst().orElseThrow().current());assertEquals(rolls,f.rolls);

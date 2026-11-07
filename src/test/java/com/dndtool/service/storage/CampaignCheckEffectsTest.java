@@ -1,10 +1,10 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.CheckInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.Command;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
+import com.dndtool.service.Schema2CharacterRuntime.Command;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.storage.CampaignCheckEffects.*;
 import com.google.gson.*;
 import java.nio.file.Path;
@@ -120,7 +120,7 @@ class CampaignCheckEffectsTest {
         }
         UUID operation = UUID.randomUUID(); Result result = CampaignCheckEffects.resolve(f.snapshot, input, operation, sides -> 20);
         var history = character(result.state(), f.a).history();
-        assertEquals(List.of("INITIALIZED", "CHECK_RESOLVED", "HEALTH_EFFECT_RESOLVED"), history.events().stream().map(JdbcSchema2CharacterRuntimeRepository.Event::kind).toList());
+        assertEquals(List.of("INITIALIZED", "CHECK_RESOLVED", "HEALTH_EFFECT_RESOLVED"), history.events().stream().map(Schema2CharacterRuntime.Event::kind).toList());
         assertEquals(history.events().get(1).after(), history.events().getLast().before());
         State retained = f.accept(result, operation); Root root = retained.roots().getLast();
         Audit good = result.audit(); Audit forged = new Audit(good.input(), good.characterVersions(), good.checkOperationId(), good.healthOperationId(),
@@ -165,11 +165,11 @@ class CampaignCheckEffectsTest {
         Fixture f = new Fixture();
         Command check = new Command("CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null,
                 new CheckInput(BundledCampaignRules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 0, false, false, "DM确认有限检定。"));
-        for (int i = 1; i < JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS; i++) {
+        for (int i = 1; i < Schema2CharacterRuntime.MAX_EVENTS; i++) {
             JsonObject input = object("characterId", f.b.toString(), "characterVersion", Long.toString(character(f.snapshot.domains(), f.b).history().current().version()));
             input.add("command", CampaignDomainCodec.toJson(check)); f.apply("character-command", input);
         }
-        assertEquals(JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS, character(f.snapshot.domains(), f.b).history().events().size());
+        assertEquals(Schema2CharacterRuntime.MAX_EVENTS, character(f.snapshot.domains(), f.b).history().events().size());
         JsonObject input = f.input(0);
         input.getAsJsonObject("success").add("healthEffect", JsonNull.INSTANCE);
         assertThrows(RuntimeException.class, () -> CampaignCheckEffects.resolve(f.snapshot, input, UUID.randomUUID(),
@@ -196,7 +196,7 @@ class CampaignCheckEffectsTest {
         }
         void damage(UUID target) {
             var health = new Command("HEALTH_EFFECT_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null, null, null,
-                    new JdbcSchema2CharacterRuntimeRepository.HealthInput(BundledCampaignRules.rule("adventure.health", "health.srd2014"),
+                    new Schema2CharacterRuntime.HealthInput(BundledCampaignRules.rule("adventure.health", "health.srd2014"),
                             BundledCampaignRules.rule("adventure.vital_effect", "vital_effect.dm_damage"), null, "DM确认直接环境伤害。"));
             JsonObject input = object("characterId", target.toString(), "characterVersion", Long.toString(character(snapshot.domains(), target).history().current().version()));
             input.add("command", CampaignDomainCodec.toJson(health)); apply("character-command", input);
@@ -210,7 +210,7 @@ class CampaignCheckEffectsTest {
         }
         State accept(Result result, UUID operation) {
             Set<UUID> old = new HashSet<>(); snapshot.domains().characters().forEach(c -> c.history().events().forEach(e -> old.add(e.operationId())));
-            var children = result.state().characters().stream().flatMap(c -> c.history().events().stream()).map(JdbcSchema2CharacterRuntimeRepository.Event::operationId)
+            var children = result.state().characters().stream().flatMap(c -> c.history().events().stream()).map(Schema2CharacterRuntime.Event::operationId)
                     .filter(id -> !old.contains(id)).sorted(Comparator.comparing(UUID::toString)).toList();
             List<Root> roots = new ArrayList<>(result.state().roots());
             roots.add(new Root(roots.size() + 1L, operation, "check-effects", result.subjectId(), "0".repeat(64), "", CampaignDomainCodec.text(result.audit()), children, null, CampaignParticipationData.Actor.dm(result.subjectId(), null)));

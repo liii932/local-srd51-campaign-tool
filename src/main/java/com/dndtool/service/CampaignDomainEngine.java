@@ -3,15 +3,12 @@ package com.dndtool.service;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.module.composition.Schema2CompositionKernel.ProgressionScope;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.Member;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.Dependency;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2CombatHistory.Member;
+import com.dndtool.service.Schema2CombatHistory.Dependency;
 import com.dndtool.service.Schema2CharacterRuntimeService.Material;
 import com.dndtool.service.Schema2CharacterRuntimeService.Request;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
-import java.sql.SQLException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.IntUnaryOperator;
@@ -35,7 +32,7 @@ public final class CampaignDomainEngine {
                 throw rejected("CAMPAIGN_CHARACTER_RECORD");
         }
     }
-    public record CombatResult(JdbcSchema2CombatRuntimeRepository.History history, List<CharacterRecord> characters) {
+    public record CombatResult(Schema2CombatHistory.History history, List<CharacterRecord> characters) {
         public CombatResult { characters = List.copyOf(characters); }
     }
 
@@ -46,7 +43,7 @@ public final class CampaignDomainEngine {
     public History initial(ProductionSchema2Projection material, InitialPlan initial, UUID preparationOperationId,
             Map<String,Integer> abilities, GrowthChoices choices, UUID operationId) {
         Objects.requireNonNull(initial);
-        var command = new JdbcSchema2CharacterRuntimeRepository.Command("INITIALIZED", null, 0, null, null, null, choices, null);
+        var command = new Schema2CharacterRuntime.Command("INITIALIZED", null, 0, null, null, null, choices, null);
         Request request = new Request(operationId, initial.character().identity(), initial.campaignId(), initial.characterId(),
                 preparationOperationId, Schema2RulesBinding.from(material), -1, command, abilities);
         Event event = characterEvent(new Material(material, initial), null, request,
@@ -55,7 +52,7 @@ public final class CampaignDomainEngine {
     }
 
     public History executeCharacter(ProductionSchema2Projection material, InitialPlan initial, History history,
-            JdbcSchema2CharacterRuntimeRepository.Command command, UUID operationId, IntUnaryOperator dice) {
+            Schema2CharacterRuntime.Command command, UUID operationId, IntUnaryOperator dice) {
         validateCharacter(material, initial, history);
         State state = history.current();
         Request request = new Request(operationId, state.identity(), state.campaignId(), state.characterId(),
@@ -70,13 +67,13 @@ public final class CampaignDomainEngine {
     public void validateCharacter(ProductionSchema2Projection material, InitialPlan initial, History history) {
         Objects.requireNonNull(material); Objects.requireNonNull(initial);
         try { validateCharacterHistory(new Material(material, initial), history); }
-        catch (SQLException invalid) { throw new IllegalArgumentException("S2_CHARACTER_HISTORY_CORRUPT", invalid); }
+        catch (Schema2RuntimeFactsException invalid) { throw new IllegalArgumentException("S2_CHARACTER_HISTORY_CORRUPT", invalid); }
     }
 
     /** One campaign command advances every character through its own supported time/health rules. */
     public List<CharacterRecord> executeCampaignCharacter(ProductionSchema2Projection material,
-            List<CharacterRecord> supplied, List<JdbcSchema2CombatRuntimeRepository.History> combats,
-            UUID targetId, JdbcSchema2CharacterRuntimeRepository.Command command, UUID operationId, IntUnaryOperator dice) {
+            List<CharacterRecord> supplied, List<Schema2CombatHistory.History> combats,
+            UUID targetId, Schema2CharacterRuntime.Command command, UUID operationId, IntUnaryOperator dice) {
         validateCampaign(material, supplied, combats);
         if (combats.stream().anyMatch(combat -> combat.current().status() != Status.ENDED))
             throw rejected("S2_CHARACTER_COMBAT_ACTIVE");
@@ -100,7 +97,7 @@ public final class CampaignDomainEngine {
             if (!existing.add(child)) throw rejected("S2_CHARACTER_OPERATION_CONFLICT");
             var active = record.history().current().rest().active();
             String activity = active == null ? "NONE" : "LIGHT";
-            var time = new JdbcSchema2CharacterRuntimeRepository.Command("TIME_ADVANCED", null, 0, null, null, null,
+            var time = new Schema2CharacterRuntime.Command("TIME_ADVANCED", null, 0, null, null, null,
                     GrowthChoices.EMPTY, new RestInput(null, activity, delta / 60, 0, Map.of()));
             synchronizedHistories.put(id, executeCharacter(material, record.initial(), record.history(), time, child,
                     sides -> { throw rejected("CAMPAIGN_TIME_RANDOMNESS"); }));
@@ -132,7 +129,7 @@ public final class CampaignDomainEngine {
 
     Event characterEvent(Material material, History history, Request request, IntUnaryOperator dice) {
         Objects.requireNonNull(dice);
-        if (JdbcSchema2CharacterRuntimeRepository.combatKind(request.command().kind()))
+        if (Schema2CharacterRuntime.combatKind(request.command().kind()))
             throw rejected("S2_CHARACTER_COMBAT_OWNER_REQUIRED");
         State before = history == null ? null : history.current();
         health.requireCommand(before, request.command());
@@ -175,12 +172,12 @@ public final class CampaignDomainEngine {
         Event event = new Event(request.operationId(), request.digest(), request.command(), roll, before, after, checkResult, healthResult);
         History result = append(history, event);
         try { validateCharacterHistory(material, result); }
-        catch (SQLException invalid) { throw new IllegalArgumentException("S2_CHARACTER_HISTORY_CORRUPT", invalid); }
+        catch (Schema2RuntimeFactsException invalid) { throw new IllegalArgumentException("S2_CHARACTER_HISTORY_CORRUPT", invalid); }
         return event;
     }
 
     public CombatResult executeCombat(ProductionSchema2Projection material, List<CharacterRecord> supplied,
-            JdbcSchema2CombatRuntimeRepository.History previous, UUID combatId, UUID operationId,
+            Schema2CombatHistory.History previous, UUID combatId, UUID operationId,
             Schema2CombatState.Command command, IntUnaryOperator dice) {
         var all = records(material, supplied);
         if (previous != null) validateCombat(material, supplied, previous);
@@ -188,7 +185,7 @@ public final class CampaignDomainEngine {
         List<Member> members = previous == null
                 ? supplied.stream().map(record -> new Member(record.history().current().characterId(),
                     record.history().current().identity(), record.history().current().preparationOperationId()))
-                    .sorted(Comparator.comparing(Member::characterId, JdbcSchema2CombatRuntimeRepository.UUID_ORDER)).toList()
+                    .sorted(Comparator.comparing(Member::characterId, Schema2CombatHistory.UUID_ORDER)).toList()
                 : previous.members();
         if (!new HashSet<>(members.stream().map(Member::characterId).toList()).equals(all.keySet()))
             throw rejected("S2_COMBAT_BINDING");
@@ -230,11 +227,11 @@ public final class CampaignDomainEngine {
             histories.put(change.characterId(), history); children.add(child);
         }
         var dependencies = members.stream().map(m -> new Dependency(m.characterId(), versions.get(m.characterId()))).toList();
-        var event = new JdbcSchema2CombatRuntimeRepository.Event(operationId, request.digest(), command,
+        var event = new Schema2CombatHistory.Event(operationId, request.digest(), command,
                 dependencies, children, previous == null ? null : previous.current(), resolution);
-        var events = new ArrayList<JdbcSchema2CombatRuntimeRepository.Event>(previous == null ? List.of() : previous.events());
+        var events = new ArrayList<Schema2CombatHistory.Event>(previous == null ? List.of() : previous.events());
         events.add(event);
-        var combat = new JdbcSchema2CombatRuntimeRepository.History(resolution.after(), members, events);
+        var combat = new Schema2CombatHistory.History(resolution.after(), members, events);
         var updated = supplied.stream().map(record -> new CharacterRecord(record.name(), record.kind(), record.initial(),
                 histories.get(record.history().current().characterId()))).toList();
         validateCombat(material, updated, combat);
@@ -242,10 +239,10 @@ public final class CampaignDomainEngine {
     }
 
     public void validateCombat(ProductionSchema2Projection material, List<CharacterRecord> supplied,
-            JdbcSchema2CombatRuntimeRepository.History combat) {
+            Schema2CombatHistory.History combat) {
         var all = records(material, supplied);
         try {
-            JdbcSchema2CombatRuntimeRepository.validate(combat);
+            Schema2CombatHistory.validate(combat);
             if (!new HashSet<>(combat.members().stream().map(Member::characterId).toList()).equals(all.keySet()))
                 throw rejected("S2_COMBAT_BINDING");
             for (Member member : combat.members()) {
@@ -254,12 +251,12 @@ public final class CampaignDomainEngine {
                     throw rejected("S2_COMBAT_BINDING");
             }
             validateCombatEvents(combat, histories(all), materials(material, all));
-        } catch (SQLException invalid) { throw new IllegalArgumentException("S2_COMBAT_HISTORY_CORRUPT", invalid); }
+        } catch (Schema2RuntimeFactsException invalid) { throw new IllegalArgumentException("S2_COMBAT_HISTORY_CORRUPT", invalid); }
     }
 
     /** Complete closed-graph validation, including children whose owner scene has already ended. */
     public void validateCampaign(ProductionSchema2Projection material, List<CharacterRecord> supplied,
-            List<JdbcSchema2CombatRuntimeRepository.History> combats) {
+            List<Schema2CombatHistory.History> combats) {
         if (supplied != null && supplied.isEmpty()) {
             if (combats == null || !combats.isEmpty()) throw rejected("S2_COMBAT_ROSTER");
             Schema2RulesBinding.from(Objects.requireNonNull(material)).verify(material);
@@ -269,7 +266,7 @@ public final class CampaignDomainEngine {
         long clock = seconds(supplied.getFirst().history().current());
         if (supplied.stream().anyMatch(record -> seconds(record.history().current()) != clock))
             throw rejected("S2_COMBAT_CLOCK_MISMATCH");
-        Map<UUID,JdbcSchema2CombatRuntimeRepository.Event> owners = new HashMap<>();
+        Map<UUID,Schema2CombatHistory.Event> owners = new HashMap<>();
         Set<UUID> sceneIds = new HashSet<>(), eventIds = new HashSet<>();
         if (combats == null || combats.stream().filter(combat -> combat.current().status() != Status.ENDED).count() > 1)
             throw rejected("S2_COMBAT_BINDING");
@@ -315,9 +312,9 @@ public final class CampaignDomainEngine {
     private static Map<UUID,Material> materials(ProductionSchema2Projection material, Map<UUID,CharacterRecord> records) {
         Map<UUID,Material> result = new LinkedHashMap<>(); records.forEach((id, r) -> result.put(id, new Material(material, r.initial()))); return result;
     }
-    void validateCharacterHistory(Material material, History history) throws SQLException {
+    void validateCharacterHistory(Material material, History history) throws Schema2RuntimeFactsException {
         try {
-            JdbcSchema2CharacterRuntimeRepository.validate(history);
+            Schema2CharacterRuntime.validate(history);
             for (Event event : history.events()) {
                 State after = event.after(); rules.validateState(material.projection(), after); rests.validateState(material.projection(), after);
                 equipment.validateState(material.projection(), after); health.validateState(after); spellbooks.validateState(material.projection(),after);
@@ -326,18 +323,18 @@ public final class CampaignDomainEngine {
                         event.before() == null ? -1 : event.before().version(), event.command(),
                         event.before() == null ? after.abilities() : Map.of());
                 if (!request.digest().equals(event.requestDigest())
-                        || !after.equals(JdbcSchema2CharacterRuntimeRepository.combatKind(event.kind())
+                        || !after.equals(Schema2CharacterRuntime.combatKind(event.kind())
                             ? Schema2CombatCharacterFacts.verify(material.projection(),event.before(),event.command(),event.healthResult(),event.after())
                             : calculate(material, request, event.before(), event.hitDieRoll(), event.checkResult(), event.healthResult())))
-                    throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT");
+                    throw new Schema2RuntimeFactsException("S2_CHARACTER_HISTORY_CORRUPT");
             }
-        } catch (IllegalArgumentException malformed) { throw new SQLException("S2_CHARACTER_HISTORY_CORRUPT", malformed); }
+        } catch (IllegalArgumentException malformed) { throw new Schema2RuntimeFactsException("S2_CHARACTER_HISTORY_CORRUPT", malformed); }
     }
 
     private State calculate(Material material, Request request, State before, Integer roll, CheckResult checkResult, HealthResult healthResult) {
-        JdbcSchema2CharacterRuntimeRepository.Command command = request.command();
+        Schema2CharacterRuntime.Command command = request.command();
         health.requireCommand(before, command);
-        if (JdbcSchema2CharacterRuntimeRepository.combatKind(command.kind())) {
+        if (Schema2CharacterRuntime.combatKind(command.kind())) {
             if (roll != null || checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
             throw rejected("S2_CHARACTER_COMBAT_OWNER_REQUIRED");
         }
@@ -372,16 +369,16 @@ public final class CampaignDomainEngine {
         };
     }
 
-    private static boolean isAdvancement(JdbcSchema2CharacterRuntimeRepository.Command command) {
+    private static boolean isAdvancement(Schema2CharacterRuntime.Command command) {
         return command.kind().equals("STATISTICS_ADVANCED") || command.kind().equals("CHARACTER_ADVANCED");
     }
 
-    private static void checkCapacity(History history, State candidate, JdbcSchema2CharacterRuntimeRepository.Command command) {
-        try { JdbcSchema2CharacterRuntimeRepository.checkCandidateCapacity(history, candidate, command); }
-        catch (SQLException exhausted) { throw new IllegalArgumentException("S2_CHARACTER_CAPACITY", exhausted); }
+    private static void checkCapacity(History history, State candidate, Schema2CharacterRuntime.Command command) {
+        try { Schema2CharacterRuntime.checkCandidateCapacity(history, candidate, command); }
+        catch (Schema2RuntimeFactsException exhausted) { throw new IllegalArgumentException("S2_CHARACTER_CAPACITY", exhausted); }
     }
 
-    private Schema2CharacterProgressionRules.PreparedAdvance prepareAdvance(Material material, State before, JdbcSchema2CharacterRuntimeRepository.Command command) {
+    private Schema2CharacterProgressionRules.PreparedAdvance prepareAdvance(Material material, State before, Schema2CharacterRuntime.Command command) {
         spellbooks.requireLearningCompleteBeforeAdvance(material.projection(),before);
         var prepared = rules.prepareAdvance(material.projection(), before,
                 command.kind().equals("CHARACTER_ADVANCED") ? command.targetClass() : before.characterClass(),
@@ -393,7 +390,7 @@ public final class CampaignDomainEngine {
     }
 
     Map<UUID,Schema2CombatRules.Context> contexts(List<Member> members,
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,Map<UUID,Long> versions,
+            Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Long> versions,
             Map<UUID,Schema2CharacterRuntimeService.Material> materials) {
         Map<UUID,Schema2CombatRules.Context> result=new LinkedHashMap<>();
         for (Member member:members) {
@@ -405,11 +402,11 @@ public final class CampaignDomainEngine {
         }
         return result;
     }
-    void validateCombatEvents(JdbcSchema2CombatRuntimeRepository.History history,Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> all,
-            Map<UUID,Schema2CharacterRuntimeService.Material> materials) throws SQLException {
+    void validateCombatEvents(Schema2CombatHistory.History history,Map<UUID,Schema2CharacterRuntime.History> all,
+            Map<UUID,Schema2CharacterRuntimeService.Material> materials) throws Schema2RuntimeFactsException {
         try {
             Map<UUID,Long> preceding=null;
-            for (JdbcSchema2CombatRuntimeRepository.Event event:history.events()) {
+            for (Schema2CombatHistory.Event event:history.events()) {
                 Map<UUID,Long> versions=new LinkedHashMap<>(); event.dependencies().forEach(d->versions.put(d.characterId(),d.version()));
                 if (preceding!=null&&!preceding.equals(versions)) throw rejected("S2_COMBAT_DEPENDENCY_HISTORY");
                 // Materials were physically verified for this validation call. Only character state varies by event.
@@ -434,10 +431,10 @@ public final class CampaignDomainEngine {
             }
             if (history.current().status()!=Schema2CombatState.Status.ENDED) for (var entry:all.entrySet())
                 if (entry.getValue().current().version()!=preceding.get(entry.getKey())) throw rejected("S2_COMBAT_DEPENDENCY_HISTORY");
-        } catch (IllegalArgumentException|IndexOutOfBoundsException invalid) { throw new SQLException("S2_COMBAT_HISTORY_CORRUPT",invalid); }
+        } catch (IllegalArgumentException|IndexOutOfBoundsException invalid) { throw new Schema2RuntimeFactsException("S2_COMBAT_HISTORY_CORRUPT",invalid); }
     }
-    void reserve(JdbcSchema2CombatRuntimeRepository.History previous,Schema2CombatRules.Prepared prepared,
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Schema2CombatRuntimeService.Request request) {
+    void reserve(Schema2CombatHistory.History previous,Schema2CombatRules.Prepared prepared,
+            Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Schema2CombatRuntimeService.Request request) {
         try {
             Battle before=prepared.before(); Schema2CombatState.Command command=request.command();
             int suffix=prepared.requiredSuffixEvents(); boolean closing=command.kind()==Kind.CLOSE_SCENE;
@@ -454,7 +451,7 @@ public final class CampaignDomainEngine {
             if(Set.of(Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL,Kind.DECLARE_SHIELD).contains(command.kind()))closeEvents+=histories.size();
             int remaining=command.kind()==Kind.MOVE?command.path().size():before==null||before.activeFlow()==null?0:
                     before.activeFlow().movements().stream().filter(m->m.status()==MovementStatus.PENDING).mapToInt(m->m.path().size()-m.cursor()).sum();
-            JdbcSchema2CombatRuntimeRepository.checkReservedCapacity(previous,before,suffix+closeEvents,before==null?command.deployments().size()+command.monsterDeployments().size():before.combatants().size(),remaining);
+            Schema2CombatHistory.checkReservedCapacity(previous,before,suffix+closeEvents,before==null?command.deployments().size()+command.monsterDeployments().size():before.combatants().size(),remaining);
             // The mandatory path may pass all optional reactions. Already accepted attacks/casts
             // still need their damage/healing and root exploration-time children before returning.
             Map<UUID,Integer> required=new HashMap<>();for(UUID id:histories.keySet())required.put(id,0);
@@ -466,9 +463,9 @@ public final class CampaignDomainEngine {
             for(UUID id:prepared.possibleHealthTargets())required.merge(id,2,Integer::sum);
             for(var entry:histories.entrySet()) {
                 int closure=closing?0:3+(before==null?0:(int)before.monsterRests().stream().filter(r->r.status()==MonsterRestStatus.ACTIVE).count())+(command.kind()==Kind.BEGIN_MONSTER_REST?1:0); // ending this round and any pending turn-bound facts
-                JdbcSchema2CharacterRuntimeRepository.checkCombatCapacity(entry.getValue(),required.get(entry.getKey())+closure);
+                Schema2CharacterRuntime.checkCombatCapacity(entry.getValue(),required.get(entry.getKey())+closure);
             }
-        } catch (SQLException|IllegalArgumentException exhausted) { throw rejected("S2_COMBAT_CAPACITY"); }
+        } catch (Schema2RuntimeFactsException|IllegalArgumentException exhausted) { throw rejected("S2_COMBAT_CAPACITY"); }
     }
 
     private static IllegalArgumentException rejected(String code) { return new IllegalArgumentException(code); }

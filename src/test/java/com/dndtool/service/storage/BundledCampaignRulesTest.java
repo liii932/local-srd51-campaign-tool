@@ -2,14 +2,14 @@ package com.dndtool.service.storage;
 
 import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.Command;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.CheckInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.EquipmentInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.GrowthChoices;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.SpellbookInput;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.Command;
+import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
+import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.HealthInput;
+import com.dndtool.service.Schema2CharacterRuntime.SpellbookInput;
+import com.dndtool.service.Schema2CharacterRuntime.State;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CharacterProgressionRules;
 import com.dndtool.service.Schema2CharacterCheckRules;
 import com.dndtool.service.Schema2CharacterEquipmentRules;
@@ -62,7 +62,7 @@ class BundledCampaignRulesTest {
     @Test void realStandardArrayInitializersConsumeTheExactSourcesAndClassChoices() {
         var growth = new Schema2CharacterProgressionRules();
         for (String characterClass : List.of("fighter", "cleric", "wizard")) {
-            var plan = initialPlan(UUID.randomUUID(), UUID.randomUUID(), Identity.random(), characterClass, "custom_artisan");
+            var plan = initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), characterClass, "custom_artisan");
             State state = growth.initial(projection(), plan, UUID.randomUUID(), ARRAY, initialChoices(characterClass));
             assertEquals(switch (characterClass) { case "fighter" -> 11; case "cleric" -> 9; default -> 7; }, state.maximumHitPoints());
             assertEquals(1, state.level());
@@ -72,7 +72,7 @@ class BundledCampaignRulesTest {
                     grant.target().equals(rule("character.tool", "tool.smith_tools"))));
             assertEquals(characterClass.equals("cleric") ? 1 : 0, state.subclasses().size());
         }
-        var acolyte = initialPlan(UUID.randomUUID(), UUID.randomUUID(), Identity.random(), "class.cleric", "background.acolyte");
+        var acolyte = initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), "class.cleric", "background.acolyte");
         assertEquals(4, acolyte.character().grants().size());
         assertThrows(IllegalArgumentException.class, () -> initialChoices("bard"));
         assertThrows(IllegalArgumentException.class, () -> rule("adventure.spell", "spell.fireball"));
@@ -163,7 +163,7 @@ class BundledCampaignRulesTest {
     @Test void levelTwoWizardRetainsEvocationIdentityAndPreflightsBurningHandsWithoutAcquiringSculptSpells() {
         var material = projection();
         UUID campaign = UUID.randomUUID(), wizardId = UUID.randomUUID(), fighterId = UUID.randomUUID();
-        Identity identity = Identity.random();
+        Schema2PreparationIdentity identity = Schema2PreparationIdentity.random();
         var wizardPlan = initialPlan(campaign, wizardId, identity, "wizard", "custom_artisan");
         var fighterPlan = initialPlan(campaign, fighterId, identity, "fighter", "custom_artisan");
         var growth = new Schema2CharacterProgressionRules();
@@ -202,7 +202,7 @@ class BundledCampaignRulesTest {
     }
 
     private static State initial(String characterClass) {
-        var plan = initialPlan(UUID.randomUUID(), UUID.randomUUID(), Identity.random(), characterClass, "custom_artisan");
+        var plan = initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), characterClass, "custom_artisan");
         return new Schema2CharacterProgressionRules().initial(projection(), plan, UUID.randomUUID(), ARRAY, initialChoices(characterClass));
     }
 

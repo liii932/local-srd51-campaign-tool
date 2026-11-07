@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthInput;
+import com.dndtool.service.Schema2CharacterRuntime.HealthInput;
 import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
 import com.dndtool.testing.IsolatedJvmTest;

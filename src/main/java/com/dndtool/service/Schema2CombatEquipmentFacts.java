@@ -1,6 +1,6 @@
 package com.dndtool.service;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2CombatState.Position;
 import java.util.*;
 

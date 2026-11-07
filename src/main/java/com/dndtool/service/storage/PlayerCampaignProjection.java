@@ -1,7 +1,7 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
 import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
@@ -112,8 +112,8 @@ public final class PlayerCampaignProjection {
     }
     private static JsonArray abilities(Map<String, Integer> values) {
         JsonArray a = new JsonArray(); List<String> names = List.of("力量", "敏捷", "体质", "智力", "感知", "魅力");
-        for (int i = 0; i < JdbcSchema2CharacterRuntimeRepository.ABILITIES.size(); i++) {
-            Integer value = values.get(JdbcSchema2CharacterRuntimeRepository.ABILITIES.get(i));
+        for (int i = 0; i < Schema2CharacterRuntime.ABILITIES.size(); i++) {
+            Integer value = values.get(Schema2CharacterRuntime.ABILITIES.get(i));
             if (value == null) continue;
             JsonObject row = new JsonObject(); row.addProperty("label", names.get(i)); row.addProperty("value", value); row.addProperty("modifier", Math.floorDiv(value - 10, 2)); a.add(row);
         } return a;

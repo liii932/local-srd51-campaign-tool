@@ -1,8 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -33,7 +32,7 @@ public final class Schema2CharacterCheckRules {
     public PreparedCheck prepare(ProductionSchema2Projection material, State before, Command command) {
         growth.validateState(material, before); rests.validateState(material, before);
         if (!"CHECK_RESOLVED".equals(command.kind()) || command.checkInput() == null
-                || before.version() >= JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS - 1)
+                || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
             throw invalid("S2_CHECK_COMMAND");
         if (before.rest().active() != null) throw invalid("S2_CHECK_REST_ACTIVE");
         if (before.hitPoints() == 0 || before.health().dead()) throw invalid("S2_CHECK_HEALTH");

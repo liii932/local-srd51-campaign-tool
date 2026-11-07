@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.CharacterProficiencyGrant.GrantKind;
 import com.dndtool.module.composition.Schema2GrantFixtures;
 import com.dndtool.module.composition.Schema2RulesBinding;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
 import com.dndtool.persistence.Schema2SourceReadFixture;
 import com.dndtool.service.Schema2InitialProficiencyRules.*;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Original ZIP through real repositories and planner over SQL proxies; no MySQL or run qualification. */
 class Schema2InitialCharacterPlanIntegrationTest {
     private static final String BASE = Schema2GrantFixtures.BASE;
-    private static final Identity IDENTITY = new Identity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
+    private static final Schema2PreparationIdentity IDENTITY = new Schema2PreparationIdentity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
             UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
     private static final UUID OPERATION = UUID.fromString("01872103-0345-4abc-8def-0123456789ab");
     private static final RuleIdentity RACE = rule("character.race", "race.human");

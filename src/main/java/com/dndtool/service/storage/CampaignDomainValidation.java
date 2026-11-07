@@ -43,7 +43,7 @@ public final class CampaignDomainValidation {
         Map<UUID, Position> positions = new HashMap<>(); Map<UUID, Item> items = new HashMap<>();
         Set<UUID> referencedOperations = new HashSet<>(), referencedCombats = new HashSet<>();
         Map<UUID,Integer> characterCursors=new HashMap<>(),combatCursors=new HashMap<>();
-        Map<UUID,com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.Event> eventsById=new HashMap<>();
+        Map<UUID,com.dndtool.service.Schema2CharacterRuntime.Event> eventsById=new HashMap<>();
         state.characters().forEach(c->{characterCursors.put(c.id(),0);c.history().events().forEach(e->eventsById.put(e.operationId(),e));});
         state.combats().forEach(c->combatCursors.put(c.current().combatId(),0));
         CampaignManualData.State manual=CampaignManualData.State.empty();
@@ -138,7 +138,7 @@ public final class CampaignDomainValidation {
                 case "character-command" -> {
                     if(CampaignManualData.active(manual))throw CampaignJson.bad("Rule-character command bypasses the simple scene owner");
                     var event=eventsById.get(root.operationId());
-                    if(!root.before().isEmpty()||!root.after().isEmpty()||root.combatId()!=null||event==null||!root.characterOperations().contains(root.operationId())||!event.after().characterId().equals(root.subjectId())||event.kind().equals("INITIALIZED")||com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.combatKind(event.kind()))throw CampaignJson.bad("Invalid ordinary character root");
+                    if(!root.before().isEmpty()||!root.after().isEmpty()||root.combatId()!=null||event==null||!root.characterOperations().contains(root.operationId())||!event.after().characterId().equals(root.subjectId())||event.kind().equals("INITIALIZED")||com.dndtool.service.Schema2CharacterRuntime.combatKind(event.kind()))throw CampaignJson.bad("Invalid ordinary character root");
                     long delta=second(event.after())-second(event.before());
                     for(UUID child:root.characterOperations())if(!child.equals(root.operationId())){
                         var value=eventsById.get(child);
@@ -188,7 +188,7 @@ public final class CampaignDomainValidation {
     private static boolean known(Map<UUID,Profile> profiles,CampaignManualData.State manual,UUID id){return profiles.containsKey(id)&&profiles.get(id).active()||manual.characters().stream().anyMatch(c->c.id().equals(id)&&c.current().active());}
     private static boolean member(CampaignManualData.State manual,UUID id){return manual.encounters().stream().filter(e->e.status().equals("ACTIVE")).flatMap(e->e.participants().stream()).anyMatch(p->p.characterId().equals(id));}
     private static Map<UUID,Profile> profilesFor(State state){Map<UUID,Profile> result=new HashMap<>();state.characters().forEach(c->result.put(c.id(),new Profile(c.id(),c.name(),c.kind(),c.active())));return result;}
-    private static long second(com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State state){return Math.addExact(Math.multiplyExact(state.rest().minute(),60),state.rest().second());}
+    private static long second(com.dndtool.service.Schema2CharacterRuntime.State state){return Math.addExact(Math.multiplyExact(state.rest().minute(),60),state.rest().second());}
     private static <T> T document(String value, Class<T> type) { return CampaignDomainCodec.decode(value.getBytes(StandardCharsets.UTF_8), type); }
     public static CampaignData.EventFact summary(Root root) { return new CampaignData.EventFact(root.sequence(), "DOMAIN_COMMAND", root.subjectId().toString(), 0, 0, 0, 0, "", 0); }
 }

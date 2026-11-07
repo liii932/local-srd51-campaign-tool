@@ -1,7 +1,7 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.composition.Schema2CheckFixtures;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class JdbcSchema2CheckSnapshotTest {
-    private static final Identity ID = Identity.random();
+    private static final Schema2PreparationIdentity ID = Schema2PreparationIdentity.random();
     private static final JdbcSchema2RuntimeSnapshotRepository REPO = new JdbcSchema2RuntimeSnapshotRepository();
     @Test void typedCheckAndCompleteSourceChainRestoreIdenticalProductionBytes() throws Exception {
         var fixture = stored(); var row = fixture.rows("s2_runtime_check").getFirst();

@@ -1,9 +1,9 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CombatHistory;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import java.util.*;
 
@@ -23,7 +23,7 @@ public final class CampaignDomainData {
         }
     }
     public record Character(String name, String kind, boolean active, InitialPlan initial,
-                            JdbcSchema2CharacterRuntimeRepository.History history) {
+                            Schema2CharacterRuntime.History history) {
         public Character { CampaignJson.name(name); if (!Set.of("PC", "NPC").contains(kind) || initial == null || history == null) throw CampaignJson.bad("Invalid character profile"); }
         public UUID id() { return initial.characterId(); }
     }
@@ -55,12 +55,12 @@ public final class CampaignDomainData {
         public World(List<Node> nodes, List<Position> positions, List<Item> items) { this(nodes, positions, items, CampaignManualData.State.empty()); }
         public World { nodes = List.copyOf(nodes); positions = List.copyOf(positions); items = List.copyOf(items); if (manual == null) throw CampaignJson.bad("Missing manual domain"); }
     }
-    public record State(Material material, List<Character> characters, List<JdbcSchema2CombatRuntimeRepository.History> combats,
+    public record State(Material material, List<Character> characters, List<Schema2CombatHistory.History> combats,
                         List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots, CampaignManualData.State manual, CampaignParticipationData.State participation) {
-        public State(Material material, List<Character> characters, List<JdbcSchema2CombatRuntimeRepository.History> combats, List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots, CampaignManualData.State manual) {
+        public State(Material material, List<Character> characters, List<Schema2CombatHistory.History> combats, List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots, CampaignManualData.State manual) {
             this(material, characters, combats, nodes, positions, items, roots, manual, CampaignParticipationData.State.empty());
         }
-        public State(Material material, List<Character> characters, List<JdbcSchema2CombatRuntimeRepository.History> combats,
+        public State(Material material, List<Character> characters, List<Schema2CombatHistory.History> combats,
                      List<Node> nodes, List<Position> positions, List<Item> items, List<Root> roots) {
             this(material, characters, combats, nodes, positions, items, roots, CampaignManualData.State.empty());
         }

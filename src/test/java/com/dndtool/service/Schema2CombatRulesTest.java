@@ -1,9 +1,9 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthState;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.RestState;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.State;
+import com.dndtool.service.Schema2CharacterRuntime.HealthState;
+import com.dndtool.service.Schema2CharacterRuntime.RestState;
+import com.dndtool.service.Schema2CharacterRuntime.State;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.*;
 import java.util.*;

@@ -4,7 +4,7 @@ import com.dndtool.module.CharacterProficiencyGrant.GrantKind;
 import com.dndtool.module.composition.Schema2GrantFixtures;
 import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.JdbcSchema2InitialPlanRepository;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
 import com.dndtool.persistence.Schema2SourceReadFixture;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Original author bytes, real preparation/planner/JDBC consumers, isolated process fault lifetimes. */
 class Schema2InitializationPreparationServiceTest {
     private static final UUID OPERATION = UUID.fromString("01872103-0345-4abc-8def-0123456789ab");
-    private static final Identity IDENTITY = new Identity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
+    private static final Schema2PreparationIdentity IDENTITY = new Schema2PreparationIdentity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
             UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
     private static final UUID CAMPAIGN = UUID.fromString("12345678-1234-4678-8234-123456789abc");
     private static final UUID CHARACTER = UUID.fromString("abcdef12-1234-4678-8234-123456789abc");

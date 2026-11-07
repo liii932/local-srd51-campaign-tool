@@ -1,7 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Snapshot;
 import com.dndtool.service.Schema2InitialCharacterPlanService.Plan;
 import com.dndtool.service.Schema2InitialProficiencyRules.*;
@@ -16,7 +16,7 @@ import static com.dndtool.service.Schema2InitialProficiencyRulesTest.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2InitialCharacterPlanServiceTest {
-    private static final Identity IDENTITY = new Identity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
+    private static final Schema2PreparationIdentity IDENTITY = new Schema2PreparationIdentity(UUID.fromString("00112233-4455-4677-8899-aabbccddeeff"),
             UUID.fromString("ffeeddcc-bbaa-4988-8766-554433221100"));
 
     @Test void actualReadIdentityAndCompleteProductionBindingAreRequiredBeforePlanning() throws Exception {
@@ -28,7 +28,7 @@ class Schema2InitialCharacterPlanServiceTest {
         assertEquals(IDENTITY, plan.identity()); assertEquals(binding, plan.binding()); assertEquals(SOURCES, plan.sources());
         assertEquals(new Schema2InitialProficiencyRules().prepare(projection, request()).grants(), plan.grants());
         assertEquals(plan, service.validate(null, IDENTITY, binding, plan)); assertEquals(2, reads.get());
-        var wrongSnapshot = new Schema2InitialCharacterPlanService((connection, identity) -> new Snapshot(Identity.random(), projection));
+        var wrongSnapshot = new Schema2InitialCharacterPlanService((connection, identity) -> new Snapshot(Schema2PreparationIdentity.random(), projection));
         assertEquals("S2_INITIAL_SNAPSHOT_MISMATCH", assertThrows(IllegalArgumentException.class,
                 () -> wrongSnapshot.prepare(null, IDENTITY, binding, request())).getMessage());
         var missing = new Schema2InitialCharacterPlanService((connection, identity) -> null);
@@ -92,7 +92,7 @@ class Schema2InitialCharacterPlanServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.validate(null, IDENTITY, binding,
                 changed(original, forgedSource, original.choices(), original.slots(), original.grants())));
         int beforeWrongIdentity = reads.get();
-        assertThrows(IllegalArgumentException.class, () -> service.validate(null, Identity.random(), binding, original));
+        assertThrows(IllegalArgumentException.class, () -> service.validate(null, Schema2PreparationIdentity.random(), binding, original));
         assertEquals(beforeWrongIdentity, reads.get());
         var changedBinding = binding(binding, binding.members(), "0".repeat(64), binding.finalRulesSha256(), binding.chainSha256());
         rejects(service, binding, new Plan(IDENTITY, changedBinding, original.sources(), original.choices(), original.slots(), original.grants()));

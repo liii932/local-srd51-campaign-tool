@@ -2,8 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
+import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2CombatRules.Context;
 import java.util.*;
 
@@ -134,11 +133,11 @@ public final class Schema2SpellRules {
             if (cure && destination.character().health().dead()) throw invalid("S2_HEALTH_DEAD");
             if (cure) {
                 requireSupportedFeatures(destination.material(),destination.character(),"S2_HEALTH_EFFECT_UNSUPPORTED");
-                if (destination.character().version()>=JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS-(id.equals(actor)?2:1))
+                if (destination.character().version()>=Schema2CharacterRuntime.MAX_EVENTS-(id.equals(actor)?2:1))
                     throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
             }
         }
-        if (caster.version()>=JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS-1) throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
+        if (caster.version()>=Schema2CharacterRuntime.MAX_EVENTS-1) throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
         return new Prepared(profile,spell,input,caster,Math.floorDiv(caster.abilities().get(profile.abilityKey())-10,2)+3,bless);
     }
     private Prepared prepareWizard(Map<UUID,Context> roster,Battle battle,UUID actor,CastInput input,boolean reaction) {
@@ -174,7 +173,7 @@ public final class Schema2SpellRules {
             CastAttempt target=findCast(battle,input.targetCastFrameKey());
             if(target==null || target.status()!=CastStatus.PENDING || target.actorId().equals(actor) || !input.targets().equals(List.of(target.actorId())) || member(battle,actor).position().distanceFeet(member(battle,target.actorId()).position())>60)throw invalid("S2_SPELL_TARGET");
         }
-        if(caster.version()>=JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS-1)throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
+        if(caster.version()>=Schema2CharacterRuntime.MAX_EVENTS-1)throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
         return new Prepared(input.castingRule(),resource,profile.abilityKey(),spells.getFirst().definition(),input,caster,0,false);
     }
     static RuleIdentity slotResource(WizardSpellcastingDefinition p,int level) {

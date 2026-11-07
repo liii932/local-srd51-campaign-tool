@@ -1,8 +1,8 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.*;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.google.gson.*;
 import java.nio.charset.StandardCharsets;
@@ -34,7 +34,7 @@ class Schema2OngoingEffectRulesTest {
         return ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
     }
     Context context(UUID id) {
-        var initial=fullPlan(material,new Identity(UUID.randomUUID(),UUID.randomUUID()),campaign,id);
+        var initial=fullPlan(material,new Schema2PreparationIdentity(UUID.randomUUID(),UUID.randomUUID()),campaign,id);
         return new Context(material,initial,new Schema2CharacterProgressionRules().initial(material,initial,UUID.randomUUID(),fullAbilities(),initialChoices()));
     }
     Battle scene() {

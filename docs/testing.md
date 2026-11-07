@@ -502,6 +502,12 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
 
+检查 `WEB-INF/classes/com/dndtool/service/` 下的 `Schema2CharacterRuntime`、
+`Schema2CombatHistory` 和 `Schema2PreparationIdentity`。核对迁出的 JDBC 嵌套领域类型
+均已排除，例如 `JdbcSchema2CharacterRuntimeRepository$State.class`、
+`JdbcSchema2CombatRuntimeRepository$History.class` 和
+`JdbcSchema2RuntimeSnapshotRepository$Identity.class`。
+
 本文前述原包排除项针对离线来源包、测试向量和作者工作目录；
 `storage/rules/{srd51-runtime,srd51-characters,srd51-magic,dm-runtime-house-rules}.zip`
 是当前显式交付的有限生产资源，必须包含且逐个验证生产 reader、许可和准确内容。

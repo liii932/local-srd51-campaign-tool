@@ -2,8 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
-import com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.Member;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CombatHistory.Member;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRuntimeService.Request;
 import com.dndtool.service.Schema2CombatState.*;
 import java.util.*;
@@ -16,7 +16,7 @@ class Schema2SpellSaveDamageRequestDigestTest {
     private static Request request(CastInput cast) {
         var binding=new Schema2RulesBinding(ProductionSchema2Projection.CANONICAL_PROFILE,ProductionSchema2Projection.COMPOSITION_ALGORITHM,
                 List.of(new ProductionSchema2Projection.StoredMember("base","1",Role.BASE,"1".repeat(64),"2".repeat(64))),"3".repeat(64),"4".repeat(64),"5".repeat(64));
-        return new Request(id(1),id(2),id(3),binding,List.of(new Member(id(4),new Identity(id(6),id(7)),id(8)),new Member(id(5),new Identity(id(9),id(10)),id(11))),7,Map.of(id(4),11L,id(5),13L),Command.cast(id(4),cast));
+        return new Request(id(1),id(2),id(3),binding,List.of(new Member(id(4),new Schema2PreparationIdentity(id(6),id(7)),id(8)),new Member(id(5),new Schema2PreparationIdentity(id(9),id(10)),id(11))),7,Map.of(id(4),11L,id(5),13L),Command.cast(id(4),cast));
     }
     private static String digest(Request request)throws Exception {
         var method=Schema2CombatRuntimeService.class.getDeclaredMethod("fingerprint",Request.class);method.setAccessible(true);return (String)method.invoke(null,request);

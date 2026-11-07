@@ -1,8 +1,8 @@
 package com.dndtool.persistence;
 
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.ProductionSchema2Projection.StoredMember;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
@@ -15,7 +15,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
     private static final String STATE = "state, text_value, integer_value, boolean_value, reference_module_key, reference_rule_key, grant_category, grant_kind, grant_target_module_key, grant_target_rule_key, grant_count, " + JdbcSchema2GrowthSnapshotRows.EXTRA_STATE;
 
     /** Caller owns the transaction and must roll it back on any failure, including later writes. */
-    public Snapshot store(Connection connection, Identity identity, ProductionSchema2Projection projection) throws SQLException {
+    public Snapshot store(Connection connection, Schema2PreparationIdentity identity, ProductionSchema2Projection projection) throws SQLException {
         require(identity != null && projection != null);
         ProductionSchema2Projection expected;
         try {
@@ -131,11 +131,11 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
     }
 
     /** Requires the complete server-owned run/snapshot binding; reads only the runtime schema. */
-    public Snapshot read(Connection connection, Identity identity) throws SQLException {
+    public Snapshot read(Connection connection, Schema2PreparationIdentity identity) throws SQLException {
         require(identity != null); checkConnection(connection, false); return readRows(connection, identity);
     }
 
-    private static Snapshot readRows(Connection connection, Identity identity) throws SQLException {
+    private static Snapshot readRows(Connection connection, Schema2PreparationIdentity identity) throws SQLException {
         try {
             var headers = query(connection, "SELECT s.*, i.run_id AS registered_run_id, i.snapshot_id AS registered_snapshot_id FROM s2_runtime_snapshot s JOIN s2_runtime_identity i ON i.run_id = s.run_id AND i.snapshot_id = s.snapshot_id WHERE s.run_id = ? AND s.snapshot_id = ? LIMIT 2",
                     1, List.of(identity.runBytes(), identity.snapshotBytes()), result -> {
@@ -311,7 +311,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
         }
         return new FieldState(kind, value);
     }
-    private static void insertSource(Connection connection, Identity identity, int index, FinalCharacterSource source) throws SQLException {
+    private static void insertSource(Connection connection, Schema2PreparationIdentity identity, int index, FinalCharacterSource source) throws SQLException {
         var value = source.definition(); var key = source.identity(); var parent = value.parentRace();
         insert(connection, "s2_runtime_character_source", "snapshot_id, rule_index, module_key, rule_type, rule_key, display_name, description, source_page, parent_race_module_key, parent_race_rule_type, parent_race_rule_key, author_note, enabled",
                 identity.snapshotBytes(), index, ascii(key.moduleKey()), ascii(key.ruleType()), ascii(key.ruleKey()), value.displayName(), value.description(), value.sourcePage(),
@@ -359,7 +359,7 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
             statement.setQueryTimeout(5); bind(statement, Arrays.asList(values)); require(statement.executeUpdate() == 1);
         }
     }
-    private static <T> List<T> rows(Connection connection, Identity identity, String table, String order, int maximum, Mapper<T> mapper) throws SQLException {
+    private static <T> List<T> rows(Connection connection, Schema2PreparationIdentity identity, String table, String order, int maximum, Mapper<T> mapper) throws SQLException {
         return query(connection, "SELECT * FROM " + table + " WHERE snapshot_id = ? ORDER BY " + order + " LIMIT " + (maximum + 1), maximum,
                 List.of(identity.snapshotBytes()), result -> { exactBytes(result, "snapshot_id", identity.snapshotBytes()); return mapper.map(result); });
     }
@@ -412,17 +412,6 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
     private record Header(String composition, String finalRules, String chain, int members, int rules, int entries, int chains, int steps) { }
     private record ChainHeader(com.dndtool.module.composition.Schema2CompositionKernel.Identity target, Field field, int count) { }
     private record StoredStep(int chain, int index, ChainStep value) { }
-    public record Snapshot(Identity identity, ProductionSchema2Projection projection) { }
+    public record Snapshot(Schema2PreparationIdentity identity, ProductionSchema2Projection projection) { }
 
-    /** Distinct server-owned UUIDv4 identities, stored in exact network byte order. */
-    public record Identity(UUID runId, UUID snapshotId) {
-        public Identity { if (!valid(runId) || !valid(snapshotId) || runId.equals(snapshotId)) throw new IllegalArgumentException("Invalid schema 2 runtime identity"); }
-        public static Identity random() { UUID run = UUID.randomUUID(), snapshot; do { snapshot = UUID.randomUUID(); } while (snapshot.equals(run)); return new Identity(run, snapshot); }
-        public static Identity fromBytes(byte[] run, byte[] snapshot) { return new Identity(decode(run), decode(snapshot)); }
-        public byte[] runBytes() { return encode(runId); }
-        public byte[] snapshotBytes() { return encode(snapshotId); }
-        private static boolean valid(UUID value) { return value != null && value.version() == 4 && value.variant() == 2; }
-        private static UUID decode(byte[] bytes) { if (bytes == null || bytes.length != 16) throw new IllegalArgumentException("Invalid UUID"); var buffer = ByteBuffer.wrap(bytes); UUID value = new UUID(buffer.getLong(), buffer.getLong()); if (!valid(value)) throw new IllegalArgumentException("Invalid UUID"); return value; }
-        private static byte[] encode(UUID value) { return ByteBuffer.allocate(16).putLong(value.getMostSignificantBits()).putLong(value.getLeastSignificantBits()).array(); }
-    }
 }

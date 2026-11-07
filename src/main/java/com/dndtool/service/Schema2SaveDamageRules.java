@@ -1,6 +1,6 @@
 package com.dndtool.service;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository.HealthResult;
+import com.dndtool.service.Schema2CharacterRuntime.HealthResult;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.Stage;
 import java.nio.charset.StandardCharsets;

@@ -1,6 +1,6 @@
 package com.dndtool.web;
 
-import com.dndtool.persistence.JdbcSchema2CharacterRuntimeRepository;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.storage.*;
 import com.google.gson.*;
 import java.io.*;
@@ -45,9 +45,9 @@ class PlayerProcessRecoveryIntegrationTest {
                     object("name", "重连的战士", "kind", "PC", "classKey", "fighter", "backgroundKey", "acolyte").toString()), false);
             JsonObject card = created.getAsJsonObject("campaign").getAsJsonObject("domain").getAsJsonArray("characters").get(0).getAsJsonObject();
             String pc = card.get("id").getAsString();
-            var acquire = new JdbcSchema2CharacterRuntimeRepository.Command("ITEM_ACQUIRED", null, 0, null, null, null,
-                    JdbcSchema2CharacterRuntimeRepository.GrowthChoices.EMPTY, null, null,
-                    new JdbcSchema2CharacterRuntimeRepository.EquipmentInput(UUID.randomUUID(), BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
+            var acquire = new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null,
+                    Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
+                    new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), BundledCampaignRules.rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
             JsonObject equipment = object("characterId", pc, "characterVersion", card.get("version").getAsString());
             equipment.add("command", CampaignDomainCodec.toJson(acquire));
             hostPost(dm, "domain", form("action", "character-command", "payload", equipment.toString()), false);

@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.BusinessWriteTransactions;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.persistence.JdbcSourceSchema2Repository;
 import com.dndtool.persistence.Schema2SourceLedger;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
@@ -20,7 +20,7 @@ public final class Schema2InitializationPreparationService {
         this.source = new JdbcSourceSchema2Repository(Objects.requireNonNull(source));
     }
 
-    public record Request(UUID operationId, Identity identity, UUID campaignId, UUID characterId,
+    public record Request(UUID operationId, Schema2PreparationIdentity identity, UUID campaignId, UUID characterId,
             List<Schema2SourceLedger.Identity> selection, Schema2RulesBinding expectedRules,
             Schema2InitialProficiencyRules.Request character) {
         public Request {

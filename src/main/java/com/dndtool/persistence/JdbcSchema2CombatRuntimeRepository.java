@@ -1,27 +1,21 @@
 package com.dndtool.persistence;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Identity;
+import com.dndtool.service.Schema2CharacterRuntime;
+import com.dndtool.service.Schema2CombatHistory;
+import com.dndtool.service.Schema2CombatHistory.*;
 import com.dndtool.service.Schema2CombatState.*;
+import com.dndtool.service.Schema2PreparationIdentity;
+import com.dndtool.service.Schema2RuntimeFactsException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.*;
 
+import static com.dndtool.service.Schema2CombatHistory.*;
+
 /** Typed, append-only combat facts. The caller owns the common guarded transaction. */
 public final class JdbcSchema2CombatRuntimeRepository {
-    public static final int MAX_EVENTS = 128, MAX_COMBATANTS = 64, MAX_CHARACTER_MEMBERS = 16, MAX_HISTORY_CHILD_ROWS = 65536;
-    public static final Comparator<UUID> UUID_ORDER = Comparator.comparing(UUID::toString);
-    public record Member(UUID characterId, Identity identity, UUID preparationOperationId) { }
-    public record Dependency(UUID characterId, long version) { }
-    public record Event(UUID operationId, String requestDigest, Command command, List<Dependency> dependencies,
-            List<UUID> characterOperations, Battle before, Resolution resolution) {
-        public Event { dependencies = List.copyOf(dependencies); characterOperations = List.copyOf(characterOperations); }
-        public Battle after() { return resolution.after(); }
-    }
-    public record History(Battle current, List<Member> members, List<Event> events) {
-        public History { members = List.copyOf(members); events = List.copyOf(events); }
-    }
     private static final List<String> TABLES = java.util.stream.Stream.concat(List.of("s2_combat_member", "s2_combat_event", "s2_combat_dependency", "s2_combat_character_result", "s2_combat_command_point", "s2_combat_command_deployment", "s2_combat_command_tie", "s2_combat_roll", "s2_combat_fact", "s2_combat_state", "s2_combat_actor", "s2_combat_initiative", "s2_combat_flow", "s2_combat_frame", "s2_combat_window", "s2_combat_opportunity", "s2_combat_opportunity_item", "s2_combat_movement", "s2_combat_movement_point", "s2_combat_attack", "s2_combat_attack_die", "s2_combat_cast_command", "s2_combat_cast_command_target", "s2_combat_ongoing_effect", "s2_combat_ongoing_target", "s2_combat_cast", "s2_combat_cast_target", "s2_combat_cast_die", "s2_combat_saving_throw", "s2_combat_ready_input", "s2_combat_ready_point", "s2_combat_ready_target", "s2_combat_zone_command", "s2_combat_health_command", "s2_combat_reaction_option", "s2_combat_window_trigger", "s2_combat_ready_release", "s2_combat_ability_check", "s2_combat_ready", "s2_combat_trigger", "s2_combat_shield", "s2_combat_concentration", "s2_combat_environment", "s2_combat_suppression").stream(), JdbcSchema2MonsterBreathRows.TABLES.stream()).toList();
     private final JdbcSchema2CharacterRuntimeRepository characters = new JdbcSchema2CharacterRuntimeRepository();
 
@@ -41,7 +35,7 @@ public final class JdbcSchema2CombatRuntimeRepository {
         int[] memberIndex = {0};
         List<Member> members = query(connection,"s2_combat_member","combat_id",bytes(combatId),"member_index",MAX_CHARACTER_MEMBERS,row -> {
             require(integer(row,"member_index") == memberIndex[0]++);
-            return new Member(id(row,"character_id"),new Identity(id(row,"run_id"),id(row,"snapshot_id")),id(row,"preparation_operation_id"));
+            return new Member(id(row,"character_id"),new Schema2PreparationIdentity(id(row,"run_id"),id(row,"snapshot_id")),id(row,"preparation_operation_id"));
         });
         for (Member member : members) verifyMember(connection,roots.getFirst(),member);
         Rows data = new Rows(connection,combatId);
@@ -135,13 +129,13 @@ public final class JdbcSchema2CombatRuntimeRepository {
         for (int i=0;i<event.characterOperations().size();i++) require(characterResult(connection,event.after().combatId(),event.operationId(),event.characterOperations().get(i)).equals(event.resolution().healthChanges().get(i)));
     }
     private void verifyDependencies(Connection connection, History history) throws SQLException {
-        Map<UUID,JdbcSchema2CharacterRuntimeRepository.History> roster = new HashMap<>();
+        Map<UUID,Schema2CharacterRuntime.History> roster = new HashMap<>();
         for (Member member : history.members()) roster.put(member.characterId(),characters.read(connection,member.characterId()));
         for (Event event : history.events()) {
-            Map<UUID,JdbcSchema2CharacterRuntimeRepository.State> states = new HashMap<>();
+            Map<UUID,Schema2CharacterRuntime.State> states = new HashMap<>();
             for (Dependency dependency : event.dependencies()) {
                 var character = roster.get(dependency.characterId()); require(character != null);
-                var matches = character.events().stream().map(JdbcSchema2CharacterRuntimeRepository.Event::after)
+                var matches = character.events().stream().map(Schema2CharacterRuntime.Event::after)
                         .filter(state -> state.version() == dependency.version()).toList();
                 require(matches.size() == 1); states.put(dependency.characterId(),matches.getFirst());
             }
@@ -166,8 +160,8 @@ public final class JdbcSchema2CombatRuntimeRepository {
         var zoneRows=indexed(data,"s2_combat_zone_command",combat,sequence,"command_index",1,r->r);
         ZoneInput zone=zoneRows.isEmpty()?null:new ZoneInput(rule(zoneRows.getFirst(),"rule"),new Position(signed(zoneRows.getFirst(),"x"),signed(zoneRows.getFirst(),"y")));
         var healthRows=indexed(data,"s2_combat_health_command",combat,sequence,"command_index",1,r->r);
-        JdbcSchema2CharacterRuntimeRepository.HealthInput health=null;
-        if(!healthRows.isEmpty()) {var r=healthRows.getFirst();health=new JdbcSchema2CharacterRuntimeRepository.HealthInput(rule(r,"rule"),nullableRule(r,"effect"),nullableAscii(r,"temporary_choice"),utf8(r,"adjudication"));}
+        Schema2CharacterRuntime.HealthInput health=null;
+        if(!healthRows.isEmpty()) {var r=healthRows.getFirst();health=new Schema2CharacterRuntime.HealthInput(rule(r,"rule"),nullableRule(r,"effect"),nullableAscii(r,"temporary_choice"),utf8(r,"adjudication"));}
         var monster=JdbcSchema2MonsterBreathRows.readCommand((table,order,maximum)->indexed(data,table,combat,sequence,
                 table.equals("s2_combat_monster_deployment")?"deployment_index":"input_index",maximum,r->r));
         return new Command(en(Kind.class,row,"command_kind"),nullableId(row,"actor_id"),nullableId(row,"target_id"),nullableId(row,"item_id"),path,deployments,ties,
@@ -309,7 +303,10 @@ public final class JdbcSchema2CombatRuntimeRepository {
         for(int i=0;i<event.characterOperations().size();i++)add(result,"s2_combat_character_result",base(combat,sequence,"result_index",i,"character_operation_id",bytes(event.characterOperations().get(i))));
         for(int i=0;i<event.resolution().rolls().size();i++){Roll r=event.resolution().rolls().get(i);add(result,"s2_combat_roll",base(combat,sequence,"roll_index",i,"purpose",a(r.purpose()),"subject_id",bytes(r.subjectId()),"sides",r.sides(),"die_value",r.value()));}
         for(int i=0;i<event.resolution().facts().size();i++){CombatFact f=event.resolution().facts().get(i);add(result,"s2_combat_fact",base(combat,sequence,"fact_index",i,"fact_kind",a(f.kind()),"subject_id",b(f.subjectId()),"reference_key",b(f.referenceKey()),"reason",a(f.reason())));}
-        if(event.before()!=null)stateRows(result,event.before(),sequence,"BEFORE");stateRows(result,event.after(),sequence,"AFTER");return result;
+        if (event.before() != null) stateRows(result, event.before(), sequence, "BEFORE");
+        stateRows(result, event.after(), sequence, "AFTER");
+        require(result.values().stream().mapToLong(List::size).sum() == eventFactCount(event));
+        return result;
     }
     private static void stateRows(Map<String,List<Map<String,Object>>> out,Battle state,long sequence,String phase)throws SQLException{
         UUID combat=state.combatId();
@@ -353,247 +350,12 @@ public final class JdbcSchema2CombatRuntimeRepository {
         JdbcSchema2MonsterBreathRows.stateRows(out,combat,sequence,phase,state);
     }
 
-    public static void validate(History history)throws SQLException{
-        require(history!=null&&!history.events().isEmpty()&&history.events().size()<=MAX_EVENTS&&history.members().size()>=2&&history.members().size()<=MAX_CHARACTER_MEMBERS);
-        List<UUID> members=history.members().stream().map(Member::characterId).toList();require(new HashSet<>(members).size()==members.size()&&members.equals(members.stream().sorted(UUID_ORDER).toList()));
-        for(Member m:history.members()){uuid(m.characterId());uuid(m.identity().runId());uuid(m.identity().snapshotId());uuid(m.preparationOperationId());}
-        Set<UUID> operations=new HashSet<>(),children=new HashSet<>();Battle previous=null;long rows=0;
-        for(Event e:history.events()){
-            uuid(e.operationId());require(operations.add(e.operationId())&&e.requestDigest()!=null&&e.requestDigest().matches("[0-9a-f]{64}")&&e.command()!=null&&e.resolution()!=null&&Objects.equals(previous,e.before()));
-            validateCommand(e.command());
-            require(e.after().version()==(previous==null?0:previous.version()+1));validateState(e.after(),members);
-            require(previous==null?e.command().kind()==Kind.START:e.command().kind()!=Kind.START&&previous.combatId().equals(e.after().combatId())&&previous.campaignId().equals(e.after().campaignId())&&previous.combatRule().equals(e.after().combatRule()));
-            require(e.dependencies().stream().map(Dependency::characterId).toList().equals(members));
-            if(e.command().castInput()!=null)require(members.containsAll(e.command().castInput().targets()));
-            for(Dependency d:e.dependencies())require(d.version()>=0&&d.version()<JdbcSchema2CharacterRuntimeRepository.MAX_EVENTS);
-            require(e.characterOperations().size()==e.resolution().healthChanges().size()&&e.characterOperations().size()<=MAX_COMBATANTS * 2);
-            for(UUID child:e.characterOperations()){uuid(child);require(children.add(child)&&!operations.contains(child));}
-            for(HealthChange change:e.resolution().healthChanges()) {
-                uuid(change.frameKey()); require(members.contains(change.characterId()) && change.before()!=null && change.after()!=null
-                        && change.characterId().equals(change.before().characterId()) && change.characterId().equals(change.after().characterId())
-                        && change.after().version()==change.before().version()+1 && change.damageAmount()>=0 && change.damageAmount()<=65535);
-                require(change.resource()!=null ? change.resource().ruleType().equals("character.resource") && change.resourceAmount()>=1
-                        && change.healthResult()==null && change.damageAmount()==0 && !change.critical() && !change.deathSave() && !change.timeAdvance() && !change.healing()
-                        : change.resourceAmount()==0 && change.healthResult()!=null);
-                require(!change.healing() || !change.critical() && !change.deathSave() && !change.timeAdvance());
-                require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
-            }
-            validateCastResults(e);validateExtendedTransition(e);
-            require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
-            for(Roll r:e.resolution().rolls()){uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
-            for(CombatFact f:e.resolution().facts())require(token(f.kind())&&(f.reason()==null||token(f.reason())));
-            for(var rs:eventRows(e).values())rows+=rs.size();previous=e.after();
+    public static void validate(History history) throws SQLException {
+        try {
+            Schema2CombatHistory.validate(history);
+        } catch (Schema2RuntimeFactsException invalid) {
+            throw new SQLException(invalid.getMessage(), invalid);
         }
-        require(previous.equals(history.current())&&Collections.disjoint(operations,children)&&rows<=MAX_HISTORY_CHILD_ROWS);
-    }
-    private static void validateCastResults(Event event) throws SQLException {
-        Map<UUID,CastAttempt> retained=new HashMap<>();
-        if(event.before()!=null)for(Flow flow:event.before().flows())for(CastAttempt cast:flow.casts())require(retained.put(cast.frameKey(),cast)==null);
-        List<CastAttempt> created=new ArrayList<>(),completedHealing=new ArrayList<>();Set<UUID> seen=new HashSet<>();
-        for(Flow flow:event.after().flows())for(CastAttempt cast:flow.casts()) {
-            require(seen.add(cast.frameKey()));CastAttempt old=retained.remove(cast.frameKey());
-            if(old==null)created.add(cast);
-            else {
-                require(old.actorId().equals(cast.actorId())&&old.castingRule().equals(cast.castingRule())&&old.spell().equals(cast.spell())&&old.targets().equals(cast.targets())
-                        &&old.slotResource().equals(cast.slotResource())&&old.slotLevel()==cast.slotLevel()&&Objects.equals(old.materialItemId(),cast.materialItemId())
-                        &&old.healingModifier()==cast.healingModifier()&&Objects.equals(old.targetCastFrameKey(),cast.targetCastFrameKey())&&Objects.equals(old.readyKey(),cast.readyKey())&&Objects.equals(old.coneDirection(),cast.coneDirection()));
-                if(old.status()==CastStatus.RESOLVED||old.status()==CastStatus.COUNTERED||old.status()==CastStatus.INTERRUPTED)require(old.equals(cast));
-                else require(cast.status()==old.status()||cast.status()==CastStatus.RESOLVED||cast.status()==CastStatus.COUNTERED||old.status()==CastStatus.PENDING&&(cast.status()==CastStatus.HELD||cast.coneDirection()!=null&&cast.status()==CastStatus.INTERRUPTED));
-            }
-            if(!cast.healingDice().isEmpty()&&(old==null||old.healingDice().isEmpty()))completedHealing.add(cast);
-        }
-        require(retained.isEmpty());
-        List<HealthChange> costs=event.resolution().healthChanges().stream().filter(c->c.resource()!=null).toList();
-        require(created.size()==costs.size());Set<UUID> costFrames=new HashSet<>();
-        for(CastAttempt cast:created) {
-            var matches=costs.stream().filter(c->c.frameKey().equals(cast.frameKey())).toList();require(matches.size()==1&&costFrames.add(cast.frameKey()));
-            var cost=matches.getFirst();require(cost.characterId().equals(cast.actorId())&&cost.resource().equals(cast.slotResource())&&cost.resourceAmount()==1);
-        }
-        List<HealthChange> healing=event.resolution().healthChanges().stream().filter(HealthChange::healing).toList();
-        if(event.command().kind()!=Kind.EXPLORATION_HEALTH)require(healing.size()==completedHealing.size());
-        for(CastAttempt cast:completedHealing) {
-            Set<UUID> frames=new HashSet<>(Set.of(cast.frameKey()));
-            if(cast.readyKey()!=null) {
-                var preparation=event.after().readyPreparations().stream().filter(r->r.readyKey().equals(cast.readyKey())&&Objects.equals(r.heldCastFrameKey(),cast.frameKey())).toList();require(preparation.size()==1);
-                Set<UUID> earlier=new HashSet<>();if(event.before()!=null)for(Flow flow:event.before().flows())for(ReadyRelease release:flow.readyReleases())earlier.add(release.frameKey());
-                for(Flow flow:event.after().flows())for(ReadyRelease release:flow.readyReleases())if(release.readyKey().equals(cast.readyKey())&&release.completed()&&!earlier.contains(release.frameKey()))frames.add(release.frameKey());
-            }
-            var matches=healing.stream().filter(c->frames.contains(c.frameKey())).toList();require(matches.size()==1&&cast.targets().size()==1);
-            var result=matches.getFirst();require(result.characterId().equals(cast.targets().getFirst())&&result.damageAmount()==cast.requestedHealing()
-                    &&result.healthResult().dice().equals(cast.healingDice())&&result.healthResult().rolledAmount()==cast.requestedHealing()&&result.healthResult().appliedAmount()==cast.appliedHealing());
-        }
-    }
-    public static void checkCandidateCapacity(History previous,Battle candidate)throws SQLException{
-        require(previous==null||previous.events().size()<MAX_EVENTS);long count=0;
-        if(previous!=null)for(Event e:previous.events())for(var rows:eventRows(e).values())count+=rows.size();
-        Map<String,List<Map<String,Object>>> next=new LinkedHashMap<>();if(previous!=null)stateRows(next,previous.current(),candidate.version()+1,"BEFORE");stateRows(next,candidate,candidate.version()+1,"AFTER");
-        for(var rows:next.values())count+=rows.size();require(count+2048<=MAX_HISTORY_CHILD_ROWS);
-    }
-    /** Reserves the complete mandatory suffix before an accepted prefix consumes any die. */
-    public static void checkReservedCapacity(History previous, Battle before, int suffixEvents,
-            int rosterSize, int remainingPath) throws SQLException {
-        if (suffixEvents < 0 || rosterSize < 2 || rosterSize > MAX_COMBATANTS || remainingPath < 0 || remainingPath > 64
-                || (previous == null ? 0 : previous.events().size()) + 1L + suffixEvents > MAX_EVENTS)
-            throw new SQLException("S2_COMBAT_CAPACITY");
-        long retained = 0;
-        if (previous != null) for (Event event : previous.events())
-            for (var rows : eventRows(event).values()) retained += rows.size();
-        long stateSize = 1L + 2L * rosterSize;
-        if (before != null) {
-            Map<String,List<Map<String,Object>>> rows = new LinkedHashMap<>();
-            stateRows(rows,before,before.version()+2,"BEFORE");
-            stateSize = rows.values().stream().mapToLong(List::size).sum();
-        }
-        // The root allowance includes one ordinary attack flow. Each remaining movement
-        // boundary can retain a window, all selection/attack frames, source items and dice.
-        // Every suffix event saves both snapshots.
-        long addedState = 64L + 100L * rosterSize * remainingPath;
-        long perEvent = 2048L + 2L * (stateSize + addedState);
-        if (retained + (suffixEvents + 1L) * perEvent > MAX_HISTORY_CHILD_ROWS)
-            throw new SQLException("S2_COMBAT_CAPACITY");
-    }
-    private static void validateState(Battle b,List<UUID> characterMembers)throws SQLException{
-        List<UUID> members=JdbcSchema2MonsterBreathRows.validateState(b,characterMembers);
-        uuid(b.combatId());uuid(b.campaignId());require(b.combatRule()!=null&&b.combatRule().ruleType().equals("adventure.combat")&&b.status()!=null&&b.round()>=1&&b.turnNumber()>=1&&b.activeOrdinal()>=0&&b.activeOrdinal()<members.size()&&b.version()>=0);
-        require(b.combatants().stream().map(Combatant::characterId).toList().equals(members)&&b.initiative().size()==members.size());
-        Set<UUID> initiative=new HashSet<>();for(int i=0;i<b.initiative().size();i++){Initiative n=b.initiative().get(i);require(initiative.add(n.characterId())&&members.contains(n.characterId())&&n.ordinal()==i&&n.d20()>=1&&n.d20()<=20&&n.dexterityModifier()>=-5&&n.dexterityModifier()<=10&&n.total()==n.d20()+n.dexterityModifier());}
-        for(Combatant c:b.combatants()){require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0);if(c.sequence()!=null){AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
-        require(b.ongoingEffects().size()<=128);Set<UUID> effectKeys=new HashSet<>();
-        for(OngoingEffect effect:b.ongoingEffects()) {
-            uuid(effect.effectKey()); require(effectKeys.add(effect.effectKey()) && ruleType(effect.spell(),"adventure.spell") && members.contains(effect.casterId())
-                    && !effect.targets().isEmpty() && effect.targets().size()<=MAX_COMBATANTS && new HashSet<>(effect.targets()).size()==effect.targets().size()
-                    && members.containsAll(effect.targets()) && effect.startedAtSecond()>=0 && effect.expiresAtSecond()>effect.startedAtSecond() && effect.expiresAtSecond()<=60000000059L
-                    && effect.status()!=null && (effect.status()==EffectStatus.ACTIVE ? effect.endReason()==null : token(effect.endReason())));
-        }
-        require(b.flows().size()<=128&&b.flows().stream().filter(f->f.status()==FlowStatus.ACTIVE).count()<=1);Set<UUID> keys=new HashSet<>();
-        for(Flow f:b.flows()){
-            uuid(f.flowKey());require(keys.add(f.flowKey())&&f.frames().size()>=1&&f.frames().size()<=1024&&f.windows().size()<=1024&&f.attacks().size()<=1024&&f.casts().size()<=1024&&f.savingThrows().size()<=1024);
-            Map<UUID,Frame> frames=new HashMap<>();for(Frame r:f.frames()){uuid(r.frameKey());uuid(r.ownerKey());require(keys.add(r.frameKey())&&frames.put(r.frameKey(),r)==null&&r.kind()!=null&&r.status()!=null&&r.invocation()!=null&&r.stage()!=null);}
-            Frame root=frames.get(f.rootFrameKey());require(root!=null&&root.parentFrameKey()==null);require(f.status()==FlowStatus.ACTIVE?frames.containsKey(f.leafFrameKey()):f.leafFrameKey()==null);
-            for(Frame r:f.frames()){Set<UUID> chain=new HashSet<>();Frame cursor=r;while(cursor.parentFrameKey()!=null){require(chain.add(cursor.frameKey())&&chain.size()<=32);cursor=frames.get(cursor.parentFrameKey());require(cursor!=null);}require(cursor.frameKey().equals(f.rootFrameKey()));}
-            Set<UUID> windows=new HashSet<>();for(Window w:f.windows()){uuid(w.windowKey());require(keys.add(w.windowKey())&&windows.add(w.windowKey())&&frames.containsKey(w.ownerFrameKey())&&w.checkpointOrdinal()>=0&&w.checkpointOrdinal()<64&&w.boundaryIndex()>=0&&w.boundaryIndex()<64&&w.opportunities().size()<=128);Set<UUID>actors=new HashSet<>();
-                for(int i=0;i<w.opportunities().size();i++){Opportunity o=w.opportunities().get(i);uuid(o.opportunityKey());require(keys.add(o.opportunityKey())&&actors.add(o.actorId())&&members.contains(o.actorId())&&o.priority()==i&&o.options().size()>=1&&o.options().size()<=32&&new HashSet<>(o.options()).size()==o.options().size()&&(o.selectionFrameKey()==null?o.status()==OpportunityStatus.PENDING:frames.containsKey(o.selectionFrameKey()))&&(o.attackFrameKey()==null||frames.containsKey(o.attackFrameKey()))&&(o.reason()==null||token(o.reason())));for(ReactionOption option:o.options())validateOption(option);}}
-            for(Movement m:f.movements()){uuid(m.movementKey());require(members.contains(m.actorId())&&m.path().size()>=1&&m.path().size()<=64&&m.cursor()>=0&&m.cursor()<=m.path().size()&&m.spent()>=0&&m.status()!=null&&(m.stopReason()==null||token(m.stopReason())));}
-            for(AttackAttempt t:f.attacks())require(frames.containsKey(t.frameKey())&&members.contains(t.actorId())&&members.contains(t.targetId())&&!t.actorId().equals(t.targetId())&&t.firstD20()>=1&&t.firstD20()<=20&&(t.secondD20()==null||t.secondD20()>=1&&t.secondD20()<=20)&&t.selectedD20()>=1&&t.selectedD20()<=20&&t.damageDice().size()<=40&&t.damageDice().stream().allMatch(v->v!=null&&v>=1&&v<=12)&&t.damageAmount()>=0&&validBlessing(t.blessingEffectKey(),t.blessingD4()));
-            Set<UUID> castFrames=new HashSet<>();
-            for(CastAttempt cast:f.casts()) {
-                require(frames.containsKey(cast.frameKey()) && frames.get(cast.frameKey()).kind()==FrameKind.CAST && castFrames.add(cast.frameKey()) && members.contains(cast.actorId())
-                        && castingType(cast.castingRule()) && ruleType(cast.spell(),"adventure.spell") && ruleType(cast.slotResource(),"character.resource")
-                        && cast.slotLevel()>=1 && cast.slotLevel()<=9 && (cast.coneDirection()==null?!cast.targets().isEmpty():cast.targets().isEmpty()&&cast.coneDirection()>=0&&cast.coneDirection()<8&&cast.readyKey()==null) && cast.targets().size()<=MAX_COMBATANTS
-                        && new HashSet<>(cast.targets()).size()==cast.targets().size() && members.containsAll(cast.targets())
-                        && cast.healingDice().size()<=20 && cast.healingDice().stream().allMatch(d->d!=null&&d>=1&&d<=12)
-                        && cast.status()!=null && cast.healingModifier()>=-5 && cast.healingModifier()<=10 && cast.requestedHealing()>=0 && cast.requestedHealing()<=65535
-                        && cast.appliedHealing()>=0 && cast.appliedHealing()<=cast.requestedHealing()
-                        && (cast.healingDice().isEmpty() ? cast.requestedHealing()==0 && cast.appliedHealing()==0
-                            : cast.effectKey()==null && cast.requestedHealing()==Math.max(0,cast.healingDice().stream().mapToInt(Integer::intValue).sum()+cast.healingModifier())));
-                if(cast.materialItemId()!=null)uuid(cast.materialItemId());if(cast.effectKey()!=null)uuid(cast.effectKey());
-            }
-            for(SavingThrowAttempt save:f.savingThrows()) {
-                require(frames.containsKey(save.frameKey()) && members.contains(save.subjectId()) && token(save.kind())
-                        && (save.abilityKey()==null || JdbcSchema2CharacterRuntimeRepository.ABILITIES.contains(save.abilityKey()))
-                        && save.d20()>=1 && save.d20()<=20 && save.abilityModifier()>=-5 && save.abilityModifier()<=10
-                        && save.proficiencyBonus()>=0 && save.proficiencyBonus()<=6 && validBlessing(save.blessingEffectKey(),save.blessingD4())
-                        && save.difficultyClass()>=0 && save.difficultyClass()<=32767
-                        && save.total()==save.d20()+save.abilityModifier()+save.proficiencyBonus()+(save.blessingD4()==null?0:save.blessingD4())
-                        && save.success()==(save.total()>=save.difficultyClass()));
-            }
-        }
-        validateExtendedState(b,members);
-    }
-    private static void validateExtendedTransition(Event event)throws SQLException {
-        Battle before=event.before(),after=event.after();Map<UUID,EnvironmentZone> zones=new HashMap<>();Map<UUID,SuppressionCause> causes=new HashMap<>();
-        if(before!=null) {for(var z:before.environmentZones())zones.put(z.zoneKey(),z);for(var c:before.suppressionCauses())causes.put(c.causeKey(),c);}
-        for(var z:after.environmentZones()) {var old=zones.remove(z.zoneKey());
-            if(old==null)require(z.createdOperationId().equals(event.operationId())&&z.endedOperationId()==null);
-            else {require(old.rule().equals(z.rule())&&old.center().equals(z.center())&&old.createdOperationId().equals(z.createdOperationId()));require(old.endedOperationId()!=null?old.equals(z):z.endedOperationId()==null||z.endedOperationId().equals(event.operationId()));}}
-        require(zones.isEmpty());
-        for(var c:after.suppressionCauses()) {var old=causes.remove(c.causeKey());
-            if(old==null)require(c.establishedOperationId().equals(event.operationId())&&(c.releasedOperationId()==null||c.releasedOperationId().equals(event.operationId())));
-            else {require(old.zoneKey().equals(c.zoneKey())&&old.effectKey().equals(c.effectKey())&&old.targetId().equals(c.targetId())&&old.establishedOperationId().equals(c.establishedOperationId()));require(old.releasedOperationId()!=null?old.equals(c):c.releasedOperationId()==null||c.releasedOperationId().equals(event.operationId()));}}
-        require(causes.isEmpty());
-        if(before!=null) {
-            require(after.triggerFacts().size()>=before.triggerFacts().size()&&after.triggerFacts().subList(0,before.triggerFacts().size()).equals(before.triggerFacts()));
-            require(after.ongoingEffects().size()>=before.ongoingEffects().size());
-            for(int i=0;i<before.ongoingEffects().size();i++) {var old=before.ongoingEffects().get(i);var next=after.ongoingEffects().get(i);
-                require(old.effectKey().equals(next.effectKey())&&old.spell().equals(next.spell())&&old.casterId().equals(next.casterId())&&old.targets().equals(next.targets())&&old.startedAtSecond()==next.startedAtSecond()&&old.expiresAtSecond()==next.expiresAtSecond());
-                if(old.status()==EffectStatus.ENDED)require(old.equals(next));}
-        }
-    }
-    private static void validateExtendedState(Battle b,List<UUID> members)throws SQLException {
-        require(b.readyPreparations().size()<=128&&b.triggerFacts().size()<=1024&&b.shields().size()<=128&&b.concentrationHolders().size()<=members.size()&&b.environmentZones().size()<=16&&b.suppressionCauses().size()<=512);
-        Map<UUID,ReadyPreparation> readies=new HashMap<>();Map<UUID,TriggerFact> triggers=new HashMap<>();Map<UUID,EnvironmentZone> zones=new HashMap<>();
-        Map<UUID,Frame> frames=new HashMap<>();for(var f:b.flows())for(var r:f.frames())frames.put(r.frameKey(),r);
-        for(var r:b.readyPreparations()) {uuid(r.readyKey());require(readies.put(r.readyKey(),r)==null&&members.contains(r.actorId())&&r.declaredTurnNumber()>=1&&r.expiresAtTurnNumber()>r.declaredTurnNumber()&&r.status()!=null);validateReadyInput(r.input());if(r.heldCastFrameKey()!=null)require(frames.containsKey(r.heldCastFrameKey()));}
-        for(var t:b.triggerFacts()) {uuid(t.triggerKey());require(triggers.put(t.triggerKey(),t)==null&&t.kind()!=null&&frames.containsKey(t.sourceFrameKey())&&members.contains(t.subjectId())&&(t.targetId()==null||members.contains(t.targetId()))&&t.ordinal()>=0&&t.ordinal()<1024);}
-        Set<UUID> effects=new HashSet<>();for(var e:b.ongoingEffects())effects.add(e.effectKey());
-        for(var sh:b.shields()) {uuid(sh.effectKey());require(effects.add(sh.effectKey())&&frames.containsKey(sh.castFrameKey())&&members.contains(sh.actorId())&&sh.startedTurnNumber()>=1&&sh.expiresAtTurnNumber()>sh.startedTurnNumber()&&sh.status()!=null&&(sh.status()==EffectStatus.ACTIVE?sh.endReason()==null:token(sh.endReason())));}
-        Set<UUID> holders=new HashSet<>();
-        for(var h:b.concentrationHolders()) {uuid(h.sourceKey());require(holders.add(h.actorId())&&members.contains(h.actorId())&&h.kind()!=null);
-            if(h.kind()==ConcentrationKind.BLESS_EFFECT)require(b.ongoingEffects().stream().anyMatch(e->e.effectKey().equals(h.sourceKey())&&e.casterId().equals(h.actorId())&&e.status()==EffectStatus.ACTIVE));
-            else {var r=readies.get(h.sourceKey());require(r!=null&&r.actorId().equals(h.actorId())&&r.input().responseKind()==ReadyResponseKind.SPELL&&(r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING));}}
-        for(var e:b.ongoingEffects())if(e.status()==EffectStatus.ACTIVE)require(b.concentrationHolders().stream().anyMatch(h->h.kind()==ConcentrationKind.BLESS_EFFECT&&h.actorId().equals(e.casterId())&&h.sourceKey().equals(e.effectKey())));
-        for(var z:b.environmentZones()) {uuid(z.zoneKey());uuid(z.createdOperationId());if(z.endedOperationId()!=null)uuid(z.endedOperationId());require(zones.put(z.zoneKey(),z)==null&&ruleType(z.rule(),"adventure.environment")&&z.center()!=null);}
-        Set<UUID> causes=new HashSet<>();Set<String> live=new HashSet<>();
-        for(var c:b.suppressionCauses()) {uuid(c.causeKey());uuid(c.establishedOperationId());if(c.releasedOperationId()!=null)uuid(c.releasedOperationId());require(causes.add(c.causeKey())&&zones.containsKey(c.zoneKey())&&effects.contains(c.effectKey())&&members.contains(c.targetId())&&(c.releasedOperationId()==null)==(c.releaseReason()==null));if(c.releasedOperationId()==null)require(live.add(c.zoneKey()+":"+c.effectKey()+":"+c.targetId()));}
-        try {com.dndtool.service.Schema2OngoingEffectRules.validateGraph(b);}catch(IllegalArgumentException malformed){throw corrupt();}
-        for(var f:b.flows()) {
-            for(var cast:f.casts()) {if(cast.targetCastFrameKey()!=null)require(frames.containsKey(cast.targetCastFrameKey())&&frames.get(cast.targetCastFrameKey()).kind()==FrameKind.CAST);if(cast.readyKey()!=null)require(readies.containsKey(cast.readyKey()));}
-            require(f.movements().size()<=1024&&f.readyReleases().size()<=1024&&f.abilityChecks().size()<=1024);
-            for(var w:f.windows())if(w.trigger()!=null)require(w.trigger().equals(triggers.get(w.trigger().triggerKey())));
-            for(var r:f.readyReleases())require(frames.containsKey(r.frameKey())&&readies.containsKey(r.readyKey())&&triggers.containsKey(r.triggerKey())&&(r.completed()?token(r.outcome()):r.outcome()==null));
-            for(var c:f.abilityChecks())require(frames.containsKey(c.frameKey())&&members.contains(c.subjectId())&&token(c.kind())&&JdbcSchema2CharacterRuntimeRepository.ABILITIES.contains(c.abilityKey())&&c.d20()>=1&&c.d20()<=20&&c.proficiencyBonus()>=0&&c.proficiencyBonus()<=6&&c.difficultyClass()>=0&&c.difficultyClass()<=32767&&c.total()==c.d20()+c.abilityModifier()+c.proficiencyBonus()&&c.success()==(c.total()>=c.difficultyClass()));
-        }
-        if(b.status()==Status.ENDED)require(holders.isEmpty()&&b.activeFlow()==null&&b.ongoingEffects().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.shields().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)&&b.environmentZones().stream().allMatch(z->z.endedOperationId()!=null)&&b.suppressionCauses().stream().allMatch(c->c.releasedOperationId()!=null));
-    }
-    private static void validateCommand(Command c)throws SQLException {
-        require(c.kind()!=null);boolean start=c.kind()==Kind.START,reenter=c.kind()==Kind.REENTER_COMBAT;
-        boolean move=c.kind()==Kind.MOVE||c.kind()==Kind.EXPLORATION_MOVE,attack=c.kind()==Kind.ATTACK,health=c.kind()==Kind.EXPLORATION_HEALTH;
-        boolean reaction=Set.of(Kind.DECLARE_OPPORTUNITY_ATTACK,Kind.DECLARE_SHIELD,Kind.DECLARE_COUNTERSPELL,Kind.RELEASE_READY,Kind.PASS_REACTION,Kind.ADVANCE_WINDOW).contains(c.kind());
-        boolean continuation=c.kind()==Kind.CONTINUE_MOVEMENT||c.kind()==Kind.CONTINUE_FLOW;
-        boolean ready=Set.of(Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL).contains(c.kind());
-        boolean cast=c.kind()==Kind.CAST||c.kind()==Kind.DECLARE_SHIELD||c.kind()==Kind.DECLARE_COUNTERSPELL;
-        require(start?c.actorId()==null:c.actorId()!=null);
-        require((c.targetId()!=null)==(attack||health)&&(c.itemId()!=null)==(attack||c.kind()==Kind.DECLARE_OPPORTUNITY_ATTACK)
-                &&(c.castInput()!=null)==cast&&(c.readyInput()!=null)==ready&&(c.healthInput()!=null)==health
-                &&(c.zoneInput()!=null)==(c.kind()==Kind.CREATE_ENVIRONMENT_ZONE)&&(c.zoneKey()!=null)==(c.kind()==Kind.END_ENVIRONMENT_ZONE)
-                &&(c.readyKey()!=null)==(c.kind()==Kind.RELEASE_READY)
-                &&(move?!c.path().isEmpty()&&c.path().size()<=64:c.path().isEmpty())
-                &&(start?c.deployments().size()>=2&&c.deployments().size()<=MAX_CHARACTER_MEMBERS&&c.deployments().size()+c.monsterDeployments().size()<=MAX_COMBATANTS:c.deployments().isEmpty()&&c.monsterDeployments().isEmpty())
-                &&(start||reenter||c.tieBreakOrder().isEmpty())&&(c.flowKey()!=null)==(reaction||continuation)
-                &&(c.leafKey()!=null)==(reaction||continuation)&&(reaction?c.windowKey()!=null:continuation?c.kind()==Kind.CONTINUE_FLOW||c.windowKey()!=null:c.windowKey()==null)&&(c.opportunityKey()!=null)==reaction
-                &&(c.kind()==Kind.EXPLORATION_ADVANCE_TIME?c.seconds()>=1&&c.seconds()<=60:c.seconds()==0));
-        for(UUID id:Arrays.asList(c.actorId(),c.targetId(),c.itemId(),c.flowKey(),c.leafKey(),c.windowKey(),c.opportunityKey(),c.readyKey(),c.zoneKey()))if(id!=null)uuid(id);
-        require((c.breathInput()!=null)==(c.kind()==Kind.MONSTER_BREATH));
-        require((c.monsterRestInput()!=null)==(c.kind()==Kind.BEGIN_MONSTER_REST||c.kind()==Kind.COMPLETE_MONSTER_REST));
-        if(c.castInput()!=null)validateCastInput(c.castInput());if(c.readyInput()!=null)validateReadyInput(c.readyInput());
-        if(c.zoneInput()!=null)require(ruleType(c.zoneInput().rule(),"adventure.environment")&&c.zoneInput().center()!=null);
-    }
-    private static void validateCastInput(CastInput input)throws SQLException {
-        require(castingType(input.castingRule())&&ruleType(input.spell(),"adventure.spell")&&input.slotLevel()>=1&&input.slotLevel()<=9
-                &&(input.coneDirection()==null?!input.targets().isEmpty():input.targets().isEmpty()&&input.coneDirection()>=0&&input.coneDirection()<8)&&input.targets().size()<=MAX_COMBATANTS&&new HashSet<>(input.targets()).size()==input.targets().size());
-        for(UUID target:input.targets())uuid(target);if(input.materialItemId()!=null)uuid(input.materialItemId());if(input.targetCastFrameKey()!=null)uuid(input.targetCastFrameKey());
-    }
-    private static boolean castingType(RuleIdentity rule){return ruleType(rule,"character.spellcasting")||ruleType(rule,"character.wizard_spellcasting");}
-    private static void validateReadyInput(ReadyInput input)throws SQLException {
-        require(input.trigger()!=null&&input.trigger().kind()!=null&&input.responseKind()!=null&&input.path().size()<=64);
-        if(input.trigger().subjectId()!=null)uuid(input.trigger().subjectId());if(input.targetId()!=null)uuid(input.targetId());if(input.itemId()!=null)uuid(input.itemId());
-        require((input.spell()!=null)==(input.responseKind()==ReadyResponseKind.SPELL));if(input.spell()!=null){validateCastInput(input.spell());require(input.spell().coneDirection()==null);}
-    }
-    private static void validateOption(ReactionOption option)throws SQLException {
-        require(option!=null&&option.kind()!=null);
-        switch(option.kind()) {
-            case OPPORTUNITY_ATTACK -> {uuid(option.itemId());require(option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0&&option.readyKey()==null);}
-            case SHIELD,COUNTERSPELL -> {require(option.itemId()==null&&castingType(option.castingRule())&&ruleType(option.spell(),"adventure.spell")&&option.slotLevel()>=1&&option.slotLevel()<=9&&option.readyKey()==null);}
-            case READY_RELEASE -> {uuid(option.readyKey());require(option.itemId()==null&&option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0);}
-        }
-    }
-    private static boolean validBlessing(UUID effect,Integer die)throws SQLException {
-        if(effect==null)return die==null;uuid(effect);return die!=null&&die>=1&&die<=4;
-    }
-    private static boolean ruleType(RuleIdentity rule,String type) {
-        String prefix=switch(type){case "character.spellcasting","character.wizard_spellcasting"->"spellcasting";case "adventure.environment"->"environment";case "adventure.spell"->"spell";case "character.resource"->"resource";default->"";};
-        return rule!=null && type.equals(rule.ruleType()) && rule.moduleKey()!=null && rule.moduleKey().matches("[a-z][a-z0-9_]{0,63}")
-                && rule.ruleKey()!=null && rule.ruleKey().length()<=128 && rule.ruleKey().matches(prefix+"[.][a-z][a-z0-9_]*([.][a-z0-9_]+)*");
     }
 
     private static void verifyRows(Rows data,History history)throws SQLException{
@@ -660,7 +422,6 @@ public final class JdbcSchema2CombatRuntimeRepository {
     private static void ruleColumns(Map<String,Object> row,String prefix,RuleIdentity identity) {
         row.put(prefix+"_module",a(identity.moduleKey()));row.put(prefix+"_type",a(identity.ruleType()));row.put(prefix+"_key",a(identity.ruleKey()));
     }
-    private static boolean token(String value){return value!=null&&value.matches("[A-Z][A-Z0-9_]{0,127}");}
     private static void uuid(UUID id)throws SQLException{require(id!=null&&id.version()==4&&id.variant()==2);}
     private static void require(boolean condition)throws SQLException{if(!condition)throw corrupt();}
     private static SQLException corrupt(){return new SQLException("S2_COMBAT_RUNTIME_CORRUPT");}
