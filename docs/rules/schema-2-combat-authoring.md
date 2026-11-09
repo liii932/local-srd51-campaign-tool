@@ -49,6 +49,8 @@
 
 本模型只登记普通近战攻击。单职业战士 5–6 级的攻击额度由独立的
 [Extra Attack 特性声明](schema-2-extra-attack.md)及真实授予提供，不是武器 profile 的数值。
+勇士 3–6 级的 [Improved Critical](schema-2-improved-critical.md)同样来自实际特性授予，
+不在武器定义上保存第二份重击阈值；普通攻击、OA 与 Ready 共用该被动贡献。
 远程、弹药、投掷、双持、versatile、重型武器特殊影响、其他额外攻击来源、
 重掷和魔法附加伤害须有自己的完整字段与消费者后才能开放，不能通过说明文字或环境健康效果冒充。
 

@@ -295,26 +295,35 @@ final class Schema2ActionFlowRules {
         void spendAction(UUID subject) {Combatant a=Schema2ActionFlowRules.actor(b,subject);actor(new Combatant(a.characterId(),a.position(),a.side(),false,a.reactionAvailable(),a.movementSpentHalfFeet(),a.movementBonus(),a.disengaged(),a.dodging(),a.sequence(),a.prone()));}
         void beginAttack(UUID subject,UUID target,UUID item,UUID parent,Invocation invocation,boolean oa,boolean readied) {
             UUID id=next("attack");addFrame(FrameKind.ATTACK,id,parent,invocation,Stage.ATTACK_HIT_BEFORE_DAMAGE);
-            Combatant a=Schema2ActionFlowRules.actor(b,subject),t=Schema2ActionFlowRules.actor(b,target);Context source=roster.get(subject),dest=roster.get(target);WeaponAttackDefinition profile=combat.weapon(source,item);
+            Combatant a=Schema2ActionFlowRules.actor(b,subject),t=Schema2ActionFlowRules.actor(b,target);Context source=roster.get(subject);WeaponAttackDefinition profile=combat.weapon(source,item);
             int ability=mod(source.character(),"ability.strength");if(profile.abilityPolicy()==WeaponAbilityPolicy.FINESSE)ability=Math.max(ability,mod(source.character(),"ability.dexterity"));
             EquipmentItem instance=source.character().equipment().stream().filter(i->i.itemId().equals(item)).findFirst().orElseThrow();
             RuleIdentity proficiency=source.material().projection().rules().stream().filter(FinalItem.class::isInstance).map(FinalItem.class::cast).filter(v->v.enabled()&&v.identity().equals(instance.item())).findFirst().orElseThrow().definition().proficiency();
             int pb=source.character().proficiencies().stream().anyMatch(v->v.target().equals(proficiency))?source.character().proficiencyBonus():0;
             int distance=a.position().distanceFeet(t.position());boolean advantage=targetHp(target)==0||t.prone()&&distance<=5;
             boolean disadvantage=equipment.derive(source.material(),source.character()).physicalCheckDisadvantage()||t.dodging()&&targetHp(target)>0&&combat.speed(roster,b,target)>0||t.prone()&&distance>5||a.prone();
+            int criticalMinimum=Schema2FeatureSupport.weaponCriticalMinimum(source.material(),source.character());
             int first=dice.draw("ATTACK_D20",subject,20);Integer second=advantage!=disadvantage?dice.draw("ATTACK_D20_SECOND",subject,20):null;int selected=second==null?first:advantage?Math.max(first,second):Math.min(first,second);
-            OngoingEffect blessing=Schema2SpellRules.blessing(snapshot(),subject);Integer d4=blessing==null?null:dice.draw("BLESS_ATTACK",subject,4);int ac=armor(target);boolean hit=selected==20||selected!=1&&selected+ability+pb+(d4==null?0:d4)>=ac;
-            attacks.add(new AttackAttempt(id,subject,target,item,oa||readied?null:a.sequence().sequenceKey(),oa||readied?0:a.sequence().performed(),oa,first,second,selected,ability,pb,ac,advantage,disadvantage,hit&&(selected==20||targetHp(target)==0&&distance<=5),hit,List.of(),0,blessing==null?null:blessing.effectKey(),d4,hit?AttackStatus.HIT_PENDING_DAMAGE:AttackStatus.RESOLVED,hit,ac));
+            OngoingEffect blessing=Schema2SpellRules.blessing(snapshot(),subject);Integer d4=blessing==null?null:dice.draw("BLESS_ATTACK",subject,4);int ac=armor(target);
+            boolean criticalRoll=selected>=criticalMinimum;
+            boolean hit=attackHits(selected,criticalRoll,ability+pb+(d4==null?0:d4),ac);
+            boolean critical=hit&&(criticalRoll||targetHp(target)==0&&distance<=5);
+            attacks.add(new AttackAttempt(id,subject,target,item,oa||readied?null:a.sequence().sequenceKey(),oa||readied?0:a.sequence().performed(),oa,first,second,selected,ability,pb,ac,advantage,disadvantage,critical,hit,List.of(),0,blessing==null?null:blessing.effectKey(),d4,hit?AttackStatus.HIT_PENDING_DAMAGE:AttackStatus.RESOLVED,hit,ac));
             if(hit&&open(id,TriggerKind.ATTACK_HIT_BEFORE_DAMAGE,subject,target,null,0,0))return;settleAttack(id);
         }
         int targetHp(UUID subject) {return roster.containsKey(subject)?Math.toIntExact(roster.get(subject).character().hitPoints()):Schema2MonsterRules.instance(b,subject).hitPoints();}
         int armor(UUID subject) {Context c=roster.get(subject);int ac=c==null?Schema2MonsterRules.definition(roster,Schema2MonsterRules.instance(b,subject).monster()).statBlock().armorClass():equipment.derive(c.material(),c.character()).armorClass();if(b.shields().stream().anyMatch(e->e.actorId().equals(subject)&&e.status()==EffectStatus.ACTIVE&&!Schema2OngoingEffectRules.isSuppressed(b,e.effectKey(),subject)))ac+=5;return ac;}
         AttackAttempt attack(UUID id) {return attacks.stream().filter(a->a.frameKey().equals(id)).findFirst().orElseThrow();}
         void attack(AttackAttempt value) {for(int i=0;i<attacks.size();i++)if(attacks.get(i).frameKey().equals(value.frameKey()))attacks.set(i,value);}
+        private static boolean attackHits(int selected, boolean criticalRoll, int bonus, int armorClass) {
+            return criticalRoll || selected != 1 && selected + bonus >= armorClass;
+        }
         void settleAttack(UUID id) {
-            AttackAttempt a=attack(id);int ac=armor(a.targetId());boolean hit=a.selectedD20()==20||a.selectedD20()!=1&&a.selectedD20()+a.abilityModifier()+a.proficiencyBonus()+(a.blessingD4()==null?0:a.blessingD4())>=ac;
+            AttackAttempt a=attack(id);int ac=armor(a.targetId());
             Context source=roster.get(a.actorId()),dest=roster.get(a.targetId());WeaponAttackDefinition profile=combat.weapon(source,a.itemId());
-            boolean critical=hit&&(a.selectedD20()==20||targetHp(a.targetId())==0&&Schema2ActionFlowRules.actor(b,a.actorId()).position().distanceFeet(Schema2ActionFlowRules.actor(b,a.targetId()).position())<=5);
+            boolean criticalRoll=a.selectedD20()>=Schema2FeatureSupport.weaponCriticalMinimum(source.material(),source.character());
+            boolean hit=attackHits(a.selectedD20(),criticalRoll,a.abilityModifier()+a.proficiencyBonus()+(a.blessingD4()==null?0:a.blessingD4()),ac);
+            boolean critical=hit&&(criticalRoll||targetHp(a.targetId())==0&&Schema2ActionFlowRules.actor(b,a.actorId()).position().distanceFeet(Schema2ActionFlowRules.actor(b,a.targetId()).position())<=5);
             List<Integer> damage=new ArrayList<>();int amount=0;
             if(hit) {for(int i=0;i<profile.diceCount()*(critical?2:1);i++)damage.add(dice.draw("DAMAGE",a.actorId(),profile.diceSides()));amount=Math.max(0,damage.stream().mapToInt(Integer::intValue).sum()+a.abilityModifier());amount=Schema2MonsterRules.effectiveDamage(roster,b,a.targetId(),profile.damageType(),true,amount);}
             attack(new AttackAttempt(a.frameKey(),a.actorId(),a.targetId(),a.itemId(),a.sequenceKey(),a.attackOrdinal(),a.opportunityAttack(),a.firstD20(),a.secondD20(),a.selectedD20(),a.abilityModifier(),a.proficiencyBonus(),a.armorClass(),a.advantage(),a.disadvantage(),critical,hit,damage,amount,a.blessingEffectKey(),a.blessingD4(),AttackStatus.RESOLVED,a.initialHit(),ac));

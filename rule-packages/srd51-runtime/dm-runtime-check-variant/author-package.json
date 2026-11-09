@@ -1,23 +1,23 @@
 {
   "author_schema_version": 2,
   "module_key": "dm_runtime_house_rules",
-  "release_version": "6",
+  "release_version": "8",
   "package_display_name": "Current application — DM check variant",
   "role": "extension",
   "dependencies": [
     {
       "module_key": "srd51_runtime",
-      "supported_versions": ["3"]
+      "supported_versions": ["4"]
     },
     {
       "module_key": "srd51_characters",
-      "supported_versions": ["3"]
+      "supported_versions": ["4"]
     }
   ],
   "compatible_combinations": [
     {
-      "srd51_runtime": "3",
-      "srd51_characters": "3"
+      "srd51_runtime": "4",
+      "srd51_characters": "4"
     }
   ],
   "load_order_constraints": [],

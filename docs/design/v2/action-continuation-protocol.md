@@ -344,8 +344,9 @@ audit.total/hit。领域采用须建立准确 typed pending-roll/outcome 投影�
 
 命中才进入 `ATTACK_HIT_BEFORE_DAMAGE`；此时 Shield 候选看见的是命中事实，伤害骰尚未产生。
 Shield 子 cast 可以有自己的 Counterspell 窗口；整个孩子结束后，父用原 selected d20/total、
-已合法合成的掷后贡献、自然 1/20 及当前合法防御重新确定该次命中，不能再掷 d20 或重复
-消费同一贡献。自然 20 的命中仍按攻击规则处理。
+已合法合成的掷后贡献、自然 1/20、已取得的武器重击能力及当前合法防御重新确定该次命中，不能再掷 d20 或重复
+消费同一贡献。自然 20 与有限[勇士精通重击](../../rules/schema-2-improved-critical.md)的选中 19
+仍按各自命中规则处理；未取得特性的 19 不因此免除 AC 比较。
 若已不命中，保存真实防御改变后的 MISS，不产生伤害骰或 GWF choice。
 原先已知命中保留为 Shield 的真实触发事实，反应后另存最终 outcome；不能回写覆盖原
 触发或已终结 audit 的 hit，也不能把 Shield 之后的判定重新当成同一命中机会开启窗口。

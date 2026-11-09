@@ -97,6 +97,12 @@ class BundledCampaignRulesTest {
         State state = fighterAtLevelFour(growth);
         assertEquals(36, state.maximumHitPoints());
         assertEquals(15, state.abilities().get("ability.constitution"));
+        var critical = (FinalFeature) find("character.feature", "feature.champion_improved_critical");
+        assertEquals(25, critical.definition().sourcePage());
+        assertEquals(CHAMPION_IMPROVED_CRITICAL_ALGORITHM, critical.definition().executionAlgorithm());
+        assertEquals(FeatureExecution.AUTOMATIC, critical.definition().executionMode());
+        assertEquals(List.of(new FeatureState(critical.identity(), STANDARD.rule("character.subclass", "subclass.champion"), 3)), state.features());
+        assertTrue(STANDARD.metadata().catalog().stream().anyMatch(row -> row.key().equals(critical.identity().ruleKey()) && row.executable()));
         assertThrows(IllegalArgumentException.class, () -> growth.prepareAdvance(material, state,
                 STANDARD.rule("character.class", "class.wizard"), 1, "FIXED_AVERAGE", GrowthChoices.EMPTY));
         assertEquals(4, state.level());
@@ -116,26 +122,27 @@ class BundledCampaignRulesTest {
         assertTrue(STANDARD.metadata().catalog().stream().anyMatch(row -> row.key().equals(feature.identity().ruleKey()) && row.executable()));
 
         State fourth = fighterAtLevelFour(growth);
-        assertTrue(fourth.features().isEmpty());
+        var improvedCritical = fourth.features().getFirst();
         assertEquals(1, Schema2FeatureSupport.attacksPerAttackAction(material, fourth));
         State fifth = advanceFighter(growth, fourth, 5, GrowthChoices.EMPTY);
         var acquired = new FeatureState(feature.identity(), fighter, 5);
-        assertEquals(List.of(acquired), fifth.features());
+        assertEquals(List.of(improvedCritical, acquired), fifth.features());
         assertEquals(2, Schema2FeatureSupport.attacksPerAttackAction(material, fifth));
         State sixth = advanceFighter(growth, fifth, 6, new GrowthChoices(null, Map.of("ability.strength", 2), null, Map.of()));
         assertEquals(fifth.features(), sixth.features());
         assertEquals(2, Schema2FeatureSupport.attacksPerAttackAction(material, sixth));
 
-        State missing = withFeatures(fifth, List.of());
+        State missing = withFeatures(fifth, fourth.features());
         assertEquals(1, Schema2FeatureSupport.attacksPerAttackAction(material, missing));
         assertEquals("S2_GROWTH_FEATURE_STATE", assertThrows(IllegalArgumentException.class,
                 () -> growth.validateState(material, missing)).getMessage());
-        assertRejectedAttackFeature(withFeatures(fourth, List.of(acquired)));
-        assertRejectedAttackFeature(withFeatures(fifth, List.of(acquired, acquired)));
-        assertRejectedAttackFeature(withFeatures(fifth, List.of(new FeatureState(acquired.feature(), fighter, 4))));
-        assertRejectedAttackFeature(withFeatures(fifth, List.of(new FeatureState(acquired.feature(),
+        assertRejectedAttackFeature(withFeatures(fourth, List.of(improvedCritical, acquired)));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical, acquired, acquired)));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical,
+                new FeatureState(acquired.feature(), fighter, 4))));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical, new FeatureState(acquired.feature(),
                 STANDARD.rule("character.class", "class.wizard"), 5))));
-        assertRejectedAttackFeature(withFeatures(fifth, List.of(new FeatureState(
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical, new FeatureState(
                 new RuleIdentity("other_module", "character.feature", acquired.feature().ruleKey()), fighter, 5))));
     }
 

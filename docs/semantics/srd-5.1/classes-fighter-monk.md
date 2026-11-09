@@ -138,6 +138,8 @@ Champion gives Improved Critical at 3, Remarkable Athlete at 7, Additional Fight
 
 Starting at level 3, your weapon attacks score a critical hit on a die result of 19 or 20. [SRD p. 25, Improved Critical](../../references/srd-5.1/pages/page-025.md)
 
+**Project interpretation:** After target eligibility and advantage/disadvantage selection, a selected 19 is a critical hit without a further AC requirement, including after Shield raises AC. The alternative reading would require 19 to meet AC because the general rule expressly makes only 20 an automatic hit. This specification treats the feature's unconditional grant of a critical hit as the specific exception. An unselected 19 provides no benefit, and the feature does not affect spell attacks or non-attack checks. [SRD p. 94, Attack Rolls and Rolling 1 or 20](../../references/srd-5.1/pages/page-094.md) · [Advantage and disadvantage](abilities.md#srd51-core-advantage-disadvantage)
+
 <a id="srd51-class-fighter-remarkable-athlete"></a>
 
 #### Remarkable Athlete

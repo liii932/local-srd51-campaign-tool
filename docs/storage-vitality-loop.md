@@ -81,13 +81,13 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 
 | 包 | 角色与直接依赖 |
 |---|---|
-| `srd51_runtime@3` | base；语言/工具/熟练/角色来源与休息等基础 |
-| `srd51_characters@3` | extension；直接依赖 `srd51_runtime@3`，声明战士 Extra Attack |
-| `srd51_magic@3` | extension；直接依赖前两包 |
-| `dm_runtime_house_rules@5` | 标准组合的第四成员，extension；直接依赖 `srd51_runtime@3` |
-| `dm_runtime_house_rules@6` | 家规组合的第四成员，extension；直接依赖 `srd51_runtime@3` 与 `srd51_characters@3` |
+| `srd51_runtime@4` | base；语言/工具/熟练/角色来源与休息等基础 |
+| `srd51_characters@4` | extension；直接依赖 `srd51_runtime@4`，声明战士 Extra Attack 与勇士 Improved Critical |
+| `srd51_magic@4` | extension；直接依赖前两包 |
+| `dm_runtime_house_rules@7` | 标准组合的第四成员，extension；直接依赖 `srd51_runtime@4` |
+| `dm_runtime_house_rules@8` | 家规组合的第四成员，extension；直接依赖 `srd51_runtime@4` 与 `srd51_characters@4` |
 
-标准组合选择家规 @5，变体选择 @6。变体的运动技能改用感知、
+标准组合选择家规 @7，变体选择 @8。变体的运动技能改用感知、
 固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。这是内容覆盖，不增加新
 算法，也不代表 SRD 原文。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
@@ -101,7 +101,9 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 数据来源、许可、确定性构建和完整限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
 
 Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级。当前角色是有限应用
-profile。种族属性提升、完整背景技能和起始装备整包均超出该范围。战士正常升到职业 5 级
+profile。种族属性提升、完整背景技能和起始装备整包均超出该范围。
+勇士 3–6 级的[精通重击](rules/schema-2-improved-critical.md)由真实子职业授予驱动，普通近战、OA 与 Ready
+选中 19 或 20 时重击；未决反应与原骰沿完整文件保留。战士正常升到职业 5 级
 获得[额外攻击](rules/schema-2-extra-attack.md)，单职业战士可在自己回合的一个 Attack 动作内
 执行至多两次有界近战攻击。其余未接入的 Fighter 特性和 Evocation Savant/Sculpt Spells
 保留为 `OPTION` 目录，选择的 Champion/Evocation 身份仍保留。Wizard Spellcasting、

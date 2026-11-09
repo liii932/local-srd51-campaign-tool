@@ -281,7 +281,7 @@
       "rule_key": "feature.champion_improved_critical"
     },
     "display_name": "Improved Critical",
-    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "description": "A single-class Champion fighter at class levels 3–6 scores a critical hit when the selected d20 for a supported melee weapon attack is 19 or 20.",
     "source_page": 25,
     "owner": {
       "kind": "rule",
@@ -290,9 +290,9 @@
       "rule_key": "subclass.champion"
     },
     "level": 3,
-    "feature_kind": "OPTION",
-    "execution_mode": "BLOCKED",
-    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_CHAMPION_IMPROVED_CRITICAL_V1"
   },
   {
     "identity": {

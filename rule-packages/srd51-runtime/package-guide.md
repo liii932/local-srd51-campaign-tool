@@ -7,17 +7,23 @@ installer. Loading them verifies their original ZIPs through
 `ProductionRuleArtifact.read`, then uses `ProductionSchema2Projection.compose`.
 The campaign freezes the complete typed projection, identities and field chains.
 
+The rule library imports and accepts exact package releases for new campaigns.
+External ZIPs can supply new content for mechanisms the installed application
+already implements without rebuilding the WAR. Improved Critical requires an
+application release that implements its algorithm. A campaign retains the exact
+ordered members and rules frozen when it was created.
+
 ## Modules and dependencies
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `3` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
-| `srd51_characters` version `3` | extension | `srd51_runtime=3` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat and Fighter Extra Attack |
-| `srd51_magic` version `3` | extension | `srd51_runtime=3`, `srd51_characters=3` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `5` | extension | `srd51_runtime=3` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `4` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
+| `srd51_characters` version `4` | extension | `srd51_runtime=4` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat, Fighter Extra Attack and Champion Improved Critical |
+| `srd51_magic` version `4` | extension | `srd51_runtime=4`, `srd51_characters=4` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `7` | extension | `srd51_runtime=4` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `6` as its
+first three members and selects `dm_runtime_house_rules` version `8` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -34,6 +40,14 @@ Multiclass acquisition uses its own restricted proficiency declarations.
 Normal fighter advancement to class level 5 grants the frozen Extra Attack
 feature. A single-class fighter at level 5 or 6 with that grant can make up to
 two supported melee attacks in one Attack action on the fighter's own turn.
+
+A single-class fighter gains Improved Critical by choosing Champion at class
+level 3. Through level 6, the feature applies to supported melee weapon attacks,
+including opportunity attacks and attacks released from Ready. A selected d20
+of 19 or 20 scores a critical hit. Under this project's interpretation, a
+selected 19 automatically hits even if the total falls short of the target's
+Armor Class, including any Shield bonus. Critical hits roll twice the weapon
+damage dice and add the fixed damage modifier once.
 
 Human sources grant Common and one standard language. Dwarf sources also
 demonstrate a real artisan-tool choice. Acolyte grants two standard language
@@ -69,8 +83,8 @@ This selection does not supply racial ability increases, complete racial
 traits, dwarf poison defenses or its heavy-armor speed exception, background
 skill/feature effects, starting equipment packages, cantrips, general cleric
 preparation, spell transcription, versatile/thrown weapon modes or full class
-feature execution. Fighter Fighting Style, Second Wind, Action Surge and
-Champion Improved Critical are catalog-only `OPTION` metadata. Fighter resources track uses and
+feature execution. Fighter Fighting Style, Second Wind and Action Surge are
+catalog-only `OPTION` metadata. Fighter resources track uses and
 recovery without executing those effects. Evocation Savant and Sculpt Spells
 are also catalog-only `OPTION` metadata and are not acquired, while the
 Evocation subclass identity is retained. Grappler is blocked acquisition
