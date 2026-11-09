@@ -104,6 +104,13 @@ public final class CampaignRuleSupport {
                 if (definition.level() > fighter.supportedMaximumLevel()) throw unsupported("FEATURE_RANGE");
                 continue;
             }
+            if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(definition.executionAlgorithm())) {
+                if (enabled(rules, FinalSubclass.class).stream().noneMatch(subclass ->
+                        subclass.identity().equals(definition.owner()) && subclass.definition().ownerClass().equals(fighter.ownerClass())))
+                    throw unsupported("FEATURE_OWNER");
+                if (definition.level() > fighter.supportedMaximumLevel()) throw unsupported("FEATURE_RANGE");
+                continue;
+            }
             if (definition.kind() == FeatureKind.FEATURE
                     && Schema2ArcaneRecoveryRules.ALGORITHM.equals(definition.executionAlgorithm())
                     && definition.owner().equals(wizard.ownerClass()) && definition.level() == 1

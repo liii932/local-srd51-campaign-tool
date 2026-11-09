@@ -31,7 +31,9 @@ Wizard 到 5 级；成长、子职业身份、ASI、多职业前提/熟练、HP/
 复用既有纯规则。内置候选可组成标准或感知运动/轻伤/侏儒语工匠家规组合，外部包可声明受支持内容及覆盖；创建、候选、
 执行、来源说明和恢复固定使用本战役的准确规则，活动运行不能换包。
 种族属性提升、完整背景技能和未实现职业特性不由这些模板补造。
-Fighter 相关特性与 Evocation Savant/Sculpt Spells 是可查的 `OPTION` 元数据，不自动获得；
+单职业战士 5–6 级的 [Extra Attack](rules/schema-2-extra-attack.md) 和勇士 3–6 级的
+[Improved Critical](rules/schema-2-improved-critical.md)经正常成长取得并由武器攻击消费者执行。
+其余未接入的 Fighter 特性与 Evocation Savant/Sculpt Spells 是可查的 `OPTION` 元数据，不自动获得；
 Wizard Spellcasting、Arcane Recovery 与一级 Life profile 则由真实消费者拥有。
 
 普通检定、装备实例/护甲限制、伤害/治疗、临时 HP、死亡豁免、先攻/回合、近战攻击、移动、

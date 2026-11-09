@@ -20,8 +20,8 @@ class CampaignRuleContextTest {
         assertSame(variant, savedVariant.restore());
 
         assertNotEquals(standard.binding(), variant.binding());
-        assertEquals("5", standard.binding().members().getLast().releaseVersion());
-        assertEquals("6", variant.binding().members().getLast().releaseVersion());
+        assertEquals("7", standard.binding().members().getLast().releaseVersion());
+        assertEquals("8", variant.binding().members().getLast().releaseVersion());
         assertEquals("language.dwarvish", artisanLanguage(standard));
         assertEquals("language.gnomish", artisanLanguage(variant));
 
@@ -36,9 +36,9 @@ class CampaignRuleContextTest {
         assertEquals(standardAthletics.moduleKey(), variantAthletics.moduleKey());
         assertTrue(standardAthletics.overrides().isEmpty());
         assertTrue(variantAthletics.overrides().contains(new CampaignRuleContext.FieldOverride("ability_key",
-                BundledCampaignRules.HOUSE_RULE_MODULE, "6", null, null)));
+                BundledCampaignRules.HOUSE_RULE_MODULE, "8", null, null)));
         assertTrue(catalogRule(variantCatalog, "background.custom_artisan").overrides().contains(
-                new CampaignRuleContext.FieldOverride("grant", BundledCampaignRules.HOUSE_RULE_MODULE, "6",
+                new CampaignRuleContext.FieldOverride("grant", BundledCampaignRules.HOUSE_RULE_MODULE, "8",
                         "proficiency_grants", "trade_language")));
     }
 

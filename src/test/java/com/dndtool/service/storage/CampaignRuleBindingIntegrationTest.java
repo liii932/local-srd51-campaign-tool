@@ -34,7 +34,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CampaignRuleBindingIntegrationTest {
     private static final String BASE = "srd51_runtime";
+    private static final String BASE_RELEASE = "4";
     private static final String HOUSE = "dm_runtime_house_rules";
+    private static final String HOUSE_RELEASE = "7";
+    private static final String VARIANT_RELEASE = "8";
     private static final String STR = "ability.strength";
     private static final String WIS = "ability.wisdom";
     private static final RuleIdentity ATHLETICS = new RuleIdentity(BASE, "character.proficiency", "proficiency.skill.athletics");
@@ -50,7 +53,7 @@ class CampaignRuleBindingIntegrationTest {
         try (var service = new CampaignStorageService(temporary.resolve("two-bindings"), boundary -> { },
                 sides -> { dice.add(sides); return 10; })) {
             var ordinary = start(service, BundledCampaignRules.STANDARD);
-            var ordinaryBinding = assertBinding(service, ordinary, STR, "5", "language.dwarvish", 6);
+            var ordinaryBinding = assertBinding(service, ordinary, STR, HOUSE_RELEASE, "language.dwarvish", 6);
             var ordinaryRequest = id();
             submit(service, ordinaryRequest, input(service, ordinary, STR, 14));
             assertResult(service, ordinary, ordinaryRequest, new CheckResult(10, null, 10, 2, 2, 14, true, false, false),
@@ -59,7 +62,7 @@ class CampaignRuleBindingIntegrationTest {
             String ordinaryFile = end(service);
 
             var variant = start(service, BundledCampaignRules.CHECK_VARIANT);
-            var variantBinding = assertBinding(service, variant, WIS, "6", "language.gnomish", 3);
+            var variantBinding = assertBinding(service, variant, WIS, VARIANT_RELEASE, "language.gnomish", 3);
             assertEquals(ordinaryBinding.members().subList(0, 3), variantBinding.members().subList(0, 3));
             assertNotEquals(ordinaryBinding.members().getLast().rawZipSha256(), variantBinding.members().getLast().rawZipSha256());
             assertNotEquals(ordinaryBinding.members().getLast().logicalSha256(), variantBinding.members().getLast().logicalSha256());
@@ -134,7 +137,7 @@ class CampaignRuleBindingIntegrationTest {
             var restored = service.recover(run);
             assertNotEquals(epoch, restored.epoch());
             assertEquals(revision + 1, restored.revision());
-            assertBinding(service, scenario, WIS, "6", "language.gnomish", 3);
+            assertBinding(service, scenario, WIS, VARIANT_RELEASE, "language.gnomish", 3);
             assertResult(service, scenario, request, new CheckResult(10, null, 10, 1, 2, 13, true, false, false),
                     DAMAGE, 3, 3, 9, 5, "成功");
             assertCode("STALE_EPOCH", () -> service.domainCommand(request, epoch, revision, "check-effects", intent));
@@ -153,7 +156,7 @@ class CampaignRuleBindingIntegrationTest {
     @Test void productionVariantMatchesAuthorBytesAndRejectsAnUnknownMechanism() throws Exception {
         var artifact = BundledCampaignRules.artifacts(BundledCampaignRules.CHECK_VARIANT).getLast();
         assertEquals(HOUSE, artifact.moduleKey());
-        assertEquals("6", artifact.releaseVersion());
+        assertEquals(VARIANT_RELEASE, artifact.releaseVersion());
         Path source = Path.of("rule-packages", "srd51-runtime");
         Path variant = source.resolve("dm-runtime-check-variant");
         Map<String, byte[]> original = artifact.originalMembers();
@@ -258,7 +261,7 @@ class CampaignRuleBindingIntegrationTest {
         var snapshot = service.accessSnapshot().snapshot();
         var state = snapshot.domains();
         var binding = state.material().binding();
-        assertEquals(List.of(BASE + "@3", "srd51_characters@3", "srd51_magic@3", HOUSE + "@" + release),
+        assertEquals(List.of(BASE + "@" + BASE_RELEASE, "srd51_characters@4", "srd51_magic@4", HOUSE + "@" + release),
                 binding.members().stream().map(member -> member.moduleKey() + "@" + member.releaseVersion()).toList());
         assertEquals(binding, character(state, scenario.actor()).initial().character().binding());
         var trade = character(state, scenario.actor()).initial().character().grants().stream()
@@ -273,8 +276,8 @@ class CampaignRuleBindingIntegrationTest {
                 .filter(row -> row.get("key").getAsString().equals(ATHLETICS.ruleKey())).findFirst().orElseThrow();
         assertTrue(candidate.get("executable").getAsBoolean());
         assertEquals(ability, candidate.get("abilityKey").getAsString());
-        List<Provider> expectedProviders = "5".equals(release) ? List.of(new Provider(BASE, "3"))
-                : List.of(new Provider(BASE, "3"), new Provider(HOUSE, "6"));
+        List<Provider> expectedProviders = HOUSE_RELEASE.equals(release) ? List.of(new Provider(BASE, BASE_RELEASE))
+                : List.of(new Provider(BASE, BASE_RELEASE), new Provider(HOUSE, VARIANT_RELEASE));
         var mapping = chain(state, ATHLETICS, Field.ABILITY_KEY);
         assertEquals(expectedProviders, mapping.steps().stream().map(ChainStep::provider).toList());
         assertEquals(new TextValue(ability), mapping.steps().getLast().after().value());
@@ -282,11 +285,11 @@ class CampaignRuleBindingIntegrationTest {
         assertEquals(new Provider(HOUSE, release), modifier.provider());
         assertEquals(new IntegerValue(damage), modifier.after().value());
         assertEquals(expectedProviders, chain(state, trade.slot(), Field.GRANT).steps().stream().map(ChainStep::provider).toList());
-        if ("6".equals(release)) {
+        if (VARIANT_RELEASE.equals(release)) {
             JsonObject override = candidate.getAsJsonArray("overrides").get(0).getAsJsonObject();
             assertEquals("ability_key", override.get("field").getAsString());
             assertEquals(HOUSE, override.get("moduleKey").getAsString());
-            assertEquals("6", override.get("releaseVersion").getAsString());
+            assertEquals(VARIANT_RELEASE, override.get("releaseVersion").getAsString());
         } else {
             assertTrue(candidate.getAsJsonArray("overrides").isEmpty());
         }

@@ -46,7 +46,7 @@ SQLite 适配器按封闭类型编码；内部 MySQL JDBC 适配器按类型化�
 | 战役与生命周期 | create/open/recover/save/end/import/download/delete/discard | `core_*`、分配/输入/清理材料、受管保存文件；生命周期服务是唯一 owner | 全部领域由同一 Snapshot 初始化、保存、读回、恢复、封存和清理 | 中断与响应丢失、锁、旧 epoch、未接受文件、准确清理 |
 | 规则角色与初始授予 | character-create/profile；`CampaignDomainEngine`、初始授予规则 | `characters_runtime_character` 的 InitialPlan、initial event/current/history；名字/PC-NPC/离场由根历史保存 | 标准数组、语言/工具及有限职业授予；完整当前与初始分别保存 | 准确引用、初始来源、活动状态、Unicode、文件初始前缀 |
 | 自由角色卡 | manual-create/profile/field/class/proficiency；`CampaignManualData/Commands` | `scenes_world` 中独立 manual 聚合；`manual_character` 核验身份、版本及资料投影 | 六属性、HP/AC/速度、十二职业等级、技能/豁免倍数；初始卡、当前卡和每次 typed 根历史 | 范围、总等级、NFC、版本冲突、归档、与规则角色隔离 |
-| 成长与职业 | character-command 的成长分支、角色成长与法术书规则 | 所属规则角色的职业、子职业、ASI、授予及成长事件 | 所选机制的未来写入结构预建，按真实消费者写初始及前后事实 | fighter 1–6、Life cleric 1、wizard 1–5 的有限模板；[战士 Extra Attack](../../rules/schema-2-extra-attack.md)由单职业战士 5 级正常成长授予，6 级保持。无消费者专长的获取请求拒绝 |
+| 成长与职业 | character-command 的成长分支、角色成长与法术书规则 | 所属规则角色的职业、子职业、ASI、授予及成长事件 | 所选机制的未来写入结构预建，按真实消费者写初始及前后事实 | fighter 1–6、Life cleric 1、wizard 1–5 的有限模板；[战士 Extra Attack](../../rules/schema-2-extra-attack.md)由单职业战士 5 级正常成长授予，6 级保持；勇士 3–6 级实际取得[精通重击](../../rules/schema-2-improved-critical.md)，普通/OA/Ready 武器攻击共用 19/20 重击判定。无消费者专长的获取请求拒绝 |
 | 资源与休息 | character-command；成长与休息网页的资源、生命骰、时间及奥术回想位数选择 | 当前资源、生命骰及休息由角色聚合拥有；`resources_character` 为核验投影 | 同一空间的推进量同根提交，角色累计秒可以不同；原骰、每日使用及消耗直接恢复 | 准确空间、累计日界、资格/预算/位数、失败无部分收益、保存/END/重开 |
 | 物品与装备 | item/manual-item；character-command 的装备分支 | 简单物品归 `scenes_world`，保留来源/说明/数量/状态；装备实例归角色，`equipment_instance` 核验 | 共同角色引用与全部取得/移动/消耗事实；不按模板重新发放 | 所有者、归档、数量、护甲与施法组件读取同一装备 |
 | 检定与健康 | character-command/check-effects/manual-check；角色基础规则及手动检定算法 | 原骰、候选/选骰、DC、派生修正、HP/临时HP/死亡、效果计划与前后值在角色/根历史 | 两分支预检，实际分支后果和根/子历史一起提交，完整恢复不重掷 | 手动/属性/技能/豁免、优势劣势、HP/物品/消息联动、晚写回滚 |
@@ -64,8 +64,8 @@ SQLite 适配器按封闭类型编码；内部 MySQL JDBC 适配器按类型化�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@3`、`srd51_characters@3`、`srd51_magic@3`，第四个成员分别为
-`dm_runtime_house_rules@5` 与 `dm_runtime_house_rules@6`。绑定保留成员顺序、准确版本与
+`srd51_runtime@4`、`srd51_characters@4`、`srd51_magic@4`，第四个成员分别为
+`dm_runtime_house_rules@7` 与 `dm_runtime_house_rules@8`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和
 历史校验共同使用所选战役的冻结规则上下文。变体以感知结算运动检定，自定义工匠获得侏儒语，

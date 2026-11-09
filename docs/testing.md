@@ -505,8 +505,8 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 本文前述原包排除项针对离线来源包、测试向量和作者工作目录；
 `storage/rules/{srd51-runtime,srd51-characters,srd51-magic,dm-runtime-house-rules,dm-runtime-check-variant}.zip`
 是当前显式交付的有限生产资源，逐个核对生产读取、许可和准确内容。每个内置运行组合包含四个包，按序共享
-`srd51_runtime@3`、`srd51_characters@3`、`srd51_magic@3`。标准组合的第四包是
-`dm_runtime_house_rules@5`，家规组合的第四包是 `dm_runtime_house_rules@6`。
+`srd51_runtime@4`、`srd51_characters@4`、`srd51_magic@4`。标准组合的第四包是
+`dm_runtime_house_rules@7`，家规组合的第四包是 `dm_runtime_house_rules@8`。
 变体使用感知进行运动检定，将定额直接伤害设为 3，并将自定义工匠背景的固定语言改为侏儒语。
 这些数值、属性映射和授予属于项目家规。见[家规作者包](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
@@ -852,6 +852,32 @@ node tools/storage/browser-extra-attack.cjs
 浏览器走真实 Host 表单和 API，核对正常升级、额度展示、两击和首击检查点恢复。
 这些是有限机制的内部集成及端到端入口证据，不代表 V04 的擒抱、挣脱、拖带、释放已实现，
 也不代替真实 MySQL、原生 Windows 或部署验收。只执行相关定向测试，按 §6 另行打包审计。
+
+<a id="improved-critical-verification"></a>
+
+## 勇士 Improved Critical 的真实链路验证
+
+严格作者/覆盖组合与规则边界先选
+`Schema2ImprovedCriticalCompositionTest,Schema2ImprovedCriticalRulesTest`，
+制品与正常授予选择 `BundledCampaignRulesTest,CampaignRuleSupportTest,CampaignRuleContextTest`。
+`CampaignImprovedCriticalIntegrationTest` 经交付原包、本机独立接受、有序预览、新建、
+正常选择勇士和装备取得，使用生产战役命令与真实临时 SQLite 核对近战 19/20 重击。
+同时覆盖相邻攻击与反应路径、原骰及成本、非法/过期/重复请求、事务回滚和完整文件恢复。
+固定数值只在服务随机源边界提供，不注入角色状态或特性授予。
+原包更新、准确组合冻结和规则库失败边界复用同轮的
+`LocalRuleLibraryTest,CampaignRuleBindingIntegrationTest,StorageHttpIntegrationTest`。
+
+在全新隔离存储根启动 `tools/storage/run-local.sh` 后，使用与浏览器匹配的 Playwright 环境执行：
+
+```bash
+node tools/storage/browser-improved-critical.cjs
+```
+
+浏览器使用实际导入/接受/新建/成长/装备/战斗/保存/END/打开表单和服务器随机源。
+浏览器不注入骰点；可重复的 19、20、劣势、Shield 和回滚数值边界由服务集成测试验证。
+被动能力复用角色特性展示与武器攻击结果入口，不新增“指定重击”的客户端控制。
+这些是隔离本机生产服务集成和浏览器证据，不是完整 SRD、真实 MySQL、原生 Windows 或部署验收。
+只补受本次改动影响的测试，按 §6 构建并审计候选 WAR；不因本切片完成重跑无关全量。
 
 ## Schema 2 战斗与动作继续验证
 

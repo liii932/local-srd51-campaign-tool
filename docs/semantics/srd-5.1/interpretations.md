@@ -26,6 +26,7 @@ rules. No later edition or external commentary supplies unmarked rules here.
 - **Ancestries:** [Tinker](ancestries.md#srd51-ancestry-rock-gnome-tinker).
 - **Character advancement and multiclassing:** [Ability-score prerequisites](character-advancement.md#srd51-character-multiclass-prerequisites); [Spellcasting across classes](character-advancement.md#srd51-character-multiclass-spellcasting).
 - **Paladin and Ranger:** [Aura of Courage and Aura of Devotion](classes-paladin-ranger.md#srd51-class-paladin-aura-of-courage).
+- **Fighter and Monk:** [Improved Critical](classes-fighter-monk.md#srd51-class-fighter-improved-critical).
 - **Rogue and Sorcerer:** [Careful Spell](classes-rogue-sorcerer.md#srd51-class-sorcerer-careful-spell); [Draconic Presence](classes-rogue-sorcerer.md#srd51-class-sorcerer-draconic-presence).
 - **Warlock and Wizard:** [Voice of the Chain Master](classes-warlock-wizard.md#srd51-class-warlock-voice-of-the-chain-master); [Arcane Recovery](classes-warlock-wizard.md#srd51-class-wizard-arcane-recovery).
 

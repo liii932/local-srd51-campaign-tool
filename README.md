@@ -22,6 +22,7 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 
 - 创建标准数组的有限 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史；
 - 单职业战士正常升到 5 级取得[额外攻击](docs/rules/schema-2-extra-attack.md)，自己回合的每个 Attack 动作可攻击两次，6 级保持；首击后的余数随完整文件保存恢复；
+- 单职业战士 3 级选择勇士后取得[精通重击](docs/rules/schema-2-improved-critical.md)，3–6 级已支持的近战武器攻击选中 19 或 20 时重击，普通攻击、借机攻击和 Ready 共用结算；
 - 由现有纯规则消费者执行已接入的成长/ASI/多职业、熟练、检定、装备、健康、休息与资源命令；
 - 使用有限普通战斗、移动、机会攻击、反应/继续、Bless、Cure Wounds、Shield、Counterspell、Burning Hands、法师书/准备和奥术回想；
 - 建立世界节点、路线及有界网格场景，显式入退场、旅行与切换唯一执行焦点；后台时钟、角色、效果与未决动作冻结；

@@ -27,6 +27,7 @@ public final class Schema2CompositionKernel {
     public static final String CANONICAL_PROFILE = "validation-json-1";
     public static final String COMPOSITION_ALGORITHM = "validation-schema2-projection-1";
     public static final String FIGHTER_EXTRA_ATTACK_ALGORITHM = "SRD_2014_FIGHTER_EXTRA_ATTACK_V1";
+    public static final String CHAMPION_IMPROVED_CRITICAL_ALGORITHM = "SRD_2014_CHAMPION_IMPROVED_CRITICAL_V1";
     public static final int MAX_PACKAGES = 8;
     private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
     private static final int MAX_RUNTIME_CHAINS = 3072, MAX_RUNTIME_STEPS = 4096;
@@ -659,12 +660,19 @@ public final class Schema2CompositionKernel {
                         for(var object:objects.values())if(object.identity instanceof RuleIdentity r && r.ruleType().equals("character.wizard_spellcasting"))targets.add(r);
                         Map<Identity,MutableObject> originalReferences=new HashMap<>();int declarationIndex=declarations.get(declaration.getKey());
                         for(Identity target:targets) {
-                            Map<Field,FieldState> prior=new HashMap<>();
-                            for(FieldChain chain:chains)if(chain.target().equals(target))for(ChainStep step:chain.steps())
-                                if(step.loadIndex()<declarationIndex || step.loadIndex()==declarationIndex&&step.op().equals("initial"))prior.put(chain.field(),step.after());
-                            if(!prior.isEmpty())originalReferences.put(target,new MutableObject(target,prior,source));
+                            MutableObject prior = originalObjectAt(target, chains, declarationIndex, source);
+                            if (prior != null) originalReferences.put(target, prior);
                         }
                         validateWizardAuxiliaryFeature(new FinalFeature(feature,true),originalReferences,source);
+                        if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(feature.executionAlgorithm())) {
+                            MutableObject owner = originalReferences.get(feature.owner());
+                            if (owner != null) {
+                                RuleIdentity fighter = ((IdentityValue) owner.fields.get(Field.OWNER_CLASS).value()).value();
+                                MutableObject prior = originalObjectAt(fighter, chains, declarationIndex, source);
+                                if (prior != null) originalReferences.put(fighter, prior);
+                            }
+                            validateImprovedCriticalOwners(new FinalFeature(feature, true), originalReferences, Stage.FINAL, source);
+                        }
                     }
                     if (original instanceof ItemDefinition item) {
                         Map<Identity, MutableObject> originalReferences = new HashMap<>();
@@ -809,8 +817,11 @@ public final class Schema2CompositionKernel {
                     validateEquipmentReferences(new FinalItem(item, true), objects, row.location);
                 }
             }
-            for(Located<Definition> row:pack.definitions)if(row.value instanceof FeatureDefinition feature)
+            for(Located<Definition> row:pack.definitions)if(row.value instanceof FeatureDefinition feature) {
                 validateWizardAuxiliaryFeature(new FinalFeature(feature,true),objects,row.location);
+                if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(feature.executionAlgorithm()))
+                    validateImprovedCriticalOwners(new FinalFeature(feature, true), objects, Stage.AUTHOR, row.location);
+            }
             for (Located<Entry> row : pack.entries) {
                 Entry value = row.value;
                 Field reference = referenceField(value.identity());
@@ -1401,6 +1412,10 @@ public final class Schema2CompositionKernel {
                 && (kind != FeatureKind.FEATURE || level != 5 || page != 25
                     || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.fighter")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Fighter Extra Attack requires a fifth-level Fighter feature from SRD page 25", source);
+        if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(algorithm)
+                && (kind != FeatureKind.FEATURE || level != 3 || page != 25
+                    || !owner.ruleType().equals("character.subclass") || !owner.ruleKey().equals("subclass.champion")))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Improved Critical requires a third-level Champion feature from SRD page 25", source);
         return new FeatureDefinition(identity, name, description, page, owner, level, kind, mode, algorithm, note);
     }
 
@@ -1428,7 +1443,8 @@ public final class Schema2CompositionKernel {
     private static Set<String> executionAlgorithms(FeatureExecution mode) {
         return switch (mode) {
             case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1",
-                    "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", FIGHTER_EXTRA_ATTACK_ALGORITHM);
+                    "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1",
+                    FIGHTER_EXTRA_ATTACK_ALGORITHM, CHAMPION_IMPROVED_CRITICAL_ALGORITHM);
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
             case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
         };
@@ -2126,13 +2142,35 @@ public final class Schema2CompositionKernel {
             throw fail("S2_REFERENCE_MISSING",Stage.FINAL,"Wizard auxiliary feature requires its real casting class",source);
     }
 
+    private static MutableObject originalObjectAt(Identity target, List<FieldChain> chains, int declarationIndex, Location source) {
+        Map<Field, FieldState> fields = new HashMap<>();
+        for (FieldChain chain : chains) if (chain.target().equals(target))
+            for (ChainStep step : chain.steps()) if (step.loadIndex() < declarationIndex
+                    || step.loadIndex() == declarationIndex && step.op().equals("initial")) fields.put(chain.field(), step.after());
+        return fields.isEmpty() ? null : new MutableObject(target, fields, source);
+    }
+
+    private static void validateImprovedCriticalOwners(FinalFeature feature, Map<Identity, MutableObject> objects,
+            Stage stage, Location source) {
+        MutableObject champion = objects.get(feature.definition().owner());
+        if (champion == null)
+            throw fail("S2_REFERENCE_MISSING", stage, "Improved Critical requires its Champion owner", source);
+        RuleIdentity ownerClass = ((IdentityValue) champion.fields.get(Field.OWNER_CLASS).value()).value();
+        if (!ownerClass.ruleKey().equals("class.fighter")
+                || ((IntegerValue) champion.fields.get(Field.SELECTION_LEVEL).value()).value() != 3)
+            throw fail("S2_TYPE", stage, "Improved Critical requires the third-level Fighter subclass", source);
+        MutableObject fighter = objects.get(ownerClass);
+        if (fighter == null || feature.enabled() && (!enabled(champion) || !enabled(fighter)))
+            throw fail("S2_REFERENCE_MISSING", stage, "Improved Critical requires its Champion and Fighter owners", source);
+    }
+
     private static void finalValidation(Map<Identity, MutableObject> objects) {
         Map<RuleIdentity, Set<RuleIdentity>> candidates = new HashMap<>();
         Set<RuleIdentity> progressionOwners = new HashSet<>();
         Map<RuleIdentity, Map<Integer, Boolean>> levels = new HashMap<>();
         Map<RuleIdentity, Integer> subclassSelectionLevels = new HashMap<>();
         int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
-        boolean extraAttackEnabled = false;
+        boolean extraAttackEnabled = false, improvedCriticalEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
@@ -2175,6 +2213,13 @@ public final class Schema2CompositionKernel {
                         if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Fighter Extra Attack requires its enabled class", object.source);
                         if (extraAttackEnabled) throw fail("S2_EXTRA_ATTACK_AMBIGUOUS", Stage.FINAL, "Only one Fighter Extra Attack may be enabled", object.source);
                         extraAttackEnabled = true;
+                    }
+                    if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
+                        validateImprovedCriticalOwners(feature, objects, Stage.FINAL, object.source);
+                        if (feature.enabled()) {
+                            if (improvedCriticalEnabled) throw fail("S2_IMPROVED_CRITICAL_AMBIGUOUS", Stage.FINAL, "Only one Improved Critical may be enabled", object.source);
+                            improvedCriticalEnabled = true;
+                        }
                     }
                     if (feature.definition().owner().ruleType().equals("character.subclass")
                             && feature.definition().level() < ((IntegerValue) owner.fields.get(Field.SELECTION_LEVEL).value()).value())

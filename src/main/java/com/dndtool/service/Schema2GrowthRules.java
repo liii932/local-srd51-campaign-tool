@@ -179,6 +179,7 @@ final class Schema2GrowthRules {
         Map<RuleIdentity, Integer> levels = classLevels(classes);
         for (SubclassState subclass : subclasses) levels.put(subclass.subclass(), levels.get(subclass.characterClass()));
         List<FeatureState> result = new ArrayList<>();
+        boolean unsupportedImprovedCritical = false;
         for (FinalRule rule : catalog.rules.values()) if (rule instanceof FinalFeature feature && rule.enabled()
                 && feature.definition().kind() == FeatureKind.FEATURE && levels.containsKey(feature.definition().owner())
                 && feature.definition().level() <= levels.get(feature.definition().owner())) {
@@ -190,8 +191,12 @@ final class Schema2GrowthRules {
             if (FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(feature.definition().executionAlgorithm())
                     && (classes.size() != 1 || levels.get(feature.definition().owner()) > 6))
                 fail("S2_GROWTH_EXTRA_ATTACK_SCOPE");
+            if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(feature.definition().executionAlgorithm())
+                    && (classes.size() != 1 || levels.get(feature.definition().owner()) > 6))
+                unsupportedImprovedCritical = true;
             result.add(new FeatureState(feature.identity(), feature.definition().owner(), feature.definition().level()));
         }
+        if (unsupportedImprovedCritical) fail("S2_GROWTH_IMPROVED_CRITICAL_SCOPE");
         if (result.size() > 64) fail("S2_GROWTH_BUDGET");
         return result.stream().sorted(Comparator.comparing(FeatureState::feature, ORDER)).toList();
     }

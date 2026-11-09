@@ -538,6 +538,24 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 [实物](objects-and-magic-items.md#object-recovery)及[跨空间](world-and-scene-spaces.md#纸面验证向量)
 的权威接口解释。纸面算式中的假定仅用于该向量，运行时须由相应事实 reader 证明。
 
+## 独立有限切片：勇士 Improved Critical
+
+此切片不属于上面 16 条原轨迹的替代验收。规则来源为
+[精通重击语义](../../semantics/srd-5.1/classes-fighter-monk.md#srd51-class-fighter-improved-critical)，
+具体声明、解释和采用范围见[有限机制合同](../../rules/schema-2-improved-critical.md)。
+
+当前消费者从单职业战士 3–6 级的正常勇士授予派生武器重击资格；普通近战、OA 与 Ready
+沿同一攻击路径使用最终选中 d20。19/20 重击，固定修正不加倍；19 的自动命中是明确的
+项目解释，反应后也适用。它不改变 Attack 额度或普通检定、豁免、法术的规则。
+此前特性仅为 OPTION 目录，不能凭既有声明或“P”取得执行资格；现由严格声明、组合、
+支持检查、真实成长和生产消费者共同接通，不增加独立重击状态或通用 handler 层。
+
+`CampaignImprovedCriticalIntegrationTest` 和 `browser-improved-critical.cjs` 从真实原包、
+准确接受与有序选择开始，定位正常取得、执行、反应继续和完整文件链证据。
+定向运行方法及内部集成/浏览器/部署的区别见
+[测试指南](../../testing.md#improved-critical-verification)。远程、投掷、法术攻击、
+多职业和 Superior Critical 仍不在应用支持范围内；本节不改判原 V02/V03/V04 或整类攻击机制。
+
 ## 证据与复验边界
 
 本页设计结论来自逐例语义、相关 SRD 原文、现有设计条款和当前源码的纸面核对。

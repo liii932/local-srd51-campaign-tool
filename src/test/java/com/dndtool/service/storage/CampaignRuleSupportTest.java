@@ -223,8 +223,8 @@ class CampaignRuleSupportTest {
         assertEquals("S2_GROWTH_EXTRA_ATTACK_SCOPE", failure.getMessage());
         assertEquals(5, fighterAtFive.current().level());
         assertEquals(5, fighterAtFive.events().size());
-        assertEquals(List.of("feature.fighter_extra_attack"), fighterAtFive.current().features().stream()
-                .map(row -> row.feature().ruleKey()).toList());
+        assertEquals(List.of("feature.champion_improved_critical", "feature.fighter_extra_attack"),
+                fighterAtFive.current().features().stream().map(row -> row.feature().ruleKey()).toList());
     }
 
     @Test void selfConsistentInitialFactsMustStillUseTheCampaignCreationTemplate() {
