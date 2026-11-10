@@ -28,6 +28,7 @@ public final class Schema2CompositionKernel {
     public static final String COMPOSITION_ALGORITHM = "validation-schema2-projection-1";
     public static final String FIGHTER_EXTRA_ATTACK_ALGORITHM = "SRD_2014_FIGHTER_EXTRA_ATTACK_V1";
     public static final String CHAMPION_IMPROVED_CRITICAL_ALGORITHM = "SRD_2014_CHAMPION_IMPROVED_CRITICAL_V1";
+    public static final String FIGHTER_SECOND_WIND_ALGORITHM = "SRD_2014_FIGHTER_SECOND_WIND_V1";
     public static final int MAX_PACKAGES = 8;
     private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
     private static final int MAX_RUNTIME_CHAINS = 3072, MAX_RUNTIME_STEPS = 4096;
@@ -657,6 +658,8 @@ public final class Schema2CompositionKernel {
                     }
                     if(original instanceof FeatureDefinition feature) {
                         Set<Identity> targets=new HashSet<>();targets.add(feature.owner());
+                        if (FIGHTER_SECOND_WIND_ALGORITHM.equals(feature.executionAlgorithm()))
+                            targets.add(fighterSecondWindResource(feature.owner()));
                         for(var object:objects.values())if(object.identity instanceof RuleIdentity r && r.ruleType().equals("character.wizard_spellcasting"))targets.add(r);
                         Map<Identity,MutableObject> originalReferences=new HashMap<>();int declarationIndex=declarations.get(declaration.getKey());
                         for(Identity target:targets) {
@@ -664,6 +667,8 @@ public final class Schema2CompositionKernel {
                             if (prior != null) originalReferences.put(target, prior);
                         }
                         validateWizardAuxiliaryFeature(new FinalFeature(feature,true),originalReferences,source);
+                        if (FIGHTER_SECOND_WIND_ALGORITHM.equals(feature.executionAlgorithm()))
+                            validateSecondWindResource(feature, originalReferences, Stage.FINAL, source);
                         if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(feature.executionAlgorithm())) {
                             MutableObject owner = originalReferences.get(feature.owner());
                             if (owner != null) {
@@ -819,6 +824,8 @@ public final class Schema2CompositionKernel {
             }
             for(Located<Definition> row:pack.definitions)if(row.value instanceof FeatureDefinition feature) {
                 validateWizardAuxiliaryFeature(new FinalFeature(feature,true),objects,row.location);
+                if (FIGHTER_SECOND_WIND_ALGORITHM.equals(feature.executionAlgorithm()))
+                    validateSecondWindResource(feature, objects, Stage.AUTHOR, row.location);
                 if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(feature.executionAlgorithm()))
                     validateImprovedCriticalOwners(new FinalFeature(feature, true), objects, Stage.AUTHOR, row.location);
             }
@@ -1416,6 +1423,10 @@ public final class Schema2CompositionKernel {
                 && (kind != FeatureKind.FEATURE || level != 3 || page != 25
                     || !owner.ruleType().equals("character.subclass") || !owner.ruleKey().equals("subclass.champion")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Improved Critical requires a third-level Champion feature from SRD page 25", source);
+        if (FIGHTER_SECOND_WIND_ALGORITHM.equals(algorithm)
+                && (kind != FeatureKind.FEATURE || level != 1 || page != 24
+                    || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.fighter")))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Second Wind requires a first-level Fighter feature from SRD page 24", source);
         return new FeatureDefinition(identity, name, description, page, owner, level, kind, mode, algorithm, note);
     }
 
@@ -1444,7 +1455,7 @@ public final class Schema2CompositionKernel {
         return switch (mode) {
             case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1",
                     "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1",
-                    FIGHTER_EXTRA_ATTACK_ALGORITHM, CHAMPION_IMPROVED_CRITICAL_ALGORITHM);
+                    FIGHTER_EXTRA_ATTACK_ALGORITHM, CHAMPION_IMPROVED_CRITICAL_ALGORITHM, FIGHTER_SECOND_WIND_ALGORITHM);
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
             case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
         };
@@ -2164,13 +2175,31 @@ public final class Schema2CompositionKernel {
             throw fail("S2_REFERENCE_MISSING", stage, "Improved Critical requires its Champion and Fighter owners", source);
     }
 
+    public static RuleIdentity fighterSecondWindResource(RuleIdentity fighter) {
+        return new RuleIdentity(fighter.moduleKey(), "character.resource", "resource.fighter.second_wind");
+    }
+
+    private static void validateSecondWindResource(FeatureDefinition feature, Map<Identity, MutableObject> objects,
+            Stage stage, Location source) {
+        var fighter = objects.get(feature.owner());
+        RuleIdentity identity = fighterSecondWindResource(feature.owner());
+        var resource = objects.get(identity);
+        if (fighter == null || !enabled(fighter) || resource == null || !enabled(resource))
+            throw fail("S2_REFERENCE_MISSING", stage, "Second Wind requires its enabled Fighter and resource", source);
+        var definition = ((FinalResource) finalRule(identity, resource.fields)).definition();
+        if (!definition.ownerClass().equals(feature.owner()) || definition.sourcePage() != 24
+                || definition.executionMode() != ResourceExecution.AUTOMATIC
+                || !definition.maximumProfile().equals("1-20:1") || !definition.recoveryProfile().equals("1-20:SHORT_REST"))
+            throw fail("S2_TYPE", stage, "Second Wind requires one Fighter use recovered on a short or long rest", source);
+    }
+
     private static void finalValidation(Map<Identity, MutableObject> objects) {
         Map<RuleIdentity, Set<RuleIdentity>> candidates = new HashMap<>();
         Set<RuleIdentity> progressionOwners = new HashSet<>();
         Map<RuleIdentity, Map<Integer, Boolean>> levels = new HashMap<>();
         Map<RuleIdentity, Integer> subclassSelectionLevels = new HashMap<>();
         int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
-        boolean extraAttackEnabled = false, improvedCriticalEnabled = false;
+        boolean extraAttackEnabled = false, improvedCriticalEnabled = false, secondWindEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
@@ -2209,6 +2238,11 @@ public final class Schema2CompositionKernel {
                 if (checked instanceof FinalFeature feature) {
                     MutableObject owner = objects.get(feature.definition().owner());
                     if (owner == null) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Feature owner is missing", object.source);
+                    if (feature.enabled() && FIGHTER_SECOND_WIND_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
+                        validateSecondWindResource(feature.definition(), objects, Stage.FINAL, object.source);
+                        if (secondWindEnabled) throw fail("S2_SECOND_WIND_AMBIGUOUS", Stage.FINAL, "Only one Second Wind may be enabled", object.source);
+                        secondWindEnabled = true;
+                    }
                     if (feature.enabled() && FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
                         if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Fighter Extra Attack requires its enabled class", object.source);
                         if (extraAttackEnabled) throw fail("S2_EXTRA_ATTACK_AMBIGUOUS", Stage.FINAL, "Only one Fighter Extra Attack may be enabled", object.source);

@@ -556,6 +556,21 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 [测试指南](../../testing.md#improved-critical-verification)。远程、投掷、法术攻击、
 多职业和 Superior Critical 仍不在应用支持范围内；本节不改判原 V02/V03/V04 或整类攻击机制。
 
+## 独立有限切片：战士 Second Wind
+
+[一级回气语义](../../semantics/srd-5.1/classes-fighter-monk.md#srd51-class-fighter-second-wind)
+现由严格特性声明、实际授予、准确资源和 SQLite 战斗命令消费，
+见[有限回气合同](../../rules/schema-2-second-wind.md)。
+原来的资源额度与恢复本身没有治疗执行资格；新增消费者在本人回合用附赠动作
+恢复 `1d10＋战士等级` HP，资源和健康后果、原骰及历史共同提交。
+
+当前唯一附赠动作与固定一次/休息资源构成封闭用量证明，不增加重复的动作余额，
+也不宣称通用附赠动作、Action Surge 或其他治疗特性已经接入。
+`CampaignSecondWindIntegrationTest` 和 `browser-second-wind.cjs` 定位正常取得、实际执行、
+失败回滚、标准休息及完整文件链证据；[测试指南](../../testing.md#second-wind-verification)
+区分服务集成、浏览器和部署。MySQL INTERNAL、战斗外和多职业回气仍未采用。
+本切片不改判上面 16 条原轨迹或任何整类机制。
+
 ## 证据与复验边界
 
 本页设计结论来自逐例语义、相关 SRD 原文、现有设计条款和当前源码的纸面核对。

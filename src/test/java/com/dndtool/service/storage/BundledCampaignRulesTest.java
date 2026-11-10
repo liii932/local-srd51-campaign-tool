@@ -11,6 +11,7 @@ import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
 import com.dndtool.service.Schema2CharacterRuntime.FeatureState;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CharacterRuntime.HealthInput;
+import com.dndtool.service.Schema2CharacterRuntime.ResourceState;
 import com.dndtool.service.Schema2CharacterRuntime.SpellbookInput;
 import com.dndtool.service.Schema2CharacterRuntime.State;
 import com.dndtool.service.Schema2CombatRules;
@@ -83,6 +84,18 @@ class BundledCampaignRulesTest {
             assertTrue(plan.character().grants().stream().anyMatch(grant ->
                     grant.target().equals(STANDARD.rule("character.tool", "tool.smith_tools"))));
             assertEquals(characterClass.equals("cleric") ? 1 : 0, state.subclasses().size());
+            if (characterClass.equals("fighter")) {
+                var secondWind = (FinalFeature) find("character.feature", "feature.fighter_second_wind");
+                assertEquals(24, secondWind.definition().sourcePage());
+                assertEquals(FeatureKind.FEATURE, secondWind.definition().kind());
+                assertEquals(FeatureExecution.AUTOMATIC, secondWind.definition().executionMode());
+                assertEquals(FIGHTER_SECOND_WIND_ALGORITHM, secondWind.definition().executionAlgorithm());
+                assertEquals(List.of(new FeatureState(secondWind.identity(), state.characterClass(), 1)), state.features());
+                var resource = STANDARD.rule("character.resource", "resource.fighter.second_wind");
+                assertEquals(List.of(new ResourceState(resource, 1, 1, false)), state.resources());
+                assertTrue(STANDARD.metadata().catalog().stream().anyMatch(row ->
+                        row.key().equals(secondWind.identity().ruleKey()) && row.executable()));
+            }
         }
         var acolyte = STANDARD.initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), "class.cleric", "background.acolyte");
         assertEquals(4, acolyte.character().grants().size());
@@ -101,7 +114,9 @@ class BundledCampaignRulesTest {
         assertEquals(25, critical.definition().sourcePage());
         assertEquals(CHAMPION_IMPROVED_CRITICAL_ALGORITHM, critical.definition().executionAlgorithm());
         assertEquals(FeatureExecution.AUTOMATIC, critical.definition().executionMode());
-        assertEquals(List.of(new FeatureState(critical.identity(), STANDARD.rule("character.subclass", "subclass.champion"), 3)), state.features());
+        var secondWind = STANDARD.rule("character.feature", "feature.fighter_second_wind");
+        assertEquals(List.of(new FeatureState(critical.identity(), STANDARD.rule("character.subclass", "subclass.champion"), 3),
+                new FeatureState(secondWind, fighter, 1)), state.features());
         assertTrue(STANDARD.metadata().catalog().stream().anyMatch(row -> row.key().equals(critical.identity().ruleKey()) && row.executable()));
         assertThrows(IllegalArgumentException.class, () -> growth.prepareAdvance(material, state,
                 STANDARD.rule("character.class", "class.wizard"), 1, "FIXED_AVERAGE", GrowthChoices.EMPTY));
@@ -123,10 +138,11 @@ class BundledCampaignRulesTest {
 
         State fourth = fighterAtLevelFour(growth);
         var improvedCritical = fourth.features().getFirst();
+        var secondWind = fourth.features().getLast();
         assertEquals(1, Schema2FeatureSupport.attacksPerAttackAction(material, fourth));
         State fifth = advanceFighter(growth, fourth, 5, GrowthChoices.EMPTY);
         var acquired = new FeatureState(feature.identity(), fighter, 5);
-        assertEquals(List.of(improvedCritical, acquired), fifth.features());
+        assertEquals(List.of(improvedCritical, acquired, secondWind), fifth.features());
         assertEquals(2, Schema2FeatureSupport.attacksPerAttackAction(material, fifth));
         State sixth = advanceFighter(growth, fifth, 6, new GrowthChoices(null, Map.of("ability.strength", 2), null, Map.of()));
         assertEquals(fifth.features(), sixth.features());
@@ -136,14 +152,14 @@ class BundledCampaignRulesTest {
         assertEquals(1, Schema2FeatureSupport.attacksPerAttackAction(material, missing));
         assertEquals("S2_GROWTH_FEATURE_STATE", assertThrows(IllegalArgumentException.class,
                 () -> growth.validateState(material, missing)).getMessage());
-        assertRejectedAttackFeature(withFeatures(fourth, List.of(improvedCritical, acquired)));
-        assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical, acquired, acquired)));
+        assertRejectedAttackFeature(withFeatures(fourth, List.of(improvedCritical, acquired, secondWind)));
+        assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical, acquired, acquired, secondWind)));
         assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical,
-                new FeatureState(acquired.feature(), fighter, 4))));
+                new FeatureState(acquired.feature(), fighter, 4), secondWind)));
         assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical, new FeatureState(acquired.feature(),
-                STANDARD.rule("character.class", "class.wizard"), 5))));
+                STANDARD.rule("character.class", "class.wizard"), 5), secondWind)));
         assertRejectedAttackFeature(withFeatures(fifth, List.of(improvedCritical, new FeatureState(
-                new RuleIdentity("other_module", "character.feature", acquired.feature().ruleKey()), fighter, 5))));
+                new RuleIdentity("other_module", "character.feature", acquired.feature().ruleKey()), fighter, 5), secondWind)));
     }
 
     @Test void wizardBookUsesRegisteredExecutableAndExplicitMetadataSpells() {

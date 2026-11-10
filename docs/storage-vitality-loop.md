@@ -81,13 +81,13 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 
 | 包 | 角色与直接依赖 |
 |---|---|
-| `srd51_runtime@4` | base；语言/工具/熟练/角色来源与休息等基础 |
-| `srd51_characters@4` | extension；直接依赖 `srd51_runtime@4`，声明战士 Extra Attack 与勇士 Improved Critical |
-| `srd51_magic@4` | extension；直接依赖前两包 |
-| `dm_runtime_house_rules@7` | 标准组合的第四成员，extension；直接依赖 `srd51_runtime@4` |
-| `dm_runtime_house_rules@8` | 家规组合的第四成员，extension；直接依赖 `srd51_runtime@4` 与 `srd51_characters@4` |
+| `srd51_runtime@5` | base；语言/工具/熟练/角色来源与休息等基础 |
+| `srd51_characters@5` | extension；直接依赖 `srd51_runtime@5`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
+| `srd51_magic@5` | extension；直接依赖前两包 |
+| `dm_runtime_house_rules@9` | 标准组合的第四成员，extension；直接依赖 `srd51_runtime@5` |
+| `dm_runtime_house_rules@10` | 家规组合的第四成员，extension；直接依赖 `srd51_runtime@5` 与 `srd51_characters@5` |
 
-标准组合选择家规 @7，变体选择 @8。变体的运动技能改用感知、
+标准组合选择家规 @9，变体选择 @10。变体的运动技能改用感知、
 固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。这是内容覆盖，不增加新
 算法，也不代表 SRD 原文。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
@@ -102,7 +102,9 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 
 Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级。当前角色是有限应用
 profile。种族属性提升、完整背景技能和起始装备整包均超出该范围。
-勇士 3–6 级的[精通重击](rules/schema-2-improved-critical.md)由真实子职业授予驱动，普通近战、OA 与 Ready
+单职业战士从一级取得[回气](rules/schema-2-second-wind.md)，在本人战斗回合使用附赠动作
+恢复 `1d10＋战士等级` HP，消耗准确一次/休息资源；原骰、成本和治疗随完整文件保留。勇士 3–6 级的
+[精通重击](rules/schema-2-improved-critical.md)由真实子职业授予驱动，普通近战、OA 与 Ready
 选中 19 或 20 时重击；未决反应与原骰沿完整文件保留。战士正常升到职业 5 级
 获得[额外攻击](rules/schema-2-extra-attack.md)，单职业战士可在自己回合的一个 Attack 动作内
 执行至多两次有界近战攻击。其余未接入的 Fighter 特性和 Evocation Savant/Sculpt Spells

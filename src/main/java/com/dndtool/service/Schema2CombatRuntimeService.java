@@ -65,6 +65,8 @@ public final class Schema2CombatRuntimeService {
 
     public Result execute(Request request) {
         Objects.requireNonNull(request);
+        if (request.command().kind() == Kind.SECOND_WIND)
+            return new Result(Status.REJECTED, JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED, null);
         if (request.spaceOwned())
             return new Result(Status.REJECTED,"S2_COMBAT_REQUEST",null);
         return transact(false,request.combatId(),request.digest(),null,connection->{
@@ -130,6 +132,8 @@ public final class Schema2CombatRuntimeService {
     }
 
     public Result inspect(Request request) {
+        if (request.command().kind() == Kind.SECOND_WIND)
+            return new Result(Status.REJECTED, JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED, null);
         return transact(true,request.combatId(),request.digest(),null,connection->{
             History history=combats.read(connection,request.combatId());
             if (history!=null) validate(connection,history);
@@ -146,7 +150,7 @@ public final class Schema2CombatRuntimeService {
 
     /** Direct recovery against retained preparations. Restores facts, never re-executes commands. */
     public Result restore(Save save) {
-        try { validateSaveShape(save); } catch (SQLException|RuntimeException invalid) { return new Result(Status.REJECTED,"S2_COMBAT_RESTORE_INVALID",null); }
+        try { validateSaveShape(save); } catch (SQLException|RuntimeException invalid) { return rejectedSave(invalid); }
         UUID id=save.combat().current().combatId(); String digest=save.combat().events().getLast().requestDigest();
         return transact(false,id,digest,save,connection->{
             validateSaved(connection,save);
@@ -169,7 +173,7 @@ public final class Schema2CombatRuntimeService {
     }
 
     public Result inspectRestore(Save save) {
-        try { validateSaveShape(save); } catch (SQLException|RuntimeException invalid) { return new Result(Status.REJECTED,"S2_COMBAT_RESTORE_INVALID",null); }
+        try { validateSaveShape(save); } catch (SQLException|RuntimeException invalid) { return rejectedSave(invalid); }
         UUID id=save.combat().current().combatId(); String digest=save.combat().events().getLast().requestDigest();
         return transact(true,id,digest,save,connection->{
             validateSaved(connection,save);
@@ -251,6 +255,11 @@ public final class Schema2CombatRuntimeService {
         if (!save.characters().stream().map(h->h.current().characterId()).toList().equals(save.combat().members().stream().map(Member::characterId).toList()))
             throw new SQLException("S2_COMBAT_RESTORE_INVALID");
         for (var history:save.characters()) JdbcSchema2CharacterRuntimeRepository.validate(history);
+    }
+
+    private static Result rejectedSave(Exception invalid) {
+        String unsupported = JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED;
+        return new Result(Status.REJECTED, unsupported.equals(invalid.getMessage()) ? unsupported : "S2_COMBAT_RESTORE_INVALID", null);
     }
     private void validateSaved(Connection c,Save save) throws SQLException {
         Map<UUID,Schema2CharacterRuntime.History> all=new LinkedHashMap<>();

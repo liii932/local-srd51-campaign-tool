@@ -434,7 +434,7 @@ public final class CampaignDomainEngine {
             case "INITIALIZED" -> rules.initial(material.projection(), material.initial(), request.preparationOperationId(),
                     request.initialAbilities(), command.growthChoices());
             case "STATISTICS_ADVANCED", "CHARACTER_ADVANCED" -> rules.advance(material.projection(), prepareAdvance(material, before, command), roll);
-            case "RESOURCE_SPENT" -> rules.spend(material.projection(), before, command.resource(), command.amount());
+            case "RESOURCE_SPENT" -> rules.spendOrdinary(material.projection(), before, command.resource(), command.amount());
             case "RESOURCES_RECOVERED" -> rules.recoverResources(material.projection(), before, command.recoveryTrigger());
             default -> throw rejected("S2_CHARACTER_COMMAND_UNSUPPORTED");
         };

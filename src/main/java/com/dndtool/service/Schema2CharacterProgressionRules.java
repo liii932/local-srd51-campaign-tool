@@ -111,6 +111,13 @@ public final class Schema2CharacterProgressionRules {
                 capacity.subclasses(), capacity.features(), capacity.feats(), capacity.proficiencies(), capacity.version(), capacity.resources(), capacity.rest(), capacity.equipment(), capacity.health(), capacity.spellbook()));
     }
 
+    public State spendOrdinary(ProductionSchema2Projection material, State state, RuleIdentity identity, long amount) {
+        if (identity != null && identity.equals(fighterSecondWindResource(state.characterClass()))
+                && identity.equals(Schema2FeatureSupport.secondWindResource(material, state)))
+            throw invalid("S2_RESOURCE_FEATURE_OWNER_REQUIRED");
+        return spend(material, state, identity, amount);
+    }
+
     public State spend(ProductionSchema2Projection material, State state, RuleIdentity identity, long amount) {
         validateState(material, state);
         requireMutationCapacity(state);

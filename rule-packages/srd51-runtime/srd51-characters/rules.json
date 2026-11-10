@@ -218,7 +218,7 @@
       "rule_key": "feature.fighter_second_wind"
     },
     "display_name": "Second Wind",
-    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "description": "Spend a bonus action on your own turn to regain 1d10 + fighter level hit points, up to your hit point maximum. One use is restored by finishing a short or long rest. The SQLite application supports this feature for single-class fighters at levels 1–6 during active combat.",
     "source_page": 24,
     "owner": {
       "kind": "rule",
@@ -227,9 +227,9 @@
       "rule_key": "class.fighter"
     },
     "level": 1,
-    "feature_kind": "OPTION",
-    "execution_mode": "BLOCKED",
-    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_FIGHTER_SECOND_WIND_V1"
   },
   {
     "identity": {
@@ -344,7 +344,7 @@
       "rule_key": "resource.fighter.second_wind"
     },
     "display_name": "Fighter Second_Wind",
-    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "description": "Tracks the one use consumed by the supported Second Wind combat action. Completing a short or long rest restores it. The application enforces the feature's class and combat eligibility.",
     "source_page": 24,
     "owner_class": {
       "kind": "rule",

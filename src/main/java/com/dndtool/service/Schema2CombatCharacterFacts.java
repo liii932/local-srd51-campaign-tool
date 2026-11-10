@@ -51,11 +51,17 @@ final class Schema2CombatCharacterFacts {
             return dropAfterDamage(before,resolved.state(),savedAfter,command);
         }
         if (command.kind().equals("COMBAT_HEALING_APPLIED")) {
-            var healed=health.applyHealing(before, command.combatInput().damageAmount());
-            if (result.dice().size()!=1 || result.dice().getFirst()<1 || result.dice().getFirst()>8
-                    || result.deathD20()!=null || result.recoveryD4()!=null
-                    || healed.result().rolledAmount()!=result.rolledAmount()
-                    || healed.result().appliedAmount()!=result.appliedAmount())
+            var input = command.combatInput();
+            // The combat owner also verifies that this child belongs to the retained Second Wind event.
+            boolean secondWind = input.frameKey().equals(Schema2CombatRules.secondWindReference(input.combatOperationId()));
+            int die = result.dice().size() == 1 ? result.dice().getFirst() : 0;
+            if (die < 1 || die > (secondWind ? 10 : 8) || result.deathD20() != null || result.recoveryD4() != null
+                    || secondWind && (!input.actorId().equals(before.characterId()) || input.damageAmount() != die + before.level()
+                        || Schema2FeatureSupport.secondWindResource(material, before) == null))
+                throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            var healed = health.applyHealing(before, input.damageAmount());
+            if (healed.result().rolledAmount() != result.rolledAmount()
+                    || healed.result().appliedAmount() != result.appliedAmount())
                 throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
             return healed.state();
         }

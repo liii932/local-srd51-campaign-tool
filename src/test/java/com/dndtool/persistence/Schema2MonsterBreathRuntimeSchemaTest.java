@@ -87,6 +87,8 @@ class Schema2MonsterBreathRuntimeSchemaTest {
         String sql=Files.readString(MIGRATION);
         Set<String> mysqlCommands = names(Schema2CombatState.Kind.values());
         SQLITE_ONLY_COMMANDS.forEach(kind -> mysqlCommands.remove(kind.name()));
+        // Second Wind uses the SQLite campaign owner rather than the MySQL combat service.
+        mysqlCommands.remove(Schema2CombatState.Kind.SECOND_WIND.name());
         assertEquals(mysqlCommands,enumValues(alter(sql,"s2_combat_event"),"command_kind"));
         assertEquals(names(Schema2CombatState.FrameKind.values()),enumValues(alter(sql,"s2_combat_frame"),"frame_kind"));
         assertEquals(names(Schema2CombatState.Stage.values()),enumValues(alter(sql,"s2_combat_frame"),"stage"));

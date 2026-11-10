@@ -171,6 +171,7 @@
         if (!rule.enabled || !types.includes(rule.type)) return false;
         if (select.form.id === 'domain-create') return rule.creationChoice;
         if (select.form.id === 'domain-spellbook' && select.name !== 'castingRule') return rule.spellbookChoice;
+        if (select.form.id === 'domain-resource') return rule.directResourceSpend;
         return rule.executable;
       });
       options(select, entries.map(ruleValue), value => ruleFromValue(value).name || ruleFromValue(value).key);
@@ -548,8 +549,19 @@
         const healing = recentCast.healingDice.length ? `原骰 d8=${recentCast.healingDice.join('、')}，加值 ${recentCast.healingModifier}，实际恢复 ${recentCast.appliedHealing}；` : '';
         text(box, 'p', `${personName(recentCast.actorId)} · ${ruleName(recentCast.spell)}：${healing}${targets.map(character => `${character.name} 当前 ${character.hitPoints}/${character.maximumHitPoints}`).join('；')}；${recentCast.slotLevel} 环法术位当前 ${slot ? `${slot.current}/${slot.maximum}` : '已记录'}`, 'cast-result');
       }
+      const secondWind = history.events?.findLast(event => event.command.kind === 'SECOND_WIND');
+      if (secondWind) {
+        const changes = secondWind.resolution.healthChanges;
+        const healing = changes.find(change => change.healing), cost = changes.find(change => change.resource);
+        if (healing && cost) {
+          const result = healing.healthResult, die = result.dice[0];
+          const before = cost.before.resources.find(resource => ruleValue(resource.identity) === ruleValue(cost.resource));
+          const after = cost.after.resources.find(resource => ruleValue(resource.identity) === ruleValue(cost.resource));
+          text(box, 'p', `${personName(secondWind.command.actorId)} · 最近回气（附赠动作）：d10=${die} + 战士等级 ${result.rolledAmount - die} = ${result.rolledAmount}；实际恢复 ${result.appliedAmount}，生命值 ${healing.before.hitPoints} → ${healing.after.hitPoints}；使用次数 ${before.current} → ${after.current}/${after.maximum}`, 'second-wind-result');
+        }
+      }
       const latest = history.events?.at(-1);
-      if (latest?.resolution?.rolls) text(box, 'p', `本次骰子：${latest.resolution.rolls.map(roll => `${roll.purpose} d${roll.sides}=${roll.value}`).join('；')}`);
+      if (latest?.resolution?.rolls && latest.command.kind !== 'SECOND_WIND') text(box, 'p', `本次骰子：${latest.resolution.rolls.map(roll => `${roll.purpose} d${roll.sides}=${roll.value}`).join('；')}`);
       summary.append(box);
       for (const flow of (battle.flows || []).filter(flow => flow.status === 'ACTIVE')) {
         const panel = document.createElement('article'); panel.className = 'card';
@@ -625,6 +637,7 @@
       : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
       : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列，再选择“攻击”、目标与已装备武器。'
       : kind === 'ATTACK' ? '每次消耗当前序列的一次攻击；两击之间可合法移动或更换目标，也可放弃剩余攻击。'
+      : kind === 'SECOND_WIND' ? '仅已取得回气的战士可在本人回合使用；消耗一次回气，以附赠动作恢复 1d10＋战士等级的生命值。短休或长休完成后恢复次数。'
       : battle.status === 'EXPLORATION' ? '当前为探索状态，可移动、推进时间，或重新进入战斗。' : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';
     for (const name of ['targetId', 'itemId', 'x', 'y', 'seconds']) {
       const input = form.elements[name];

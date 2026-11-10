@@ -4,6 +4,7 @@ import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import java.util.*;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.fighterSecondWindResource;
 import static com.dndtool.service.Schema2CombatState.*;
 
 /** Typed combat history, structural validation and capacity reservation. */
@@ -84,6 +85,8 @@ public final class Schema2CombatHistory {
                 &&Collections.disjoint(operations,children)&&rows<=MAX_HISTORY_CHILD_ROWS);
     }
     private static void validateCastResults(Event event) {
+        boolean secondWind = event.command().kind() == Kind.SECOND_WIND;
+        if (secondWind) validateSecondWindResults(event);
         Map<UUID,CastAttempt> retained=new HashMap<>();
         if(event.before()!=null)for(Flow flow:event.before().flows())for(CastAttempt cast:flow.casts())require(retained.put(cast.frameKey(),cast)==null);
         List<CastAttempt> created=new ArrayList<>(),completedHealing=new ArrayList<>();Set<UUID> seen=new HashSet<>();
@@ -100,13 +103,14 @@ public final class Schema2CombatHistory {
             if(!cast.healingDice().isEmpty()&&(old==null||old.healingDice().isEmpty()))completedHealing.add(cast);
         }
         require(retained.isEmpty());
-        List<HealthChange> costs=event.resolution().healthChanges().stream().filter(c->c.resource()!=null).toList();
+        List<HealthChange> changes = secondWind ? List.of() : event.resolution().healthChanges();
+        List<HealthChange> costs=changes.stream().filter(c->c.resource()!=null).toList();
         require(created.size()==costs.size());Set<UUID> costFrames=new HashSet<>();
         for(CastAttempt cast:created) {
             var matches=costs.stream().filter(c->c.frameKey().equals(cast.frameKey())).toList();require(matches.size()==1&&costFrames.add(cast.frameKey()));
             var cost=matches.getFirst();require(cost.characterId().equals(cast.actorId())&&cost.resource().equals(cast.slotResource())&&cost.resourceAmount()==1);
         }
-        List<HealthChange> healing=event.resolution().healthChanges().stream().filter(HealthChange::healing).toList();
+        List<HealthChange> healing=changes.stream().filter(HealthChange::healing).toList();
         if(event.command().kind()!=Kind.EXPLORATION_HEALTH)require(healing.size()==completedHealing.size());
         for(CastAttempt cast:completedHealing) {
             Set<UUID> frames=new HashSet<>(Set.of(cast.frameKey()));
@@ -119,6 +123,25 @@ public final class Schema2CombatHistory {
             var result=matches.getFirst();require(result.characterId().equals(cast.targets().getFirst())&&result.damageAmount()==cast.requestedHealing()
                     &&result.healthResult().dice().equals(cast.healingDice())&&result.healthResult().rolledAmount()==cast.requestedHealing()&&result.healthResult().appliedAmount()==cast.appliedHealing());
         }
+    }
+
+    private static void validateSecondWindResults(Event event) {
+        UUID actor = event.command().actorId();
+        Battle before = event.before();
+        var resolution = event.resolution();
+        require(before != null && before.status() == Status.ACTIVE && before.activeFlow() == null
+                && actor.equals(before.activeActor()) && resolution.healthChanges().size() == 2 && resolution.rolls().size() == 1);
+        HealthChange cost = resolution.healthChanges().getFirst(), healing = resolution.healthChanges().getLast();
+        Roll roll = resolution.rolls().getFirst();
+        int requested = roll.value() + cost.before().level();
+        require(actor.equals(cost.characterId()) && actor.equals(healing.characterId()) && cost.before().hitPoints() > 0
+                && fighterSecondWindResource(cost.before().characterClass()).equals(cost.resource()) && cost.resourceAmount() == 1
+                && cost.after().equals(healing.before()) && cost.frameKey().equals(healing.frameKey())
+                && roll.equals(new Roll(Schema2CombatRules.SECOND_WIND_ROLL, actor, 10, roll.value()))
+                && healing.healing() && healing.damageAmount() == requested
+                && healing.healthResult().equals(new Schema2CharacterRuntime.HealthResult(List.of(roll.value()), null, null, requested,
+                        (int) Math.min(requested, healing.before().maximumHitPoints() - healing.before().hitPoints())))
+                && resolution.facts().equals(List.of(new CombatFact(Kind.SECOND_WIND.name(), actor, cost.frameKey(), "BONUS_ACTION"))));
     }
     /** Reserves the complete mandatory suffix before an accepted prefix consumes any die. */
     public static void checkReservedCapacity(History previous, Battle before, int suffixEvents,

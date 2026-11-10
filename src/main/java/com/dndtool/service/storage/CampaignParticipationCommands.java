@@ -135,7 +135,8 @@ public final class CampaignParticipationCommands {
         } else if (!Set.of(Schema2CombatState.Kind.END_TURN, Schema2CombatState.Kind.BEGIN_ATTACK,
                 Schema2CombatState.Kind.FORFEIT_ATTACKS, Schema2CombatState.Kind.ATTACK, Schema2CombatState.Kind.CAST,
                 Schema2CombatState.Kind.MOVE, Schema2CombatState.Kind.DASH, Schema2CombatState.Kind.DISENGAGE,
-                Schema2CombatState.Kind.DODGE, Schema2CombatState.Kind.STAND_UP, Schema2CombatState.Kind.END_CONCENTRATION).contains(command.kind()))
+                Schema2CombatState.Kind.DODGE, Schema2CombatState.Kind.STAND_UP, Schema2CombatState.Kind.SECOND_WIND,
+                Schema2CombatState.Kind.END_CONCENTRATION).contains(command.kind()))
             throw playerPermissionDenied();
     }
     private static StorageException playerPermissionDenied() {
