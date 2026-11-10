@@ -9,21 +9,24 @@ The campaign freezes the complete typed projection, identities and field chains.
 
 The rule library imports and accepts exact package releases for new campaigns.
 External ZIPs can supply new content for mechanisms the installed application
-already implements without rebuilding the WAR. Improved Critical requires an
-application release that implements its algorithm. A campaign retains the exact
-ordered members and rules frozen when it was created.
+already implements without rebuilding the WAR. Using a mechanism for the first
+time requires an application release that implements it, including for Improved
+Critical and Second Wind. An active campaign keeps the exact ordered members and
+rules frozen at creation. Opening a saved campaign requires the original ZIPs
+for those exact members, explicit acceptance in the local rule library, and an
+application that supports the saved mechanisms.
 
 ## Modules and dependencies
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `4` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
-| `srd51_characters` version `4` | extension | `srd51_runtime=4` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat, Fighter Extra Attack and Champion Improved Critical |
-| `srd51_magic` version `4` | extension | `srd51_runtime=4`, `srd51_characters=4` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `7` | extension | `srd51_runtime=4` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `5` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
+| `srd51_characters` version `5` | extension | `srd51_runtime=5` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `5` | extension | `srd51_runtime=5`, `srd51_characters=5` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `9` | extension | `srd51_runtime=5` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `8` as its
+first three members and selects `dm_runtime_house_rules` version `10` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -36,6 +39,17 @@ starting class skill/save/armor/weapon training, later HP, ASI, subclass
 acquisition, finite resource capacities and multiclass prerequisites use the
 real typed consumers. Fighter ASI levels are 4 and 6; Wizard ASI is level 4.
 Multiclass acquisition uses its own restricted proficiency declarations.
+
+Fighters gain Second Wind at level 1. The SQLite application supports this
+bonus action for a single-class fighter at levels 1–6 on that fighter's own
+active combat turn. It spends one use to heal the fighter by a server-rolled
+`1d10 + fighter level`, capped at maximum hit points. It spends the use even
+when the fighter is already at maximum hit points. A completed short or long
+rest restores the one use outside combat. This is the only executable bonus
+action in this selection.
+The combat action requires the exact acquired feature and available resource.
+Generic resource spending cannot substitute for Second Wind. The MySQL INTERNAL
+combat entry point rejects this action.
 
 Normal fighter advancement to class level 5 grants the frozen Extra Attack
 feature. A single-class fighter at level 5 or 6 with that grant can make up to
@@ -83,9 +97,9 @@ This selection does not supply racial ability increases, complete racial
 traits, dwarf poison defenses or its heavy-armor speed exception, background
 skill/feature effects, starting equipment packages, cantrips, general cleric
 preparation, spell transcription, versatile/thrown weapon modes or full class
-feature execution. Fighter Fighting Style, Second Wind and Action Surge are
-catalog-only `OPTION` metadata. Fighter resources track uses and
-recovery without executing those effects. Evocation Savant and Sculpt Spells
+feature execution. Fighter Fighting Style and Action Surge are catalog-only
+`OPTION` metadata. The Action Surge resource tracks uses and recovery without
+granting an additional action. Evocation Savant and Sculpt Spells
 are also catalog-only `OPTION` metadata and are not acquired, while the
 Evocation subclass identity is retained. Grappler is blocked acquisition
 metadata; its unresolved influence remains subject to the consumer rejection

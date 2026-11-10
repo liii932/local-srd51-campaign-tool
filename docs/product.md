@@ -33,6 +33,8 @@ Wizard 到 5 级；成长、子职业身份、ASI、多职业前提/熟练、HP/
 种族属性提升、完整背景技能和未实现职业特性不由这些模板补造。
 单职业战士 5–6 级的 [Extra Attack](rules/schema-2-extra-attack.md) 和勇士 3–6 级的
 [Improved Critical](rules/schema-2-improved-critical.md)经正常成长取得并由武器攻击消费者执行。
+单职业战士 1–6 级的 [Second Wind](rules/schema-2-second-wind.md)从一级创建取得，
+在本人战斗回合以附赠动作治疗，准确资源、原骰和健康后果共同保存；标准短休或长休恢复次数。
 其余未接入的 Fighter 特性与 Evocation Savant/Sculpt Spells 是可查的 `OPTION` 元数据，不自动获得；
 Wizard Spellcasting、Arcane Recovery 与一级 Life profile 则由真实消费者拥有。
 

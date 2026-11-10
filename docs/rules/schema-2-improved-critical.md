@@ -31,7 +31,7 @@
 子职业必须启用，选择等级为 3，真实所有者是启用的 `class.fighter`。
 严格读取与最终组合都校验约束；修改字段不能绕过校验。组合至多启用一个此能力，
 未知算法、错误模式、等级、来源、所有者或重复声明拒绝。能力不绑定特定包名。
-内置 `srd51_characters@4` 使用稳定键 `feature.champion_improved_critical`，
+内置 `srd51_characters@5` 使用稳定键 `feature.champion_improved_critical`，
 外部包仍须遵守准确依赖、完整身份和同一支持合同。
 
 `Schema2GrowthRules` 在正常 `CHARACTER_ADVANCED` 选择子职业后派生授予，

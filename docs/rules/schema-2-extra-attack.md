@@ -8,7 +8,7 @@ SRD 5.1 的战士从职业 5 级起，在自己回合执行 Attack 动作时可�
 
 ## 声明、组合与授予
 
-内置角色包 `srd51_characters@4` 声明
+内置角色包 `srd51_characters@5` 声明
 `(srd51_characters, character.feature, feature.fighter_extra_attack)`。
 它使用现有特性类型和字段链，必需 `feature_kind=FEATURE`、`execution_mode=AUTOMATIC`、
 `execution_algorithm=SRD_2014_FIGHTER_EXTRA_ATTACK_V1`、`source_page=25`、`level=5`，

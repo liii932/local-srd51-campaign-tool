@@ -149,7 +149,7 @@ public final class CampaignRuleContext {
                                 String collection, String entryKey) { }
     public record CatalogEntry(String moduleKey, String type, String key, String name, boolean enabled,
                                boolean executable, String description, String abilityKey, String category,
-                               boolean creationChoice, boolean spellbookChoice,
+                               boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
                                List<FieldOverride> overrides) {
         public CatalogEntry { overrides = List.copyOf(overrides); }
     }
@@ -176,6 +176,10 @@ public final class CampaignRuleContext {
                 .map(FinalEntry::entry).filter(SpellbookEntry.class::isInstance).map(SpellbookEntry.class::cast)
                 .filter(entry -> wizardProfiles.contains(entry.identity().rule())).map(SpellbookEntry::spell)
                 .collect(Collectors.toUnmodifiableSet());
+        Set<RuleIdentity> secondWindResources = projection.projection().rules().stream()
+                .filter(FinalRule::enabled).filter(FinalFeature.class::isInstance).map(FinalFeature.class::cast)
+                .filter(row -> FIGHTER_SECOND_WIND_ALGORITHM.equals(row.definition().executionAlgorithm()))
+                .map(row -> fighterSecondWindResource(row.definition().owner())).collect(Collectors.toUnmodifiableSet());
         List<CatalogEntry> catalog = new ArrayList<>();
         for (FinalRule row : projection.projection().rules()) {
             Definition definition = row.definition();
@@ -194,10 +198,12 @@ public final class CampaignRuleContext {
                     && !(Set.of("character.class", "character.background").contains(row.identity().ruleType()) && !creationChoice)
                     && !row.identity().ruleType().startsWith("catalog.");
             var proficiency = definition instanceof ProficiencyDefinition value ? value : null;
+            boolean directResourceSpend = executable && definition instanceof ResourceDefinition
+                    && !secondWindResources.contains(row.identity());
             catalog.add(new CatalogEntry(row.identity().moduleKey(), row.identity().ruleType(),
                     row.identity().ruleKey(), definition.displayName(), row.enabled(), executable, description(definition),
                     proficiency == null ? null : proficiency.abilityKey(), proficiency == null ? null : proficiency.category().name(),
-                    creationChoice, spellbookChoice,
+                    creationChoice, spellbookChoice, directResourceSpend,
                     overrides.getOrDefault(row.identity(), List.of())));
         }
         return new Metadata("SRD 5.1 finite current-application rules", "FINITE_APPLICATION_SCHEMA_2",
@@ -205,6 +211,7 @@ public final class CampaignRuleContext {
                     "Standard-array application characters; racial ability increases and full racial traits are unavailable.",
                     "Fighter levels 1–6, Life-domain cleric level 1, Wizard levels 1–5; this is not complete SRD class support.",
                     "An acquired Fighter Extra Attack allows up to two melee attacks within the Attack action on that fighter's turn.",
+                    "An acquired Fighter Second Wind spends its own use as a bonus action on that fighter's active turn and heals 1d10 plus Fighter level.",
                     "Background sources currently grant languages/tools, without background skills, features or starting gear.",
                     "Unimplemented fighter features, Evocation Savant and Sculpt Spells remain catalog-only OPTION metadata and are not acquired; Grappler is blocked acquisition metadata.",
                     "Only Bless, Cure Wounds, Shield, Counterspell and Burning Hands have bounded casting consumers; other spells are metadata.",

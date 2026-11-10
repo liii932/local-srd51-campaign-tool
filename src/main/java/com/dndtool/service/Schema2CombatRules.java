@@ -15,6 +15,7 @@ import static com.dndtool.service.Schema2CombatState.*;
 
 /** Closed ordinary-melee combat consumer. All preflight is pure and precedes the first die. */
 public final class Schema2CombatRules {
+    static final String SECOND_WIND_ROLL = "SECOND_WIND_HEALING";
     public static final int MAX_COMBATANTS = 64, MAX_FLOWS = 128, MAX_PATH = 64, MAX_FACTS = 4096;
     public static final int START_TIME_HEADROOM_MINUTES = (Schema2CombatHistory.MAX_EVENTS * 6 + 59) / 60 + 240;
     public record Context(ProductionSchema2Projection material, InitialPlan initial, State character, long sceneSecond) {
@@ -46,6 +47,7 @@ public final class Schema2CombatRules {
             return Schema2ActionFlowRules.handles(command.kind())?actions.mandatorySuffix(roster,before,command):0;
         }
         public Set<UUID> possibleHealthTargets() {
+            if (command.kind() == Kind.SECOND_WIND) return Set.of(command.actorId());
             if(Schema2SaveDamageRules.handles(before,command)||Schema2ActionFlowRules.handles(command.kind())||Schema2MonsterRestRules.handles(command.kind())||worldCommand(command.kind())||command.kind()==Kind.END_COMBAT)return Set.copyOf(roster.keySet());
             if(command.kind()==Kind.START)return roster.entrySet().stream().filter(e->e.getValue().character().hitPoints()==0&&!e.getValue().character().health().dead()&&!e.getValue().character().health().stable()).map(Map.Entry::getKey).collect(java.util.stream.Collectors.toUnmodifiableSet());
             if(command.kind()==Kind.END_TURN)return before.activeOrdinal()+1==before.initiative().size()?Set.copyOf(roster.keySet()):roster.containsKey(before.initiative().get(before.activeOrdinal()+1).characterId())?Set.of(before.initiative().get(before.activeOrdinal()+1).characterId()):Set.of();
@@ -356,6 +358,10 @@ public final class Schema2CombatRules {
                 if (command.kind() == Kind.BEGIN_ATTACK) attackAllowance(p.roster.get(actor.characterId()));
             }
             case FORFEIT_ATTACKS -> { if (actor.sequence() == null || actor.sequence().closed()) throw invalid("S2_COMBAT_SEQUENCE_UNAVAILABLE"); }
+            case SECOND_WIND -> {
+                State paid = paySecondWind(p.roster.get(actor.characterId()));
+                health.applyHealing(paid, 1 + paid.level());
+            }
             case STAND_UP -> {
                 int speed=speed(p.roster,p.before,actor.characterId());
                 if(!actor.prone() || speed==0 || 2*(speed+actor.movementBonus())-actor.movementSpentHalfFeet()<speed)throw invalid("S2_COMBAT_CANNOT_STAND");
@@ -444,17 +450,47 @@ public final class Schema2CombatRules {
                             actor.disengaged() || p.command.kind() == Kind.DISENGAGE,actor.dodging() || p.command.kind() == Kind.DODGE,sequence,actor.prone()));
                 }
                 case END_CONCENTRATION -> battle=Schema2SpellRules.end(battle,p.command.actorId(),"VOLUNTARY",facts);
+                case SECOND_WIND -> applySecondWind(p, dice, changes);
                 case STAND_UP -> battle=replaceActor(battle,new Combatant(actor.characterId(),actor.position(),actor.side(),actor.actionAvailable(),actor.reactionAvailable(),actor.movementSpentHalfFeet()+speed(p.roster,battle,actor.characterId()),actor.movementBonus(),actor.disengaged(),actor.dodging(),actor.sequence(),false));
                 case FORFEIT_ATTACKS -> battle = replaceActor(battle,closeSequence(actor));
                 default -> throw invalid("S2_COMBAT_COMMAND");
             }
             battle = new Battle(battle.combatId(),battle.campaignId(),battle.combatRule(),battle.status(),battle.round(),battle.turnNumber(),battle.activeOrdinal(),p.before.version()+1,battle.combatants(),battle.initiative(),battle.flows(),battle.ongoingEffects(),battle.readyPreparations(),battle.triggerFacts(),battle.shields(),battle.concentrationHolders(),battle.environmentZones(),battle.suppressionCauses(),battle.monsters(),battle.saveDamageBatches(),battle.monsterRests());
-            facts.add(new CombatFact(p.command.kind().name(),p.command.actorId(),p.combatId,null));
+            boolean secondWind = p.command.kind() == Kind.SECOND_WIND;
+            facts.add(new CombatFact(p.command.kind().name(), p.command.actorId(),
+                    secondWind ? secondWindReference(p.operationId) : p.combatId, secondWind ? "BONUS_ACTION" : null));
         }
         battle=reconcileEffects(p,battle,changes,facts);
         var reconciliation=Schema2OngoingEffectRules.reconcile(battle,p.operationId);facts.addAll(reconciliation.facts());battle=Schema2OngoingEffectRules.withCauses(battle,reconciliation.causes());
         validateState(battle);
         return new Resolution(battle,changes,dice.actual,facts);
+    }
+
+    private State paySecondWind(Context context) {
+        if (context == null) throw invalid("S2_COMBAT_SECOND_WIND_UNAVAILABLE");
+        State state = context.character();
+        RuleIdentity resource = Schema2FeatureSupport.secondWindResource(context.material(), state);
+        if (resource == null) throw invalid("S2_COMBAT_SECOND_WIND_UNAVAILABLE");
+        // This is the only supported bonus action. Its single use cannot recover within combat.
+        return growth.spend(context.material(), state, resource, 1);
+    }
+
+    private void applySecondWind(Prepared prepared, Draws dice, List<HealthChange> changes) {
+        UUID actor = prepared.command.actorId();
+        Context context = prepared.roster.get(actor);
+        State before = context.character(), paid = paySecondWind(context);
+        RuleIdentity resource = fighterSecondWindResource(before.characterClass());
+        UUID reference = secondWindReference(prepared.operationId);
+        int roll = dice.draw(SECOND_WIND_ROLL, actor, 10);
+        int requested = roll + before.level();
+        var healed = health.applyHealing(paid, requested);
+        changes.add(new HealthChange(actor, before, paid, reference, 0, false, null, false, false, 0, resource, 1, false));
+        var result = new HealthResult(List.of(roll), null, null, requested, healed.result().appliedAmount());
+        changes.add(new HealthChange(actor, paid, healed.state(), reference, requested, false, result, false, false, 0, null, 0, true));
+    }
+
+    static UUID secondWindReference(UUID operationId) {
+        return key(operationId, "second-wind");
     }
 
     private static boolean worldCommand(Kind kind) {return Set.of(Kind.CREATE_ENVIRONMENT_ZONE,Kind.END_ENVIRONMENT_ZONE,Kind.EXPLORATION_HEALTH,Kind.EXPLORATION_ADVANCE_TIME,Kind.EXPLORATION_MOVE,Kind.REENTER_COMBAT,Kind.CLOSE_SCENE).contains(kind);}

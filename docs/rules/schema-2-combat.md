@@ -45,6 +45,7 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 | `START` | 服务器掷先攻 DEX 检定，应用不熟练护甲造成的劣势，保留全部原骰；按总值及同分裁定排序，开始第一个真实回合。 |
 | `BEGIN_ATTACK` | 消费本回合 action 一次，创建有限攻击序列；普通额度为一次，冻结规则与实际已取得的[战士 Extra Attack](schema-2-extra-attack.md)可派生为两次。客户端不能指定额度。 |
 | `ATTACK` | 从实际手持实例、冻结 profile、角色属性、熟练和目标 AC 派生攻击；自然 1 失手、自然 20 重击，真实取得的[精通重击](schema-2-improved-critical.md)可使选中 19 也重击。命中才掷伤害，真正更新目标角色。 |
+| `SECOND_WIND` | SQLite 有限回气：已实际取得的单职业战士在本人回合用附赠动作恢复 `1d10＋战士等级` HP，扣一次准确职业资源。普通动作、反应、移动和攻击序列保持；MySQL INTERNAL 明确拒绝。 |
 | `FORFEIT_ATTACKS` | 明确放弃当前序列剩余额度并关闭序列，不退还 action。 |
 | `DASH` / `DISENGAGE` / `DODGE` | 消费 action，分别增加速度等额移动、免除本人本回合机会攻击、建立真实闪避贡献。 |
 | `MOVE` | 接受完整有限路径，按实际走过的段消费移动；有机会攻击时在离开触及之前提交暂停。 |
@@ -74,6 +75,8 @@ Ready 及探索持续见[施法合同](schema-2-spells.md)。怪物吐息与其�
 [有限怪物合同](schema-2-monster-breath.md)；战士 5–6 级 Extra Attack 按[独立能力合同](schema-2-extra-attack.md)接合。
 勇士 3–6 级 Improved Critical 由同一武器消费者用于普通、OA 和 Ready 单击，
 反应后用原选骰重验；19 的自动命中解释与准确授予门见[精通重击合同](schema-2-improved-critical.md)。
+SQLite 的[一级回气](schema-2-second-wind.md)在无未决流时同根完成资源扣减与治疗，
+不是施法或攻击；其有限附赠动作证明不扩展为通用附赠动作预算。
 其他怪物动作、双持附赠攻击、高等级或其他职业 Extra Attack、
 角色抗性和其他法术／反应机制仍须各自消费者，不能借通用命令绕过其成本与后果。
 

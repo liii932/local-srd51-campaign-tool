@@ -58,6 +58,8 @@ schema 2 的法师 `SRD_2014_WIZARD_ARCANE_RECOVERY_V1` 另按[奥术回想合�
 真实职业 5 级授予。当前能力限单职业战士 5–6 级，成长预检和恢复共同核验该范围。
 勇士 `SRD_2014_CHAMPION_IMPROVED_CRITICAL_V1` 按[精通重击合同](schema-2-improved-critical.md)
 校验 3 级实际子职业授予，限单职业战士 3–6 级；不会仅凭等级产生能力。
+战士 `SRD_2014_FIGHTER_SECOND_WIND_V1` 按[回气合同](schema-2-second-wind.md)校验一级
+实际授予和准确一次/休息资源，当前限单职业战士 1–6 级；使用由 SQLite 战斗入口拥有。
 专长当前仅允许 `BLOCKED`／`BLOCKED_DOWNSTREAM_SYSTEM_V1`：可验证前提并记录获得，不能
 执行未接入的效果。自动获得范围只包括到期的非 `OPTION` 特性；选项记录不自动全部授予。
 遇到到期非 OPTION 特性的 `BOUNDED_FEATURE_SELECTION_V1` 时，在 RNG 前拒绝整次成长，

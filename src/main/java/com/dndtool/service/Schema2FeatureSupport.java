@@ -27,7 +27,11 @@ public final class Schema2FeatureSupport {
         return validate(material, state, "S2_COMBAT_FEATURE_UNSUPPORTED").improvedCritical() ? 19 : 20;
     }
 
-    private record SupportedFeatures(boolean extraAttack, boolean improvedCritical) { }
+    public static RuleIdentity secondWindResource(ProductionSchema2Projection material, State state) {
+        return validate(material, state, "S2_COMBAT_FEATURE_UNSUPPORTED").secondWindResource();
+    }
+
+    private record SupportedFeatures(boolean extraAttack, boolean improvedCritical, RuleIdentity secondWindResource) { }
 
     private static SupportedFeatures validate(ProductionSchema2Projection material, State state, String code) {
         if (!state.feats().isEmpty()) throw new IllegalArgumentException(code);
@@ -35,6 +39,7 @@ public final class Schema2FeatureSupport {
         List<FeatureDefinition> castingFeatures = new ArrayList<>();
         boolean extraAttack = false;
         boolean improvedCritical = false;
+        RuleIdentity secondWindResource = null;
         for (var acquired : state.features()) {
             if (!seen.add(acquired.feature())) throw new IllegalArgumentException(code);
             var definitions = material.projection().rules().stream()
@@ -46,6 +51,13 @@ public final class Schema2FeatureSupport {
                     || feature.level() != acquired.acquiredAtClassLevel()) throw new IllegalArgumentException(code);
 
             switch (feature.executionAlgorithm()) {
+                case FIGHTER_SECOND_WIND_ALGORITHM -> {
+                    if (secondWindResource != null || !feature.owner().equals(state.characterClass())
+                            || !state.classes().equals(List.of(new ClassLevel(feature.owner(), state.level())))
+                            || state.level() < feature.level() || state.level() > 6)
+                        throw new IllegalArgumentException(code);
+                    secondWindResource = fighterSecondWindResource(feature.owner());
+                }
                 case FIGHTER_EXTRA_ATTACK_ALGORITHM -> {
                     if (extraAttack || !feature.owner().equals(state.characterClass()) || state.classes().size() != 1
                             || !feature.owner().equals(state.classes().getFirst().characterClass())
@@ -73,6 +85,6 @@ public final class Schema2FeatureSupport {
             }
         }
         if (!castingFeatures.isEmpty()) Schema2SpellRules.requireSupportedCastingFeatures(material, state, castingFeatures, code);
-        return new SupportedFeatures(extraAttack, improvedCritical);
+        return new SupportedFeatures(extraAttack, improvedCritical, secondWindResource);
     }
 }

@@ -223,7 +223,7 @@ class CampaignRuleSupportTest {
         assertEquals("S2_GROWTH_EXTRA_ATTACK_SCOPE", failure.getMessage());
         assertEquals(5, fighterAtFive.current().level());
         assertEquals(5, fighterAtFive.events().size());
-        assertEquals(List.of("feature.champion_improved_critical", "feature.fighter_extra_attack"),
+        assertEquals(List.of("feature.champion_improved_critical", "feature.fighter_extra_attack", "feature.fighter_second_wind"),
                 fighterAtFive.current().features().stream().map(row -> row.feature().ruleKey()).toList());
     }
 

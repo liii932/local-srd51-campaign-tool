@@ -505,8 +505,8 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 本文前述原包排除项针对离线来源包、测试向量和作者工作目录；
 `storage/rules/{srd51-runtime,srd51-characters,srd51-magic,dm-runtime-house-rules,dm-runtime-check-variant}.zip`
 是当前显式交付的有限生产资源，逐个核对生产读取、许可和准确内容。每个内置运行组合包含四个包，按序共享
-`srd51_runtime@4`、`srd51_characters@4`、`srd51_magic@4`。标准组合的第四包是
-`dm_runtime_house_rules@7`，家规组合的第四包是 `dm_runtime_house_rules@8`。
+`srd51_runtime@5`、`srd51_characters@5`、`srd51_magic@5`。标准组合的第四包是
+`dm_runtime_house_rules@9`，家规组合的第四包是 `dm_runtime_house_rules@10`。
 变体使用感知进行运动检定，将定额直接伤害设为 3，并将自定义工匠背景的固定语言改为侏儒语。
 这些数值、属性映射和授予属于项目家规。见[家规作者包](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
@@ -878,6 +878,32 @@ node tools/storage/browser-improved-critical.cjs
 被动能力复用角色特性展示与武器攻击结果入口，不新增“指定重击”的客户端控制。
 这些是隔离本机生产服务集成和浏览器证据，不是完整 SRD、真实 MySQL、原生 Windows 或部署验收。
 只补受本次改动影响的测试，按 §6 构建并审计候选 WAR；不因本切片完成重跑无关全量。
+
+<a id="second-wind-verification"></a>
+
+## 战士一级 Second Wind 的真实链路验证
+
+严格声明、真实授予和数值边界选择 `Schema2SecondWindCompositionTest` 与
+`Schema2SecondWindRulesTest`；原包/支持门选择 `BundledCampaignRulesTest`、
+`CampaignRuleSupportTest`、`CampaignRuleContextTest`。`CampaignSecondWindIntegrationTest`
+使用实际原 ZIP、审阅接受、有序预览和新建战役，正常创建一级战士并成长，
+通过生产命令验证自己回合的附赠动作治疗、满 HP、耗尽、真实休息恢复和完整文件。
+固定骰值只进入服务随机源，不注入授予/角色状态；坏文件是明确负例。
+`PlayerSecondWindCandidateTest` 通过真实邀请、审批、控制和接管验证玩家候选、
+服务器生成命令、一次支付、过期候选拒绝及原回执查证。
+共享战斗历史、治疗/资源、休息、玩家候选及内部拒绝范围选择其对应回归；
+实际测试名与结果由当次验证记录，不缓存动态计数。
+
+全新隔离存储根按前文启动后，执行：
+
+```bash
+node tools/storage/browser-second-wind.cjs
+```
+
+浏览器从实际导入、接受、新建和角色表单进入，使用服务器随机骰，核验回气结果、资源、
+普通动作保留及保存/END/重开后继续；服务测试负责确定数值、拒绝、幂等和晚写回滚。
+测试不触碰真实战役，不是原生 Windows、真实 MySQL 或部署验收。完成相关定向验证后
+复用结果按 §6 打包审计，不因新增按钮重跑无关全量。
 
 ## Schema 2 战斗与动作继续验证
 
