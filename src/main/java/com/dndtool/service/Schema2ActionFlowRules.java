@@ -13,6 +13,7 @@ import static com.dndtool.service.Schema2CombatState.*;
 
 /** The single typed continuation graph for attack, movement, casting and prepared reactions. */
 final class Schema2ActionFlowRules {
+    private static final String MOVEMENT_INTERRUPTED = "ACTOR_INACTIVE_OR_NO_MOVEMENT";
     interface Roller { int draw(String purpose,UUID subject,int sides); }
     private final Schema2CombatRules combat;
     private final Schema2SpellRules spells=new Schema2SpellRules();
@@ -99,12 +100,20 @@ final class Schema2ActionFlowRules {
         // No supported monster OA producer or typed reach reader exists in this slice. Prove
         // the entire branch safe before moving even its first cell instead of omitting a reactor.
         for(var monster:b.monsters()) {var candidate=actor(b,monster.monsterId());if(!monster.dead()&&candidate.side()!=a.side()&&candidate.reactionAvailable())throw invalid("S2_MONSTER_REACTION_UNSUPPORTED");}
-        require(!a.prone(),"S2_COMBAT_PRONE");require(!path.isEmpty()&&path.size()<=64,"S2_COMBAT_PATH");
-        int allowance=readied?combat.speed(roster.get(source)):combat.speed(roster.get(source))+a.movementBonus()-a.movementSpentHalfFeet()/2;
-        require(path.size()*5<=allowance,"S2_COMBAT_MOVEMENT_ALLOWANCE");Position previous=a.position();
+        require(!path.isEmpty()&&path.size()<=64,"S2_COMBAT_PATH");
+        int speed = combat.speed(roster.get(source));
+        int allowance = readied ? 2 * speed : turnMovementRemaining(a, speed);
+        require(movementCost(a, path.size() * 5) <= allowance, "S2_COMBAT_MOVEMENT_ALLOWANCE");
+        Position previous=a.position();
         for(Position next:path) {require(previous.distanceFeet(next)==5&&b.combatants().stream().noneMatch(other->!other.characterId().equals(source)&&other.position().equals(next)),"S2_COMBAT_PATH");previous=next;}
         // Every currently equipped weapon and every acquisition feature was exhaustively checked by the shared root preflight.
         health.prepareDamage(roster.get(source).material(),roster.get(source).character());
+    }
+    private static int movementCost(Combatant actor, int distanceFeet) {
+        return distanceFeet * (actor.prone() ? 4 : 2);
+    }
+    private static int turnMovementRemaining(Combatant actor, int speed) {
+        return 2 * (speed + actor.movementBonus()) - actor.movementSpentHalfFeet();
     }
     private void prepareReadyResponse(Map<UUID,Context> roster,Battle battle,ReadyPreparation ready) {
         ReadyInput input=ready.input();
@@ -124,7 +133,7 @@ final class Schema2ActionFlowRules {
     private boolean readyAvailable(Map<UUID,Context> roster,Battle battle,ReadyPreparation ready) {
         try {prepareReadyResponse(roster,battle,ready);return true;}
         catch(IllegalArgumentException unavailable) {
-            if(Set.of("S2_COMBAT_OUT_OF_REACH","S2_COMBAT_WEAPON_NOT_PREPARED","S2_COMBAT_PRONE","S2_COMBAT_MOVEMENT_ALLOWANCE","S2_COMBAT_PATH","S2_SPELL_TARGET","S2_HEALTH_DEAD","S2_SPELL_ANTIMAGIC_ZONE").contains(unavailable.getMessage()))return false;
+            if(Set.of("S2_COMBAT_OUT_OF_REACH","S2_COMBAT_WEAPON_NOT_PREPARED","S2_COMBAT_MOVEMENT_ALLOWANCE","S2_COMBAT_PATH","S2_SPELL_TARGET","S2_HEALTH_DEAD","S2_SPELL_ANTIMAGIC_ZONE").contains(unavailable.getMessage()))return false;
             throw unavailable;
         }
     }
@@ -278,7 +287,15 @@ final class Schema2ActionFlowRules {
         }
         void actor(Combatant value) {boolean moved=!Schema2ActionFlowRules.actor(b,value.characterId()).position().equals(value.position());b=rebuild(b,b.combatants().stream().map(a->a.characterId().equals(value.characterId())?value:a).toList(),b.flows(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.version());if(moved)reconcileBoundary();}
         void reconcileBoundary() {var result=Schema2OngoingEffectRules.reconcile(snapshot(),operation,++boundarySerial);b=Schema2OngoingEffectRules.withCauses(b,result.causes());facts.addAll(result.facts());}
-        void change(HealthChange value) {changes.add(value);Context old=roster.get(value.characterId());roster.put(value.characterId(),old.after(value.after(), value.timeAdvance() ? value.seconds() : 0));}
+        void change(HealthChange value) {
+            changes.add(value);
+            Context old = roster.get(value.characterId());
+            roster.put(value.characterId(), old.after(value.after(), value.timeAdvance() ? value.seconds() : 0));
+            // Keep the interruption while the reaction stack unwinds, even if a later reaction heals the mover.
+            if (value.before().hitPoints() > 0 && value.after().hitPoints() == 0)
+                moves.replaceAll(move -> move.status() == MovementStatus.PENDING && move.actorId().equals(value.characterId())
+                        ? move.stopped(MOVEMENT_INTERRUPTED) : move);
+        }
         void ready(ReadyPreparation value) {List<ReadyPreparation> all=new ArrayList<>(b.readyPreparations());int i=0;while(i<all.size()&&!all.get(i).readyKey().equals(value.readyKey()))i++;if(i==all.size())all.add(value);else all.set(i,value);b=rebuild(b,b.combatants(),b.flows(),all,b.triggerFacts(),b.shields(),b.concentrationHolders(),b.version());}
         void holder(ConcentrationHolder value) {List<ConcentrationHolder> all=new ArrayList<>(b.concentrationHolders().stream().filter(h->!h.actorId().equals(value.actorId())).toList());all.add(value);b=rebuild(b,b.combatants(),b.flows(),b.readyPreparations(),b.triggerFacts(),b.shields(),all,b.version());}
         void endConcentration(UUID subject,String reason) {b=Schema2SpellRules.end(snapshot(),subject,reason,facts);}
@@ -351,20 +368,25 @@ final class Schema2ActionFlowRules {
         void move(Movement value) {for(int i=0;i<moves.size();i++)if(moves.get(i).movementKey().equals(value.movementKey()))moves.set(i,value);}
         void driveMovement(UUID id) {
             Movement m=move(id);Combatant actor=Schema2ActionFlowRules.actor(b,m.actorId());State current=roster.get(m.actorId()).character();
-            if(current.hitPoints()==0||current.health().dead()||actor.prone()) {stopMovement(id,"ACTOR_INACTIVE_OR_NO_MOVEMENT");return;}
+            if (m.status() == MovementStatus.STOPPED) { stopMovement(id, m.stopReason()); return; }
+            if (current.hitPoints() == 0 || current.health().dead()) { stopMovement(id, MOVEMENT_INTERRUPTED); return; }
             Position expected=m.cursor()==0?m.origin():m.path().get(m.cursor()-1);if(!actor.position().equals(expected)) {stopMovement(id,"POSITION_CHANGED");return;}
             while(m.cursor()<m.path().size()) {
-                actor=Schema2ActionFlowRules.actor(b,m.actorId());Position next=m.path().get(m.cursor());int allowance=m.readied()?Math.min(m.allowanceFeet(),combat.speed(roster.get(m.actorId())))-m.spent():combat.speed(roster.get(m.actorId()))+actor.movementBonus()-actor.movementSpentHalfFeet()/2;
+                actor=Schema2ActionFlowRules.actor(b,m.actorId());Position next=m.path().get(m.cursor());
+                int speed = combat.speed(roster.get(m.actorId()));
+                int allowance = m.readied() ? 2 * Math.min(m.allowanceFeet(), speed) - movementCost(actor, m.spent())
+                        : turnMovementRemaining(actor, speed);
+                int stepCost = movementCost(actor, 5);
                 UUID movingActor=m.actorId();
-                if(allowance<5||actor.position().distanceFeet(next)!=5||b.combatants().stream().anyMatch(v->!v.characterId().equals(movingActor)&&v.position().equals(next))) {stopMovement(id,"SUFFIX_UNAVAILABLE");return;}
+                if(allowance<stepCost||actor.position().distanceFeet(next)!=5||b.combatants().stream().anyMatch(v->!v.characterId().equals(movingActor)&&v.position().equals(next))) {stopMovement(id,"SUFFIX_UNAVAILABLE");return;}
                 if(!consumed(id,TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE,m.cursor())&&open(id,TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE,m.actorId(),null,next,m.cursor(),m.cursor()))return;
-                actor(new Combatant(actor.characterId(),next,actor.side(),actor.actionAvailable(),actor.reactionAvailable(),actor.movementSpentHalfFeet()+(m.readied()?0:10),actor.movementBonus(),actor.disengaged(),actor.dodging(),actor.sequence(),actor.prone()));
+                actor(new Combatant(actor.characterId(),next,actor.side(),actor.actionAvailable(),actor.reactionAvailable(),actor.movementSpentHalfFeet()+(m.readied()?0:stepCost),actor.movementBonus(),actor.disengaged(),actor.dodging(),actor.sequence(),actor.prone()));
                 m=new Movement(m.movementKey(),m.actorId(),m.origin(),m.path(),m.cursor()+1,m.spent()+5,MovementStatus.PENDING,null,m.readied(),m.allowanceFeet());move(m);
                 if(open(id,TriggerKind.CREATURE_ENTER_CELL_AFTER,m.actorId(),null,next,m.cursor()-1,m.cursor()-1))return;
             }
             move(new Movement(m.movementKey(),m.actorId(),m.origin(),m.path(),m.cursor(),m.spent(),MovementStatus.COMPLETED,null,m.readied(),m.allowanceFeet()));facts.add(new CombatFact("MOVEMENT_COMPLETED",m.actorId(),m.movementKey(),null));finish(id,Stage.MOVEMENT_COMPLETED);
         }
-        void stopMovement(UUID id,String reason) {Movement m=move(id);move(new Movement(id,m.actorId(),m.origin(),m.path(),m.cursor(),m.spent(),MovementStatus.STOPPED,reason,m.readied(),m.allowanceFeet()));facts.add(new CombatFact("MOVEMENT_STOPPED",m.actorId(),id,reason));finish(id,Stage.MOVEMENT_STOPPED);}
+        void stopMovement(UUID id,String reason) {Movement m=move(id);move(m.stopped(reason));facts.add(new CombatFact("MOVEMENT_STOPPED",m.actorId(),id,reason));finish(id,Stage.MOVEMENT_STOPPED);}
         void beginCast(UUID subject,CastInput input,UUID parent,Invocation invocation,UUID readyKey) {
             var prepared=spells.prepare(roster,snapshot(),subject,input,invocation==Invocation.REACTION);UUID id=next("cast");addFrame(FrameKind.CAST,id,parent,invocation,Stage.CAST_BEFORE_COMPLETION);
             State paid=spells.spend(prepared);change(new HealthChange(subject,prepared.caster(),paid,id,0,false,null,false,false,0,prepared.slotResource(),1,false));

@@ -10,7 +10,7 @@ import java.util.*;
 public final class Schema2CombatState {
     private Schema2CombatState() { }
     public enum Status { ACTIVE, EXPLORATION, ENDED }
-    public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, STAND_UP, SECOND_WIND, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
+    public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, DROP_PRONE, STAND_UP, SECOND_WIND, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
         ADVANCE_WINDOW, CONTINUE_MOVEMENT, CONTINUE_FLOW, CAST, READY_ATTACK, READY_MOVE, READY_SPELL,
         CREATE_ENVIRONMENT_ZONE, END_ENVIRONMENT_ZONE, EXPLORATION_HEALTH, EXPLORATION_ADVANCE_TIME, EXPLORATION_MOVE, REENTER_COMBAT, CLOSE_SCENE, END_CONCENTRATION, END_COMBAT }
@@ -229,6 +229,7 @@ public final class Schema2CombatState {
         }
         public Window { opportunities = List.copyOf(opportunities); }
     }
+    /** Spent records physical feet traveled. The combatant tracks turn movement cost in half-feet. */
     public record Movement(UUID movementKey, UUID actorId, Position origin, List<Position> path,
             int cursor, int spent, MovementStatus status, String stopReason, boolean readied, int allowanceFeet) {
         public Movement(UUID movementKey, UUID actorId, Position origin, List<Position> path,
@@ -236,6 +237,9 @@ public final class Schema2CombatState {
             this(movementKey,actorId,origin,path,cursor,spent,status,stopReason,false,0);
         }
         public Movement { path = List.copyOf(path); }
+        Movement stopped(String reason) {
+            return new Movement(movementKey, actorId, origin, path, cursor, spent, MovementStatus.STOPPED, reason, readied, allowanceFeet);
+        }
     }
     public record AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
             UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,

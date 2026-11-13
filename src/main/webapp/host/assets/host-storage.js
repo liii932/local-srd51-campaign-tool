@@ -535,7 +535,8 @@
       const executing = battle.combatId === activeBattle?.combatId;
       text(box, 'h3', `${spaceName({kind: 'SCENE', id: battle.combatId})} · ${battleStatus(battle.status)} · ${executing ? '焦点' : '后台'}`);
       if (active && executing && battle.status === 'ACTIVE') text(box, 'p', `第 ${battle.round} 轮 · 当前 ${personName(active)}`);
-      table(box, ['参与者', '格位', '阵营', '动作', '反应', '攻击动作'], battle.combatants.map(actor => [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
+      table(box, ['参与者', '格位', '阵营', '姿态', '动作', '反应', '攻击动作'], battle.combatants.map(actor => [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
+        actor.prone ? '倒地' : '站立',
         actor.actionAvailable ? '可用' : '已用', actor.reactionAvailable ? '可用' : '已用',
         actor.sequence ? `已攻击 ${actor.sequence.performed}/${actor.sequence.limit} · 剩余 ${actor.sequence.limit - actor.sequence.performed - actor.sequence.forfeited}${actor.sequence.forfeited ? ` · 已放弃 ${actor.sequence.forfeited}` : ''}` : '未开始']));
       for (const effect of battle.ongoingEffects || []) text(box, 'p', `效果：${ruleName(effect.spell || effect.rule)} · ${effect.status === 'ACTIVE' ? '生效' : '已结束'}`);
@@ -623,9 +624,9 @@
   const combatActions = new Map(Array.from(byId('domain-combat').elements.kind.options, option => [option.value, option.textContent]));
   function refreshCombatForm() {
     const form = byId('domain-combat'), battle = battleFor(form.elements.combatId.value);
-    const exploration = ['EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
+    const exploration = ['STAND_UP', 'EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
     const actions = battle?.status === 'EXPLORATION' ? exploration : battle?.status === 'ACTIVE'
-      ? [...combatActions.keys()].filter(kind => !exploration.includes(kind) || kind === 'END_CONCENTRATION') : [];
+      ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT') : [];
     options(form.elements.kind, actions, kind => combatActions.get(kind));
     form.elements.kind.disabled = actions.length === 0;
     if (battle?.status === 'EXPLORATION') options(form.elements.actorId,
@@ -633,16 +634,22 @@
     const pending = battle?.flows.some(flow => flow.status === 'ACTIVE');
     form.querySelector('button').disabled = actions.length === 0 || pending;
     const kind = form.elements.kind.value;
+    const actor = battle?.combatants.find(actor => actor.characterId === form.elements.actorId.value);
     byId('domain-combat-note').textContent = pending ? '请先在上方处理反应或继续结算，再进行下一次行动。'
       : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
       : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列，再选择“攻击”、目标与已装备武器。'
       : kind === 'ATTACK' ? '每次消耗当前序列的一次攻击；两击之间可合法移动或更换目标，也可放弃剩余攻击。'
       : kind === 'SECOND_WIND' ? '仅已取得回气的战士可在本人回合使用；消耗一次回气，以附赠动作恢复 1d10＋战士等级的生命值。短休或长休完成后恢复次数。'
-      : battle.status === 'EXPLORATION' ? '当前为探索状态，可移动、推进时间，或重新进入战斗。' : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';
-    for (const name of ['targetId', 'itemId', 'x', 'y', 'seconds']) {
+      : kind === 'DROP_PRONE' ? '角色可在本人回合主动卧倒，保留动作、反应与移动力。'
+      : kind === 'STAND_UP' ? (battle.status === 'EXPLORATION' ? '倒地角色在探索中起身会推进场景时钟 6 秒。' : '倒地角色在本人回合起身时，消耗等于当前速度一半的移动力。')
+      : kind === 'MOVE' && actor?.prone ? '当前角色倒地，移动为匍匐，每格消耗 10 尺移动力。'
+      : kind === 'EXPLORATION_MOVE' && actor?.prone ? '倒地时请先起身，再探索移动。'
+      : battle.status === 'EXPLORATION' ? '当前为探索状态，可按角色状态移动、起身、推进时间，或重新进入战斗。'
+      : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';
+    for (const name of ['targetId', 'itemId', 'x', 'y', 'path', 'seconds']) {
       const input = form.elements[name];
       const visible = ['targetId', 'itemId'].includes(name) ? kind === 'ATTACK'
-        : ['x', 'y'].includes(name) ? ['MOVE', 'EXPLORATION_MOVE'].includes(kind) : kind === 'EXPLORATION_ADVANCE_TIME';
+        : ['x', 'y', 'path'].includes(name) ? ['MOVE', 'EXPLORATION_MOVE'].includes(kind) : kind === 'EXPLORATION_ADVANCE_TIME';
       input.closest('label').hidden = !visible;
       input.disabled = !visible;
     }
@@ -1300,7 +1307,9 @@
     for (const panel of document.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== button.dataset.pane;
     for (const tab of document.querySelectorAll('[data-pane]')) tab.setAttribute('aria-pressed', String(tab === button));
   });
-  for (const select of document.querySelectorAll('.domain-character,.combat-actor-choice,.monster-choice')) select.addEventListener('change', refreshCharacterChoices);
+  const combatActor = byId('domain-combat').elements.actorId;
+  for (const select of document.querySelectorAll('.domain-character,.combat-actor-choice,.monster-choice'))
+    select.addEventListener('change', select === combatActor ? refreshCombatForm : refreshCharacterChoices);
   byId('check-with-effects').addEventListener('change', refreshCheckBranches);
   byId('domain-rest').elements.kind.addEventListener('change', refreshArcaneRecovery);
   byId('domain-check').elements.kind.addEventListener('change', refreshCheckAbility);

@@ -29,6 +29,7 @@
 | 物理结构 | 应用 JSON + `StorageSchemaCatalog/StoragePlan/SqliteSchemaVerifier`，一次初始化完整写入足迹 | 真实引擎、外键、锁、编码、进程/文件故障及容量分别验证；恢复不补表/seed |
 | 复杂状态 | 严格 typed TEXT 聚合保存全部 current/history，关系列与索引逐行核验。角色与战斗的类型和结构校验归领域，JDBC 与文件是适配 | 核对字段、图闭包和独立期望，坏投影拒绝 |
 | 身份/初始化 | core run、epoch 与 HTTP 收据重新建立。`Schema2PreparationIdentity`、原事件键和版本作为稳定业务事实保留。INITIAL 完整保存后才开放写入，玩家名单和控制关系归独立参与聚合 | 任意加入等级或完整角色编辑器等未来输入另设计，保留初始及当前事实 |
+| 倒地姿态生命周期 | 规则角色本人 ACTIVE 回合主动卧倒、双倍成本爬行、精确半速起身；倒地攻防、OA 和 Ready 共用消费者，未决移动随完整文件恢复；探索起身推进六秒，未起身不能离场；见[合同](../../rules/schema-2-prone.md) | 探索主动卧倒/爬行、怪物主动姿态、推撞、擒抱和复杂地形仍不支持；MySQL INTERNAL 拒绝新 DROP_PRONE 命令 |
 | 当前规则角色 | 标准数组 fighter≤6、Life cleric=1、Wizard≤5；初始计划、授予/成长/ASI/资源/装备/健康/休息及书籍等复用纯规则；单职业战士正常升至 5 级取得 [Extra Attack](../../rules/schema-2-extra-attack.md)，本人 Attack 序列额度为 2，6 级保持；勇士 3–6 级的[精通重击](../../rules/schema-2-improved-critical.md)经真实授予用于普通/OA/Ready 近战，Shield 后保留原选骰判定；一级[回气](../../rules/schema-2-second-wind.md)在本人战斗回合消费准确资源并治疗 | 其他未实现职业特性仅 OPTION 目录不自动授予；擒抱、挣脱、拖带和释放仍无消费者，Extra Attack 不代表 V04 整条轨迹通过 |
 | 原正式自由卡/Manual | 独立 typed DM-managed 领域接合基础字段/职业等级/熟练、MANUAL/SAVING_THROW 和有序效果；共用空间安置与 DM 裁定战斗 | 当前实际实现/测试/界面与精确差距以接合表核实；未获本次证据前不能宣称全 v1 闭合或以文档排除 |
 | 检定分支后果 | `check-effects` 使用战役绑定的检定和两分支预检，提交同根健康、物品与消息后果。标准与家规组合沿同一入口结算 | `CampaignRuleBindingIntegrationTest` 核对组合差异与恢复。`CampaignCheckEffectsTest` 核对预检、原子后果和失败边界 |

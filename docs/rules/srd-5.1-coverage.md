@@ -127,7 +127,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 机制族与原文 | 当前数据/执行 | 状态/恢复与具体缺口 | 依据 |
 |---|---|---|---|
 | 时间、旅行速度、行军与特殊速度（[84—85](../references/srd-5.1/pages/page-084.md)） | 单角色分钟/秒、平面步行探索与战斗六秒局部自动 | 缺完整战役共享时间、队伍 travel pace/强行军/导航、骑乘/特殊速度、所有可达后继；不从墙钟推断 | [休息](#rest)、[战斗](#combat)、[探索](#spells) |
-| 困难地形、跳跃、攀爬、游泳、爬行（[85](../references/srd-5.1/pages/page-085.md)） | 当前普通步行不接纳 | 缺逐段成本/起跳助跑/距离/高度、STR 派生、失败后果与类型化裁定；倒地起身不代表爬行 | [战斗](#combat)空间边界 |
+| 困难地形、跳跃、攀爬、游泳（[85](../references/srd-5.1/pages/page-085.md)） | 当前普通步行不接纳 | 缺地形叠加成本/起跳助跑/距离/高度、STR 派生、失败后果与类型化裁定；有限平地爬行不授予这些能力 | [战斗](#combat)空间边界 |
 | 坠落、窒息（[86](../references/srd-5.1/pages/page-086.md)） | 直接环境健康效果可声明；两机制未实现 | 缺高度/坠落骰上限/落地 prone、屏息与窒息轮数/零 HP/禁止恢复等真实状态及计时；不能降为任意伤害 | [健康](#foundation)只是后果 owner |
 | 光照/遮蔽、黑暗视觉/盲视/真实视觉、隐藏与察觉（[86](../references/srd-5.1/pages/page-086.md)） | 固定正常可见空间；怪物 senses 有限数据 | 缺光源/范围/障碍、观察者感官与空间资格、被动/主动发现、隐形位置和攻击/法术限制 | [战斗](#combat)、[怪物](#monsters)明确不授予感官执行 |
 | 食物/水、饥渴、耗竭与恢复（[86—87](../references/srd-5.1/pages/page-086.md)、[358](../references/srd-5.1/pages/page-358.md)） | 原文；标准休息不自动结算 | 缺摄取量/天数/CON、耗竭累计与全部派生贡献、长休且进食饮水后的恢复；当前长休不能清空未建状态 | [休息](#rest)封闭范围 |
@@ -157,7 +157,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | Ready（[93—94](../references/srd-5.1/pages/page-093.md)） | 有限 attack/move/spell 及封闭完成事实触发、reaction、持能量专注 | 局部闭环；不解释任意自然语言触发，不开放其他物体/能力响应；新触发须有真实 producer 与恢复闭包 | [施法](#spells)、[动作流](#combat) |
 | Use an Object、拾取/重新装备、临时行动（[91](../references/srd-5.1/pages/page-091.md)、[94](../references/srd-5.1/pages/page-094.md)） | 战斗掉地已保存；使用/拾取未接入 | 缺免费交互与 action 区分、目标距离/手位、物品使用成本/效果/归属和类型化临时行动结果 | [基础](#foundation)、[战斗](#combat) |
 | Grapple/Shove/escape（[95—96](../references/srd-5.1/pages/page-095.md)） | 未接入 | 缺 Attack 内替代额度、手位/体型/触及、Athletics 对抗候选、平手、抓取者关系、拖拽/脱离/失能终止、push/prone 后果 | 对抗/位置/条件须同根事件，不借普通 damage 模拟 |
-| 移动/OA/起身（[91—95](../references/srd-5.1/pages/page-091.md)） | 平面相邻未占格步行、精确半速起身、PC 普通武器 OA 与逐段暂停 | 局部闭环；缺怪物 OA、穿越/挤压/爬行/地形、teleport/强制移动的触发例外；敌对可反应怪物使相关 PC 移动保守拒绝 | [战斗](#combat)、[怪物](#monsters) |
+| 移动/OA/倒地姿态（[91—95](../references/srd-5.1/pages/page-091.md)） | 平面相邻未占格步行、主动卧倒、双倍成本爬行、精确半速起身；Ready 爬行、PC 武器 OA 逐段暂停和完整文件恢复 | ACTIVE 规则角色局部闭环；缺探索爬行、怪物主动姿态/OA、穿越/挤压/地形、teleport/强制移动；敌对可反应怪物使相关 PC 移动保守拒绝 | [倒地合同](schema-2-prone.md)、[战斗](#combat)、[怪物](#monsters) |
 | 体型空间、触及、掩护/遮挡、区域（[92](../references/srd-5.1/pages/page-092.md)、[96](../references/srd-5.1/pages/page-096.md)、[102—103](../references/srd-5.1/pages/page-102.md)） | 单点格、正常可见、无遮挡；有限锥形和固定半径区域 | 局部目标证明；缺大体积/三维/障碍、半/四分之三/全掩护、所有区域形状与完整战外 roster；点格政策不代表通用 SRD 空间引擎 | [战斗](#combat)、[怪物](#monsters)、[施法](#spells) |
 | 伤害类型、抗性/易伤/免疫、共享伤害（[96—97](../references/srd-5.1/pages/page-096.md)） | 有限吐息共享骰及准确怪物防御/适用 gate；PC 来源不通用 | 局部闭环；缺角色防御 producer、多分量及一般物理/魔法/攻击门限、伤害后反应如 Uncanny Dodge、Evasion/Legendary Resistance | [怪物](#monsters)；共享核不能授予所有伤害机制 |
 | 治疗/temp HP/零 HP/稳定/死亡/即死（[97—99](../references/srd-5.1/pages/page-097.md)） | 真实有限健康、回合死亡豁免、稳定期限、掉物/倒地；怪物有限零 HP 死亡政策 | 局部闭环；缺医疗动作稳定、非致命击倒、复活、最大 HP 变化和特性替代后果；治疗不自动起身/捡物 | [健康](#foundation)、[战斗](#combat)、[怪物](#monsters) |
@@ -167,7 +167,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 
 | 状态与原文 | 当前实际范围 | 仍缺的具体合同/执行/恢复责任 |
 |---|---|---|
-| Prone（[359](../references/srd-5.1/pages/page-359.md)） | 零 HP 引起倒地、攻击优劣势、起身；[战斗](#combat)局部 | 其他 producer、爬行、完整来源/期限/解除关系尚未接入。 |
+| Prone（[359](../references/srd-5.1/pages/page-359.md)） | 零 HP 或主动卧倒、攻击优劣势、ACTIVE/Ready 爬行、半速起身及探索独立起身；[有限合同](schema-2-prone.md) | 推撞等其他 producer、探索爬行、一般条件来源/期限/解除关系尚未接入。 |
 | Unconscious / Incapacitated（[358—359](../references/srd-5.1/pages/page-358.md)） | 零 HP 健康及战斗动作阻断/掉物/近距暴击/适用自动失败、专注强制结束局部 | 法术/条件外部施加、非 HP 昏迷/失能来源、重叠/到期、感知与所有 STR/DEX save 消费者未完整建立。 |
 | Blinded（[358](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺视觉检定自动失败、可视施法/发现资格、双向攻击优势劣势、来源/期限/免疫。 |
 | Deafened（[358](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺听觉检定自动失败、感知触发与来源/期限/免疫。 |

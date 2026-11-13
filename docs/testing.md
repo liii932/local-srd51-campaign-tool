@@ -905,6 +905,35 @@ node tools/storage/browser-second-wind.cjs
 测试不触碰真实战役，不是原生 Windows、真实 MySQL 或部署验收。完成相关定向验证后
 复用结果按 §6 打包审计，不因新增按钮重跑无关全量。
 
+<a id="prone-verification"></a>
+
+## 倒地姿态、爬行与起身的组内验证
+
+`Schema2ProneRulesTest` 检查不花动作的主动卧倒、双倍移动成本、Dash、25 尺速度的
+半尺边界、Ready 独立移动预算、OA 与失能停止；相关既有战斗、Ready、反应和回气测试
+保护共享消费者。`CampaignProneIntegrationTest` 从交付原 ZIP 的独立审阅接受、有序
+预览和新建开始，正常创建角色及取得装备，经真实生产命令和临时 SQLite 验证姿态、
+移动、起身、未决路径保存/END/重开、探索起身和离场门、拒绝边界、幂等、过期和事务回滚。
+25 尺速度来自定向规则向量，不声称当前人类创建模板具有该速度。
+`PlayerProneCandidateTest` 经过真实邀请、审批、控制和接管验证服务端候选，
+客户端不能指定移动成本或替他人修改姿态。
+
+本组使用既有战斗与速度声明，没有新作者内容或版本。按当前改动选择上述测试及
+`BundledCampaignRulesTest,CampaignRuleSupportTest,CampaignRuleBindingIntegrationTest,LocalRuleLibraryTest,StorageHttpIntegrationTest`
+作为共同加载、冻结和 HTTP 证据；已通过且输入未变的结果复用，不按行为重复构建。
+固定骰值仅在服务随机源边界输入；构造的坏文件和纯规则状态只提供负例或补充边界证据。
+
+按前文在全新隔离根启动 `tools/storage/run-local.sh` 后执行：
+
+```bash
+node tools/storage/browser-prone.cjs
+```
+
+浏览器通过 Host 原包导入/接受/新建和角色表单执行卧倒、爬行、起身，检查姿态、
+移动及普通动作保留，并在倒地保存后 END、重开直接继续。检查宽窄屏布局和 JavaScript/CSP。
+原包确定性用 `build-bundles.py --check` 核验；相关测试通过后按 §6 打包和审计 WAR。
+不运行真实 MySQL、不部署；探索爬行、推撞/擒抱、怪物主动姿态和原生 Windows 不由这些测试证明。
+
 ## Schema 2 战斗与动作继续验证
 
 [内部战斗合同](rules/schema-2-combat.md)通过实际来源、准备、冻结镜像、角色和战斗仓储验证：

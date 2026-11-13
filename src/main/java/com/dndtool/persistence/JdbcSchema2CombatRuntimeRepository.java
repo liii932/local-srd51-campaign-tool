@@ -17,6 +17,7 @@ import static com.dndtool.service.Schema2CombatHistory.*;
 /** Typed, append-only combat facts. The caller owns the common guarded transaction. */
 public final class JdbcSchema2CombatRuntimeRepository {
     public static final String SECOND_WIND_SQLITE_REQUIRED = "S2_COMBAT_SECOND_WIND_SQLITE_REQUIRED";
+    public static final String DROP_PRONE_SQLITE_REQUIRED = "S2_COMBAT_DROP_PRONE_SQLITE_REQUIRED";
     private static final List<String> TABLES = java.util.stream.Stream.concat(List.of("s2_combat_member", "s2_combat_event", "s2_combat_dependency", "s2_combat_character_result", "s2_combat_command_point", "s2_combat_command_deployment", "s2_combat_command_tie", "s2_combat_roll", "s2_combat_fact", "s2_combat_state", "s2_combat_actor", "s2_combat_initiative", "s2_combat_flow", "s2_combat_frame", "s2_combat_window", "s2_combat_opportunity", "s2_combat_opportunity_item", "s2_combat_movement", "s2_combat_movement_point", "s2_combat_attack", "s2_combat_attack_die", "s2_combat_cast_command", "s2_combat_cast_command_target", "s2_combat_ongoing_effect", "s2_combat_ongoing_target", "s2_combat_cast", "s2_combat_cast_target", "s2_combat_cast_die", "s2_combat_saving_throw", "s2_combat_ready_input", "s2_combat_ready_point", "s2_combat_ready_target", "s2_combat_zone_command", "s2_combat_health_command", "s2_combat_reaction_option", "s2_combat_window_trigger", "s2_combat_ready_release", "s2_combat_ability_check", "s2_combat_ready", "s2_combat_trigger", "s2_combat_shield", "s2_combat_concentration", "s2_combat_environment", "s2_combat_suppression").stream(), JdbcSchema2MonsterBreathRows.TABLES.stream()).toList();
     private final JdbcSchema2CharacterRuntimeRepository characters = new JdbcSchema2CharacterRuntimeRepository();
 
@@ -354,11 +355,20 @@ public final class JdbcSchema2CombatRuntimeRepository {
     public static void validate(History history) throws SQLException {
         try {
             Schema2CombatHistory.validate(history);
-            if (history.events().stream().anyMatch(event -> event.command().kind() == Kind.SECOND_WIND))
-                throw new SQLException(SECOND_WIND_SQLITE_REQUIRED);
+            for (Event event : history.events()) {
+                String unsupported = sqliteRequiredCode(event.command().kind());
+                if (unsupported != null) throw new SQLException(unsupported);
+            }
         } catch (Schema2RuntimeFactsException invalid) {
             throw new SQLException(invalid.getMessage(), invalid);
         }
+    }
+    public static String sqliteRequiredCode(Kind kind) {
+        return switch (kind) {
+            case SECOND_WIND -> SECOND_WIND_SQLITE_REQUIRED;
+            case DROP_PRONE -> DROP_PRONE_SQLITE_REQUIRED;
+            default -> null;
+        };
     }
 
     private static void verifyRows(Rows data,History history)throws SQLException{
