@@ -65,8 +65,8 @@ public final class Schema2CombatRuntimeService {
 
     public Result execute(Request request) {
         Objects.requireNonNull(request);
-        if (request.command().kind() == Kind.SECOND_WIND)
-            return new Result(Status.REJECTED, JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED, null);
+        String unsupported = JdbcSchema2CombatRuntimeRepository.sqliteRequiredCode(request.command().kind());
+        if (unsupported != null) return new Result(Status.REJECTED, unsupported, null);
         if (request.spaceOwned())
             return new Result(Status.REJECTED,"S2_COMBAT_REQUEST",null);
         return transact(false,request.combatId(),request.digest(),null,connection->{
@@ -132,8 +132,8 @@ public final class Schema2CombatRuntimeService {
     }
 
     public Result inspect(Request request) {
-        if (request.command().kind() == Kind.SECOND_WIND)
-            return new Result(Status.REJECTED, JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED, null);
+        String unsupported = JdbcSchema2CombatRuntimeRepository.sqliteRequiredCode(request.command().kind());
+        if (unsupported != null) return new Result(Status.REJECTED, unsupported, null);
         return transact(true,request.combatId(),request.digest(),null,connection->{
             History history=combats.read(connection,request.combatId());
             if (history!=null) validate(connection,history);
@@ -258,8 +258,10 @@ public final class Schema2CombatRuntimeService {
     }
 
     private static Result rejectedSave(Exception invalid) {
-        String unsupported = JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED;
-        return new Result(Status.REJECTED, unsupported.equals(invalid.getMessage()) ? unsupported : "S2_COMBAT_RESTORE_INVALID", null);
+        String code = invalid.getMessage();
+        if (!JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED.equals(code)
+                && !JdbcSchema2CombatRuntimeRepository.DROP_PRONE_SQLITE_REQUIRED.equals(code)) code = "S2_COMBAT_RESTORE_INVALID";
+        return new Result(Status.REJECTED, code, null);
     }
     private void validateSaved(Connection c,Save save) throws SQLException {
         Map<UUID,Schema2CharacterRuntime.History> all=new LinkedHashMap<>();

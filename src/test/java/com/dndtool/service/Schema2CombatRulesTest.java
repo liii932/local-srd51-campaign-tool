@@ -119,7 +119,6 @@ class Schema2CombatRulesTest {
         roster.put(b,withState(target,Schema2CombatEquipmentFacts.drop(withHealth(target.character(),0,HealthState.INITIAL),combat,new Position(2,0))));
         start(new Position(0,0),new Position(2,0));apply(Command.action(Kind.END_TURN,a),20);
         assertEquals(1,roster.get(b).character().hitPoints());assertTrue(actor(b).prone());
-        assertThrows(IllegalArgumentException.class,()->rules.preflight(UUID.randomUUID(),combat,campaign,roster,battle,Command.move(b,List.of(new Position(3,0)))));
         apply(Command.action(Kind.STAND_UP,b));assertFalse(actor(b).prone());assertEquals(25,actor(b).movementSpentHalfFeet());
         apply(Command.move(b,List.of(new Position(3,0))));assertEquals(35,actor(b).movementSpentHalfFeet());
     }
@@ -198,7 +197,13 @@ class Schema2CombatRulesTest {
         assertTrue(ended.healthChanges().stream().allMatch(change->change.timeAdvance() && change.seconds()==6 && !change.deathSave()));
         for(Context context:roster.values())assertEquals(6,context.character().rest().second());
         assertEquals(0,roster.get(a).character().health().deathFailures());
-        var closed=apply(Command.action(Kind.CLOSE_SCENE,b));assertEquals(Status.ENDED,battle.status());assertTrue(closed.healthChanges().isEmpty());assertTrue(closed.rolls().isEmpty());
+        Battle beforeClose = battle;
+        Map<UUID, Context> beforeRoster = Map.copyOf(roster);
+        var failure = assertThrows(IllegalArgumentException.class, () -> rules.preflight(UUID.randomUUID(), combat,
+                campaign, roster, battle, Command.action(Kind.CLOSE_SCENE, b)));
+        assertEquals("S2_SCENE_OBLIGATIONS_PENDING", failure.getMessage());
+        assertEquals(beforeClose, battle);
+        assertEquals(beforeRoster, roster);
     }
     @Test void startReservesAllRuntimeRoundTimeAndMaximumStableRecoveryOnlyAtAdmission() {
         assertEquals(253,Schema2CombatRules.START_TIME_HEADROOM_MINUTES);

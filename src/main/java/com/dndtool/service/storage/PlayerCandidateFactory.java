@@ -17,7 +17,7 @@ public final class PlayerCandidateFactory {
     }
     private static final int MAX_CHOICES = 1024;
     private static final List<Kind> TURN_ACTIONS = List.of(Kind.END_TURN, Kind.BEGIN_ATTACK, Kind.FORFEIT_ATTACKS,
-            Kind.DASH, Kind.DISENGAGE, Kind.DODGE, Kind.STAND_UP, Kind.SECOND_WIND, Kind.END_CONCENTRATION);
+            Kind.DASH, Kind.DISENGAGE, Kind.DODGE, Kind.DROP_PRONE, Kind.STAND_UP, Kind.SECOND_WIND, Kind.END_CONCENTRATION);
     private static final String[] DIRECTIONS = {"北", "东北", "东", "东南", "南", "西南", "西", "西北"};
     private static final int[][] STEPS = {{0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}};
 
@@ -79,7 +79,10 @@ public final class PlayerCandidateFactory {
                         factory.add(Command.attack(actor, target, item.itemId()), "攻击 " + PlayerCampaignProjection.characterName(domain, target) + " · " + PlayerCampaignProjection.ruleName(domain, item.item()));
                 factory.moves(actor, false); factory.spells(actor, visible);
             } else if (battle.status() == Status.EXPLORATION) {
-                if (CampaignParticipationCommands.permitted(domain, actor, "EXPLORATION_MOVE")) factory.moves(actor, true);
+                if (CampaignParticipationCommands.permitted(domain, actor, "EXPLORATION_MOVE")) {
+                    factory.add(Command.action(Kind.STAND_UP, actor), label(Kind.STAND_UP));
+                    factory.moves(actor, true);
+                }
                 if (CampaignParticipationCommands.permitted(domain, actor, "END_CONCENTRATION")) factory.add(Command.action(Kind.END_CONCENTRATION, actor), "结束专注");
                 // Spell use in exploration must be explicitly granted for this exact scene.
                 if (CampaignParticipationCommands.permitted(domain, actor, "CHARACTER_COMMAND")) factory.spells(actor, visible);
@@ -124,7 +127,8 @@ public final class PlayerCandidateFactory {
     private static String locationLabel(String value) { return switch (value) { case "MAIN_HAND" -> "主手"; case "OFF_HAND" -> "副手"; case "BOTH_HANDS" -> "双手"; default -> "穿戴"; }; }
     private static String label(Kind kind) { return switch (kind) {
         case END_TURN -> "结束我的回合"; case BEGIN_ATTACK -> "开始攻击动作"; case FORFEIT_ATTACKS -> "放弃剩余攻击";
-        case DASH -> "疾走"; case DISENGAGE -> "撤离"; case DODGE -> "闪避"; case STAND_UP -> "起身";
+        case DASH -> "疾走"; case DISENGAGE -> "撤离"; case DODGE -> "闪避";
+        case DROP_PRONE -> "主动卧倒"; case STAND_UP -> "起身";
         case SECOND_WIND -> "回气（附赠动作）"; case END_CONCENTRATION -> "结束专注"; default -> "继续行动";
     }; }
     private static final class BattleChoices {
@@ -146,11 +150,12 @@ public final class PlayerCandidateFactory {
         }
         void moves(UUID actor, boolean exploration) {
             var combatant = battle.combatants().stream().filter(c -> c.characterId().equals(actor)).findFirst().orElse(null); if (combatant == null) return;
+            String movement = !exploration && combatant.prone() ? "匍匐" : "移动";
             for (int i = 0; i < STEPS.length; i++) {
                 int x = combatant.position().x() + STEPS[i][0], y = combatant.position().y() + STEPS[i][1];
                 if (Math.abs(x) > 10000 || Math.abs(y) > 10000) continue;
                 List<Position> path = List.of(new Position(x, y));
-                add(exploration ? Command.exploreMove(actor, path) : Command.move(actor, path), "向" + DIRECTIONS[i] + "移动一格");
+                add(exploration ? Command.exploreMove(actor, path) : Command.move(actor, path), "向" + DIRECTIONS[i] + movement + "一格");
             }
         }
         void spells(UUID actor, Set<UUID> visible) {

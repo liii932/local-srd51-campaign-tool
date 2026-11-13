@@ -53,6 +53,7 @@ SQLite 适配器按封闭类型编码；内部 MySQL JDBC 适配器按类型化�
 | 检定与健康 | character-command/check-effects/manual-check；角色基础规则及手动检定算法 | 原骰、候选/选骰、DC、派生修正、HP/临时HP/死亡、效果计划与前后值在角色/根历史 | 两分支预检，实际分支后果和根/子历史一起提交，完整恢复不重掷 | 手动/属性/技能/豁免、优势劣势、HP/物品/消息联动、晚写回滚 |
 | 地图、场景与焦点 | node-create/link、position、focus-set、scene-*、space-move、travel；`CampaignSpaceCommands` | `scenes_world` 的世界节点、唯一安置、场景、焦点和各空间钟 | 网格与名册从安置和场景事实投影。自由卡和规则角色使用同一位置合同，DM 裁定战斗与自动规则各有入口 | 错锚点、占位、版本与焦点代次、后台冻结、源空间计时和跨文件恢复 |
 | 战斗与动作 | combat-command；`CampaignDomainEngine`、`Schema2CombatRules` | `combat_scene` 完整当前/历史，`actions_frame` 为核验投影；角色 HP/资源仍属角色 | 先攻、回合、攻击、移动、OA、Ready、窗口/机会/父子帧与继续点完整保存 | OPEN/CLOSED 窗口保存恢复；支付/原骰只一次；跨角色后果共同提交 |
+| 倒地姿态与爬行 | `combat-command/DROP_PRONE/MOVE/STAND_UP/READY_MOVE`；战斗与动作继续 owner | 复用 `Combatant.prone`、半尺移动成本和物理路径游标，无第二份状态 | 完整文件保留姿态、已走前缀、反应支付及未决继续点；原包/结构不变 | [有限倒地合同](../../rules/schema-2-prone.md)；正常建角即可用，ACTIVE/Ready 爬行，失能终止、恢复不重付；探索起身推进六秒，未起身不能离场；探索爬行与推撞/擒抱未接入 |
 | 施法与法术书 | 角色法术书/准备/恢复；场景施法/反应 | 法术书归角色、`spellcasting_book` 投影；施法 attempt/成本/目标/原骰归场景动作历史 | 五个已支持法术机制使用同一规则、装备、资源与继续流 | Bless、Cure Wounds、Shield、Counterspell、Burning Hands 的各有限合同；学习/准备/位阶边界 |
 | 持续效果与环境 | 场景专注、环境、探索/战斗交接 | 场景效果/holder/压制/期限/历史；`effects_instance` 核验投影 | 保留 SHADOWED、已结束但仍被引用实例及继续义务 | 专注、到期、独立压制原因、恢复不重复贡献或结束回调 |
 | 怪物与共享伤害 | monster-create、空间转移、场景吐息/充能/休息 | 战役怪物身份、HP 与动作额度由空间聚合保管，场景保存结算前后事实与共享伤害批次 | 共享原骰、目标证明、逐目标豁免/packet、已消费动作及休息保留 | 已掷未 APPLY 保存恢复；多目标 HP/专注一起提交，不二次扣费 |

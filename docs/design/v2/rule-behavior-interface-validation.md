@@ -556,6 +556,26 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 [测试指南](../../testing.md#improved-critical-verification)。远程、投掷、法术攻击、
 多职业和 Superior Critical 仍不在应用支持范围内；本节不改判原 V02/V03/V04 或整类攻击机制。
 
+## 独立有限切片：倒地姿态生命周期
+
+[Being Prone](../../semantics/srd-5.1/combat.md#srd51-core-being-prone) 与
+[Prone](../../semantics/srd-5.1/conditions.md#srd51-condition-prone)形成同一状态生命周期：
+主动卧倒建立姿态，爬行和攻击读取姿态，起身结束姿态；OA/Ready 使用同一移动继续图。
+准确来源、应用边界和 owner 见[有限倒地合同](../../rules/schema-2-prone.md)。
+
+| 行为 | 实际消费者与可复验结果 |
+|---|---|
+| 主动卧倒 | 正常创建规则角色后，由 `Schema2CombatRules` 验证本人 ACTIVE 回合并设置唯一姿态；动作、反应、移动和攻击序列保持。 |
+| 普通爬行 | `Schema2ActionFlowRules` 按权威姿态双倍计费；OA 离开触及前暂停，只扣已跨格成本；降至零 HP 停止原移动。 |
+| Ready 爬行 | 共用路径与反应图，声明和释放均检查姿态；反应支付一次，按独立速度预算爬行，不借用 Dash 或重付普通移动。 |
+| 起身与攻防 | ACTIVE 半尺移动 owner 精确扣速度的一半；探索起身以独立六秒活动解除，离场前不得遗失姿态。普通/OA/Ready 攻击读取同一姿态，不重置攻击序列。 |
+
+这些是应用能力修改，作者参数、原 ZIP、版本和准确依赖不变。`CampaignProneIntegrationTest`
+覆盖原包接受、有序冻结、正常取得、实际命令与完整文件；规则和玩家测试以及
+`browser-prone.cjs` 分别提供数值边界、控制权限和真实页面证据，见[验证入口](../../testing.md#prone-verification)。
+探索爬行、怪物主动姿态、推撞和擒抱仍未接入；本组不改变 V04 的擒抱轨迹判定，
+不由主动倒地推导其他 producer 或整个条件机制族完成。
+
 ## 独立有限切片：战士 Second Wind
 
 [一级回气语义](../../semantics/srd-5.1/classes-fighter-monk.md#srd51-class-fighter-second-wind)

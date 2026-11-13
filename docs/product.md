@@ -39,7 +39,9 @@ Wizard 到 5 级；成长、子职业身份、ASI、多职业前提/熟练、HP/
 Wizard Spellcasting、Arcane Recovery 与一级 Life profile 则由真实消费者拥有。
 
 普通检定、装备实例/护甲限制、伤害/治疗、临时 HP、死亡豁免、先攻/回合、近战攻击、移动、
-机会攻击和反应/继续保存实际骰点及完整状态。生命领域支持 Bless/Cure Wounds；单职业 Wizard
+机会攻击和反应/继续保存实际骰点及完整状态。规则角色可在本人战斗回合
+[主动卧倒、双倍成本爬行和半速起身](rules/schema-2-prone.md)，Ready 移动使用自己的反应移动上限；
+姿态、路径前缀、已付成本和反应窗口随完整文件恢复，探索爬行仍未接入。生命领域支持 Bless/Cure Wounds；单职业 Wizard
 支持 Shield/Counterspell/Burning Hands、真实法术书、学习/准备和短休奥术回想。其余目录法术
 只提供学习/准备元数据，不能施放。多施法职业的共享位数不在现有 casting 消费者支持范围。
 有限怪物支持 Hell Hound 吐息、充能及所列防御；其他动作保留阻断元数据。抗魔区域是明确
