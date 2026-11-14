@@ -53,21 +53,21 @@ public final class Schema2ExplorationRules {
         return new TimePlan(seconds,changes,after);
     }
 
-    /** One unopposed walking interval takes six seconds and preserves each cell boundary for zone reconciliation. */
+    /** One walking or crawling interval takes six seconds and preserves each cell boundary for zone reconciliation. */
     public static void prepareMove(Map<UUID,Context> roster,Battle battle,UUID actor,List<Position> path) {
         requireExploration(battle);requireTimeSafe(roster,6);
         Context context=roster.get(actor);
         if(context==null||context.character().hitPoints()==0||context.character().health().dead()) throw invalid("S2_COMBAT_ACTOR_INACTIVE");
         Combatant mover=battle.combatants().stream().filter(c->c.characterId().equals(actor)).findFirst()
                 .orElseThrow(()->invalid("S2_COMBAT_CHARACTER_NOT_FOUND"));
-        if(mover.prone()) throw invalid("S2_EXPLORATION_MOVEMENT_UNSUPPORTED");
         var sources=context.initial().character().sources();
         var movement=context.material().projection().rules().stream().filter(FinalMovement.class::isInstance).map(FinalMovement.class::cast)
                 .filter(r->r.enabled()&&(r.definition().owner().equals(sources.race())||r.definition().owner().equals(sources.subrace()))).toList();
         if(movement.size()!=1||!movement.getFirst().definition().algorithm().equals("SRD_2014_WALKING_SPEED_V1")) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
         int speed=Math.max(0,movement.getFirst().definition().walkSpeedFeet()
                 -new Schema2CharacterEquipmentRules().derive(context.material(),context.character()).speedPenalty());
-        if(path==null||path.isEmpty()||path.size()>64||path.size()*5>speed) throw invalid("S2_EXPLORATION_PATH");
+        int stepCostFeet=mover.prone()?10:5;
+        if(path==null||path.isEmpty()||path.size()>64||path.size()*stepCostFeet>speed) throw invalid("S2_EXPLORATION_PATH");
         Set<Position> occupied=new HashSet<>();
         for(Combatant other:battle.combatants()) if(!other.characterId().equals(actor)) occupied.add(other.position());
         Position from=mover.position();

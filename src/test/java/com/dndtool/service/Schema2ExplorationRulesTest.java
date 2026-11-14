@@ -1,7 +1,10 @@
 package com.dndtool.service;
 
+import com.dndtool.module.composition.ProductionSchema2Projection;
+import com.dndtool.module.composition.Schema2GrantFixtures;
 import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2CombatRules.Context;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +43,27 @@ class Schema2ExplorationRulesTest {
         var tooLong=new ArrayList<Position>();for(int x=1;x<=7;x++)tooLong.add(new Position(x,0));
         assertThrows(IllegalArgumentException.class,()->Schema2ExplorationRules.prepareMove(fixture.roster,b,fixture.a,tooLong));
         assertThrows(IllegalArgumentException.class,()->Schema2ExplorationRules.prepareMove(fixture.roster,fixture.battle,fixture.a,List.of(new Position(1,0))));
+    }
+    @Test void crawlingCannotInventAMissingFrozenMovementRule() {
+        var files = packages();
+        var definitions = Schema2GrantFixtures.json(files.getFirst().get("rules.json")).getAsJsonArray();
+        for (int i = definitions.size() - 1; i >= 0; i--)
+            if (definitions.get(i).getAsJsonObject().getAsJsonObject("identity").get("rule_type").getAsString().equals("character.movement"))
+                definitions.remove(i);
+        files.getFirst().put("rules.json", definitions.toString().getBytes(StandardCharsets.UTF_8));
+        var missingMovement = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+        Battle original = exploration();
+        var actors = original.combatants().stream().map(actor -> new Combatant(actor.characterId(), actor.position(),
+                actor.side(), actor.actionAvailable(), actor.reactionAvailable(), actor.movementSpentHalfFeet(),
+                actor.movementBonus(), actor.disengaged(), actor.dodging(), actor.sequence(), true)).toList();
+        Battle prone = Schema2ActionFlowRules.rebuild(original, actors, original.flows(), original.readyPreparations(),
+                original.triggerFacts(), original.shields(), original.concentrationHolders(), original.version());
+        var context = context(missingMovement, fixture.campaign, fixture.a);
+        assertEquals("ACTION_FLOW_RULE_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
+                () -> Schema2ExplorationRules.prepareMove(Map.of(fixture.a, context), prone, fixture.a,
+                        List.of(new Position(1, 0)))).getMessage());
+        assertEquals(0, context.sceneSecond());
+        assertEquals(new Position(0, 0), prone.combatants().getFirst().position());
     }
     @Test void worldHealthResolvesPublishedVitalSourceInsteadOfAcceptingAnAmount() {
         var prepared=Schema2ExplorationRules.prepareHealth(fixture.roster,exploration(),fixture.a,new HealthInput(HEALTH,DAMAGE,null,"DM confirms this direct environmental damage source."));

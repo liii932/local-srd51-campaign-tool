@@ -909,14 +909,17 @@ node tools/storage/browser-second-wind.cjs
 
 ## 倒地姿态、爬行与起身的组内验证
 
-`Schema2ProneRulesTest` 检查不花动作的主动卧倒、双倍移动成本、Dash、25 尺速度的
-半尺边界、Ready 独立移动预算、OA 与失能停止；相关既有战斗、Ready、反应和回气测试
+`Schema2ProneRulesTest` 检查不花动作或时间的主动卧倒、探索姿态链及旧战斗预算保留、
+双倍移动成本、Dash、25 尺速度的半尺边界、Ready 独立移动预算、OA 与失能停止；
+`Schema2ExplorationRulesTest` 检查六秒活动和整路径预检。相关既有战斗、Ready、反应和回气测试
 保护共享消费者。`CampaignProneIntegrationTest` 从交付原 ZIP 的独立审阅接受、有序
 预览和新建开始，正常创建角色及取得装备，经真实生产命令和临时 SQLite 验证姿态、
-移动、起身、未决路径保存/END/重开、探索起身和离场门、拒绝边界、幂等、过期和事务回滚。
+移动、起身、未决路径保存/END/重开、探索卧倒/爬行/起身、战斗交接和离场门、拒绝边界、幂等、过期和事务回滚。
+探索链应同时断言：卧倒不推进时钟；每段爬行最多按当前速度支付双倍成本，不能借旧 Dash；
+移动与起身各推进六秒，旧移动/动作/反应事实保持；完整文件直接恢复姿态，重试不重复推进时间。
 25 尺速度来自定向规则向量，不声称当前人类创建模板具有该速度。
 `PlayerProneCandidateTest` 经过真实邀请、审批、控制和接管验证服务端候选，
-客户端不能指定移动成本或替他人修改姿态。
+包括探索许可、撤权及旧候选拒绝；客户端不能指定移动成本或替他人修改姿态。
 
 本组使用既有战斗与速度声明，没有新作者内容或版本。按当前改动选择上述测试及
 `BundledCampaignRulesTest,CampaignRuleSupportTest,CampaignRuleBindingIntegrationTest,LocalRuleLibraryTest,StorageHttpIntegrationTest`
@@ -929,10 +932,11 @@ node tools/storage/browser-second-wind.cjs
 node tools/storage/browser-prone.cjs
 ```
 
-浏览器通过 Host 原包导入/接受/新建和角色表单执行卧倒、爬行、起身，检查姿态、
-移动及普通动作保留，并在倒地保存后 END、重开直接继续。检查宽窄屏布局和 JavaScript/CSP。
+浏览器通过 Host 原包导入/接受/新建和角色表单执行战斗及探索的卧倒、爬行、起身，检查姿态、
+成本、探索路径上限与旧战斗预算保留，并在倒地保存后 END、重开直接继续。
+检查宽窄屏布局和 JavaScript/CSP。
 原包确定性用 `build-bundles.py --check` 核验；相关测试通过后按 §6 打包和审计 WAR。
-不运行真实 MySQL、不部署；探索爬行、推撞/擒抱、怪物主动姿态和原生 Windows 不由这些测试证明。
+不运行真实 MySQL、不部署；推撞/擒抱、怪物主动姿态、复杂地形、搬运和原生 Windows 不由这些测试证明。
 
 ## Schema 2 战斗与动作继续验证
 

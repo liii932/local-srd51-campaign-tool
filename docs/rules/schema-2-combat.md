@@ -32,7 +32,8 @@ HP、临时 HP、死亡记录、装备实例、法术位资源及时间仍在原
 支持的场景是所有人已警觉、彼此可见、无遮挡的平坦五尺方格，角色占一个格子，阵营固定。
 步行路径每段相邻、不得进入已占格子；距离使用方格距离。地形、遮蔽、特殊感官、突袭、
 穿过其他生物、飞行、游泳、攀爬、传送及强制移动需要各自消费者。
-ACTIVE 规则角色的[爬行](schema-2-prone.md)复用相同路径与反应图，每尺支付两尺移动；探索爬行仍拒绝。
+ACTIVE 规则角色的[爬行](schema-2-prone.md)复用相同路径与反应图，每尺支付两尺移动；
+EXPLORATION 以每段当前速度为成本上限按同一姿态派生爬行，不借用旧战斗移动余额。
 本入口没有把这些情况默认为普通步行的参数。
 
 所有适用武器必须有启用的普通近战 profile，所有已取得特性／专长及其他效果必须在当前
@@ -50,16 +51,17 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 | `FORFEIT_ATTACKS` | 明确放弃当前序列剩余额度并关闭序列，不退还 action。 |
 | `DASH` / `DISENGAGE` / `DODGE` | 消费 action，分别增加速度等额移动、免除本人本回合机会攻击、建立真实闪避贡献。 |
 | `MOVE` | 接受完整有限路径，按实际走过的段消费移动；倒地时每尺花两尺移动，有机会攻击时在离开触及之前提交暂停。 |
-| `DROP_PRONE` | SQLite 规则角色在本人 ACTIVE 回合主动卧倒，不消费 action、reaction、移动或攻击额度；已有倒地或未决流拒绝。 |
+| `DROP_PRONE` | SQLite 规则角色在本人 ACTIVE 回合或 EXPLORATION 主动卧倒，不消费 action、reaction、移动、攻击额度或时间；仅存活且 HP 大于零的角色可用，已有倒地或未决流拒绝。 |
 | `STAND_UP` | ACTIVE 本人回合清除倒地、消费速度的一半；半尺预算使 25 尺速度精确消费 12.5 尺。EXPLORATION 以独立六秒活动起身并推进场景时间，起身前不能离场。 |
 | `END_TURN` | 关闭未完成的攻击序列，轮到下个角色；其反应恢复，必要的死亡豁免由服务器执行一次。 |
 | `CAST` | 仅一级单职业生命领域的始终准备 Bless/Cure Wounds；真实组件、完整目标、action 与共享一级位通过首 RNG/写入前预检，成本与后果同事务接受。 |
 | `END_CONCENTRATION` | 没有活动动作流时主动结束本人专注，不消费 action，可在他人回合执行。 |
-| `END_COMBAT` | 无活动动作流及待到期 Shield／Ready 时，收束当前轮六秒并转为 `EXPLORATION`，保留角色、位置、存续效果、独立原因及历史。 |
+| `END_COMBAT` | 无活动动作流及待到期 Shield／Ready 时，收束当前轮六秒并转为 `EXPLORATION`，保留角色、位置、倒地姿态、存续效果、独立原因及历史。 |
 | `READY_ATTACK` / `READY_MOVE` / `READY_SPELL` | 用 action 准备真实响应；保持法术先支付成本并占用专注。触发后 `RELEASE_READY` 消费 reaction；详见施法合同。 |
 | `CREATE_ENVIRONMENT_ZONE` / `END_ENVIRONMENT_ZONE` | 依准确冻结环境定义放置／结束固定抗魔区域，独立记录其对各目标应用的压制原因。 |
-| `EXPLORATION_ADVANCE_TIME` / `EXPLORATION_MOVE` / `EXPLORATION_HEALTH` | 在同一场景中显式推进时间、合法移动及真实冻结健康效果；持续时间、压制与专注仍由原 owner 处理。 |
-| `REENTER_COMBAT` / `CLOSE_SCENE` | 原场景保留效果重新掷先攻，或在全部来源关闭后终结场景。 |
+| `EXPLORATION_MOVE` | 按权威姿态和当前速度预检完整路径：每格直立成本五尺、倒地十尺；逐格核对区域，末尾推进六秒并结算到期。保留原移动、Dash、动作和反应余额，不开启战斗移动反应。 |
+| `EXPLORATION_ADVANCE_TIME` / `EXPLORATION_HEALTH` | 在同一场景中显式推进时间及真实冻结健康效果；持续时间、压制与专注仍由原 owner 处理。 |
+| `REENTER_COMBAT` / `CLOSE_SCENE` | 原场景保留效果和姿态重新掷先攻，或在全部来源关闭且没有尚未死亡的倒地规则角色时终结场景。 |
 
 反应按本人下一回合开始恢复，不能在全局轮次边界统一恢复。每个完整 round 对所有成员的
 原角色时钟推进六秒，秒余数、稳定恢复期限和长休收益间隔均精确保留；轮次内各角色回合

@@ -58,8 +58,81 @@ class Schema2ProneRulesTest {
         assertTrue(attackAgainstProne.advantage());
         assertEquals(2, attackAgainstProne.selectedD20());
         apply(Command.action(Kind.END_COMBAT, opponent));
-        reject("S2_COMBAT_REQUIRED", Command.action(Kind.DROP_PRONE, mover));
+        reject("S2_COMBAT_ALREADY_PRONE", Command.action(Kind.DROP_PRONE, mover));
         assertTrue(actor(mover).prone());
+    }
+
+    @Test void explorationDropIsImmediateWithoutARealTurnOrAnyBudgetChange() {
+        start(30, new Position(0, 8));
+        apply(Command.action(Kind.DASH, mover));
+        apply(Command.move(mover, List.of(cell(1))));
+        apply(Command.action(Kind.END_TURN, mover));
+        apply(Command.action(Kind.END_COMBAT, opponent));
+        Battle before = battle;
+        Map<UUID, Context> contexts = Map.copyOf(roster);
+        Combatant standing = actor(mover);
+        Command drop = Command.action(Kind.DROP_PRONE, mover);
+        assertTrue(rules.preflight(UUID.randomUUID(), combat, campaign, roster, battle, drop).possibleHealthTargets().isEmpty());
+
+        Resolution dropped = apply(drop);
+        assertEquals(new Combatant(mover, standing.position(), standing.side(), standing.actionAvailable(),
+                standing.reactionAvailable(), standing.movementSpentHalfFeet(), standing.movementBonus(),
+                standing.disengaged(), standing.dodging(), standing.sequence(), true), actor(mover));
+        assertEquals(contexts, roster);
+        assertTrue(dropped.healthChanges().isEmpty());
+        assertTrue(dropped.rolls().isEmpty());
+        assertEquals(before.flows(), battle.flows());
+        assertEquals(before.round(), battle.round());
+        assertEquals(before.turnNumber(), battle.turnNumber());
+        assertEquals(before.activeActor(), battle.activeActor());
+        assertEquals(before.version() + 1, battle.version());
+        assertEquals("DROP_PRONE", dropped.facts().getLast().kind());
+        reject("S2_COMBAT_ALREADY_PRONE", drop);
+    }
+
+    @Test void explorationPostureRejectsInactiveActorsAndForgedCommandFields() {
+        start(30, new Position(0, 8));
+        apply(Command.action(Kind.END_COMBAT, mover));
+        reject("S2_COMBAT_COMMAND", Command.action(Kind.DROP_PRONE, UUID.randomUUID()));
+        reject("S2_COMBAT_COMMAND", new Command(Kind.DROP_PRONE, mover, opponent, null,
+                List.of(), List.of(), List.of(), null, null, null, null));
+        reject("S2_COMBAT_COMMAND", new Command(Kind.DROP_PRONE, mover, null, null,
+                List.of(cell(1)), List.of(), List.of(), null, null, null, null));
+        reject("S2_COMBAT_COMMAND", new Command(Kind.DROP_PRONE, mover, null, null,
+                List.of(), List.of(), List.of(), null, null, null, null, null, null, null, null, null, null, 6));
+        Context context = roster.get(mover);
+        roster.put(mover, withState(context, withHealth(context.character(), 0,
+                new Schema2CharacterRuntime.HealthState(0, 0, 0, true, false, context.character().rest().minute() + 60))));
+        reject("S2_COMBAT_ACTOR_INACTIVE", Command.action(Kind.DROP_PRONE, mover));
+        reject("S2_COMBAT_ACTOR_INACTIVE", Command.action(Kind.STAND_UP, mover));
+        reject("S2_COMBAT_ACTOR_INACTIVE", Command.exploreMove(mover, List.of(cell(1))));
+        assertFalse(actor(mover).prone());
+    }
+
+    @Test void immediateDropDoesNotAdvanceAnUnstableCompanionsClock() {
+        start(30, new Position(0, 8));
+        apply(Command.action(Kind.END_COMBAT, mover));
+        Context companion = roster.get(opponent);
+        roster.put(opponent, withState(companion, withHealth(companion.character(), 0,
+                Schema2CharacterRuntime.HealthState.INITIAL)));
+        Map<UUID, Context> before = Map.copyOf(roster);
+        apply(Command.action(Kind.DROP_PRONE, mover));
+        assertEquals(before, roster);
+        reject("S2_EXPLORATION_UNSTABLE_CHARACTER", Command.exploreMove(mover, List.of(cell(1))));
+        reject("S2_EXPLORATION_UNSTABLE_CHARACTER", Command.action(Kind.STAND_UP, mover));
+        assertEquals(6, roster.get(mover).sceneSecond());
+        assertTrue(actor(mover).prone());
+    }
+
+    @Test void explorationDropNeedsNoTimeHeadroomButCrawlingAndStandingDo() {
+        start(30, new Position(0, 8));
+        apply(Command.action(Kind.END_COMBAT, mover));
+        long finalSecond = Schema2CharacterRestRules.MAX_MINUTE * 60;
+        roster.replaceAll((id, context) -> new Context(context.material(), context.initial(), context.character(), finalSecond));
+        apply(Command.action(Kind.DROP_PRONE, mover));
+        assertTrue(roster.values().stream().allMatch(context -> context.sceneSecond() == finalSecond));
+        reject("S2_COMBAT_TIME_CAPACITY", Command.exploreMove(mover, List.of(cell(1))));
+        reject("S2_COMBAT_TIME_CAPACITY", Command.action(Kind.STAND_UP, mover));
     }
 
     @Test void dashExtendsTheSameMovementPoolWithoutChangingCrawlCost() {
@@ -91,16 +164,24 @@ class Schema2ProneRulesTest {
         reject("S2_COMBAT_MOVEMENT_ALLOWANCE", Command.move(mover, List.of(cell(2))));
     }
 
-    @Test void explorationStandPreservesTurnBudgetAndAdvancesOnlySceneTime() {
-        start(30, new Position(0, 8));
+    @Test void explorationCrawlAndStandPreserveTurnBudgetAndAdvanceOnlySceneTime() {
+        start(25, new Position(0, 8));
         apply(Command.action(Kind.DROP_PRONE, mover));
         apply(Command.move(mover, List.of(cell(1))));
         apply(Command.action(Kind.END_TURN, mover));
         apply(Command.action(Kind.END_COMBAT, opponent));
         reject("S2_SCENE_OBLIGATIONS_PENDING", Command.action(Kind.CLOSE_SCENE, opponent));
-        reject("S2_EXPLORATION_MOVEMENT_UNSUPPORTED", Command.exploreMove(mover, List.of(cell(2))));
+        reject("S2_EXPLORATION_PATH", Command.exploreMove(mover, List.of(cell(2), cell(3), cell(4))));
         long turn = battle.turnNumber();
         int round = battle.round();
+        var crawled = apply(Command.exploreMove(mover, List.of(cell(2), cell(3))));
+        assertEquals(cell(3), actor(mover).position());
+        assertTrue(actor(mover).prone());
+        assertEquals(20, actor(mover).movementSpentHalfFeet());
+        assertEquals(10, battle.flows().getLast().movement().spent());
+        assertEquals(2, battle.flows().getLast().movement().cursor());
+        assertNull(battle.activeFlow());
+        assertTrue(crawled.healthChanges().stream().allMatch(change -> change.timeAdvance() && change.seconds() == 6));
         Combatant before = actor(mover);
 
         var stood = apply(Command.action(Kind.STAND_UP, mover));
@@ -112,9 +193,16 @@ class Schema2ProneRulesTest {
                 before.sequence(), false), actor(mover));
         assertEquals(2, stood.healthChanges().size());
         assertTrue(stood.healthChanges().stream().allMatch(change -> change.timeAdvance() && change.seconds() == 6));
-        assertEquals(12, roster.get(mover).sceneSecond());
+        assertEquals(18, roster.get(mover).sceneSecond());
         reject("S2_COMBAT_CANNOT_STAND", Command.action(Kind.STAND_UP, mover));
-        apply(Command.exploreMove(mover, List.of(cell(2))));
+        apply(Command.exploreMove(mover, List.of(cell(4), cell(5), cell(6), cell(7), cell(8))));
+        assertEquals(20, actor(mover).movementSpentHalfFeet());
+        assertEquals(25, battle.flows().getLast().movement().spent());
+        assertFalse(actor(mover).prone());
+        apply(Command.action(Kind.DROP_PRONE, mover));
+        apply(Command.reenter(mover, List.of(mover, opponent)), 20, 10);
+        assertTrue(actor(mover).prone());
+        assertEquals(0, actor(mover).movementSpentHalfFeet());
     }
 
     @Test void zeroSpeedStillAllowsDroppingAndPreventsStandingInEitherMode() {
@@ -140,6 +228,7 @@ class Schema2ProneRulesTest {
         reject("S2_COMBAT_CANNOT_STAND", Command.action(Kind.STAND_UP, mover));
         apply(Command.action(Kind.END_COMBAT, mover));
         reject("S2_COMBAT_CANNOT_STAND", Command.action(Kind.STAND_UP, mover));
+        reject("S2_EXPLORATION_PATH", Command.exploreMove(mover, List.of(cell(1))));
     }
 
     @Test void crawlPausesBeforeCrossingAndStopsIfOpportunityAttackDropsMover() {

@@ -624,7 +624,7 @@
   const combatActions = new Map(Array.from(byId('domain-combat').elements.kind.options, option => [option.value, option.textContent]));
   function refreshCombatForm() {
     const form = byId('domain-combat'), battle = battleFor(form.elements.combatId.value);
-    const exploration = ['STAND_UP', 'EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
+    const exploration = ['DROP_PRONE', 'STAND_UP', 'EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
     const actions = battle?.status === 'EXPLORATION' ? exploration : battle?.status === 'ACTIVE'
       ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT') : [];
     options(form.elements.kind, actions, kind => combatActions.get(kind));
@@ -640,11 +640,11 @@
       : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列，再选择“攻击”、目标与已装备武器。'
       : kind === 'ATTACK' ? '每次消耗当前序列的一次攻击；两击之间可合法移动或更换目标，也可放弃剩余攻击。'
       : kind === 'SECOND_WIND' ? '仅已取得回气的战士可在本人回合使用；消耗一次回气，以附赠动作恢复 1d10＋战士等级的生命值。短休或长休完成后恢复次数。'
-      : kind === 'DROP_PRONE' ? '角色可在本人回合主动卧倒，保留动作、反应与移动力。'
+      : kind === 'DROP_PRONE' ? (battle.status === 'EXPLORATION' ? '角色可在探索中主动卧倒，不推进场景时钟。' : '角色可在本人回合主动卧倒，保留动作、反应与移动力。')
       : kind === 'STAND_UP' ? (battle.status === 'EXPLORATION' ? '倒地角色在探索中起身会推进场景时钟 6 秒。' : '倒地角色在本人回合起身时，消耗等于当前速度一半的移动力。')
       : kind === 'MOVE' && actor?.prone ? '当前角色倒地，移动为匍匐，每格消耗 10 尺移动力。'
-      : kind === 'EXPLORATION_MOVE' && actor?.prone ? '倒地时请先起身，再探索移动。'
-      : battle.status === 'EXPLORATION' ? '当前为探索状态，可按角色状态移动、起身、推进时间，或重新进入战斗。'
+      : kind === 'EXPLORATION_MOVE' ? (actor?.prone ? '当前角色倒地，探索移动为匍匐，每格按 10 尺计入当前速度上限；每次推进场景时钟 6 秒。' : '探索移动每格按 5 尺计入当前速度上限；每次推进场景时钟 6 秒。')
+      : battle.status === 'EXPLORATION' ? '当前为探索状态，可按角色状态卧倒、移动、起身、推进时间，或重新进入战斗。'
       : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';
     for (const name of ['targetId', 'itemId', 'x', 'y', 'path', 'seconds']) {
       const input = form.elements[name];

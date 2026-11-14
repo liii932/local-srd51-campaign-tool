@@ -114,8 +114,9 @@ class CampaignProneIntegrationTest {
             f.combat(Command.action(Kind.END_COMBAT, hound));
             assertEquals(Status.EXPLORATION, f.battle().status());
             assertTrue(f.actor(fighter).prone());
-            f.reject(drop, "S2_COMBAT_REQUIRED");
-            f.reject(Command.exploreMove(fighter, List.of(cell(2, 3))), "S2_EXPLORATION_MOVEMENT_UNSUPPORTED");
+            f.reject(drop, "S2_COMBAT_ALREADY_PRONE");
+            f.reject(Command.exploreMove(fighter, List.of(cell(2, 3), cell(2, 4), cell(2, 5), cell(2, 6))),
+                    "S2_EXPLORATION_PATH");
             var exploration = f.access();
             var refused = assertCode("DOMAIN_REJECTED", () -> f.leave(fighter));
             assertEquals("S2_SCENE_OBLIGATIONS_PENDING", refused.getMessage());
@@ -302,6 +303,129 @@ class CampaignProneIntegrationTest {
         }
     }
 
+    @Test void explorationPosturePreservesOldBudgetsAndSurvivesCompleteFilesAndCombatTransitions() throws Exception {
+        try (var f = new Fixture(temporary)) {
+            f.create();
+            UUID fighter = f.character("探索者", "PC"), guard = f.character("同伴", "NPC");
+            f.equip(guard, "item.dagger");
+            f.startOpponents(fighter, cell(1, 1), guard, cell(4, 2));
+            f.combat(Command.move(fighter, List.of(cell(2, 1))));
+            f.combat(Command.action(Kind.DASH, fighter));
+            f.combat(Command.action(Kind.END_COMBAT, fighter));
+            var oldBudget = f.actor(fighter);
+            assertEquals(10, oldBudget.movementSpentHalfFeet());
+            assertEquals(30, oldBudget.movementBonus());
+            assertFalse(oldBudget.actionAvailable());
+            var scene = f.state().space().focus().space();
+            long second = f.state().space().clock(scene).second();
+            long personal = f.personalSecond(fighter);
+            var beforeDrop = f.card(fighter);
+            var guardBefore = f.card(guard);
+
+            f.combat(Command.action(Kind.DROP_PRONE, fighter));
+            assertTrue(f.actor(fighter).prone());
+            assertEquals(beforeDrop, f.card(fighter));
+            assertEquals(guardBefore, f.card(guard));
+            assertEquals(second, f.state().space().clock(scene).second());
+            assertEquals(personal, f.personalSecond(fighter));
+            assertEquals(oldBudget.movementSpentHalfFeet(), f.actor(fighter).movementSpentHalfFeet());
+            assertEquals(oldBudget.movementBonus(), f.actor(fighter).movementBonus());
+            f.reject(Command.action(Kind.DROP_PRONE, fighter), "S2_COMBAT_ALREADY_PRONE");
+            var blockedLeave = f.access();
+            assertCode("DOMAIN_REJECTED", () -> f.leave(fighter));
+            assertEquals(blockedLeave, f.access());
+            f.reopen();
+
+            // Exploration gets one speed-based interval, never the old turn's Dash allowance.
+            f.reject(Command.exploreMove(fighter, List.of(cell(3, 1), cell(4, 1), cell(5, 1), cell(6, 1))),
+                    "S2_EXPLORATION_PATH");
+            var occupied = f.access();
+            assertCode("SCENE_CELL_OCCUPIED", () -> f.submit(id(), occupied,
+                    f.combatInput(Command.exploreMove(fighter, List.of(cell(3, 1), cell(4, 2))))));
+            assertEquals(occupied, f.access());
+            f.combat(Command.exploreMove(fighter, List.of(cell(3, 1), cell(4, 1), cell(5, 1))));
+            assertMovement(f.movement(), 3, 15, MovementStatus.COMPLETED);
+            assertNull(f.battle().activeFlow());
+            assertTrue(f.battle().flows().getLast().windows().isEmpty());
+            assertTrue(f.actor(guard).reactionAvailable());
+            assertTrue(f.actor(fighter).prone());
+            assertEquals(second + 6, f.state().space().clock(scene).second());
+            assertEquals(personal + 6, f.personalSecond(fighter));
+            assertEquals(oldBudget.movementSpentHalfFeet(), f.actor(fighter).movementSpentHalfFeet());
+            assertEquals(oldBudget.movementBonus(), f.actor(fighter).movementBonus());
+            assertEquals(oldBudget.actionAvailable(), f.actor(fighter).actionAvailable());
+            assertEquals(oldBudget.reactionAvailable(), f.actor(fighter).reactionAvailable());
+            assertTrue(f.state().roots().getLast().rolls().isEmpty());
+            f.reopen();
+
+            f.combat(Command.reenter(fighter, List.of(fighter, guard)), 20, 10);
+            assertTrue(f.actor(fighter).prone());
+            assertEquals(0, f.actor(fighter).movementSpentHalfFeet());
+            assertEquals(0, f.actor(fighter).movementBonus());
+            f.combat(Command.move(fighter, List.of(cell(5, 2))));
+            assertEquals(20, f.actor(fighter).movementSpentHalfFeet());
+            f.combat(Command.action(Kind.END_COMBAT, fighter));
+            f.combat(Command.action(Kind.STAND_UP, fighter));
+            assertFalse(f.actor(fighter).prone());
+            assertEquals(20, f.actor(fighter).movementSpentHalfFeet());
+            f.leave(fighter, guard);
+            assertEquals("WORLD", CampaignSpaceCommands.position(f.state(), fighter).space().kind());
+        }
+    }
+
+    @Test void freshExplorationPostureCommandsAreAtomicStrictAndReplayWithoutExtraTime() throws Exception {
+        try (var f = new Fixture(temporary)) {
+            f.create();
+            UUID fighter = f.character("探索者", "PC"), guard = f.character("同伴", "NPC");
+            f.enterScene(List.of(new Deployment(fighter, cell(1, 1), 0), new Deployment(guard, cell(8, 8), 1)));
+            assertEquals(Status.EXPLORATION, f.battle().status());
+            var scene = f.state().space().focus().space();
+            long second = f.state().space().clock(scene).second();
+
+            for (Command command : List.of(Command.action(Kind.DROP_PRONE, fighter),
+                    Command.exploreMove(fighter, List.of(cell(2, 1))), Command.action(Kind.STAND_UP, fighter))) {
+                var before = f.access();
+                var payload = f.combatInput(command);
+                var forged = payload.deepCopy();
+                forged.getAsJsonObject("command").addProperty("movementCost", 0);
+                assertCode("INVALID_FILE", () -> f.submit(id(), before, forged));
+                var stale = payload.deepCopy();
+                stale.addProperty("combatVersion", Long.toString(f.battle().version() - 1));
+                assertCode("STALE_COMBAT", () -> f.submit(id(), before, stale));
+                assertCode("STALE_REVISION", () -> f.service.domainCommand(id(), before.epoch(), before.revision() - 1,
+                        "combat-command", payload));
+                f.failAfterDomainWrite = true;
+                String request = id();
+                assertEquals("posture transaction failure", assertThrows(IllegalStateException.class,
+                        () -> f.submit(request, before, payload)).getMessage());
+                assertEquals(before, f.access());
+                f.submit(request, before, payload);
+                var accepted = f.access();
+                assertTrue(f.submit(request, before, payload).lastCommand().replayed());
+                assertEquals(accepted, f.access());
+                assertEquals(1L, f.state().roots().stream().filter(root -> root.operationId().toString().equals(request)).count());
+                assertTrue(f.state().roots().getLast().rolls().isEmpty());
+                assertCode("IDEMPOTENCY_CONFLICT", () -> f.submit(request, accepted,
+                        f.combatInput(Command.action(Kind.DROP_PRONE, guard))));
+            }
+            assertEquals(second + 12, f.state().space().clock(scene).second());
+            assertFalse(f.actor(fighter).prone());
+            assertEquals(cell(2, 1), f.actor(fighter).position());
+            assertEquals(0, f.actor(fighter).movementSpentHalfFeet());
+            f.reopen();
+            f.combat(Command.action(Kind.DROP_PRONE, guard));
+            assertTrue(f.actor(guard).prone());
+            f.combat(Command.exploreMove(guard, List.of(cell(8, 7))));
+            var beforeEnd = f.access();
+            String file = f.service.end(id(), beforeEnd.epoch(), beforeEnd.revision()).fileKey();
+            assertTamperedFilesRejected(f.service, Files.readAllBytes(f.service.savedFile(file)));
+            f.service.open(file);
+            assertEquals(beforeEnd.snapshot(), f.access().snapshot());
+            f.combat(Command.action(Kind.STAND_UP, guard));
+            assertFalse(f.actor(guard).prone());
+        }
+    }
+
     private static void assertTamperedFilesRejected(CampaignStorageService service, byte[] complete) {
         var before = service.status();
         var material = CampaignJson.read(complete);
@@ -437,6 +561,12 @@ class CampaignProneIntegrationTest {
         }
         void start(List<Deployment> placements, Integer... initiative) {
             var roster = placements.stream().map(Deployment::characterId).toList();
+            enterScene(placements);
+            combat(Command.reenter(roster.getFirst(), roster), initiative);
+            assertEquals(roster.getFirst(), battle().activeActor());
+        }
+        void enterScene(List<Deployment> placements) {
+            var roster = placements.stream().map(Deployment::characterId).toList();
             UUID world = PlayerSpaceFixture.placeAtWorld(service, roster.toArray(UUID[]::new));
             UUID scene = subject("scene-create", input("name", "演练场", "nodeId", world, "width", 10, "height", 10,
                     "resolution", "RULES"));
@@ -450,8 +580,6 @@ class CampaignProneIntegrationTest {
             }
             enter.add("subjects", subjects);
             CampaignSpaceFixtures.command(service, "scene-enter", enter);
-            combat(Command.reenter(roster.getFirst(), roster), initiative);
-            assertEquals(roster.getFirst(), battle().activeActor());
         }
         void leave(UUID... roster) {
             var payload = new JsonObject();

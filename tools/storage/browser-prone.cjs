@@ -54,6 +54,35 @@ async function main() {
     return JSON.parse(observed.request.get('payload')).command;
   }
 
+  async function rejectDomain(trigger) {
+    const before = current.campaign;
+    const [rejected, refreshed] = await Promise.all([
+      page.waitForResponse(res => res.url() === origin + '/api/host/storage/domain' && res.request().method() === 'POST'),
+      page.waitForResponse(res => res.url() === origin + '/api/host/storage/state' && res.request().method() === 'GET'),
+      trigger()
+    ]);
+    assert.equal(rejected.status(), 409);
+    assert.equal((await rejected.json()).code, 'DOMAIN_REJECTED');
+    assert.equal(refreshed.status(), 200);
+    current = await refreshed.json();
+    assert.deepEqual(current.campaign, before);
+    await waitForStorageReady(page);
+    await form('storage-message').filter({hasText: '已重新读取当前战役'}).waitFor();
+  }
+
+  async function saveEndReopen() {
+    const before = domain();
+    await action('save', () => form('storage-save').click());
+    const ended = await action('end', () => form('storage-end').click());
+    owned = false;
+    await form('storage-files').selectOption(ended.savedFile);
+    await action('open', () => button('storage-open').click());
+    owned = true;
+    assert.deepEqual(domain(), before);
+    await page.locator('[data-pane="combat"]').click();
+    await posture('倒地').waitFor();
+  }
+
   async function assertViewportFits() {
     const widths = await page.evaluate(() => [innerWidth, document.documentElement.scrollWidth, document.body.scrollWidth]);
     assert.ok(widths.slice(1).every(width => width <= widths[0]), `Page overflows viewport: ${widths}`);
@@ -118,19 +147,7 @@ async function main() {
 
     await page.setViewportSize({width: 390, height: 844});
     await assertViewportFits();
-    const beforeRejection = current.campaign;
-    const [rejected, refreshed] = await Promise.all([
-      page.waitForResponse(res => res.url() === origin + '/api/host/storage/domain' && res.request().method() === 'POST'),
-      page.waitForResponse(res => res.url() === origin + '/api/host/storage/state' && res.request().method() === 'GET'),
-      button('domain-combat').click()
-    ]);
-    assert.equal(rejected.status(), 409);
-    assert.equal((await rejected.json()).code, 'DOMAIN_REJECTED');
-    assert.equal(refreshed.status(), 200);
-    current = await refreshed.json();
-    assert.deepEqual(current.campaign, beforeRejection);
-    await waitForStorageReady(page);
-    await form('storage-message').filter({hasText: '已重新读取当前战役'}).waitFor();
+    await rejectDomain(() => button('domain-combat').click());
     await posture('倒地').waitFor();
 
     await kind.selectOption('MOVE');
@@ -147,16 +164,7 @@ async function main() {
     assert.equal(latestMovement().status, 'COMPLETED');
     assert.equal(latestMovement().spent, 5);
 
-    const beforeReopen = domain();
-    await action('save', () => form('storage-save').click());
-    const ended = await action('end', () => form('storage-end').click());
-    owned = false;
-    await form('storage-files').selectOption(ended.savedFile);
-    await action('open', () => button('storage-open').click());
-    owned = true;
-    assert.deepEqual(domain(), beforeReopen);
-    await page.locator('[data-pane="combat"]').click();
-    await posture('倒地').waitFor();
+    await saveEndReopen();
     await kind.selectOption('STAND_UP');
     await note.filter({hasText: '当前速度一半'}).waitFor();
     await submitCombat();
@@ -182,25 +190,88 @@ async function main() {
     await kind.selectOption('END_COMBAT');
     await submitCombat();
     assert.equal(battle().status, 'EXPLORATION');
-    assert.equal(await kind.locator('option[value="DROP_PRONE"]').count(), 0);
+    assert.equal(await kind.locator('option[value="DROP_PRONE"]').count(), 1);
     await field('domain-combat', 'actorId').selectOption(fighter);
     await posture('倒地').waitFor();
-    await kind.selectOption('EXPLORATION_MOVE');
-    await note.filter({hasText: '倒地时请先起身'}).waitFor();
     const beforeStandSecond = sceneSecond();
-    const beforeStandMovement = combatant(fighter).movementSpentHalfFeet;
+    const explorationBudget = combatant(fighter);
     await kind.selectOption('STAND_UP');
     await note.filter({hasText: '推进场景时钟 6 秒'}).waitFor();
     await submitCombat();
     await posture('站立').waitFor();
     assert.equal(sceneSecond(), beforeStandSecond + 6);
-    assert.equal(combatant(fighter).movementSpentHalfFeet, beforeStandMovement);
+    assert.equal(combatant(fighter).movementSpentHalfFeet, explorationBudget.movementSpentHalfFeet);
+
+    const explorationStanding = combatant(fighter);
+    const beforeDropSecond = sceneSecond();
+    await kind.selectOption('DROP_PRONE');
+    await note.filter({hasText: '探索中主动卧倒，不推进场景时钟'}).waitFor();
+    await submitCombat();
+    await posture('倒地').waitFor();
+    assert.deepEqual(combatant(fighter), {...explorationStanding, prone: true});
+    assert.equal(sceneSecond(), beforeDropSecond);
+
+    await kind.selectOption('EXPLORATION_MOVE');
+    await note.filter({hasText: '匍匐，每格按 10 尺计入当前速度上限'}).waitFor();
+    await page.setViewportSize({width: 1440, height: 1050});
     await assertViewportFits();
+    await page.setViewportSize({width: 390, height: 844});
+    await assertViewportFits();
+    await field('domain-combat', 'path').fill('4,1\n5,1\n6,1\n7,1');
+    await rejectDomain(() => button('domain-combat').click());
+    await field('domain-combat', 'path').fill('4,1\n5,1\n6,1');
+    const explorationCrawl = await submitCombat();
+    assert.equal(explorationCrawl.kind, 'EXPLORATION_MOVE');
+    assert.equal(explorationCrawl.path.length, 3);
+    for (const key of ['movementCost', 'locomotion', 'prone']) assert.equal(Object.hasOwn(explorationCrawl, key), false);
+    assert.equal(sceneSecond(), beforeDropSecond + 6);
+    assert.deepEqual(combatant(fighter).position, {x: 6, y: 1});
+    assert.equal(combatant(fighter).prone, true);
+    assert.equal(combatant(fighter).movementSpentHalfFeet, explorationBudget.movementSpentHalfFeet);
+
+    await saveEndReopen();
+    assert.equal(battle().status, 'EXPLORATION');
+    await field('domain-combat', 'actorId').selectOption(fighter);
+    await kind.selectOption('EXPLORATION_MOVE');
+    await field('domain-combat', 'path').fill('7,1\n8,1\n9,1');
+    await submitCombat();
+    assert.deepEqual(combatant(fighter).position, {x: 9, y: 1});
+    assert.equal(combatant(fighter).prone, true);
+    assert.equal(combatant(fighter).movementSpentHalfFeet, explorationBudget.movementSpentHalfFeet);
+    assert.equal(sceneSecond(), beforeDropSecond + 12);
+
+    await page.locator('[data-pane="world"]').click();
+    await form('domain-scene-leave-subjects').locator(`[data-character="${fighter}"] [name="join"]`).check();
+    await rejectDomain(() => button('domain-scene-leave').click());
+    await page.locator('[data-pane="combat"]').click();
+    await field('domain-combat', 'actorId').selectOption(fighter);
+    await kind.selectOption('STAND_UP');
+    await submitCombat();
+    assert.equal(sceneSecond(), beforeDropSecond + 18);
+    assert.equal(combatant(fighter).prone, false);
+    assert.equal(combatant(fighter).movementSpentHalfFeet, explorationBudget.movementSpentHalfFeet);
+    assert.equal(combatant(fighter).actionAvailable, explorationBudget.actionAvailable);
+    assert.equal(combatant(fighter).reactionAvailable, explorationBudget.reactionAvailable);
+
+    await kind.selectOption('EXPLORATION_MOVE');
+    await note.filter({hasText: '每格按 5 尺计入当前速度上限'}).waitFor();
+    await field('domain-combat', 'path').fill('8,1\n7,1\n6,1\n5,1\n4,1\n3,1');
+    await submitCombat();
+    assert.deepEqual(combatant(fighter).position, {x: 3, y: 1});
+    assert.equal(sceneSecond(), beforeDropSecond + 24);
+    assert.equal(combatant(fighter).movementSpentHalfFeet, explorationBudget.movementSpentHalfFeet);
+    await page.locator('[data-pane="world"]').click();
+    await form('domain-scene-leave-subjects').locator(`[data-character="${fighter}"] [name="join"]`).check();
+    await action('domain', () => button('domain-scene-leave').click());
+    assert.equal(domain().space.focus.space.kind, 'WORLD');
+    assert.equal(domain().positions.find(position => position.characterId === fighter).space.id, world);
     await action('end', () => form('storage-end').click());
     owned = false;
     assert.deepEqual(pageErrors, []);
     console.log(JSON.stringify({result: 'PASSED', browser: browser.version(), crawlFeet, walkFeet,
-      standFeet: 15, explorationStandSeconds: 6, duplicateRejected: true, reopenedAndContinued: true, viewportWidths: [1440, 390]}));
+      standFeet: 15, explorationDropSeconds: 0, explorationStepSeconds: 6, explorationCrawlMaxCells: 3,
+      explorationWalkMaxCells: 6, duplicateRejected: true, excessCrawlRejected: true, proneLeaveRejected: true,
+      reopenedAndContinued: true, explorationReopenedAndContinued: true, stoodAndLeft: true, viewportWidths: [1440, 390]}));
   } finally {
     if (owned && (await form('storage-campaign-name').textContent().catch(() => '')).trim() === campaignName) {
       await action('end', () => form('storage-end').click()).catch(error => console.error(`Test fixture cleanup: ${error.message}`));
