@@ -127,7 +127,7 @@ public final class CampaignParticipationCommands {
         if (battle.status() == Schema2CombatState.Status.EXPLORATION) {
             String required = switch (command.kind()) {
                 case CAST -> "CHARACTER_COMMAND";
-                case EXPLORATION_MOVE, STAND_UP -> "EXPLORATION_MOVE";
+                case DROP_PRONE, EXPLORATION_MOVE, STAND_UP -> "EXPLORATION_MOVE";
                 case END_CONCENTRATION -> "END_CONCENTRATION";
                 default -> throw playerPermissionDenied();
             };

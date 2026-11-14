@@ -80,6 +80,7 @@ public final class PlayerCandidateFactory {
                 factory.moves(actor, false); factory.spells(actor, visible);
             } else if (battle.status() == Status.EXPLORATION) {
                 if (CampaignParticipationCommands.permitted(domain, actor, "EXPLORATION_MOVE")) {
+                    factory.add(Command.action(Kind.DROP_PRONE, actor), label(Kind.DROP_PRONE));
                     factory.add(Command.action(Kind.STAND_UP, actor), label(Kind.STAND_UP));
                     factory.moves(actor, true);
                 }
@@ -150,7 +151,7 @@ public final class PlayerCandidateFactory {
         }
         void moves(UUID actor, boolean exploration) {
             var combatant = battle.combatants().stream().filter(c -> c.characterId().equals(actor)).findFirst().orElse(null); if (combatant == null) return;
-            String movement = !exploration && combatant.prone() ? "匍匐" : "移动";
+            String movement = combatant.prone() ? "匍匐" : "移动";
             for (int i = 0; i < STEPS.length; i++) {
                 int x = combatant.position().x() + STEPS[i][0], y = combatant.position().y() + STEPS[i][1];
                 if (Math.abs(x) > 10000 || Math.abs(y) > 10000) continue;

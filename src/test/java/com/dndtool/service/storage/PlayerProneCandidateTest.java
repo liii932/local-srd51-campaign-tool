@@ -114,7 +114,9 @@ class PlayerProneCandidateTest {
             PlayerSpaceFixture.combat(storage, battle(storage), Command.action(Kind.END_COMBAT, fighter));
             assertEquals(Status.EXPLORATION, battle(storage).status());
             assertTrue(combatant(storage, fighter).prone());
-            assertTrue(options(gateway.read(token, connection, false).body(), STAND).isEmpty());
+            var unauthorized = gateway.read(token, connection, false).body();
+            for (String label : List.of(DROP, CRAWL, STAND, "向南移动一格"))
+                assertTrue(options(unauthorized, label).isEmpty(), label);
 
             var scene = CampaignSpaceData.Ref.scene(battle(storage).combatId());
             var permission = fields("characterId", fighter, "permissionVersion", 0, "sceneId", scene.id());
@@ -125,16 +127,59 @@ class PlayerProneCandidateTest {
             host(gateway, storage, "exploration", fields("payload", permission));
             var exploration = gateway.read(token, connection, false).body();
             assertTrue(options(exploration, DROP).isEmpty());
-            assertTrue(options(exploration, CRAWL).isEmpty());
+            assertEquals(1, options(exploration, CRAWL).size());
             assertTrue(options(exploration, "向南移动一格").isEmpty());
+            var beforeExplorationCrawl = combatant(storage, fighter);
+            long beforeCrawlSecond = storage.accessSnapshot().snapshot().domains().space().clock(scene).second();
+            var explorationCrawl = onlyOption(exploration, CRAWL);
+            assertEquals(Set.of("id", "label", "characterId", "precondition"), explorationCrawl.keySet());
+            var crawledInExploration = submit(gateway, token, csrf, connection, request(connection, explorationCrawl));
+            assertEquals(beforeCrawlSecond + 6, storage.accessSnapshot().snapshot().domains().space().clock(scene).second());
+            assertEquals(new Position(1, 2), combatant(storage, fighter).position());
+            assertTrue(combatant(storage, fighter).prone());
+            assertEquals(beforeExplorationCrawl.movementSpentHalfFeet(), combatant(storage, fighter).movementSpentHalfFeet());
+            assertEquals(Kind.EXPLORATION_MOVE, CampaignSpaceCommands.currentBattle(storage.accessSnapshot().snapshot().domains()).events().getLast().command().kind());
             var beforeExplorationStand = combatant(storage, fighter);
             long sceneSecond = storage.accessSnapshot().snapshot().domains().space().clock(scene).second();
-            var explored = submit(gateway, token, csrf, connection, request(connection, onlyOption(exploration, STAND)));
+            var explored = submit(gateway, token, csrf, connection, request(connection, onlyOption(crawledInExploration, STAND)));
             assertEquals(sceneSecond + 6, storage.accessSnapshot().snapshot().domains().space().clock(scene).second());
             assertFalse(combatant(storage, fighter).prone());
             assertEquals(beforeExplorationStand.movementSpentHalfFeet(), combatant(storage, fighter).movementSpentHalfFeet());
             assertFalse(effects(explored).contains("倒地"));
             assertEquals(1, options(explored, "向南移动一格").size());
+
+            var beforeExplorationDrop = combatant(storage, fighter);
+            long beforeDropSecond = storage.accessSnapshot().snapshot().domains().space().clock(scene).second();
+            var droppedInExploration = submit(gateway, token, csrf, connection, request(connection, onlyOption(explored, DROP)));
+            assertTrue(combatant(storage, fighter).prone());
+            assertEquals(beforeDropSecond, storage.accessSnapshot().snapshot().domains().space().clock(scene).second());
+            assertEquals(beforeExplorationDrop.position(), combatant(storage, fighter).position());
+            assertEquals(beforeExplorationDrop.actionAvailable(), combatant(storage, fighter).actionAvailable());
+            assertEquals(beforeExplorationDrop.reactionAvailable(), combatant(storage, fighter).reactionAvailable());
+            assertEquals(beforeExplorationDrop.movementSpentHalfFeet(), combatant(storage, fighter).movementSpentHalfFeet());
+            assertTrue(effects(droppedInExploration).contains("倒地"));
+            assertTrue(options(droppedInExploration, DROP).isEmpty());
+            assertEquals(CampaignParticipationData.Actor.player(member, fighter), storage.accessSnapshot().snapshot().domains().roots().getLast().actor());
+
+            var staleStand = request(connection, onlyOption(droppedInExploration, STAND));
+            permission.addProperty("permissionVersion", "1");
+            permission.addProperty("active", false);
+            host(gateway, storage, "exploration", fields("payload", permission));
+            var revoked = storage.accessSnapshot();
+            assertEquals("PLAYER_VIEW_EXPIRED", assertThrows(PlayerGatewayException.class,
+                    () -> gateway.post(token, csrf, connection, "command", staleStand, null)).code());
+            assertEquals(revoked, storage.accessSnapshot());
+            var revokedView = gateway.read(token, connection, false).body();
+            for (String label : List.of(DROP, CRAWL, STAND, "向南移动一格"))
+                assertTrue(options(revokedView, label).isEmpty(), label);
+            for (Kind kind : List.of(Kind.DROP_PRONE, Kind.EXPLORATION_MOVE, Kind.STAND_UP)) {
+                var input = new JsonObject();
+                var command = kind == Kind.EXPLORATION_MOVE ? Command.exploreMove(fighter, List.of(new Position(1, 3))) : Command.action(kind, fighter);
+                input.add("command", CampaignDomainCodec.toJson(command));
+                assertEquals("PLAYER_COMMAND_FORBIDDEN", assertThrows(StorageException.class,
+                        () -> CampaignParticipationCommands.requireExecutionPermission(revoked.snapshot().domains(), "combat-command", input,
+                                CampaignParticipationData.Actor.player(member, fighter))).code());
+            }
         }
     }
 
