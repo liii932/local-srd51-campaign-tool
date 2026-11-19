@@ -7,7 +7,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {chromium} = require('playwright');
-const {observeStorageAction} = require('./browser-action.cjs');
+const {observeStorageAction, waitForStorageReady, waitForHistoryCount} = require('./browser-action.cjs');
 const {createNode, focusSpace, placeAtFocus, createScene, enterScene} = require('./browser-spaces.cjs');
 const [output, acknowledgement, storageRoot] = process.argv.slice(2);
 const resumeAfterRoster = acknowledgement === '--resume-after-roster';
@@ -133,8 +133,18 @@ async function main(){
   const secondTab=await mobileTab.context.newPage();observe(secondTab);await secondTab.goto(PLAYER+'/player');await secondTab.locator('#player-table').waitFor();await secondTab.locator('#player-takeover').click();await secondTab.locator('#player-status-title').filter({hasText:'你的席位已就绪'}).waitFor();
   await mobile.locator('#player-status-title').filter({hasText:'此设备当前只读'}).waitFor();assert.equal(await mobile.locator('#player-actions button:not([disabled])').count(),0);
   await screenshot(secondTab,'02-player-ready-mobile.png',390,844);await screenshot(secondTab,'03-player-ready-wide.png',1440,1050);await screenshot(host,'04-dm-player-management-wide.png',1440,1050);
-  await playerSetting('close',()=>host.locator('#host-players-close').click());assert.equal((await readPlayer(secondTab)).session.status,'APPROVED');
-  report.checks.push('New page began read-only; explicit takeover disabled the former page; closing invitation preserved approved members');
+  await waitForStorageReady(host);
+  let inviteCloseRefreshes = 0;
+  const observeInviteClose = request => {
+    if (request.method() === 'GET' && request.url() === HOST + '/api/host/storage/state') inviteCloseRefreshes++;
+  };
+  host.on('request', observeInviteClose);
+  try {
+    await playerSetting('close', () => host.locator('#host-players-close').click());
+    assert.equal((await readPlayer(secondTab)).session.status, 'APPROVED');
+    assert.equal(inviteCloseRefreshes, 0, 'Closing an invitation must leave the current campaign view ready');
+  } finally { host.off('request', observeInviteClose); }
+  report.checks.push('New page began read-only; explicit takeover disabled the former page; closing invitation preserved approved members and needed no campaign refresh');
   phase='mobile exploration route and intentionally undelivered request';
   await secondTab.setViewportSize({width: 390, height: 844});
   const scene = await createScene(host, hostAction, '探索路线验证场景', 'RULES');
@@ -184,7 +194,9 @@ async function main(){
   assert.equal(afterRoute.domain.roots.length, beforeDrop.domain.roots.length + 1);
   assert.equal(sceneSecond(afterRoute.domain), sceneSecond(beforeDrop.domain) + 6);
   assert.equal(report.playerCommandPosts, 3);
-  report.checks.push('Six ordered neighboring cells traversed 30 feet in one accepted player action and one six-second scene interval');
+  await waitForHistoryCount(host, afterRoute.domain.roots.length);
+  await waitForStorageReady(host);
+  report.checks.push('Six ordered neighboring cells advanced one six-second interval, and the Host history synchronized automatically');
 
   phase='end owned fixture';await hostAction('end',()=>host.locator('#storage-end').click());
   assert.equal((await readHost()).storage.state,'IDLE');assert.deepEqual(await fs.readdir(path.join(root,'runs')),[]);

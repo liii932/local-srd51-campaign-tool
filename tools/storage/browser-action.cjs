@@ -18,7 +18,7 @@ function waitForHistoryCount(page, expected) {
 }
 
 async function observeStorageAction(page, name, trigger, timing, timeout = 120000, phase = () => {}) {
-  const started = Date.now(), posts = [], states = [];
+  const started = Date.now(), posts = new Set(), states = new Set();
   let resolvePost, resolveState;
   const post = new Promise(resolve => { resolvePost = resolve; });
   const state = new Promise(resolve => { resolveState = resolve; });
@@ -30,21 +30,31 @@ async function observeStorageAction(page, name, trigger, timing, timeout = 12000
       })]);
     } finally { clearTimeout(timer); }
   }
-  const observe = response => {
-    const request = response.request();
-    if (request.method() === 'POST' && response.url() === `${ORIGIN}/api/host/storage/${name}`) {
-      posts.push(response); timing.postResponseMs = Date.now() - started; timing.postStatus = response.status();
+  const observeRequest = request => {
+    if (request.method() === 'POST' && request.url() === `${ORIGIN}/api/host/storage/${name}`) {
+      posts.add(request);
+      timing.postRequestMs = Date.now() - started;
       timing.requestId = request.headers()['x-request-id'] || null;
       const fields = new URLSearchParams(request.postData());
       if (fields.has('fileKey')) timing.fileKey = fields.get('fileKey');
       if (fields.has('action')) timing.domainAction = fields.get('action');
+    } else if (posts.size && request.method() === 'GET' && request.url() === `${ORIGIN}/api/host/storage/state`) {
+      states.add(request);
+      timing.stateRequestMs = Date.now() - started;
+    }
+  };
+  const observeResponse = response => {
+    const request = response.request();
+    if (posts.has(request)) {
+      timing.postResponseMs = Date.now() - started; timing.postStatus = response.status();
       resolvePost(response);
-    } else if (request.method() === 'GET' && response.url() === `${ORIGIN}/api/host/storage/state`) {
-      states.push(response); timing.stateResponseMs = Date.now() - started; timing.stateStatus = response.status();
+    } else if (states.has(request)) {
+      timing.stateResponseMs = Date.now() - started; timing.stateStatus = response.status();
       resolveState(response);
     }
   };
-  page.on('response', observe);
+  page.on('request', observeRequest);
+  page.on('response', observeResponse);
   try {
     phase('trigger'); await trigger();
     phase('post-response'); const response = await within(post, `POST /${name}`);
@@ -61,14 +71,15 @@ async function observeStorageAction(page, name, trigger, timing, timeout = 12000
     }
     phase('render');
     await waitForStorageReady(page);
-    assert.equal(posts.length, 1, `${name} must submit once without retrying`);
-    assert.equal(states.length, timing.stateRefreshRequired ? 1 : 0,
+    assert.equal(posts.size, 1, `${name} must submit once without retrying`);
+    assert.equal(states.size, timing.stateRefreshRequired ? 1 : 0,
       `${name} must refresh the session only after an epoch change or a failed command`);
     assert.equal(response.status(), 200, `${name} failed: ${JSON.stringify(body)}`);
     assert.equal(body.status, 'OK', `${name} returned an invalid state response`);
     return {body, request: new URLSearchParams(response.request().postData())};
   } finally {
-    page.off('response', observe);
+    page.off('request', observeRequest);
+    page.off('response', observeResponse);
   }
 }
 

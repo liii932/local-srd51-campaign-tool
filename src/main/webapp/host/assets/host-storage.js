@@ -1407,8 +1407,12 @@
     } catch (_) { setBusy(false); message('无法读取所选文件，请重新选择完整战役 JSON 文件。'); }
   });
   setBusy(true, '正在读取战役…');
-  document.addEventListener('dnd:storage-refresh', () => {
-    if (!busy) load().catch(failure => message(messages[failure.message] || '无法读取当前战役。'));
+  document.addEventListener('dnd:storage-refresh', async () => {
+    if (busy) return;
+    setBusy(true);
+    try { await load(); }
+    catch (failure) { message(messages[failure.message] || '无法读取当前战役。'); }
+    finally { setBusy(false); }
   });
   load().then(() => message(view.campaign ? '战役已就绪。' : '创建、打开或恢复一个战役。'))
     .catch(failure => message(messages[failure.message] || '无法读取战役。')).finally(() => setBusy(false));
