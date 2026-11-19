@@ -100,7 +100,7 @@ final class StorageReadinessTest {
     private static Fixture check(CampaignStorageService service) throws Exception {
         Fixture result = new Fixture();
         ServletContext context = proxy(ServletContext.class, (ignored, method, arguments) -> switch (method.getName()) {
-            case "getAttribute" -> StorageApplicationListener.ENABLED_ATTRIBUTE.equals(arguments[0]) ? true : service;
+            case "getAttribute" -> StorageApplicationListener.SERVICE_ATTRIBUTE.equals(arguments[0]) ? service : null;
             default -> throw new AssertionError("Unexpected context call: " + method.getName());
         });
         HttpServletRequest request = proxy(HttpServletRequest.class, (ignored, method, arguments) -> switch (method.getName()) {

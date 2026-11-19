@@ -519,7 +519,7 @@ public final class Schema2CombatRules {
         Schema2ExplorationRules.requireExploration(b);
         switch(c.kind()) {
             case EXPLORATION_ADVANCE_TIME -> Schema2ExplorationRules.requireTimeSafe(p.roster,c.seconds());
-            case EXPLORATION_MOVE -> {if(b.flows().size()>=MAX_FLOWS)throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");Schema2ExplorationRules.prepareMove(p.roster,b,c.actorId(),c.path());Schema2ActionFlowRules.requireCauseCapacity(p.roster,b,c);}
+            case EXPLORATION_MOVE -> {Schema2ExplorationRules.prepareMove(p.roster,b,c.actorId(),c.path());Schema2ActionFlowRules.requireCauseCapacity(p.roster,b,c);}
             case DROP_PRONE -> {
                 active(p.roster.get(c.actorId()));
                 if (combatant(b, c.actorId()).prone()) throw invalid("S2_COMBAT_ALREADY_PRONE");

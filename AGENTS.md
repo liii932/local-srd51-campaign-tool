@@ -56,7 +56,7 @@ Distinguish current behavior from a target design before treating a difference a
 
 ## Product and security boundaries
 
-- The tool has one DM, whose entry remains loopback-only at `http://127.0.0.1:8080`. Explicit SQLite runtime mode also has a default-disabled player HTTPS entry on an exactly configured private, link-local or loopback IPv4 address and port `8443`.
+- The tool has one DM, whose entry remains loopback-only at `http://127.0.0.1:8080`. The SQLite application also has a default-disabled player HTTPS entry on an exactly configured private, link-local or loopback IPv4 address and port `8443`.
 - Player access uses campaign membership, individual approval and a separate session; it does not provide global player accounts. Public access, anonymous display, `/display` and `/api/public/*` remain unsupported. Enabling a listener, device certificate trust or firewall access follows the separate authorization and deployment requirements below.
 - Client input is untrusted. Dice, selected candidates, derived modifiers, algorithms, canonical identities, row versions and audit results are server-owned unless a documented API declares a bounded input.
 - Validate a complete request, frozen catalog, target set and optimistic versions before consuming randomness or writing audit rows.
@@ -70,8 +70,8 @@ Distinguish current behavior from a target design before treating a difference a
 - When retaining an existing database, preserve its applied migration history and use a forward migration; never edit checksums to hide a mismatch. A prototype schema replacement may instead use a new initialization path and an explicitly authorized reset/rebuild. Coordinate its code, manifests, tests and documentation; no fixed historical migration range dictates the future schema design.
 - While a rule release is supported by the current version, its identity, canonical/archive values, algorithms, fields, event/effect types and digests must agree across readers, writers and runtime. Future versions may replace or remove that release and its readers without preserving old saves.
 - Catalogs, runtime models, APIs, canonical/archive projections and tests may evolve cohesively. Reject unsupported old formats clearly; do not silently reinterpret them or add compatibility shims unless the user explicitly requires particular data to survive.
-- The legacy default, complete-rule DRAFT state and archive-format gates describe the current implementation. Change them only with the corresponding supported behavior and verification; do not present a design or partial mechanism as complete runtime support.
-- Preserve `com.dndtool`, Maven coordinates, `jdbc/DndToolSE` and existing environment-variable contracts unless a dedicated migration plan explicitly changes them.
+- SQLite is the supported Web runtime. The separate complete-rule DRAFT state and archive-format gates describe the supported rule boundaries. Change them only with the corresponding supported behavior and verification; do not present a design or partial mechanism as complete runtime support.
+- Preserve `com.dndtool`, Maven coordinates, existing environment-variable contracts and the offline tools’ MySQL identities unless a dedicated migration plan explicitly changes them.
 - Keep database credentials, Connector/J secrets, certificates, Tomcat external configuration, logs, backups and real save data outside Git and WAR.
 
 ## Implementation workflow

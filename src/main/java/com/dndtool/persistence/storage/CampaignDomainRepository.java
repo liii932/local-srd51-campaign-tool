@@ -19,19 +19,68 @@ public final class CampaignDomainRepository {
         // JDBC autoCommit flag does not reflect a transaction begun with SQL.
         Map<String, List<List<Object>>> expected = rows(state);
         for (String table : TABLES.reversed()) try (Statement statement = connection.createStatement()) { statement.executeUpdate("DELETE FROM " + table); }
-        for (String table : TABLES) for (List<Object> row : expected.get(table)) {
-            String sql = "INSERT INTO " + table + " VALUES (" + String.join(",", Collections.nCopies(row.size(), "?")) + ")";
+        for (String table : TABLES) insert(connection, table, expected.get(table), "");
+    }
+
+    private record RemovedRows(StorageSchemaCatalog.Table table, Set<List<Object>> keys) { }
+
+    /** Update parents before their children and retire obsolete children before their parents. */
+    public void applyChanges(Connection connection, StoragePlan plan, State before, State after) throws SQLException {
+        var original = rows(before);
+        var updated = rows(after);
+        List<RemovedRows> removed = new ArrayList<>();
+        for (var table : plan.tables()) {
+            var oldRows = original.get(table.name());
+            var newRows = updated.get(table.name());
+            if (oldRows == null || oldRows.equals(newRows)) continue;
+            var columns = table.columns().stream().map(StorageSchemaCatalog.Column::name).toList();
+            var keyIndices = table.primaryKey().stream().map(columns::indexOf).toList();
+            Map<List<Object>, List<Object>> remaining = new LinkedHashMap<>();
+            for (var row : oldRows) remaining.put(keyIndices.stream().map(row::get).toList(), row);
+            List<List<Object>> changed = new ArrayList<>();
+            for (var row : newRows) {
+                var prior = remaining.remove(keyIndices.stream().map(row::get).toList());
+                if (!row.equals(prior)) changed.add(row);
+            }
+            if (!changed.isEmpty()) {
+                var assignments = columns.stream().filter(column -> !table.primaryKey().contains(column))
+                        .map(SqliteSchemaCompiler::quote).map(name -> name + " = excluded." + name).toList();
+                String conflict = " ON CONFLICT (" + SqliteSchemaCompiler.columns(table.primaryKey())
+                        + ") DO UPDATE SET " + String.join(", ", assignments);
+                insert(connection, table.name(), changed, conflict);
+            }
+            if (!remaining.isEmpty()) removed.add(new RemovedRows(table, remaining.keySet()));
+        }
+        for (var obsolete : removed.reversed()) {
+            var table = obsolete.table();
+            var predicates = table.primaryKey().stream().map(key -> SqliteSchemaCompiler.quote(key) + " = ?").toList();
+            String sql = "DELETE FROM " + SqliteSchemaCompiler.quote(table.name()) + " WHERE " + String.join(" AND ", predicates);
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                for (int i = 0; i < row.size(); i++) {
-                    Object value = row.get(i);
-                    if (value == null) statement.setNull(i + 1, Types.BLOB);
-                    else if (value instanceof UUID uuid) statement.setBytes(i + 1, CampaignRepository.uuid(uuid.toString()));
-                    else if (value instanceof String text) statement.setString(i + 1, text);
-                    else if (value instanceof Long number) statement.setLong(i + 1, number);
-                    else throw new SQLException("DOMAIN_BINDING_TYPE");
+                for (var key : obsolete.keys()) {
+                    bind(statement, key);
+                    if (statement.executeUpdate() != 1) throw new SQLException("DOMAIN_DELETE_COUNT");
                 }
+            }
+        }
+    }
+
+    private static void insert(Connection connection, String table, List<List<Object>> rows, String conflict) throws SQLException {
+        if (rows.isEmpty()) return;
+        String placeholders = String.join(",", Collections.nCopies(rows.getFirst().size(), "?"));
+        String sql = "INSERT INTO " + SqliteSchemaCompiler.quote(table) + " VALUES (" + placeholders + ")" + conflict;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            for (var row : rows) {
+                bind(statement, row);
                 if (statement.executeUpdate() != 1) throw new SQLException("DOMAIN_INSERT_COUNT");
             }
+        }
+    }
+
+    private static void bind(PreparedStatement statement, List<Object> values) throws SQLException {
+        for (int i = 0; i < values.size(); i++) {
+            Object value = values.get(i);
+            if (value instanceof UUID uuid) statement.setBytes(i + 1, CampaignRepository.uuid(uuid.toString()));
+            else statement.setObject(i + 1, value);
         }
     }
     public State read(Connection connection) throws SQLException {

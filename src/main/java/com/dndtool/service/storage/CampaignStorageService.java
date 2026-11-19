@@ -32,12 +32,16 @@ public final class CampaignStorageService implements AutoCloseable {
                                List<EventView> history, CommandResult lastCommand, JsonObject domain) { }
     public record SaveResult(String fileKey, long revision, String sha256) { }
     public record ImportResult(String fileKey, String name, long eventTail, String sha256) { }
-    public record SavedCampaign(String fileKey, String name, long eventTail) { }
+    public record SavedCampaign(String fileKey, String name, long eventTail, boolean available) { }
+    private record SaveEntry(Object fileId, FileTime modified, long size, SavedCampaign summary) { }
     public enum Boundary { AFTER_PREPARATION_DIRECTORY, AFTER_PREPARATION_LOCK, AFTER_INPUT_STAGING_CREATE, DURING_INPUT_WRITE, AFTER_INPUT_LINK, AFTER_INPUT_WRITE,
                            AFTER_ALLOCATION_STAGING_CREATE, DURING_ALLOCATION_WRITE, AFTER_ALLOCATION_LINK, AFTER_ALLOCATION_WRITE, AFTER_PREPARATION_PUBLISH, AFTER_DATABASE_PREPARATION, AFTER_DDL, AFTER_INIT_COMMIT, AFTER_CHARACTER_UPDATE, AFTER_BUSINESS_COMMIT,
                            AFTER_P0, AFTER_TEMP, AFTER_P2, BEFORE_P3_COMMIT, AFTER_P3_COMMIT,
                            AFTER_IMPORT_TEMP, AFTER_IMPORT_PUBLISH, AFTER_DISCARD_ISOLATION }
     @FunctionalInterface public interface FaultInjector { void at(Boundary boundary); }
+    public static final class InvalidRootException extends IOException {
+        InvalidRootException(String message) { super(message); }
+    }
     private static final FaultInjector NO_FAULTS = boundary -> { };
     private static final Set<String> RUN_FILES = Set.of("run.db", "run.db-journal", "run.lock", "allocation.json", "input.json", "initialized.json", "database-started.json", "cleanup.json");
     private static final Set<String> DISCARD_FILES = Set.of("run.db", "run.db-journal", "run.lock", "allocation.json", "input.json", "initialized.json", "database-started.json", "cleanup.json", "discard.json");
@@ -52,6 +56,7 @@ public final class CampaignStorageService implements AutoCloseable {
     private final FaultInjector faults;
     private final java.util.function.IntUnaryOperator dice;
     private final LocalRuleLibrary ruleLibrary;
+    private final Map<String, SaveEntry> saveSummaries = new HashMap<>();
     private Active active;
     private boolean closed;
 
@@ -69,11 +74,11 @@ public final class CampaignStorageService implements AutoCloseable {
         this(root, faults, sides -> new SecureRandom().nextInt(sides) + 1);
     }
     CampaignStorageService(Path root, FaultInjector faults, java.util.function.IntUnaryOperator dice) throws IOException {
-        if (root == null || !root.isAbsolute()) throw new IOException("Managed storage root must be absolute");
+        if (root == null || !root.isAbsolute()) throw new InvalidRootException("Managed storage root must be absolute");
         if (ManagedCampaignFiles.windows() && root.getRoot().toString().startsWith("\\\\"))
-            throw new IOException("Managed storage requires a local Windows drive; UNC roots are unsupported");
+            throw new InvalidRootException("Managed storage requires a local Windows drive; UNC roots are unsupported");
         for (Path ancestor = root.normalize(); ancestor != null; ancestor = ancestor.getParent()) {
-            if (Files.exists(ancestor.resolve(".git"), LinkOption.NOFOLLOW_LINKS) || Files.exists(ancestor.resolve("WEB-INF"), LinkOption.NOFOLLOW_LINKS)) throw new IOException("Managed storage must be outside Git and deployed application trees: " + ancestor);
+            if (Files.exists(ancestor.resolve(".git"), LinkOption.NOFOLLOW_LINKS) || Files.exists(ancestor.resolve("WEB-INF"), LinkOption.NOFOLLOW_LINKS)) throw new InvalidRootException("Managed storage must be outside Git and deployed application trees: " + ancestor);
         }
         this.root = root.toAbsolutePath().normalize(); this.faults = Objects.requireNonNull(faults); this.dice = Objects.requireNonNull(dice);
         this.ruleLibrary = new LocalRuleLibrary(this.root);
@@ -93,15 +98,37 @@ public final class CampaignStorageService implements AutoCloseable {
     public synchronized List<SavedCampaign> savedCampaigns() {
         ensureOpen();
         try {
-            List<SavedCampaign> result = new ArrayList<>();
-            for (String key : saveFiles()) {
-                Document document = codec.decode(readBounded(checkedSavePath(key)));
-                if (!key.equals(document.fileKey())) throw new StorageException("STORAGE_INTEGRITY", "Saved campaign file identity differs");
-                result.add(new SavedCampaign(key, document.snapshot().name(), document.snapshot().history().size()));
-            }
-            result.sort(Comparator.comparing(SavedCampaign::name).thenComparingLong(SavedCampaign::eventTail).thenComparing(SavedCampaign::fileKey));
-            return List.copyOf(result);
+            return summaries(saveFiles());
         } catch (IOException e) { throw io("Cannot inspect saved campaigns", e); }
+    }
+
+    private List<SavedCampaign> summaries(List<String> visible) {
+        saveSummaries.keySet().retainAll(new HashSet<>(visible));
+        return visible.stream().map(this::saveSummary)
+                .sorted(Comparator.comparing(SavedCampaign::available).reversed().thenComparing(SavedCampaign::name)
+                        .thenComparingLong(SavedCampaign::eventTail).thenComparing(SavedCampaign::fileKey)).toList();
+    }
+
+    // This cache supplies list labels only. Every file operation still verifies the selected file.
+    private SavedCampaign saveSummary(String key) {
+        try {
+            Path path = checkedSavePath(key);
+            var attrs = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            SaveEntry cached = saveSummaries.get(key);
+            if (cached != null && Objects.equals(cached.fileId(), attrs.fileKey()) && cached.size() == attrs.size()
+                    && cached.modified().equals(attrs.lastModifiedTime())) return cached.summary();
+            SavedCampaign summary;
+            try {
+                Document document = codec.decode(readBounded(path));
+                if (!key.equals(document.fileKey())) throw CampaignJson.bad("Saved campaign file identity differs");
+                summary = new SavedCampaign(key, document.snapshot().name(), document.snapshot().history().size(), true);
+            } catch (StorageException invalid) { summary = new SavedCampaign(key, "", 0, false); }
+            saveSummaries.put(key, new SaveEntry(attrs.fileKey(), attrs.lastModifiedTime(), attrs.size(), summary));
+            return summary;
+        } catch (IOException | StorageException unreadable) {
+            saveSummaries.remove(key);
+            return new SavedCampaign(key, "", 0, false);
+        }
     }
     public synchronized Status status() {
         ensureOpen();
@@ -124,13 +151,18 @@ public final class CampaignStorageService implements AutoCloseable {
         catch (RuntimeException e) { active.blocked = "INTEGRITY"; throw e; }
     }
 
+    public synchronized CampaignView create(String name) {
+        ensureIdle();
+        return createWithRules(CampaignJson.name(name), BundledCampaignRules.projection());
+    }
+
     public synchronized CampaignView create(String name, List<StoredMember> members) {
         ensureIdle();
-        String checkedName = CampaignJson.name(name);
-        CampaignRuleContext rules = prepareRules(members);
-        Snapshot input = CampaignData.validate(new Snapshot(newId(), checkedName,
-                CampaignDomainData.State.initial(rules.projection())));
-        return initialize(input);
+        return createWithRules(CampaignJson.name(name), prepareRules(members).projection());
+    }
+
+    private CampaignView createWithRules(String name, ProductionSchema2Projection rules) {
+        return initialize(new Snapshot(newId(), name, CampaignDomainData.State.initial(rules)));
     }
 
     public synchronized CampaignRuleContext.Metadata previewRules(List<StoredMember> members) {
@@ -159,8 +191,11 @@ public final class CampaignStorageService implements AutoCloseable {
             Path file = checkedSavePath(fileKey); Document input = codec.decode(readBounded(file));
             if (!input.fileKey().equals(fileKey)) throw new StorageException("INVALID_FILE", "Filename and portable file identity differ");
             var frozen = input.snapshot().domains().material();
-            var prepared = prepareRules(frozen.binding().members());
-            if (!frozen.equals(CampaignDomainData.Material.of(prepared.projection())))
+            var members = frozen.binding().members();
+            var projection = members.equals(BundledCampaignRules.standardBinding().members())
+                    ? BundledCampaignRules.projection()
+                    : prepareRules(members).projection();
+            if (!frozen.equals(CampaignDomainData.Material.of(projection)))
                 throw new StorageException("RULE_COMPOSITION_MISMATCH", "The original packages differ from the complete frozen campaign material");
             return initialize(input.snapshot());
         } catch (IOException e) { throw io("Cannot read the selected campaign file", e); }
@@ -558,7 +593,7 @@ public final class CampaignStorageService implements AutoCloseable {
         ensureActive(true); CampaignJson.uuid(requestId);
         if (action == null || supplied == null || guard == null) throw CampaignJson.bad("Missing domain command or guard");
         JsonObject input = supplied.deepCopy();
-        CommandResult accepted = transaction(c -> {
+        CampaignView accepted = transaction(c -> {
             AccessSnapshot access = accessSnapshot(c); Snapshot before = access.snapshot(); Control control = repository.control(c);
             if (control.epoch() != epoch) throw new StorageException("STALE_EPOCH", "Refresh the current Host epoch");
             guard.validate(access);
@@ -566,7 +601,7 @@ public final class CampaignStorageService implements AutoCloseable {
             CampaignParticipationCommands.validateActor(before.domains(), action, input, actor);
             String intent = domainIntent(expectedRevision, action, input, actor);
             CommandReceipt prior = replay(c, requestId, intent, "DOMAIN_COMMAND");
-            if (prior != null) return result(prior, true);
+            if (prior != null) return view(before, control, result(prior, true));
             requireGate(c, control, epoch, expectedRevision);
             CampaignDomainData.State domains;
             try {
@@ -577,12 +612,15 @@ public final class CampaignStorageService implements AutoCloseable {
             }
             Snapshot after = CampaignData.validate(new Snapshot(before.campaignId(), before.name(), domains));
             codec.encode(new Document(newId(), after));
-            new CampaignDomainRepository().write(c, domains); faults.at(Boundary.AFTER_CHARACTER_UPDATE);
+            new CampaignDomainRepository().applyChanges(c, active.plan, before.domains(), domains);
+            faults.at(Boundary.AFTER_CHARACTER_UPDATE);
             repository.acceptCommand(c, requestId, intent, "DOMAIN_COMMAND", expectedRevision, domains.roots().getLast());
-            if (!after.equals(repository.snapshot(c))) throw new StorageException("STORAGE_INTEGRITY", "Domain transaction readback differs");
-            return result(repository.command(c, requestId), false);
+            Snapshot readback = verifiedSnapshot(c);
+            if (!after.equals(readback)) throw new StorageException("STORAGE_INTEGRITY", "Domain transaction readback differs");
+            return view(readback, repository.control(c), result(repository.command(c, requestId), false));
         });
-        afterBusinessCommit(!accepted.replayed()); return current(accepted);
+        afterBusinessCommit(!accepted.lastCommand().replayed());
+        return accepted;
     }
     /** Exact read-only result verification. An absent result never proves non-submission. */
     public synchronized Optional<CampaignDomainData.Root> exactDomainReceipt(String requestId, String runId, long originalRevision,
@@ -638,14 +676,10 @@ public final class CampaignStorageService implements AutoCloseable {
         catch (SQLException e) { throw database(e); }
     }
 
-    private CampaignView current(CommandResult command) {
-        try (Connection c = connect(active.database)) { return view(c, command); }
-        catch (SQLException e) { active.blocked = "INTEGRITY"; throw database(e); }
-        catch (RuntimeException e) { active.blocked = "INTEGRITY"; throw e; }
+    private CampaignView view(Connection c) throws SQLException {
+        return view(verifiedSnapshot(c), repository.control(c), null);
     }
-    private CampaignView view(Connection c) throws SQLException { return view(c, null); }
-    private CampaignView view(Connection c, CommandResult command) throws SQLException {
-        Snapshot snapshot = verifiedSnapshot(c); Control control = repository.control(c);
+    private static CampaignView view(Snapshot snapshot, Control control, CommandResult command) {
         return new CampaignView(snapshot.campaignId(), snapshot.name(), control.revision(), control.epoch(),
                 historyView(snapshot), command, domainView(snapshot.domains()));
     }
@@ -1130,12 +1164,13 @@ public final class CampaignStorageService implements AutoCloseable {
             repository.saves(c).stream().filter(s -> !s.accepted()).forEach(s -> pending.add(s.fileKey()));
         } catch (SQLException e) { return List.of(); }
         List<String> ids = new ArrayList<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(saves)) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(saves, "*.json")) {
             for (Path path : stream) {
-                rejectUnsafeFile(path, false); String name = path.getFileName().toString();
-                if (name.endsWith(".json")) { String id = name.substring(0, name.length() - 5); CampaignJson.uuid(id); if (!pending.contains(id)) ids.add(id); }
-                else if (name.endsWith(".tmp")) CampaignJson.uuid(name.substring(0, name.length() - 4));
-                else throw new StorageException("STORAGE_INTEGRITY", "Unknown file in managed save directory");
+                String name = path.getFileName().toString();
+                String id = name.substring(0, name.length() - 5);
+                try { CampaignJson.uuid(id); }
+                catch (StorageException unrelated) { continue; }
+                if (!pending.contains(id)) ids.add(id);
             }
         }
         Collections.sort(ids); return List.copyOf(ids);

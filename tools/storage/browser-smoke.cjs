@@ -312,6 +312,8 @@ async function main() {
     disposableConfirmed = true;
     report.checks.push('Fresh disposable root verified before the first business write');
     console.log('Browser phase: verifying local rule acceptance and free-card forms');
+    assert.equal(await form('storage-create-rules').inputValue(), 'standard');
+    assert.equal(await form('storage-create-custom').isVisible(), false);
     await selectStandardRules(page);
     await form('storage-create').locator('[name="name"]').fill(CAMPAIGN);
     await action('create', () => form('storage-create').getByRole('button', { name: '创建战役', exact: true }).click());
@@ -353,6 +355,7 @@ async function main() {
     report.checks.push('Selected exact final save through UI; reopened free-card HP and all seven history entries match');
     await screenshot('03-reopened-wide.png', 1440, 1050);
     await endFixture();
+    await form('storage-create-rules').selectOption('standard');
     await form('storage-create').locator('[name="name"]').fill(FULL_CAMPAIGN);
     await action('create', () => form('storage-create').getByRole('button', { name: '创建战役', exact: true }).click());
     ownsActiveFixture = true; await visible('#storage-domain');

@@ -103,7 +103,6 @@ class PlayerLoopLauncherReadinessTest {
         return (ServletContext)Proxy.newProxyInstance(ServletContext.class.getClassLoader(),new Class[]{ServletContext.class},(proxy,method,args)->{
             if(!method.getName().equals("getAttribute"))throw new AssertionError("Unexpected context call: "+method.getName());
             return switch((String)args[0]) {
-                case StorageApplicationListener.ENABLED_ATTRIBUTE -> true;
                 case StorageApplicationListener.SERVICE_ATTRIBUTE -> storage;
                 case StorageApplicationListener.ERROR_ATTRIBUTE -> error;
                 default -> throw new AssertionError("Unexpected context attribute");

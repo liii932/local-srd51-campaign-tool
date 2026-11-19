@@ -47,7 +47,6 @@ public final class HostStorageServlet extends HttpServlet {
     private static final Set<String> IDENTITY_FIELDS = Set.of("moduleKey", "releaseVersion");
 
     @Override protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!StorageApplicationListener.enabled(request.getServletContext())) { response.sendError(404); return; }
         String action = request.getPathInfo();
         if (action == null && request.getServletPath().equals("/host/storage")) {
             response.setContentType("text/html; charset=UTF-8");
@@ -70,11 +69,10 @@ public final class HostStorageServlet extends HttpServlet {
         catch (StorageException failure) { error(response, 409, failure.code()); }
         catch (Schema2Exception failure) { compositionError(response, failure); }
         catch (IllegalArgumentException failure) { error(response, 400, "INVALID_REQUEST"); }
-        catch (RuntimeException | LinkageError failure) { error(response, 503, "STORAGE_UNAVAILABLE"); }
+        catch (RuntimeException | LinkageError failure) { error(response, 503, StorageApplicationListener.startupError(request.getServletContext())); }
     }
 
     @Override protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!StorageApplicationListener.enabled(request.getServletContext())) { response.sendError(404); return; }
         try {
             String action = request.getPathInfo();
             if (action == null || !CAMPAIGN_COMMANDS.contains(action) && !RULE_COMMANDS.contains(action)) {
@@ -116,7 +114,9 @@ public final class HostStorageServlet extends HttpServlet {
                 return;
             }
             Object result = switch (action) {
-                case "/create" -> service.create(single(fields, "name"), members(fields));
+                case "/create" -> fields.containsKey("members")
+                        ? service.create(single(fields, "name"), members(fields))
+                        : service.create(single(fields, "name"));
                 case "/open" -> service.open(single(fields, "fileKey"));
                 case "/recover" -> service.recover(single(fields, "runId"));
                 case "/import" -> service.importFile(upload);
@@ -137,7 +137,7 @@ public final class HostStorageServlet extends HttpServlet {
         } catch (IllegalArgumentException failure) {
             error(response, 400, "INVALID_REQUEST");
         } catch (Exception | LinkageError failure) {
-            error(response, 503, "STORAGE_UNAVAILABLE");
+            error(response, 503, StorageApplicationListener.startupError(request.getServletContext()));
         }
     }
 
@@ -170,13 +170,15 @@ public final class HostStorageServlet extends HttpServlet {
             response.setStatus(503);
             response.setContentType("application/json; charset=UTF-8");
             response.getWriter().write("{\"status\":\"ERROR\",\"mode\":\"SQLITE\",\"ready\":false,"
-                    + "\"state\":\"UNAVAILABLE\",\"code\":\"STORAGE_UNAVAILABLE\"}");
+                    + "\"state\":\"UNAVAILABLE\",\"code\":"
+                    + JsonSupport.quote(StorageApplicationListener.startupError(request.getServletContext())) + "}");
         }
     }
 
     private static Map<String, List<String>> fields(HttpServletRequest request, String action) {
+        Set<String> submittedKeys = request.getParameterMap().keySet();
         Set<String> expected = switch (action) {
-            case "/create" -> Set.of("name", "members");
+            case "/create" -> submittedKeys.contains("members") ? Set.of("name", "members") : Set.of("name");
             case "/open", "/delete" -> Set.of("fileKey");
             case "/recover", "/discard" -> Set.of("runId");
             case "/domain" -> Set.of("action", "payload");
@@ -186,7 +188,7 @@ public final class HostStorageServlet extends HttpServlet {
             case "/rule-recover" -> Set.of("operationId");
             default -> Set.of();
         };
-        if (!request.getParameterMap().keySet().equals(expected)) throw new IllegalArgumentException("INVALID_REQUEST");
+        if (!submittedKeys.equals(expected)) throw new IllegalArgumentException("INVALID_REQUEST");
         Map<String, List<String>> values = new LinkedHashMap<>();
         for (String key : expected) {
             String[] submitted = request.getParameterValues(key);

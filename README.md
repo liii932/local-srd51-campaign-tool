@@ -1,24 +1,15 @@
 # Local 5E Campaign Tool
 
-Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具，使用 Java、Tomcat
-和 JDBC 管理战役并执行 D&D 5e 2014 规则；显式 SQLite 运行模式承接当前有限领域，
-未配置时仍使用 MySQL 简化模式。项目目标是完整覆盖 SRD 5.1 中可公开实现的
-角色、冒险、战斗、法术、装备、怪物和状态规则，同时保留可持久化、可审计、可恢复的单 DM
-操作闭环。
+Local 5E Campaign Tool 帮助一名 DM 在本机主持 D&D 5e 2014 战役。打开 `http://127.0.0.1:8080`，输入战役名称，使用应用随附的标准规则开团。角色、行动、骰点和历史由本机 SQLite 保存。结束战役后可用完整文件继续游戏。可选的玩家 HTTPS 入口默认关闭。
 
-项目处于原型阶段，只保证当前应用版本的运行，不承诺跨版本延续战役或读取旧存档。
-设计可按当前需求和验证结果修订，现有实现不构成永久兼容基线；范围见[产品说明](./docs/product.md)。
-
-> 当前实现包含可选 SQLite 有限运行规则与默认 MySQL 简化模式，尚未完成全部 SRD 5.1。DM 入口固定为
-> `http://127.0.0.1:8080`，由本机 DM 操作。SQLite 模式另有默认关闭的独立 HTTPS 玩家原型；
-> 实际局域网启用、设备信任和验收须另行完成。公网、匿名展示和公开 API 仍不在范围内。
+本项目是原型，支持当前版本的战役文件。已实现的职业、法术和动作范围见[产品说明](./docs/product.md)。
 
 ## 当前已实现
 
 显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
 首次体验可按[短冒险流程](./docs/storage-vitality-loop.md#跑一段短冒险)完成建队、探索、战斗和保存后继续；
 隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
-在“本机规则库”导入原包，分别审阅并明确接受，再选择准确有序成员并预览组合后，可以：
+使用标准规则即可开始。要使用外部包或家规组合，在“自定义规则组合”中逐包审阅、接受并预览。工作台可以：
 
 - 创建标准数组的有限 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史；
 - 单职业战士 1 级正常取得[回气](docs/rules/schema-2-second-wind.md)，在本人战斗回合用附赠动作恢复 `1d10＋战士等级` HP，次数随标准短休或长休恢复；
@@ -33,7 +24,7 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
   有序检定效果，并在共享网格上使用 DM 裁定战斗和阵营；
 - 在一个 SQLite 事务提交完整领域后果、历史、版本与幂等结果；保存初始及当前完整 JSON，下载/上传导入、同版重开，显式恢复或精确放弃残留。
 
-本机规则库支持外部作者 ZIP 与应用交付候选，所有包均须单独导入和接受。组合最多八包，
+标准规则直接取自 WAR 内四个准确原包。自定义组合可选用本机规则库里已导入、接受的内置或外部原包。组合最多八包，
 经过严格生产 reader、依赖/覆盖组合及当前机制与创建模板的完整支持校验。标准组合见[包指南](./rule-packages/srd51-runtime/package-guide.md)，第二组合见
 [家规说明](./rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)：运动改用感知、
 固定直接伤害为 3、工匠初始语言改为侏儒语。创建、候选、结算、来源展示和恢复使用同一战役
@@ -42,10 +33,7 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授予。
 准确领域覆盖、现行能力差异及剩余采用门见[领域接合表](./docs/design/v2/domain-integration.md)。
 
-未设置 `DND_STORAGE_ROOT` 时，原 MySQL 简化模式仍是启动默认，保留冻结规则
-`dnd5e2014_srd51_se_v1`、既有 Host 入口和格式 1 存档。SQLite 模式启动后关闭这些旧业务路由，
-不会双写、读取旧库补状态或在失败时回退。现有 MySQL 数据、迁移账本和外部账号必须独立保管；
-本地代码接合不表示已迁移、部署或删除真实数据。
+战役默认存放在运行账号的 `${user.home}/.dndtool/campaigns`。通过 `DND_STORAGE_ROOT` 可指定其他私有目录。
 
 来源 MySQL 的作者包安装/接受、内部快照与规则算法测试继续具有各自责任。
 通用外部规则安装、完整 SRD 发布、完整通用 archive format 2 和跨版本存档兼容
@@ -76,7 +64,7 @@ DM-managed 自由卡与有限规则角色各自校验，不自动互相转换；
 当前 SQLite 运行按[世界与场景](./docs/design/v2/world-and-scene-spaces.md)维护每个空间的
 逻辑时钟及唯一安置。DM 裁定本次旅行耗时，角色恢复资格按累计实际经历时间计算。
 完整文件 `RULE_BOUND_CAMPAIGN` format 3 保存各场景时钟、焦点及全部待继续事项。
-新建和文件打开核验本机准确原包与接受，活动运行、保存及本机残留恢复使用冻结材料。
+新建和文件打开均核对所绑定的完整规则，自定义组合还要核验本机接受记录。活动运行、保存及本机残留恢复使用冻结材料。
 目标以应用随版本交付的[JSON 表结构声明](./docs/design/v2/storage-schema-and-planning.md)，
 按规则、机制、历史与未决状态闭包建立每次打开独占的 SQLite 运行空间，使用完整 JSON
 保存与同版残留显式恢复。[数据覆盖与替换路线](./docs/design/v2/storage-data-map-and-rollout.md)
@@ -111,8 +99,8 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 |---|---|
 | 运行时 | Java 21 |
 | Web 容器 | Apache Tomcat 10.1，外部 WAR 部署 |
-| Web API/UI | Jakarta Servlet 6.0、JSP、原生 JavaScript |
-| 数据库 | 可选私有 SQLite/JDBC；默认 MySQL 8.0/JNDI 简化模式 |
+| Web API/UI | Jakarta Servlet 6.0、HTML、原生 JavaScript |
+| 数据库 | 进程私有 SQLite，随 WAR 交付 JDBC 驱动 |
 | JSON | Gson 2.14 |
 | 构建 | Maven 3.9 |
 | 测试 | JUnit 5、可选独立 MySQL 集成测试 |
@@ -122,15 +110,14 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 ```text
 本机浏览器
   └─ http://127.0.0.1:8080/host
-       └─ Servlet / JSP / JavaScript
+       └─ Servlet / HTML / JavaScript
             └─ Service：验证、事务、幂等与规则边界
                  └─ JDBC Repository
-                      ├─ 显式 DND_STORAGE_ROOT → 私有 SQLite 战役
-                      └─ 未配置 → Tomcat JNDI / MySQL 简化模式
+                      └─ 私有 SQLite 战役工作库
 ```
 
 应用按职责分为 `web`、`security`、`service`、`persistence` 和 `module` 包。Servlet
-不直接执行 SQL，Repository 不决定业务权限，JSP 不保存权威状态；跨表业务操作由 Service
+不直接执行 SQL，Repository 不决定业务权限，浏览器展示服务端状态；跨表业务操作由 Service
 拥有事务边界。
 
 ## 环境要求
@@ -138,13 +125,12 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 - JDK 21；
 - Maven 3.9 或兼容版本；
 - Apache Tomcat 10.1；
-- SQLite 模式使用原生 Windows 本地 NTFS/私有 ACL，或 Linux/WSL 的 POSIX 私有文件系统；文件锁、硬链接及平台落盘边界见[配置](./docs/configuration.md#sqlite-当前应用存储配置)；原 MySQL 模式需要 MySQL 8.0；
+- SQLite 模式使用原生 Windows 本地 NTFS/私有 ACL，或 Linux/WSL 的 POSIX 私有文件系统；文件锁、硬链接及平台落盘边界见[配置](./docs/configuration.md#sqlite-当前应用存储配置)；
 - 支持现代 JavaScript 的本机浏览器。
 
 应用不提供内嵌服务器，也不能通过 `java -jar` 独立启动。Windows 正式路线为外部
 Tomcat 10.1 + WAR + 主机本地 SQLite；配置真实启动身份和私有根后，通过
 `/api/host/storage/readiness` 确认就绪，打开 `http://127.0.0.1:8080`。
-原 MySQL 模式的 Connector/J 和数据库凭据由外部 Tomcat 提供，不得打包进 WAR。
 隔离测试和真实 WAR 验收见[测试指南](./docs/testing.md#原生-windows-外部-tomcat-候选验收)，
 正式切换及日常启停遵循[部署流程](./docs/deployment.md)。
 
@@ -170,29 +156,9 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 
 ## 数据库与部署
 
-本项目使用外部 Tomcat 根上下文部署；SQLite 运行模式按[配置](./docs/configuration.md#sqlite-当前应用存储配置)
-设置 `DND_STORAGE_ROOT`，由应用建立私有工作库，无需运行 MySQL 迁移。以下步骤用于原
-MySQL 模式及其独立账号/历史保管，数据库维护和 WAR 部署分别授权：
+正式运行使用外部 Tomcat 的根上下文。已审计的 WAR 自带 SQLite，存储根需位于应用和 Git 目录之外。部署或回滚时分别保管 WAR、存储根和启动身份。按[配置说明](./docs/configuration.md)和[部署指南](./docs/deployment.md)操作。
 
-1. 使用专用 migrator 账号按顺序应用尚未执行的迁移；
-2. 使用只读验收脚本和专用只读账号核对结构；
-3. 单独授予运行账号所需的最小权限；
-4. 在 Tomcat 外配置 `java:comp/env/jdbc/DndToolSE`；
-5. 将已构建并审计的 WAR 部署为 `ROOT.war`；
-6. 启动 MySQL 和 Tomcat 后访问 `http://127.0.0.1:8080/host`。
-
-当前自动化使用 `dnd_tool_se` 作为本地部署运行库，使用 `dnd_tool_se_it` 执行临时表集成测试；
-完整 V001—V042 迁移链只在物理隔离、可销毁的 MySQL 实例中以原名 `dnd_tool_se` 原样重放，不在
-运行实例内创建改名 schema，也不改写迁移 SQL。运行、只读核验、正式迁移、集成测试和隔离重放
-使用不同账号。现有少量测试数据的运行库可继续作为开发部署目标，但不能作为集成测试或迁移重放
-目标，使用前仍需盘点和备份。精确账号权限与 Agent 检查点见[数据库说明](./docs/database.md)。
-
-现有 V001—V018 迁移一旦应用即不可修改或重跑。不要把数据库口令放入命令行、Git、WAR、
-日志或 Java 启动参数。先阅读[数据库说明](./docs/database.md)与[配置说明](./docs/configuration.md)，
-再按[部署指南](./docs/deployment.md)执行可回滚部署。可参考以下无秘密示例配置：
-
-- [Tomcat ROOT Context](./config/tomcat/ROOT.xml.example)
-- [Tomcat setenv](./config/tomcat/setenv.bat.example)
+既有 MySQL 库、账号、迁移账本及离线规则工具单独维护。数据库维护说明见[数据库文档](./docs/database.md)。
 
 ## 安全与数据约束
 
@@ -202,8 +168,7 @@ MySQL 模式及其独立账号/历史保管，数据库维护和 WAR 部署分�
 - 客户端不能指定骰点、选中骰、派生修正、最终结果、效果算法或规范业务身份；
 - 未知、重复、未发布、摘要不一致或不受支持的冻结规则必须失败关闭；
 - 权威状态、事件、骰子、效果、字段变化、版本和幂等结果在同一事务提交或回滚；
-- MySQL 格式 1 存档使用稳定业务键，不包含数据库 ID、行版本或完整内部历史；SQLite 完整 JSON
-  保留当前有限模型的状态、历史与规则材料，排除玩家凭据、私钥和本机控制材料；
+- SQLite 完整 JSON 保留当前有限模型的状态、历史与规则材料，排除玩家凭据、私钥和本机控制材料；
 - 数据库账号按迁移、运行和只读验收职责分离。
 
 ## 项目结构

@@ -12,7 +12,19 @@
   let session = null, view = null, connectionId = '', pendingRequest = null, lastReceipt = null;
   storage.remove('connection');
   let readPromise = null, timer = null, failures = 0, submitting = false, synchronized = false, receiptUnresolved = false;
-  let candidates = [];
+  let candidates = [], routeDraft = null, pendingDetail = '';
+  const directionSteps = [
+    ['西北', -1, -1], ['北', 0, -1], ['东北', 1, -1], ['西', -1, 0],
+    ['东', 1, 0], ['西南', -1, 1], ['南', 0, 1], ['东南', 1, 1]
+  ];
+  const directionButtons = directionSteps.map(([label], index) => {
+    const button = element('button', 'secondary', label);
+    button.type = 'button';
+    button.setAttribute('aria-label', '向' + label);
+    button.addEventListener('click', () => addRouteStep(index));
+    $('player-route-directions').append(button);
+    return button;
+  });
   let cardsRenderKey = '', sharedRenderKey = '', proposalsRenderKey = '', actionsRenderKey = '', pendingRenderKey = '';
   try { pendingRequest = JSON.parse(storage.get('pending') || 'null'); } catch (_) { receiptUnresolved = true; }
   if (pendingRequest && (!pendingRequest.requestId || !pendingRequest.candidateId || !pendingRequest.precondition)) {
@@ -53,7 +65,7 @@
     const label = $('player-connection'); label.className = 'connection ' + (online ? 'is-live' : 'is-offline');
     label.replaceChildren(element('i'), document.createTextNode(online ? '已连接' : '连接中断'));
   }
-  async function api(path, body, isRead = false) {
+  async function api(path, body) {
     const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const headers = {'Accept': 'application/json'};
@@ -64,7 +76,7 @@
       let data;
       try { data = await response.json(); } catch (_) { throw new Error('RESPONSE_UNKNOWN'); }
       if (!response.ok || data.status === 'ERROR') {
-        const failure = new Error(data.code || 'PLAYER_UNAVAILABLE'); failure.definitive = response.status >= 400 && response.status < 500;
+        const failure = new Error(data.code || 'PLAYER_UNAVAILABLE');
         failure.status = response.status; throw failure;
       }
       if (data.session) session = data.session;
@@ -72,7 +84,7 @@
     } finally { clearTimeout(timeout); }
   }
   function clearProjection() {
-    view = null; candidates = []; synchronized = false;
+    view = null; candidates = []; routeDraft = null; synchronized = false;
     cardsRenderKey = sharedRenderKey = proposalsRenderKey = actionsRenderKey = pendingRenderKey = '';
     for (const id of ['player-cards', 'player-actions', 'player-shared', 'player-proposals', 'player-pending', 'player-proposal-character']) $(id).replaceChildren();
     $('player-table').hidden = true;
@@ -90,17 +102,64 @@
       const content = element('span'); content.append(element('strong', '', candidate.label || '当前行动'));
       const character = (view.cards || []).find(card => card.id === candidate.characterId);
       if (candidate.description || character) content.append(element('small', '', [character?.name, candidate.description].filter(Boolean).join(' · ')));
-        button.append(content, element('span', 'arrow', '→')); button.addEventListener('click', () => {
-          const current = candidates.find(value => value.id === candidate.id && value.precondition === candidate.precondition);
-          if (current) sendCommand(current);
+        const arrow = element('span', 'arrow', '→');
+        arrow.setAttribute('aria-hidden', 'true');
+        button.append(content, arrow); button.addEventListener('click', () => {
+          const current = candidateInView(candidate);
+          if (!current || !canWrite()) return;
+          if (current.route) {
+            routeDraft = {candidate: current, trigger: button, steps: []};
+            renderRoute();
+            directionButtons.find(option => !option.disabled)?.focus();
+          } else sendCommand(current);
         }); container.append(button);
       }
     }
     for (const button of container.querySelectorAll('button')) button.disabled = !canWrite();
+    renderRoute();
+    $('player-receipt-recovery').hidden = !pendingRequest?.receiptKey || session?.status !== 'APPROVED';
+    $('player-close-receipt').disabled = !synchronized || submitting;
     $('player-proposal-form').querySelector('button').disabled = !synchronized || submitting || session?.status !== 'APPROVED' || !view?.cards?.length;
     $('player-takeover').disabled = !synchronized || submitting || receiptUnresolved || Boolean(pendingRequest);
     $('player-join-form').querySelector('button').disabled = submitting || !session;
     $('player-resume').disabled = submitting || !session;
+  }
+  function candidateInView(candidate) {
+    return candidates.find(value => value.id === candidate.id && value.precondition === candidate.precondition);
+  }
+  function routeStep(index) {
+    const [, dx, dy] = directionSteps[index], route = routeDraft.candidate.route;
+    const last = routeDraft.steps.at(-1) || route;
+    const x = last.x + dx, y = last.y + dy;
+    if (x < 0 || y < 0 || x >= (route.width ?? 201) || y >= (route.height ?? 201)) return null;
+    return {x, y, direction: directionSteps[index][0]};
+  }
+  function renderRoute() {
+    if (routeDraft && !candidateInView(routeDraft.candidate)) routeDraft = null;
+    $('player-route').hidden = !routeDraft;
+    if (!routeDraft) return;
+    const {candidate, steps} = routeDraft, route = candidate.route;
+    const available = canWrite(), tip = steps.at(-1) || route;
+    const rule = "每格消耗 " + route.stepCostFeet + " 英尺移动额度。提交整段路线推进场景时间 6 秒。";
+    const path = steps.length ? steps.map(step => step.direction).join(' → ') + '。' : '';
+    const preview = path + '已选 ' + steps.length + ' / ' + route.maxSteps + ' 格。' +
+      (steps.length ? '终点' : '起点') + '（' + tip.x + ', ' + tip.y + '）';
+    if ($('player-route-rules').textContent !== rule) $('player-route-rules').textContent = rule;
+    if ($('player-route-preview').textContent !== preview) $('player-route-preview').textContent = preview;
+    directionButtons.forEach((button, index) => {
+      button.disabled = !available || steps.length === route.maxSteps || !routeStep(index);
+    });
+    $('player-route-undo').disabled = !available || !steps.length;
+    $('player-route-submit').disabled = !available || !steps.length;
+    $('player-route-cancel').disabled = submitting;
+  }
+  function addRouteStep(index) {
+    if (!routeDraft || !canWrite() || routeDraft.steps.length === routeDraft.candidate.route.maxSteps) return;
+    const next = routeStep(index), focused = document.activeElement;
+    if (!next) return;
+    routeDraft.steps.push(next);
+    renderRoute();
+    if (focused?.disabled) (directionButtons.find(button => !button.disabled) || $('player-route-submit')).focus();
   }
   function stat(value, label) { const node = element('div', 'stat'); node.append(element('strong', '', value ?? '—'), element('span', '', label)); return node; }
   function listSection(parent, title, values, format) {
@@ -183,9 +242,15 @@
       if (view.pending) pending.append(element('h2', '', view.pending.title || '等待当前行动继续'), element('p', '', view.pending.description || '请按当前允许的机会继续。'));
     }
     $('player-receipt').hidden = !lastReceipt;
-    if (lastReceipt) $('player-receipt').textContent = lastReceipt.outcome === 'WAITING' ? '上次收据：行动已接受，当时等待后续决定。当前现场请看上方进度。' : '上次收据：行动已完成。';
+    if (lastReceipt) {
+      let note = '上次收据：行动已完成。';
+      if (lastReceipt.state === 'NOT_EXECUTED') note = '上次收据：确认未执行，旧请求已作废。';
+      else if (lastReceipt.outcome === 'WAITING') note = '上次收据：行动已接受，当时等待后续决定。当前现场请看上方进度。';
+      if ($('player-receipt').textContent !== note) $('player-receipt').textContent = note;
+    }
     candidates = Array.isArray(view.candidates) ? view.candidates : [];
-    if (receiptUnresolved || pendingRequest) status('上一操作的结果待查证', '当前进度已读回，但还不能证明上一操作是否执行。请等待查证；必要时请 DM 核对准确收据。', 'warning', true);
+    if (receiptUnresolved || pendingRequest) status('上一操作的结果待查证', pendingDetail ||
+      '当前进度已读回。请核对上次操作的收据，必要时请 DM 协助。', 'warning', true);
     else if (!synchronized) status('正在同步当前进度', '操作暂时锁定，完整同步后再继续。', 'warning');
     else if (session.paused) status('DM 暂停了玩家操作', '你仍可查看角色与已共享内容。当前待处理行动保留，等待 DM 恢复。', 'warning');
     else if (!session.writeEnabled) status('此设备当前只读', '需要在这里行动时，请明确点击“在此设备启用操作”。', 'warning');
@@ -196,13 +261,21 @@
     clearTimeout(timer); const foreground = failures ? Math.min(8000, 2000 * 2 ** (failures - 1)) : 2000, base = document.hidden ? Math.max(10000, foreground) : foreground;
     timer = setTimeout(() => synchronize(), base + (failures ? Math.floor(Math.random() * 500) : 0));
   }
-  function forgetPending() { pendingRequest = null; receiptUnresolved = false; storage.remove('pending'); }
-  async function verifyPending() {
+  function forgetPending() { pendingRequest = null; receiptUnresolved = false; pendingDetail = ''; storage.remove('pending'); }
+  function applyReceipt(receipt, allowClosed = false) {
+    if (pendingRequest && receipt?.requestId === pendingRequest.requestId &&
+        (receipt?.state === 'ACCEPTED' || allowClosed && receipt?.state === 'NOT_EXECUTED')) {
+      lastReceipt = receipt; forgetPending();
+    } else receiptUnresolved = true;
+  }
+  async function verifyPending(close = false) {
     if (!pendingRequest) return;
-    const data = await api('receipt', pendingRequest, true);
-    const receipt = data.receipt;
-    if (receipt?.state === 'ACCEPTED') { lastReceipt = receipt; forgetPending(); }
-    else receiptUnresolved = true;
+    const {requestId, candidateId, precondition, receiptKey} = pendingRequest;
+    const identity = {requestId, candidateId, precondition};
+    if (close) identity.receiptKey = receiptKey;
+    const data = await api(close ? 'receipt-close' : 'receipt', identity);
+    view = data.view;
+    applyReceipt(data.receipt, close);
   }
   async function synchronize() {
     if (readPromise) return readPromise;
@@ -222,21 +295,59 @@
       } finally { readPromise = null; schedule(); }
     })(); return readPromise;
   }
-  async function sendCommand(candidate) {
-    if (!canWrite() || !candidates.includes(candidate)) return;
-    submitting = true; synchronized = false;
+  async function sendCommand(candidate, route) {
+    if (!canWrite() || !candidateInView(candidate)) return;
+    submitting = true;
+    renderActions();
     if (readPromise) await readPromise;
-    pendingRequest = {requestId: crypto.randomUUID(), candidateId: candidate.id, precondition: candidate.precondition};
+    if (!synchronized || !session?.writeEnabled || !candidateInView(candidate)) {
+      submitting = false;
+      render();
+      return;
+    }
+    synchronized = false; routeDraft = null; lastReceipt = null;
+    pendingRequest = {requestId: crypto.randomUUID(), candidateId: candidate.id, precondition: candidate.precondition, receiptKey: candidate.receiptKey};
     if (!storage.set('pending', JSON.stringify(pendingRequest))) {
       forgetPending(); submitting = false; status('本次行动尚未提交', '浏览器无法保留操作查证凭据。请允许此站点的会话存储后重新同步。', 'warning', true); renderActions(); return;
     }
     renderActions(); status('正在提交你的行动', '等待本次结果，请勿重复操作。');
-    try { const data = await api('command', {...pendingRequest, connectionId}); if (data.receipt?.state === 'ACCEPTED') { lastReceipt = data.receipt; forgetPending(); } else receiptUnresolved = true; }
-    catch (failure) {
-      if (failure.definitive) { forgetPending(); status('本次行动未执行', errors[failure.message] || '当前资格或现场已变化，正在重新读取允许的行动。', 'warning'); }
-      else { receiptUnresolved = true; status('行动结果待查证', '请求没有取得明确结果。先读回现场，再查证准确收据；不会自动重发。', 'warning', true); }
+    const command = {requestId: pendingRequest.requestId, candidateId: candidate.id, precondition: candidate.precondition, connectionId};
+    if (route) command.route = route;
+    try {
+      const data = await api('command', command);
+      applyReceipt(data.receipt);
+    } catch (failure) {
+      receiptUnresolved = true; pendingDetail = errors[failure.message] || '';
+      status('行动结果待查证', pendingDetail || '请求没有取得明确结果。正在读回现场并核对收据。', 'warning', true);
     } finally { submitting = false; synchronized = false; await synchronize(); }
   }
+  $('player-route-undo').addEventListener('click', () => {
+    if (!routeDraft || !canWrite()) return;
+    routeDraft.steps.pop();
+    renderRoute();
+    if ($('player-route-undo').disabled) directionButtons.find(button => !button.disabled)?.focus();
+  });
+  $('player-route-cancel').addEventListener('click', () => {
+    const trigger = routeDraft?.trigger;
+    routeDraft = null;
+    renderRoute();
+    trigger?.focus();
+  });
+  $('player-route-submit').addEventListener('click', () => {
+    if (!routeDraft?.steps.length) return;
+    sendCommand(routeDraft.candidate, routeDraft.steps.map(({x, y}) => ({x, y})));
+  });
+  $('player-close-receipt').addEventListener('click', async () => {
+    if (!synchronized || submitting || !pendingRequest?.receiptKey) return;
+    submitting = true;
+    renderActions();
+    try {
+      if (readPromise) await readPromise;
+      if (synchronized && pendingRequest?.receiptKey) await verifyPending(true);
+    } catch (failure) {
+      pendingDetail = errors[failure.message] || '仍无法查证这次行动。请重新同步，必要时由 DM 核对。';
+    } finally { submitting = false; synchronized = false; await synchronize(); }
+  });
   $('player-invitation').value = invitation; invitation = ''; fragment.delete('invite');
   $('player-join-form').addEventListener('submit', async event => {
     event.preventDefault(); if (submitting || !session) return; submitting = true; renderActions();

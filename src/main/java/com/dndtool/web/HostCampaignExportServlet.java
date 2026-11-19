@@ -28,7 +28,6 @@ public final class HostCampaignExportServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         if (exporter != null) return;
-        if (StorageApplicationListener.skipLegacyInitialization(this)) return;
         try {
             Object resource = InitialContext.doLookup("java:comp/env/jdbc/DndToolSE");
             if (!(resource instanceof DataSource dataSource)) throw new NamingException();

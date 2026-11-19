@@ -11,7 +11,7 @@ public final class PlayerBoundaryFilter implements Filter {
     private static final Set<String> READS = Set.of("/player", "/player/", "/player/assets/player.js", "/player/assets/player.css",
             "/api/player/session", "/api/player/state");
     private static final Set<String> WRITES = Set.of("/api/player/join", "/api/player/resume", "/api/player/takeover",
-            "/api/player/command", "/api/player/receipt", "/api/player/proposal");
+            "/api/player/command", "/api/player/receipt", "/api/player/receipt-close", "/api/player/proposal");
 
     public PlayerBoundaryFilter() { }
     public PlayerBoundaryFilter(PlayerListenerConfiguration configuration) { this.configuration = configuration; }
@@ -26,10 +26,11 @@ public final class PlayerBoundaryFilter implements Filter {
         if (!(input instanceof HttpServletRequest request) || !(output instanceof HttpServletResponse response)) throw new ServletException("HTTP required");
         String uri = request.getRequestURI(), context = request.getContextPath();
         String path = uri == null || context == null || !uri.startsWith(context) ? "" : uri.substring(context.length());
-        boolean playerPath = path.equals("/player") || path.startsWith("/player/") || path.startsWith("/api/player/");
+        boolean playerPath = isPlayerPath(path);
         boolean hostConnector = request.getLocalPort() == 8080 && "http".equals(request.getScheme());
         if (hostConnector) {
-            if (playerPath) deny(response, 404); else chain.doFilter(input, output);
+            if (playerPath || isPlayerPath(request.getServletPath())) deny(response, 404);
+            else chain.doFilter(input, output);
             return;
         }
         if (configuration == null || !allowedBoundary(request, configuration) || !playerPath || request.getQueryString() != null) { deny(response, 404); return; }
@@ -49,6 +50,11 @@ public final class PlayerBoundaryFilter implements Filter {
                     || !"empty".equals(request.getHeader("Sec-Fetch-Dest"))) { deny(response, 403); return; }
         } else { deny(response, 404); return; }
         chain.doFilter(input, output);
+    }
+
+    private static boolean isPlayerPath(String path) {
+        return path != null && (path.equals("/player") || path.startsWith("/player/")
+                || path.equals("/api/player") || path.startsWith("/api/player/"));
     }
 
     static boolean allowedBoundary(HttpServletRequest request, PlayerListenerConfiguration config) {

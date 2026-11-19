@@ -11,7 +11,9 @@ import static com.dndtool.service.Schema2CombatState.*;
 
 /** Finite server-authored choices. Candidate preparation never consumes game randomness. */
 public final class PlayerCandidateFactory {
-    public record Candidate(String id, String label, String characterId, String action, JsonObject input) {
+    public record ExplorationRoute(int x, int y, int maxSteps, int stepCostFeet, Integer width, Integer height) { }
+    public record Candidate(String id, String label, String characterId, String action, JsonObject input,
+                            ExplorationRoute route) {
         public Candidate { input = input.deepCopy(); }
         @Override public JsonObject input() { return input.deepCopy(); }
     }
@@ -77,12 +79,12 @@ public final class PlayerCandidateFactory {
                 for (UUID target : visible) if (!target.equals(actor) && roster.containsKey(target))
                     for (var item : roster.get(actor).character().equipment())
                         factory.add(Command.attack(actor, target, item.itemId()), "攻击 " + PlayerCampaignProjection.characterName(domain, target) + " · " + PlayerCampaignProjection.ruleName(domain, item.item()));
-                factory.moves(actor, false); factory.spells(actor, visible);
+                factory.moves(actor); factory.spells(actor, visible);
             } else if (battle.status() == Status.EXPLORATION) {
                 if (CampaignParticipationCommands.permitted(domain, actor, "EXPLORATION_MOVE")) {
                     factory.add(Command.action(Kind.DROP_PRONE, actor), label(Kind.DROP_PRONE));
                     factory.add(Command.action(Kind.STAND_UP, actor), label(Kind.STAND_UP));
-                    factory.moves(actor, true);
+                    factory.route(actor, player);
                 }
                 if (CampaignParticipationCommands.permitted(domain, actor, "END_CONCENTRATION")) factory.add(Command.action(Kind.END_CONCENTRATION, actor), "结束专注");
                 // Spell use in exploration must be explicitly granted for this exact scene.
@@ -120,10 +122,13 @@ public final class PlayerCandidateFactory {
         input.add("command", CampaignDomainCodec.toJson(command)); add(result, label, character.id(), "character-command", input);
     }
     private static void add(List<Candidate> result, String label, UUID actor, String action, JsonObject input) {
+        add(result, label, actor, action, input, null);
+    }
+    private static void add(List<Candidate> result, String label, UUID actor, String action, JsonObject input, ExplorationRoute route) {
         if (result.size() >= MAX_CHOICES) return;
-        JsonObject identity = new JsonObject(); identity.addProperty("action", action); identity.add("input", input);
+        JsonObject identity = new JsonObject(); identity.addProperty("action", action); identity.addProperty("actor", actor.toString()); identity.add("input", input);
         String id = CampaignJson.digest("DND-PLAYER-CANDIDATE", CampaignJson.canonical(identity));
-        if (result.stream().noneMatch(c -> c.id().equals(id))) result.add(new Candidate(id, label, actor.toString(), action, input));
+        if (result.stream().noneMatch(c -> c.id().equals(id))) result.add(new Candidate(id, label, actor.toString(), action, input, route));
     }
     private static String locationLabel(String value) { return switch (value) { case "MAIN_HAND" -> "主手"; case "OFF_HAND" -> "副手"; case "BOTH_HANDS" -> "双手"; default -> "穿戴"; }; }
     private static String label(Kind kind) { return switch (kind) {
@@ -145,18 +150,37 @@ public final class PlayerCandidateFactory {
                 rules.preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(), roster, battle, command);
             }
             catch (StorageException | IllegalArgumentException unavailable) { return; }
-            JsonObject input = new JsonObject(); input.addProperty("combatId", battle.combatId().toString()); input.addProperty("combatVersion", Long.toString(battle.version()));
-            input.add("focus", CampaignSpaceCommands.focusPayload(domain));
+            JsonObject input = combatInput();
             input.add("command", CampaignDomainCodec.toJson(command)); PlayerCandidateFactory.add(result, label, command.actorId(), "combat-command", input);
         }
-        void moves(UUID actor, boolean exploration) {
+        private JsonObject combatInput() {
+            JsonObject input = new JsonObject();
+            input.addProperty("combatId", battle.combatId().toString());
+            input.addProperty("combatVersion", Long.toString(battle.version()));
+            input.add("focus", CampaignSpaceCommands.focusPayload(domain));
+            return input;
+        }
+        void route(UUID actor, UUID member) {
+            Schema2ExplorationRules.MoveBudget budget;
+            try { budget = Schema2ExplorationRules.moveBudget(roster, battle, actor); }
+            catch (IllegalArgumentException unavailable) { return; }
+            if (budget.maxSteps() == 0) return;
+            var scene = domain.space().scene(battle.combatId());
+            boolean shared = PlayerCampaignProjection.shared(domain, member, CampaignParticipationData.ShareKind.SCENE, scene.id());
+            if (shared && scene.width() == 1 && scene.height() == 1) return;
+            var route = new ExplorationRoute(budget.start().x(), budget.start().y(), budget.maxSteps(), budget.stepCostFeet(),
+                    shared ? scene.width() : null, shared ? scene.height() : null);
+            PlayerCandidateFactory.add(result, budget.stepCostFeet() == 10 ? "规划探索匍匐路线" : "规划探索移动路线",
+                    actor, "combat-command", combatInput(), route);
+        }
+        void moves(UUID actor) {
             var combatant = battle.combatants().stream().filter(c -> c.characterId().equals(actor)).findFirst().orElse(null); if (combatant == null) return;
             String movement = combatant.prone() ? "匍匐" : "移动";
             for (int i = 0; i < STEPS.length; i++) {
                 int x = combatant.position().x() + STEPS[i][0], y = combatant.position().y() + STEPS[i][1];
                 if (Math.abs(x) > 10000 || Math.abs(y) > 10000) continue;
                 List<Position> path = List.of(new Position(x, y));
-                add(exploration ? Command.exploreMove(actor, path) : Command.move(actor, path), "向" + DIRECTIONS[i] + movement + "一格");
+                add(Command.move(actor, path), "向" + DIRECTIONS[i] + movement + "一格");
             }
         }
         void spells(UUID actor, Set<UUID> visible) {

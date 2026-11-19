@@ -91,6 +91,10 @@ class PlayerProcessRecoveryIntegrationTest {
             JsonObject originalReceipt = accepted.getAsJsonObject("receipt").deepCopy();
             assertEquals("ACCEPTED", originalReceipt.get("state").getAsString());
             JsonObject exactIdentity = object("requestId", requestId, "candidateId", option.get("id").getAsString(), "precondition", option.get("precondition").getAsString());
+            JsonObject closedIdentity = exactIdentity.deepCopy();
+            closedIdentity.add("receiptKey", option.get("receiptKey")); secrets.add(option.get("receiptKey").getAsString());
+            JsonObject neverDelivered = closedIdentity.deepCopy();
+            neverDelivered.addProperty("requestId", UUID.randomUUID().toString());
             JsonObject acceptedState = ok(get(dm, HOST + "/api/host/storage/state"), null);
             Facts beforeRestart = facts(acceptedState); long oldEpoch = acceptedState.getAsJsonObject("storage").get("epoch").getAsLong();
             String oldSession = cookie(deviceCookies, "DNDPLAYERSESSION"), originalDevice = cookie(deviceCookies, "DNDPLAYERDEVICE");
@@ -140,6 +144,11 @@ class PlayerProcessRecoveryIntegrationTest {
                 JsonObject checked = playerPost(reconnected, deviceCookies, "receipt", csrf(resumed), exactIdentity);
                 assertTrue(originalReceipt.equals(checked.get("receipt")), "same-run recovery must return the original receipt outcome");
                 assertFalse(checked.getAsJsonObject("session").get("writeEnabled").getAsBoolean());
+                JsonObject closed = playerPost(reconnected, deviceCookies, "receipt-close", csrf(checked), closedIdentity);
+                assertEquals(originalReceipt, closed.get("receipt"), "closure must return the original acceptance if the response was lost");
+                JsonObject absent = playerPost(reconnected, deviceCookies, "receipt-close", csrf(closed), neverDelivered);
+                assertEquals("NOT_EXECUTED", absent.getAsJsonObject("receipt").get("state").getAsString());
+                assertFalse(absent.getAsJsonObject("session").get("writeEnabled").getAsBoolean());
                 assertTrue(beforeReceipt.equals(facts(ok(get(recoveredDm, HOST + "/api/host/storage/state"), null))), "identity recovery and receipt lookup must not consume RNG, append roots or modify any business fact");
                 phase = "closing only the replacement child";
             }
