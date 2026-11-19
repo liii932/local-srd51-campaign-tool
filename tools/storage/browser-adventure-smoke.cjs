@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {chromium} = require('playwright');
-const {observeStorageAction, waitForStorageReady} = require('./browser-action.cjs');
+const {observeStorageAction, waitForStorageReady, readHistory, showCharacter} = require('./browser-action.cjs');
 const {selectStandardRules} = require('./browser-rule-library.cjs');
 
 const {focusSpace, placeAtFocus, beginBattle} = require('./browser-spaces.cjs');
@@ -248,7 +248,7 @@ async function main() {
       assert.equal(check.success, check.total >= 12);
       assert.equal(current.campaign.domain.positions.find(position => position.characterId === pcId).space.id, campId);
       report.checkResult = check;
-      assert.match(await form('storage-history').innerText(), check.success ? /发现桥后的脚印/ : /没有辨清脚印/);
+      assert.match(await readHistory(page), check.success ? /发现桥后的脚印/ : /没有辨清脚印/);
       await pane('world');
       await form('domain-travel').locator('[name="targetNodeId"]').selectOption(towerId);
       for (const id of [pcId, npcId])
@@ -333,7 +333,9 @@ async function main() {
       report.initialSaves.open = await captureSavedFiles(null, true);
       assert.deepEqual(facts(current.campaign), retained, 'Every initial/current character, rule, item, position, root, combat flow, original die and history must survive reopening');
       await pane('combat');
+      await showCharacter(page, 'RULE', pcId);
       assert.match(await form('storage-characters').innerText(), new RegExp(PC));
+      await showCharacter(page, 'RULE', npcId);
       assert.match(await form('storage-characters').innerText(), new RegExp(NPC));
       await screenshot('05-reopened-wide.png', 1440, 1050); await screenshot('06-reopened-mobile.png', 390, 844);
       report.reopenedFinal = finalFile;

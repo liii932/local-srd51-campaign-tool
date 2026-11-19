@@ -596,7 +596,19 @@ Ctrl+C 仅停止这个隔离验证实例；未 END 的运行下次启动必须�
 
 可选浏览器自动验收使用独立安装的 Playwright/Chromium，浏览器环境需有中文字库；
 不向 Maven 或 WAR 加浏览器依赖。
-聚焦短冒险体验时，先以上述启动器启用全新临时根，再执行：
+
+验证 DM 三栏工作台时，使用[玩家参与测试启动器](#玩家参与原型验证)和全新一次性私有根，以便左栏从真实玩家接口读取席位。待启动器就绪后，在另一终端使用同一根运行：
+
+```bash
+NODE_PATH=/absolute/browser-tools/node_modules \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
+node tools/storage/browser-workspace.cjs /absolute/empty/workspace-evidence \
+  --fresh-root /absolute/disposable/player-store
+```
+
+脚本通过实际表单创建角色和自由卡，在已有战斗行动者与攻击目标的情况下翻页，核对选择值和服务器刷新后的卡片身份。桌面及 390px 截图和滚动、焦点、请求检查的结果写入证据目录。详情见[工作台使用说明](storage-vitality-loop.md#战役工作台)。
+
+聚焦短冒险体验时，先用 `tools/storage/run-local.sh` 启用全新临时根，再执行：
 
 ```bash
 NODE_PATH=/absolute/browser-tools/node_modules \

@@ -17,6 +17,33 @@ function waitForHistoryCount(page, expected) {
   return page.locator(selector).waitFor({state: 'attached'});
 }
 
+// Card browsing is independent of the working form. Never refresh state to select a card.
+async function showCharacter(page, source, id) {
+  assert.ok(['RULE', 'MANUAL'].includes(source), `Unknown character source ${source}`);
+  const cards = page.locator('#character-browser-scroll [data-character-source]');
+  const matches = () => cards.evaluateAll((rows, expected) => rows.some(row =>
+    row.dataset.characterSource === expected.source && row.dataset.characterId === expected.id), {source, id});
+  if (await matches()) return;
+  const previous = page.locator('#character-browser-previous'), next = page.locator('#character-browser-next');
+  while (await previous.isEnabled()) await previous.click();
+  for (;;) {
+    if (await matches()) return;
+    assert.ok(await next.isEnabled(), `Character ${source}:${id} is not in the browser`);
+    const position = await page.locator('#character-browser-position').textContent();
+    await next.click();
+    assert.notEqual(await page.locator('#character-browser-position').textContent(), position, 'Next must advance the browser');
+  }
+}
+
+async function readHistory(page) {
+  const overlay = page.locator('#campaign-log-overlay');
+  const wasOpen = await overlay.isVisible();
+  if (!wasOpen) await page.locator('#campaign-log-toggle').click();
+  const text = await page.locator('#storage-history').innerText();
+  if (!wasOpen) await page.locator('#campaign-log-close').click();
+  return text;
+}
+
 async function observeStorageAction(page, name, trigger, timing, timeout = 120000, phase = () => {}) {
   const started = Date.now(), posts = [], states = [];
   let resolvePost, resolveState;
@@ -72,4 +99,4 @@ async function observeStorageAction(page, name, trigger, timing, timeout = 12000
   }
 }
 
-module.exports = {observeStorageAction, waitForStorageReady, waitForExactText, waitForHistoryCount};
+module.exports = {observeStorageAction, waitForStorageReady, waitForExactText, waitForHistoryCount, showCharacter, readHistory};

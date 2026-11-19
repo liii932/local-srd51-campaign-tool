@@ -15,7 +15,7 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 
 ## 当前已实现
 
-显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
+显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 `/host/storage`。在[战役工作台](./docs/storage-vitality-loop.md#战役工作台)左栏管理规则库与玩家，中栏进行战役操作，右栏翻阅角色卡。
 首次体验可按[短冒险流程](./docs/storage-vitality-loop.md#跑一段短冒险)完成建队、探索、战斗和保存后继续；
 隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
 在“本机规则库”导入原包，分别审阅并明确接受，再选择准确有序成员并预览组合后，可以：

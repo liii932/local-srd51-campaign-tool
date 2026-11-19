@@ -2,6 +2,8 @@
 (() => {
   const $ = id => document.getElementById(id), base = '/api/host/storage/players/';
   let state = null, hostView = null, busy = false, readPromise = null, timer = null, invitationUrl = '', proposalRenderKey = '';
+  let messageCampaignScope = null;
+  const activeCampaignMessage = '逐人核对加入、分配角色，并选择明确的共享受众。';
   const panel = $('host-players');
   const messages = {PLAYER_DISABLED:'玩家 HTTPS 入口尚未配置。配置正确地址与受信任证书后，再开放加入。',PLAYER_UNAVAILABLE:'玩家参与暂不可用，请确认当前活动战役与入口配置。',PLAYER_RUN_UNAVAILABLE:'请先创建、打开或恢复一个战役。',PLAYER_RULES_UNAVAILABLE:'玩家参与需要含规则角色模块的战役。',
     STALE_VERSION:'现场已变化，本次设置未提交。已读取最新席位，请核对后明确操作。',STALE_REVISION:'现场已变化，本次设置未提交。已读取最新席位。',
@@ -158,8 +160,10 @@
   }
   function render() {
     if (!state) return;
-    if (!state.configured) { $('host-players-content').hidden=true; message('玩家 HTTPS 入口尚未配置。请先按部署说明设置准确的局域网地址与受信任证书，再开放加入。'); return; }
-    if (!hostView?.campaign) { $('host-players-content').hidden=true; invitationUrl='';$('host-player-qr').replaceChildren();$('host-player-link').removeAttribute('href');$('host-player-link').textContent='';message('请先创建、打开或恢复一个战役，再邀请玩家入席。');return; }
+    if (!state.configured) { messageCampaignScope=null; $('host-players-content').hidden=true; message('玩家 HTTPS 入口尚未配置。请先按部署说明设置准确的局域网地址与受信任证书，再开放加入。'); return; }
+    if (!hostView?.campaign) { messageCampaignScope=null; $('host-players-content').hidden=true; invitationUrl='';$('host-player-qr').replaceChildren();$('host-player-link').removeAttribute('href');$('host-player-link').textContent='';message('请先创建、打开或恢复一个战役，再邀请玩家入席。');return; }
+    const scope = `${hostView.storage.runId}:${hostView.campaign.campaignId}`;
+    if (scope !== messageCampaignScope) { messageCampaignScope=scope; message(activeCampaignMessage); }
     $('host-players-content').hidden=false;renderInvitation();renderApplications();renderMembers();renderProposals();renderControls();
   }
   async function refresh(showMessage=true) {
@@ -169,7 +173,7 @@
       const previous=state;state=data;
       if(!busy && (!previous || JSON.stringify(previous)!==JSON.stringify(state))) render();
       if(state.configured && hostView?.campaign && String(hostView.campaign.revision)!==String(state.revision)) document.dispatchEvent(new Event('dnd:storage-refresh'));
-      if(showMessage && state.configured && hostView?.campaign) message('逐人核对加入、分配角色，并选择明确的共享受众。');
+      if(showMessage && state.configured && hostView?.campaign) message(activeCampaignMessage);
     }catch(failure){if(showMessage) message(messages[failure.message] || '暂时无法读取玩家席位。');}
     finally{readPromise=null;clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden && !busy) refresh(false);else schedule();},document.hidden?15000:4000);}})();return readPromise;
   }

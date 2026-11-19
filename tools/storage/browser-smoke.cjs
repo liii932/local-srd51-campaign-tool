@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
 const { createHash } = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
 const HTTP_TIMEOUT = 120000;
-const { observeStorageAction, waitForStorageReady, waitForExactText, waitForHistoryCount } = require('./browser-action.cjs');
+const { observeStorageAction, waitForStorageReady, waitForExactText, waitForHistoryCount, readHistory, showCharacter } = require('./browser-action.cjs');
 const { selectStandardRules } = require('./browser-rule-library.cjs');
 
 const {createNode, focusSpace, placeAtFocus, createScene, enterScene, beginBattle} = require('./browser-spaces.cjs');
@@ -292,7 +292,7 @@ async function main() {
     const reopened = await currentCampaign();
     assert.deepEqual(reopened.domain, recovered.domain); assert.deepEqual(reopened.history, recovered.history);
     assert.match(await form('storage-characters').innerText(), /奥术回想使用日：第 0 日/);
-    assert.match(await form('storage-history').innerText(), /奥术回想：.*0 → 1（恢复 1）/);
+    assert.match(await readHistory(page), /奥术回想：.*0 → 1（恢复 1）/);
     await screenshot('03-reopened-arcane-wide.png', 1440, 1050);
     await endFixture();
     report.checks.push('Fresh save + END + exact-file open preserved the entire recovered Host domain/history; reopened fixture ended successfully');
@@ -336,7 +336,7 @@ async function main() {
     await action('domain', () => checkForm.getByRole('button', {name: '服务器掷骰并应用后果', exact: true}).click());
     await equalText('#manual-cards .hp', '9 / 12');
     await historyCount(7);
-    assert.match(await form('storage-history').innerText(), /自由卡检定.*应用顺序：生命值 5/);
+    assert.match(await readHistory(page), /自由卡检定.*应用顺序：生命值 5/);
     report.checks.push('Explicit accepted rule selection allowed a free-card check to apply a +5 HP consequence to 4/12');
     await screenshot('01-healed-wide.png', 1440, 1050);
     await screenshot('02-healed-mobile.png', 390, 844);
@@ -368,12 +368,13 @@ async function main() {
       await chooseRule('#domain-create [name="classKey"]', 'fighter');
       await action('domain', () => form('domain-create').getByRole('button', { name: '创建完整角色', exact: true }).click());
     }
-    assert.equal(await page.locator('#storage-characters .character-card').count(), 2);
+    const ruleCards = (await currentCampaign()).domain.characters;
+    const pc = ruleCards.find(card => card.kind === 'PC'), npc = ruleCards.find(card => card.kind === 'NPC');
+    for (const card of [pc, npc]) await showCharacter(page, 'RULE', card.id);
+    assert.equal(await page.locator('#storage-characters .character-card').count(), 1);
     console.log('Browser phase: rich PC and NPC created; testing world and conditional checks');
     const camp = await createNode(page, action, '石桥营地');
     await focusSpace(page, action, 'WORLD', camp);
-    const ruleCards = (await currentCampaign()).domain.characters;
-    const pc = ruleCards.find(card => card.kind === 'PC'), npc = ruleCards.find(card => card.kind === 'NPC');
     await placeAtFocus(page, action, [pc.id, npc.id]);
     await form('domain-item').locator('[name="characterId"]').selectOption(pc.id);
     await form('domain-item').locator('[name="name"]').fill('火把');
@@ -386,6 +387,7 @@ async function main() {
     await page.locator('[data-pane="actions"]').click();
     await form('domain-check').locator('[name="characterId"]').selectOption(pc.id);
     await action('domain', () => form('domain-check').getByRole('button', { name: '服务器掷骰检定', exact: true }).click());
+    await showCharacter(page, 'RULE', pc.id);
     assert.match(await form('storage-characters').innerText(), /最近检定/);
     await form('check-with-effects').check();
     await chooseRule('#domain-check [name="successEffect"]', 'vital_effect.dm_damage');
@@ -401,12 +403,14 @@ async function main() {
     await form('domain-check').locator('[name="failureMessage"]').fill('失败分支：在营地消耗火把。');
     await form('domain-check').locator('[name="difficultyClass"]').fill('0');
     await action('domain', () => form('domain-check').getByRole('button', { name: '服务器掷骰检定', exact: true }).click());
-    assert.match(await form('storage-history').innerText(), /成功分支：备好火把/);
-    assert.match(await form('storage-history').innerText(), /火把 数量 3 → 5/);
+    const successHistory = await readHistory(page);
+    assert.match(successHistory, /成功分支：备好火把/);
+    assert.match(successHistory, /火把 数量 3 → 5/);
     await form('domain-check').locator('[name="difficultyClass"]').fill('30');
     await action('domain', () => form('domain-check').getByRole('button', { name: '服务器掷骰检定', exact: true }).click());
-    assert.match(await form('storage-history').innerText(), /失败分支：在营地消耗火把/);
-    assert.match(await form('storage-history').innerText(), /火把 数量 5 → 4/);
+    const failureHistory = await readHistory(page);
+    assert.match(failureHistory, /失败分支：在营地消耗火把/);
+    assert.match(failureHistory, /火把 数量 5 → 4/);
     report.checks.push('The same check form declared both branches before server dice, then applied HP, inventory and message for forced success and forced failure');
     console.log('Browser phase: both rich conditional outcomes verified; testing free cards');
     await page.locator('[data-pane="manual"]').click();
@@ -455,6 +459,7 @@ async function main() {
     await manualEffect('success', 'MESSAGE', {text: '自由行动成功，先恢复后消耗。'});
     await manualEffect('failure', 'HP', {amount: '-1'});
     await action('domain', () => form('manual-check').getByRole('button', { name: '服务器掷骰并应用后果', exact: true }).click());
+    await showCharacter(page, 'MANUAL', manualCreated.commandResult.subjectId);
     const freeCard = () => page.locator('#manual-cards .card').filter({hasText: '自由记录员'});
     assert.equal((await freeCard().locator('.hp').textContent()).trim(), '6 / 12');
     await form('manual-check').locator('[name="checkType"]').selectOption('SAVING_THROW');
@@ -465,7 +470,7 @@ async function main() {
     await manualEffect('failure', 'MESSAGE', {text: '豁免失败，使用应急绷带。'});
     await action('domain', () => form('manual-check').getByRole('button', { name: '服务器掷骰并应用后果', exact: true }).click());
     assert.equal((await freeCard().locator('.hp').textContent()).trim(), '5 / 12');
-    assert.match(await form('storage-history').innerText(), /豁免失败，使用应急绷带/);
+    assert.match(await readHistory(page), /豁免失败，使用应急绷带/);
     assert.match(await freeCard().innerText(), /应急绷带 × 2/);
     await form('manual-inventory').locator('[name="characterId"]').selectOption({label: '自由记录员'});
     await form('manual-item-source').selectOption('item.torch');
@@ -500,8 +505,10 @@ async function main() {
     await form('storage-files').selectOption(fullSave);
     await action('open', () => form('storage-open').getByRole('button', { name: '打开战役', exact: true }).click());
     ownsActiveFixture = true; await visible('#storage-domain');
-    assert.equal(await page.locator('#storage-characters .character-card').count(), 2);
-    assert.equal(await page.locator('#manual-cards .card').count(), 2);
+    for (const id of [pc.id, npc.id]) await showCharacter(page, 'RULE', id);
+    await showCharacter(page, 'MANUAL', manualIds.find(id => id !== owner.id));
+    await showCharacter(page, 'MANUAL', owner.id);
+    assert.match(await form('character-browser-position').innerText(), /\/\s*4\b/);
     assert.match(await form('manual-cards').innerText(), /应急绷带/);
     await historyCount(fullHistoryCount);
     assert.match(await form('domain-world-summary').innerText(), /石桥营地/);
@@ -570,7 +577,7 @@ async function main() {
     assert.equal(Number(wizardSlots(wizard).current), 1); assert.equal(Number(wizard.state.spellbook.lastArcaneRecoveryDay), 0);
     assert.deepEqual(wizard.history.events.at(-1).command.restInput.recoveredSpellSlots, {'1': 1});
     assert.match(await form('storage-characters').innerText(), /最近奥术回想：.*0 → 1（恢复 1）/);
-    assert.match(await form('storage-history').innerText(), /奥术回想：.*0 → 1（恢复 1）/);
+    assert.match(await readHistory(page), /奥术回想：.*0 → 1（恢复 1）/);
     await restAction('REST_ENDED'); await restAction('REST_STARTED');
     await rest.locator('[name="minutes"]').fill('60'); await restAction('TIME_ADVANCED');
     await rest.locator('[name="kind"]').selectOption('REST_COMPLETED'); await rest.locator('[name="recoverSlot1"]').fill('1');
@@ -592,7 +599,7 @@ async function main() {
     assert.deepEqual(arcaneAfter.domain, arcaneBefore.domain, 'Save, END and reopen must retain slots, use day, exact roots and child history');
     assert.deepEqual(arcaneAfter.history, arcaneBefore.history);
     assert.match(await form('storage-characters').innerText(), /奥术回想使用日：第 0 日/);
-    assert.match(await form('storage-history').innerText(), /奥术回想：.*0 → 1（恢复 1）/);
+    assert.match(await readHistory(page), /奥术回想：.*0 → 1（恢复 1）/);
     await endFixture();
     report.checks.push('Real Wizard rest form offered only spent supported slots and submitted selected ranks/counts; incomplete rest, over-budget and daily reuse were rejected without state/history writes; empty selection declined');
     report.checks.push('Arcane Recovery restored exactly one spent slot, displayed actual recovery/day, and Save + END + reopen preserved slots, use day and complete root/child history');
