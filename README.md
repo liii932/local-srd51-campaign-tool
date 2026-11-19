@@ -15,7 +15,7 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 
 ## 当前已实现
 
-显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 `/host/storage`。在[战役工作台](./docs/storage-vitality-loop.md#战役工作台)左栏管理规则库与玩家，中栏进行战役操作，右栏翻阅角色卡。
+显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
 首次体验可按[短冒险流程](./docs/storage-vitality-loop.md#跑一段短冒险)完成建队、探索、战斗和保存后继续；
 隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
 在“本机规则库”导入原包，分别审阅并明确接受，再选择准确有序成员并预览组合后，可以：
@@ -28,6 +28,7 @@ Local 5E Campaign Tool 是一个面向单机游戏主持人的本地 Web 工具�
 - 使用有限普通战斗、移动、机会攻击、反应/继续、Bless、Cure Wounds、Shield、Counterspell、Burning Hands、法师书/准备和奥术回想；
 - 规则角色可在探索中或本人战斗回合[主动卧倒、双倍成本爬行和起身](docs/rules/schema-2-prone.md)；探索卧倒不耗时，移动与起身各推进六秒，战斗起身花半速；复用倒地攻防、OA 与 Ready 移动，姿态和未决路径随完整文件恢复；
 - 建立世界节点、路线及有界网格场景，显式入退场、旅行与切换唯一执行焦点；后台时钟、角色、效果与未决动作冻结；
+- 在[战役工作台](./docs/storage-vitality-loop.md#战役工作台)左栏管理规则库与玩家，中栏主持当前场景，右栏翻阅角色卡。
 - 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、唯一安置、简单物品、角色状态与消息根历史；
 - 管理独立的 DM-managed 自由卡、基础字段、职业等级和熟练，执行 MANUAL/SAVING_THROW、
   有序检定效果，并在共享网格上使用 DM 裁定战斗和阵营；
