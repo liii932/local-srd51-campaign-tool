@@ -6,7 +6,7 @@ Local 5E Campaign Tool 帮助一名 DM 在本机主持 D&D 5e 2014 战役。打�
 
 ## 当前已实现
 
-显式设置 `DND_STORAGE_ROOT` 后，`/host` 进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
+`/` 和 `/host` 均进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
 首次体验可按[短冒险流程](./docs/storage-vitality-loop.md#跑一段短冒险)完成建队、探索、战斗和保存后继续；
 隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
 使用标准规则即可开始。要使用外部包或家规组合，在“自定义规则组合”中逐包审阅、接受并预览。工作台可以：
@@ -179,10 +179,10 @@ src/main/java/com/dndtool/
   persistence/     JDBC Repository、模式查询与持久化边界
   security/        loopback 主机边界和请求安全过滤器
   service/         业务验证、诊断编排、事务、幂等和存档服务
-  web/             JNDI/启动装配、Servlet、HTTP DTO 与页面支持
+  web/             SQLite 启动与就绪检查、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
-                    V001—V042 只增不改运行数据库迁移
-src/main/webapp/    JSP、web.xml 和主机端 JavaScript
+                    独立 MySQL 维护与核验使用的 V001—V042 迁移
+src/main/webapp/    WAR 的 Host / Player HTML、web.xml、JavaScript 和 CSS。旧 JSP 供测试使用
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
 database/           只读验证、最小授权与独立测试库辅助 SQL
@@ -234,8 +234,8 @@ tracks semantic drafting and source review separately from implementation.
 | [职业特性 v2](./docs/rules/class-features-v2.md) | 12 职业/子职业特性矩阵、资源恢复与阻断边界 |
 | [多职业共享法术位 v2](./docs/rules/multiclass-spell-slots-v2.md) | DRAFT 职业贡献、共享位上限与未完成边界 |
 | [Archive format 2 角色投影](./docs/rules/archive-format-2-character-state.md) | DRAFT 稳定事件闭包、严格 codec 与恢复来源 |
-| [配置](./docs/configuration.md) | JNDI、数据库凭据与 loopback Connector |
-| [数据库](./docs/database.md) | 当前迁移链、保留数据库或重建的边界与账号职责 |
+| [配置](./docs/configuration.md) | SQLite 存储根、Tomcat 运行身份与可选玩家 HTTPS Connector |
+| [数据库](./docs/database.md) | SQLite 工作库与独立 MySQL 迁移、核验及账号职责 |
 | [安全](./docs/security.md) | 请求边界、权威输入、最小权限与秘密处理 |
 | [测试](./docs/testing.md) | 定向测试、完整验证、集成测试和 WAR 审计 |
 | [公开仓库发布检查清单](./docs/public-release-checklist.md) | 私有迁移仓库公开前的内容审计与 GitHub 设置确认 |

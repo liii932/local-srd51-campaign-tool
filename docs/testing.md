@@ -24,16 +24,17 @@ mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 
 相关测试失败时先修复并重跑相关范围，不自动扩大为全量。复用本次对相同代码、资源、依赖、配置及相关环境取得的有效结果；后续改动影响证据时才重跑对应范围。不得同时运行会写同一 `target` 的 Maven 命令。
 
-规则模型归属或诊断装配变化时，先覆盖固定 canonical/hash 向量、目录 JDBC、发布门和旧单池诊断：
+当前工作台的启动、规则绑定、完整文件与就绪测试见[SQLite 结构、完整文件与运行验收](#sqlite-结构完整文件与运行验收)。
+
+维护旧 MySQL 目录或诊断代码时，按变更选择固定 canonical/hash 向量、目录 JDBC、发布门和单池诊断测试。
 
 ```bash
 mvn '-Dtest=ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,ModuleContentHasherTest,BuiltinModuleHashManifestTest,BuiltinModuleReleaseRegistryTest,JdbcModuleCatalogRepositoryTest,ModuleIntegrityServiceTest,SchemaMigrationsTest,DatabaseSchemaVerifierTest,DatabaseDiagnosticsTest,DatabaseDiagnosticsFactoryTest,HostDatabaseDiagnosticServletTest,CampaignArchiveCapabilityBoundaryTest' test
 ```
 
-再按真实引用闭包加入受影响的角色、检定、存档、规则浏览和语言投影消费者。诊断测试须证明
+再按实际调用方加入受影响的旧角色、检定、存档、规则浏览和语言投影消费者。旧诊断测试覆盖
 打包迁移/schema 在规则之前校验、失败不继续查询、只查原 `jdbc/DndToolSE`、查询资源关闭、
-无数据写入、每次 GET 更新结果及有限 HTTP/日志类别。包迁移打包时排除旧路径残留类，
-特别是旧 listener，避免重复启动诊断；这些无数据库测试不构成真实 MySQL 或部署验收。
+无数据写入、每次 GET 更新结果及有限 HTTP/日志类别。真实 MySQL 验收按第 3 节独立执行。
 
 ### Tomcat 测试依赖
 
@@ -526,8 +527,9 @@ WAR 审计通过不代表已经部署。
 
 `StorageApplicationListenerTest` 和 `StorageHttpIntegrationTest` 覆盖默认根、无 JNDI 的生产入口及显式无效根。用 `CampaignRuleBindingIntegrationTest` 验证标准战役在新根直接重开、自定义绑定仍需本机接受。`CampaignStorageServiceTest` 验证单份损坏存档隔离、未改动行保持原位及提交故障恢复。
 
-当前有限 SQLite 模型见[运行合同](storage-vitality-loop.md)。所有新建测试显式导入并接受准确
-原包；文件移机测试必须分别核验缺库、未接受和已接受状态。文件往返不代表接受已迁移。结构与真实 SQLite 的定向入口是
+当前有限 SQLite 模型见[运行合同](storage-vitality-loop.md)。标准新建测试只提交战役名称，
+并核对标准存档可在空规则库的存储根打开且无接受写入。自定义组合测试覆盖移机时缺少原包、
+已导入但未接受、准确接受后的打开。结构与真实 SQLite 的定向入口是
 `StorageSchemaCatalogTest`、`SqliteSchemaTest`；业务/生命周期见 `CampaignStorageServiceTest`、
 `CampaignStorageLifecycleTest`。`BundledCampaignRulesTest` 核验常规组合的四包、精确数字、可执行初始化
 与基础/施法预检。`CampaignRuleBindingIntegrationTest` 核验两个组合各自的候选属性、角色初始授予、来源链与真实分支结算，
@@ -560,7 +562,7 @@ Windows JVM 执行，核验 NTFS ACL、junction 拒绝及跨进程运行锁；Li
 Windows 通过。`CampaignArcaneRecoveryIntegrationTest` 覆盖短休资格、真实位数与预算、
 每日限制、法术书、幂等、晚写回滚和保存/END/重开。
 `StorageApplicationListenerTest`、`StorageReadinessTest` 验证配置优先级、显式空根失败关闭、
-实际规则/文件/运行就绪、需恢复和损坏阻断。
+运行就绪、残留需恢复及活动库损坏阻断。独立保存文件损坏时只将该文件标为不可用。
 
 系统临时目录也必须在 Git/WAR 树外；若环境在临时根放置 `.git` 或 `WEB-INF` 标记，
 应用会拒绝其下的运行。此时为 Maven 和测试 JVM 同时指定合格的

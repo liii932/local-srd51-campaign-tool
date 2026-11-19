@@ -181,10 +181,12 @@
         const sameEpoch = String(data.epoch) === String(hostView.storage.epoch);
         if (hostView !== hostAtRequest && !sameEpoch) return;
         if (sameEpoch && hostView.campaign && BigInt(data.revision) < BigInt(hostView.campaign.revision)) return;
+        if (!sameEpoch && hostView.campaign && String(data.revision) === String(hostView.campaign.revision))
+          document.dispatchEvent(new Event('dnd:storage-refresh'));
       }
       state = data;
       if (!busy && (!stateAtRequest || JSON.stringify(stateAtRequest) !== JSON.stringify(state))) render();
-      synchronizeStorageView();
+      if(state.configured && hostView?.campaign && String(hostView.campaign.revision)!==String(state.revision)) document.dispatchEvent(new Event('dnd:storage-refresh'));
       if(showMessage && state.configured && hostView?.campaign) message('逐人核对加入、分配角色，并选择明确的共享受众。');
     }catch(failure){if(showMessage) message(messages[failure.message] || '暂时无法读取玩家席位。');}
     finally{readPromise=null;clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden && !busy) refresh(false);else schedule();},document.hidden?15000:4000);}})();return readPromise;
