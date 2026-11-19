@@ -18,7 +18,7 @@ DM 新建或打开战役后可使用角色卡、冒险、检定和当前规则�
 | `/`、`/host` | 进入本机战役桌 `/host/storage` |
 | `/health` | 进程存活检查 |
 | `/api/host/storage/*` | 读取战役、管理文件及规则库、提交 DM 命令 |
-| `/api/host/storage/readiness` | 只读核验存储服务、可见保存文件及活动状态 |
+| `/api/host/storage/readiness` | 只读核验存储服务、保存文件列表及活动状态 |
 | `/api/host/storage/players/*` | DM 管理玩家席位、权限、共享和裁定 |
 | `/player`、`/api/player/*` | 独立 HTTPS 的有限玩家页面和允许的 API |
 

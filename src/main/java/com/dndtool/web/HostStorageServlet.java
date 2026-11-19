@@ -153,7 +153,6 @@ public final class HostStorageServlet extends HttpServlet {
             boolean ready;
             synchronized (service) {
                 var status = service.status();
-                service.savedCampaigns();
                 if ("ACTIVE".equals(status.state())) service.current();
                 ready = Set.of("IDLE", "ACTIVE").contains(status.state());
                 body.addProperty("status", ready ? "OK" : "ERROR");

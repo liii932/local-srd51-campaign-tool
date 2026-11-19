@@ -8,7 +8,6 @@ const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {chromium} = require('playwright');
 const {observeStorageAction} = require('./browser-action.cjs');
-const {selectStandardRules} = require('./browser-rule-library.cjs');
 const {createNode, focusSpace, placeAtFocus, createScene, enterScene} = require('./browser-spaces.cjs');
 const [output, acknowledgement, storageRoot] = process.argv.slice(2);
 const resumeAfterRoster = acknowledgement === '--resume-after-roster';
@@ -54,7 +53,7 @@ async function main(){
   await host.locator('#storage-workspace:not([disabled])').waitFor();
   if(!resumeAfterRoster){
   assert.equal(initialState.storage.state,'IDLE');await host.locator('#storage-create [name="name"]').fill('玩家入席验证战役');
-  await selectStandardRules(host);
+  assert.equal(await host.locator('#storage-create-rules').inputValue(), 'standard');
   await hostAction('create',()=>host.locator('#storage-create button[type="submit"]').click());
   for(const [name,kind]of [[PC,'PC'],[OTHER,'PC'],[SECRET,'NPC']]){await host.locator('#domain-create [name="name"]').fill(name);await host.locator('#domain-create [name="kind"]').selectOption(kind);await rule('#domain-create [name="classKey"]','class.fighter');await hostAction('domain',()=>host.locator('#domain-create button').click());}
   }else{
@@ -66,7 +65,7 @@ async function main(){
   let current=await readHost();const pcId=current.campaign.domain.characters.find(card=>card.name===PC).id,otherId=current.campaign.domain.characters.find(card=>card.name===OTHER).id;
   if(!resumeAfterRoster){
   await pane('actions');await host.locator('#domain-equipment [name="characterId"]').selectOption(pcId);await host.locator('#domain-equipment [name="kind"]').selectOption('ITEM_ACQUIRED');await rule('#domain-equipment [name="item"]','item.dagger');await hostAction('domain',()=>host.locator('#domain-equipment button').click());
-  report.checks.push('Fresh disposable campaign, two rule PCs and a hidden NPC created by real Host forms');
+  report.checks.push('Name-only standard campaign, two rule PCs and a hidden NPC created by real Host forms');
   }else report.checks.push('Exact existing roster/equipment checkpoint verified; completed preparation was not replayed');
   const anchor=await createNode(host,hostAction,'玩家探索营地');
   await focusSpace(host,hostAction,'WORLD',anchor);

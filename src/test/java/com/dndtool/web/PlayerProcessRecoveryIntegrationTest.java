@@ -170,7 +170,8 @@ class PlayerProcessRecoveryIntegrationTest {
             while (System.nanoTime() < deadline) {
                 String output = Files.exists(log) ? Files.readString(log) : "";
                 String certificate = line(output, "Temporary test certificate: "), spki = line(output, "Test-only certificate SPKI: ");
-                if (output.contains("DM: " + HOST + "/host/storage") && output.contains("Player: " + PLAYER + "/player") && certificate != null && spki != null) {
+                if ((HOST + "/host").equals(line(output, "DM: ")) && (PLAYER + "/player").equals(line(output, "Player: "))
+                        && certificate != null && spki != null) {
                     Path pem = Path.of(certificate).toAbsolutePath().normalize();
                     assertTrue(pem.startsWith(childTemporary.toAbsolutePath().normalize()) && pem.getFileName().toString().equals("test-certificate.pem"), "certificate must belong to this child test directory");
                     assertTrue(Files.isRegularFile(pem, LinkOption.NOFOLLOW_LINKS), "ready child must expose its exact public test certificate");
