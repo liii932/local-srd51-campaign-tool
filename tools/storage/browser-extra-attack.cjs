@@ -4,7 +4,7 @@
 // Run against a fresh disposable StorageLoopLauncher instance on the protected loopback entry.
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const { observeStorageAction } = require('./browser-action.cjs');
+const { observeStorageAction, showCharacter } = require('./browser-action.cjs');
 const { selectStandardRules } = require('./browser-rule-library.cjs');
 const { createNode, focusSpace, placeAtFocus, beginBattle } = require('./browser-spaces.cjs');
 
@@ -92,6 +92,7 @@ async function main() {
       assert.deepEqual(extraAttacks().map(feature => feature.acquiredAtClassLevel), level < 5 ? [] : [5]);
     }
     await page.locator('[data-pane="people"]').click();
+    await showCharacter(page, 'RULE', fighter);
     assert.match(await form('storage-characters').locator('article').filter({hasText: fighterName}).innerText(), /Extra Attack/);
 
     await page.locator('[data-pane="actions"]').click();

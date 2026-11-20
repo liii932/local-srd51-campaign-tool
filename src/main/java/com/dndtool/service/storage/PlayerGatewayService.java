@@ -1,6 +1,8 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CharacterRuntime;
+import com.dndtool.service.Schema2CombatState.Command;
+import com.dndtool.service.Schema2CombatState.Position;
 
 import com.dndtool.service.CharacterNamePolicy;
 import com.dndtool.service.storage.CampaignParticipationData.*;
@@ -11,6 +13,8 @@ import java.security.*;
 import java.time.Clock;
 import java.util.*;
 import java.util.function.Supplier;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /** Run-scoped transport authority. Every access and Host mutation shares the storage monitor. */
 public final class PlayerGatewayService {
@@ -23,6 +27,7 @@ public final class PlayerGatewayService {
     private final Budget bootstrapBudget = new Budget(128,2);
     private final Map<String, Session> sessions = new HashMap<>();
     private record Writer(String sessionToken, String connection) { }
+    private record IssuedCandidate(PlayerCandidateFactory.Candidate candidate, String receiptKey) { }
     private final Map<UUID, Writer> writers = new HashMap<>();
     private final List<Proposal> proposals = new ArrayList<>();
     private final Map<String,JsonObject> adjudications = new HashMap<>();
@@ -36,7 +41,7 @@ public final class PlayerGatewayService {
         UUID member;
         long epoch, expires, candidateRevision = -1;
         String precondition;
-        Map<String, PlayerCandidateFactory.Candidate> candidates = Map.of();
+        Map<String, IssuedCandidate> candidates = Map.of();
         final Budget reads = new Budget(8,1), posts = new Budget(12,1), identityAttempts = new Budget(5,1.0/60), receipts = new Budget(8,0.5);
         Session(String token, String csrf, long expires) { this.token = token; this.csrf = csrf; this.expires = expires; }
     }
@@ -81,7 +86,7 @@ public final class PlayerGatewayService {
             refreshRun(); expire(); Session session = requireSession(credential);
             session.posts.take(now());
             if(Set.of("join","resume").contains(action))session.identityAttempts.take(now());
-            if(action.equals("receipt"))session.receipts.take(now());
+            if (action.equals("receipt") || action.equals("receipt-close")) session.receipts.take(now());
             if (!same(session.csrf, csrf)) throw denied(403, "PLAYER_CSRF_REQUIRED");
             String device = null;
             switch (action) {
@@ -100,6 +105,7 @@ public final class PlayerGatewayService {
                     UUID member = UUID.fromString(text(binding, "memberId")); requireMember(access, member);
                     requireBindingVersion(access,binding,member);
                     session.member = member; session.bindingId = text(binding, "id"); session.run = run; session.epoch = epoch;
+                    invalidateCandidates(session);
                     session.nickname = access.snapshot().domains().participation().member(member).name();
                     session.status = "APPROVED"; session.csrf = token();
                     sessions.remove(session.token); session.token = token(); sessions.put(session.token, session);
@@ -113,25 +119,28 @@ public final class PlayerGatewayService {
                     return new Reply(body, null, null);
                 }
                 case "command" -> {
-                    fields(input, "connectionId", "candidateId", "precondition", "requestId");
+                    if (input.has("route")) fields(input, "connectionId", "candidateId", "precondition", "requestId", "route");
+                    else fields(input, "connectionId", "candidateId", "precondition", "requestId");
                     AccessSnapshot access = authorize(session, true);
                     String writer = text(input, "connectionId"), candidateId = text(input, "candidateId"), precondition = text(input, "precondition"), requestId = uuid(input, "requestId");
                     requireWriter(session, writer);
                     if (!same(session.precondition, precondition) || session.candidateRevision != access.revision()) throw denied(409, "PLAYER_VIEW_EXPIRED");
-                    PlayerCandidateFactory.Candidate candidate = session.candidates.get(candidateId);
-                    if (candidate == null) throw denied(409, "PLAYER_VIEW_EXPIRED");
+                    IssuedCandidate issued = session.candidates.get(candidateId);
+                    if (issued == null) throw denied(409, "PLAYER_VIEW_EXPIRED");
+                    PlayerCandidateFactory.Candidate candidate = issued.candidate();
                     requireCandidateFocus(access, candidate);
                     UUID character = UUID.fromString(candidate.characterId());
                     if (!session.member.equals(access.snapshot().domains().participation().controller(character))) throw denied(403, "PLAYER_CONTROL_REQUIRED");
-                    JsonObject local = access.localControl().deepCopy(); JsonArray attempts = array(local, "attempts");
+                    JsonObject command = commandInput(candidate, character, input.get("route"));
+                    JsonObject local = access.localControl(); JsonArray attempts = array(local, "attempts");
                     if (attempts.size() >= MAX_ATTEMPTS) throw denied(409, "PLAYER_RECEIPT_CAPACITY");
                     for (JsonElement element : attempts) if (text(element.getAsJsonObject(), "requestId").equals(requestId)) throw denied(409, "PLAYER_REQUEST_ALREADY_SENT");
                     JsonObject attempt = new JsonObject(); attempt.addProperty("bindingId", session.bindingId); attempt.addProperty("requestId", requestId);
                     attempt.addProperty("candidateId", candidateId); attempt.addProperty("precondition", precondition); attempt.addProperty("revision", Long.toString(access.revision()));
-                    attempt.addProperty("action", candidate.action()); attempt.add("input", candidate.input().deepCopy()); attempt.addProperty("characterId", candidate.characterId());
+                    attempt.addProperty("action", candidate.action()); attempt.add("input", command); attempt.addProperty("characterId", candidate.characterId());
                     attempts.add(attempt); local.add("attempts", attempts); storage.updateLocalPlayerControl(local);
                     try {
-                        storage.domainCommand(requestId, access.epoch(), access.revision(), candidate.action(), candidate.input(), Actor.player(session.member, character),
+                        storage.domainCommand(requestId, access.epoch(), access.revision(), candidate.action(), command, Actor.player(session.member, character),
                                 current -> {
                                     validateCurrent(session, writer, precondition, current);
                                     requireCandidateFocus(current, candidate);
@@ -142,17 +151,8 @@ public final class PlayerGatewayService {
                     }
                     return receipt(session, attempt, writer);
                 }
-                case "receipt" -> {
-                    fields(input, "requestId", "candidateId", "precondition"); authorize(session, false);
-                    String requestId = uuid(input, "requestId");
-                    JsonObject attempt = null;
-                    for (JsonElement element : array(access().localControl(), "attempts")) {
-                        JsonObject row = element.getAsJsonObject();
-                        if (text(row, "bindingId").equals(session.bindingId) && text(row, "requestId").equals(requestId)
-                                && same(text(row, "candidateId"), text(input, "candidateId")) && same(text(row, "precondition"), text(input, "precondition"))) attempt = row;
-                    }
-                    if (attempt == null) return unverified(session, connection);
-                    return receipt(session, attempt, connection);
+                case "receipt", "receipt-close" -> {
+                    return checkReceipt(session, connection, input, action.equals("receipt-close"));
                 }
                 case "proposal" -> {
                     fields(input, "characterId", "text"); AccessSnapshot access = authorize(session, false);
@@ -169,20 +169,117 @@ public final class PlayerGatewayService {
         });
     }
 
+    private static JsonObject commandInput(PlayerCandidateFactory.Candidate candidate, UUID character, JsonElement selection) {
+        JsonObject input = candidate.input();
+        var route = candidate.route();
+        if (route == null) {
+            if (selection != null) throw denied(400, "PLAYER_INVALID_REQUEST");
+            return input;
+        }
+        if (selection == null || !selection.isJsonArray()) throw denied(400, "PLAYER_INVALID_REQUEST");
+        JsonArray cells = selection.getAsJsonArray();
+        if (cells.isEmpty() || cells.size() > route.maxSteps()) throw denied(400, "PLAYER_INVALID_REQUEST");
+        List<Position> path = new ArrayList<>(cells.size());
+        Position previous = new Position(route.x(), route.y());
+        for (JsonElement element : cells) {
+            if (!element.isJsonObject()) throw denied(400, "PLAYER_INVALID_REQUEST");
+            JsonObject cell = element.getAsJsonObject();
+            fields(cell, "x", "y");
+            Position next = new Position(coordinate(cell.get("x")), coordinate(cell.get("y")));
+            if (previous.distanceFeet(next) != 5) throw denied(400, "PLAYER_INVALID_REQUEST");
+            path.add(next);
+            previous = next;
+        }
+        input.add("command", CampaignDomainCodec.toJson(Command.exploreMove(character, path)));
+        return input;
+    }
+
+    private static int coordinate(JsonElement value) {
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber() || !value.toString().matches("0|[1-9][0-9]{0,2}"))
+            throw denied(400, "PLAYER_INVALID_REQUEST");
+        return value.getAsInt();
+    }
+
+    private Reply checkReceipt(Session session, String connection, JsonObject input, boolean close) {
+        if (close) fields(input, "requestId", "candidateId", "precondition", "receiptKey");
+        else fields(input, "requestId", "candidateId", "precondition");
+        AccessSnapshot access = authorize(session, false);
+        String requestId = uuid(input, "requestId"), candidateId = text(input, "candidateId"), precondition = text(input, "precondition");
+        if (close && !same(receiptKey(session, candidateId, precondition), text(input, "receiptKey"))) return unverified(session, connection);
+        for (JsonElement element : array(access.localControl(), "attempts")) {
+            JsonObject attempt = element.getAsJsonObject();
+            if (!text(attempt, "requestId").equals(requestId)) continue;
+            if (!text(attempt, "bindingId").equals(session.bindingId)
+                    || !same(text(attempt, "candidateId"), candidateId) || !same(text(attempt, "precondition"), precondition))
+                return unverified(session, connection);
+            try {
+                var found = exactReceipt(session, attempt);
+                if (found.isPresent()) return accepted(session, access, found.get(), requestId, connection);
+            } catch (StorageException unavailable) {
+                if (unavailable.code().equals("IDEMPOTENCY_CONFLICT")) return unverified(session, connection);
+                throw unavailable;
+            }
+            break;
+        }
+        if (!close || access.snapshot().domains().roots().stream().anyMatch(root -> root.operationId().toString().equals(requestId)))
+            return unverified(session, connection);
+        // The healthy run has no acceptance for this attempt. The storage monitor also
+        // serializes command delivery. Invalidate the original view before confirming absence.
+        for (Session original : sessions.values()) {
+            if (session.bindingId.equals(original.bindingId) && same(original.precondition, precondition))
+                invalidateCandidates(original);
+        }
+        JsonObject result = new JsonObject();
+        result.addProperty("state", "NOT_EXECUTED");
+        result.addProperty("requestId", requestId);
+        return receiptReply(session, connection, result);
+    }
+
+    private static void invalidateCandidates(Session session) {
+        session.precondition = null;
+        session.candidates = Map.of();
+    }
+
+    private Optional<CampaignDomainData.Root> exactReceipt(Session session, JsonObject attempt) {
+        UUID character = UUID.fromString(text(attempt, "characterId"));
+        return storage.exactDomainReceipt(text(attempt, "requestId"), run, Long.parseLong(text(attempt, "revision")), text(attempt, "action"),
+                attempt.getAsJsonObject("input"), Actor.player(session.member, character), next -> authorize(session, false));
+    }
+
     private Reply receipt(Session session, JsonObject attempt, String connection) {
         AccessSnapshot current = authorize(session, false);
-        UUID character = UUID.fromString(text(attempt, "characterId"));
-        var found = storage.exactDomainReceipt(text(attempt, "requestId"), run, Long.parseLong(text(attempt, "revision")), text(attempt, "action"),
-                attempt.getAsJsonObject("input"), Actor.player(session.member, character), next -> authorize(session, false));
-        if (found.isEmpty()) return unverified(session, connection);
+        var found = exactReceipt(session, attempt);
+        return found.isPresent() ? accepted(session, current, found.get(), text(attempt, "requestId"), connection) : unverified(session, connection);
+    }
+
+    private Reply accepted(Session session, AccessSnapshot current, CampaignDomainData.Root root, String requestId, String connection) {
+        JsonObject result = PlayerCampaignProjection.receipt(current, session.member, root);
+        result.addProperty("requestId", requestId);
+        return receiptReply(session, connection, result);
+    }
+
+    private Reply unverified(Session session, String connection) {
+        JsonObject result = new JsonObject();
+        result.addProperty("state", "UNVERIFIED");
+        return receiptReply(session, connection, result);
+    }
+
+    private Reply receiptReply(Session session, String connection, JsonObject result) {
         JsonObject body = envelope(session, connection);
-        JsonObject result = PlayerCampaignProjection.receipt(current, session.member, found.get());
-        result.addProperty("requestId", text(attempt, "requestId")); body.add("receipt", result);
+        body.add("receipt", result);
         return new Reply(body, null, null);
     }
-    private Reply unverified(Session session, String connection) {
-        JsonObject body = envelope(session, connection), receipt = new JsonObject(); receipt.addProperty("state", "UNVERIFIED");
-        body.add("receipt", receipt); return new Reply(body, null, null);
+
+    /** A same-run device can prove an issued view even after that session has expired. */
+    private String receiptKey(Session session, String candidateId, String precondition) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(session.bindingId.getBytes(StandardCharsets.US_ASCII), "HmacSHA256"));
+            String identity = run + ":" + candidateId + ":" + precondition;
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(identity.getBytes(StandardCharsets.UTF_8)));
+        } catch (GeneralSecurityException impossible) {
+            throw new IllegalStateException("HmacSHA256 is unavailable", impossible);
+        }
     }
 
     private JsonObject envelope(Session session, String connection) {
@@ -198,18 +295,34 @@ public final class PlayerGatewayService {
             JsonObject view = PlayerCampaignProjection.project(access, session.member);
             if (session.candidateRevision != access.revision() || session.precondition == null) {
                 session.precondition = token(); session.candidateRevision = access.revision();
-                Map<String, PlayerCandidateFactory.Candidate> choices = new LinkedHashMap<>();
+                Map<String, IssuedCandidate> choices = new LinkedHashMap<>();
                 for (var candidate : PlayerCandidateFactory.candidates(access, session.member)) {
                     if (choices.size() >= 1024) break;
-                    choices.put(token(), candidate);
+                    String id = token();
+                    choices.put(id, new IssuedCandidate(candidate, receiptKey(session, id, session.precondition)));
                 }
                 session.candidates = Collections.unmodifiableMap(new LinkedHashMap<>(choices));
             }
             JsonArray candidates = new JsonArray();
             for (var issued : session.candidates.entrySet()) {
-                var candidate = issued.getValue();
+                var candidate = issued.getValue().candidate();
                 JsonObject choice = new JsonObject(); choice.addProperty("id", issued.getKey()); choice.addProperty("label", candidate.label());
-                choice.addProperty("characterId", candidate.characterId()); choice.addProperty("precondition", session.precondition); candidates.add(choice);
+                choice.addProperty("characterId", candidate.characterId()); choice.addProperty("precondition", session.precondition);
+                choice.addProperty("receiptKey", issued.getValue().receiptKey());
+                var route = candidate.route();
+                if (route != null) {
+                    JsonObject selection = new JsonObject();
+                    selection.addProperty("x", route.x());
+                    selection.addProperty("y", route.y());
+                    selection.addProperty("maxSteps", route.maxSteps());
+                    selection.addProperty("stepCostFeet", route.stepCostFeet());
+                    if (route.width() != null) {
+                        selection.addProperty("width", route.width());
+                        selection.addProperty("height", route.height());
+                    }
+                    choice.add("route", selection);
+                }
+                candidates.add(choice);
             }
             view.add("candidates", candidates); JsonArray ownProposals = new JsonArray();
             for (Proposal proposal : proposals) if (proposal.memberId.equals(session.member)) ownProposals.add(proposalJson(proposal));

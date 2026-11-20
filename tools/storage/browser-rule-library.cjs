@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 async function selectStandardRules(page) {
   const standardKeys = ['srd51_runtime', 'srd51_characters', 'srd51_magic', 'dm_runtime_house_rules'];
   const library = page.locator('#rule-library');
+  await page.locator('#storage-create-rules').selectOption('custom');
   await page.locator('#rule-members-load').click();
   const memberRow = (list, key, version) => page.locator(`#${list} [data-rule-module="${key}"][data-rule-release="${version}"]`);
   const bundled = page.locator('#rule-bundled [data-rule-module]');
@@ -42,7 +43,7 @@ async function selectStandardRules(page) {
     }
   } else assert.deepEqual(ordered, expected);
   await page.locator('#rule-preview').click();
-  await page.locator('#storage-create button[type="submit"]:enabled').waitFor();
+  await page.locator('#rule-preview-result').waitFor();
   await library.locator('summary').click();
 }
 

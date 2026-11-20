@@ -33,7 +33,7 @@ public final class PlayerServlet extends HttpServlet {
     @Override protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             String path = request.getPathInfo();
-            if (path == null || !Set.of("/join","/resume","/takeover","/command","/receipt","/proposal").contains(path)) { error(response,404,"PLAYER_REQUEST_DENIED"); return; }
+            if (path == null || !Set.of("/join","/resume","/takeover","/command","/receipt","/receipt-close","/proposal").contains(path)) { error(response,404,"PLAYER_REQUEST_DENIED"); return; }
             if (request.getQueryString() != null || request.getContentLengthLong() < 0 || request.getContentLengthLong() > MAX_BODY
                     || request.getContentType() == null || !request.getContentType().split(";",2)[0].equalsIgnoreCase("application/json")) { error(response,400,"PLAYER_INVALID_REQUEST"); return; }
             byte[] body = request.getInputStream().readNBytes(MAX_BODY + 1);

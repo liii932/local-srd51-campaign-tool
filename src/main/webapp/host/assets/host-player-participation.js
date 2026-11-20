@@ -2,6 +2,8 @@
 (() => {
   const $ = id => document.getElementById(id), base = '/api/host/storage/players/';
   let state = null, hostView = null, busy = false, readPromise = null, timer = null, invitationUrl = '', proposalRenderKey = '';
+  let messageCampaignScope = null;
+  const activeCampaignMessage = '逐人核对加入、分配角色，并选择明确的共享受众。';
   const panel = $('host-players');
   const messages = {PLAYER_DISABLED:'玩家 HTTPS 入口尚未配置。配置正确地址与受信任证书后，再开放加入。',PLAYER_UNAVAILABLE:'玩家参与暂不可用，请确认当前活动战役与入口配置。',PLAYER_RUN_UNAVAILABLE:'请先创建、打开或恢复一个战役。',PLAYER_RULES_UNAVAILABLE:'玩家参与需要含规则角色模块的战役。',
     STALE_VERSION:'现场已变化，本次设置未提交。已读取最新席位，请核对后明确操作。',STALE_REVISION:'现场已变化，本次设置未提交。已读取最新席位。',
@@ -31,6 +33,12 @@
   const currentView = () => Boolean(state && hostView?.campaign
     && String(state.epoch) === String(hostView.storage.epoch)
     && String(state.revision) === String(hostView.campaign.revision));
+  function synchronizeStorageView() {
+    if (!state?.configured || !hostView?.campaign) return;
+    if (String(state.epoch) !== String(hostView.storage.epoch) ||
+        BigInt(state.revision) > BigInt(hostView.campaign.revision))
+      document.dispatchEvent(new Event('dnd:storage-refresh'));
+  }
   function selectOptions(select, values, label, blank) {
     const selected = select.value; select.replaceChildren();
     if (blank) { const option = element('option', '', blank); option.value = ''; select.append(option); }
@@ -60,7 +68,10 @@
         'X-CSRF-Token':context.csrf,'X-Host-State-Epoch':context.epoch,'X-Object-Row-Version':context.revision,'X-Request-Id':crypto.randomUUID(),'X-Request-Digest':requestDigest},body:body.toString()});
       const data = await response.json();
       if (!response.ok || data.status === 'ERROR') { const failure = new Error(data.code || 'PLAYER_UNAVAILABLE'); failure.definitive = response.status < 500; throw failure; }
-      state = {...state,...data,csrf:data.csrf || state.csrf}; render(); document.dispatchEvent(new Event('dnd:storage-refresh')); message(action === 'approve' ? '该申请已逐人核对并批准。接下来可分配玩家角色。' : action === 'proposal-execute' ? '裁定已明确执行，请核对实际业务结果。' : '玩家设置已更新。');
+      state = {...state,...data,csrf:data.csrf || state.csrf};
+      render();
+      synchronizeStorageView();
+      message(action === 'approve' ? '该申请已逐人核对并批准。接下来可分配玩家角色。' : action === 'proposal-execute' ? '裁定已明确执行，请核对实际业务结果。' : '玩家设置已更新。');
     } catch (failure) {
       message(sent && !failure.definitive ? '本次设置的结果尚未确认。请刷新并核对实际席位；不会自动重复提交。' : messages[failure.message] || '设置未完成，请核对当前战役与玩家状态。');
       await refresh(false);
@@ -158,18 +169,29 @@
   }
   function render() {
     if (!state) return;
-    if (!state.configured) { $('host-players-content').hidden=true; message('玩家 HTTPS 入口尚未配置。请先按部署说明设置准确的局域网地址与受信任证书，再开放加入。'); return; }
-    if (!hostView?.campaign) { $('host-players-content').hidden=true; invitationUrl='';$('host-player-qr').replaceChildren();$('host-player-link').removeAttribute('href');$('host-player-link').textContent='';message('请先创建、打开或恢复一个战役，再邀请玩家入席。');return; }
+    if (!state.configured) { messageCampaignScope=null; $('host-players-content').hidden=true; message('玩家 HTTPS 入口尚未配置。请先按部署说明设置准确的局域网地址与受信任证书，再开放加入。'); return; }
+    if (!hostView?.campaign) { messageCampaignScope=null; $('host-players-content').hidden=true; invitationUrl='';$('host-player-qr').replaceChildren();$('host-player-link').removeAttribute('href');$('host-player-link').textContent='';message('请先创建、打开或恢复一个战役，再邀请玩家入席。');return; }
+    const scope = `${hostView.storage.runId}:${hostView.campaign.campaignId}`;
+    if (scope !== messageCampaignScope) { messageCampaignScope=scope; message(activeCampaignMessage); }
     $('host-players-content').hidden=false;renderInvitation();renderApplications();renderMembers();renderProposals();renderControls();
   }
   async function refresh(showMessage=true) {
     if(readPromise) return readPromise;
+    const hostAtRequest = hostView, stateAtRequest = state;
     readPromise=(async()=>{try {const response=await fetch(base+'state',{credentials:'same-origin',cache:'no-store'}),data=await response.json();
       if(!response.ok || data.status==='ERROR') throw new Error(data.code || 'PLAYER_UNAVAILABLE');
-      const previous=state;state=data;
-      if(!busy && (!previous || JSON.stringify(previous)!==JSON.stringify(state))) render();
+      if (state !== stateAtRequest) return;
+      if (data.configured && hostView) {
+        const sameEpoch = String(data.epoch) === String(hostView.storage.epoch);
+        if (hostView !== hostAtRequest && !sameEpoch) return;
+        if (sameEpoch && hostView.campaign && BigInt(data.revision) < BigInt(hostView.campaign.revision)) return;
+        if (!sameEpoch && hostView.campaign && String(data.revision) === String(hostView.campaign.revision))
+          document.dispatchEvent(new Event('dnd:storage-refresh'));
+      }
+      state = data;
+      if (!busy && (!stateAtRequest || JSON.stringify(stateAtRequest) !== JSON.stringify(state))) render();
       if(state.configured && hostView?.campaign && String(hostView.campaign.revision)!==String(state.revision)) document.dispatchEvent(new Event('dnd:storage-refresh'));
-      if(showMessage && state.configured && hostView?.campaign) message('逐人核对加入、分配角色，并选择明确的共享受众。');
+      if(showMessage && state.configured && hostView?.campaign) message(activeCampaignMessage);
     }catch(failure){if(showMessage) message(messages[failure.message] || '暂时无法读取玩家席位。');}
     finally{readPromise=null;clearTimeout(timer);timer=setTimeout(()=>{if(!document.hidden && !busy) refresh(false);else schedule();},document.hidden?15000:4000);}})();return readPromise;
   }
@@ -191,7 +213,8 @@
       && (focus?.kind === 'WORLD' || scene?.resolution === 'RULES' && scene.mode === 'EXPLORATION');
     for (const action of explorationForm.querySelectorAll('[name="allowedAction"]'))
       action.disabled = revoke || !supported || (focus.kind === 'WORLD' && action.value !== 'CHARACTER_COMMAND');
-    explorationForm.querySelector('button').disabled = busy || (revoke ? !permissionFor(id)?.active : !supported);
+    explorationForm.querySelector('button').disabled = busy || !currentView() || !state?.opened ||
+      (revoke ? !permissionFor(id)?.active : !supported);
     $('host-player-exploration-note').textContent = revoke ? '撤回该角色的现有探索许可。'
       : supported ? focus.kind === 'WORLD' ? '许可绑定角色所在的焦点世界节点。' : '许可绑定角色所在的焦点规则探索场景。'
       : '请先将规则 PC 安置在焦点世界节点或规则探索场景。';

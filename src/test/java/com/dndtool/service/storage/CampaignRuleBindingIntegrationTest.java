@@ -1,6 +1,7 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.module.composition.ProductionRuleArtifact;
+import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
 import com.dndtool.service.Schema2CharacterRuntime.CheckResult;
@@ -10,6 +11,7 @@ import com.dndtool.service.Schema2CharacterRuntime.HealthResult;
 import com.google.gson.Gson;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -47,6 +49,57 @@ class CampaignRuleBindingIntegrationTest {
     private static final RuleIdentity HEALING = new RuleIdentity(HOUSE, "adventure.vital_effect", "vital_effect.dm_healing");
 
     @TempDir Path temporary;
+
+    @Test void standardCampaignCreatesAndReopensOnAnEmptyRootWithoutRuleLibraryWrites() throws Exception {
+        Path source = temporary.resolve("standard-source"), destination = temporary.resolve("standard-destination");
+        byte[] portable;
+        CampaignStorageService.CampaignView expected;
+        try (var service = new CampaignStorageService(source)) {
+            service.create("标准规则战役");
+            assertEquals(Schema2RulesBinding.from(BundledCampaignRules.projection()),
+                    service.accessSnapshot().snapshot().domains().material().binding());
+            command(service, id(), "note", object("text", "移机后保留的线索"));
+            expected = service.current();
+            portable = Files.readAllBytes(service.savedFile(end(service)));
+            assertFalse(Files.exists(source.resolve("rule-library")));
+        }
+        try (var service = new CampaignStorageService(destination)) {
+            String file = service.importFile(portable).fileKey();
+            assertReopened(service, file, expected);
+            assertFalse(Files.exists(destination.resolve("rule-library")));
+        }
+    }
+
+    @Test void standardOpenRejectsDifferentOriginalsAndForgedProjectionEvenUnderTheSameModuleVersions() throws Exception {
+        var standard = BundledCampaignRules.projection();
+        var artifacts = new ArrayList<>(BundledCampaignRules.artifacts());
+        var originals = new TreeMap<>(artifacts.getLast().originalMembers());
+        var definitions = JsonParser.parseString(new String(originals.get("rules.json"), StandardCharsets.UTF_8));
+        definitions.getAsJsonArray().asList().stream().map(element -> element.getAsJsonObject())
+                .filter(rule -> DAMAGE.ruleKey().equals(rule.getAsJsonObject("identity").get("rule_key").getAsString()))
+                .findFirst().orElseThrow().addProperty("modifier", 3);
+        originals.put("rules.json", definitions.toString().getBytes(StandardCharsets.UTF_8));
+        artifacts.set(artifacts.size() - 1, ProductionRuleArtifact.read(storedZip(originals)));
+        var different = ProductionSchema2Projection.compose(artifacts);
+        assertEquals(standard.members().getLast().releaseVersion(), different.members().getLast().releaseVersion());
+        assertNotEquals(standard.members().getLast().rawZipSha256(), different.members().getLast().rawZipSha256());
+        assertNotEquals(standard.members().getLast().logicalSha256(), different.members().getLast().logicalSha256());
+        var forged = projectionClaimingMembers(different.projection(), standard.members());
+
+        Path root = temporary.resolve("standard-rejections");
+        try (var service = new CampaignStorageService(root)) {
+            var codec = new CampaignCodec();
+            String differentFile = service.importFile(codec.encode(new CampaignData.Document(id(),
+                    new CampaignData.Snapshot(id(), "不同原包", CampaignDomainData.State.initial(different))))).fileKey();
+            String forgedFile = service.importFile(codec.encode(new CampaignData.Document(id(),
+                    new CampaignData.Snapshot(id(), "伪造投影", CampaignDomainData.State.initial(forged))))).fileKey();
+            var before = service.status();
+            assertLibraryCode("RULE_PACKAGE_MISSING", () -> service.open(differentFile));
+            assertCode("RULE_COMPOSITION_MISMATCH", () -> service.open(forgedFile));
+            assertEquals(before, service.status());
+            assertFalse(Files.exists(root.resolve("rule-library")));
+        }
+    }
 
     @Test void twoCampaignsBindCandidatesPlansOutcomesAndReopenedFiles() throws Exception {
         List<Integer> dice = new ArrayList<>();
@@ -228,28 +281,32 @@ class CampaignRuleBindingIntegrationTest {
             assertEquals(0, opened.revision()); end(service);
 
             // A self-consistent frozen projection cannot claim different content for accepted original bytes.
-            var sourceProjection = com.dndtool.module.composition.ProductionSchema2Projection.compose(selected);
+            var sourceProjection = ProductionSchema2Projection.compose(selected);
             damage.addProperty("value", 3);
             var different = new ArrayList<>(selected.subList(0, 4));
             different.add(CampaignRuleSupportTest.extension("external_campaign_rules", different,
                     List.of(), List.of(), List.of(mapping, damage)));
-            var changed = com.dndtool.module.composition.ProductionSchema2Projection.compose(different).projection();
-            var claimedChains = changed.chains().stream().map(chain -> new FieldChain(chain.target(), chain.field(),
-                    chain.steps().stream().map(step -> {
-                        var location = step.authorLocation();
-                        var claimed = sourceProjection.members().get(step.loadIndex());
-                        return new ChainStep(step.op(), step.before(), step.after(), step.provider(), step.loadIndex(),
-                                new Location(location.moduleKey(), location.releaseVersion(), claimed.rawZipSha256(),
-                                        location.path(), location.pointer(), location.byteOffset()), step.origin());
-                    }).toList())).toList();
-            var forged = com.dndtool.module.composition.ProductionSchema2Projection.restore(sourceProjection.members(),
-                    changed.rules(), changed.entries(), claimedChains);
+            var changed = ProductionSchema2Projection.compose(different).projection();
+            var forged = projectionClaimingMembers(changed, sourceProjection.members());
             byte[] selfConsistent = new CampaignCodec().encode(new CampaignData.Document(id(),
                     new CampaignData.Snapshot(id(), "错绑内容", CampaignDomainData.State.initial(forged))));
             String wrongFile = service.importFile(selfConsistent).fileKey();
             assertCode("RULE_COMPOSITION_MISMATCH", () -> service.open(wrongFile));
             assertEquals("IDLE", service.status().state());
         }
+    }
+
+    private static ProductionSchema2Projection projectionClaimingMembers(
+            Projection projection, List<ProductionSchema2Projection.StoredMember> members) {
+        var claimedChains = projection.chains().stream().map(chain -> new FieldChain(chain.target(), chain.field(),
+                chain.steps().stream().map(step -> {
+                    var location = step.authorLocation();
+                    var claimed = members.get(step.loadIndex());
+                    return new ChainStep(step.op(), step.before(), step.after(), step.provider(), step.loadIndex(),
+                            new Location(location.moduleKey(), location.releaseVersion(), claimed.rawZipSha256(),
+                                    location.path(), location.pointer(), location.byteOffset()), step.origin());
+                }).toList())).toList();
+        return ProductionSchema2Projection.restore(members, projection.rules(), projection.entries(), claimedChains);
     }
 
     private static void assertLibraryCode(String code, org.junit.jupiter.api.function.Executable action) {

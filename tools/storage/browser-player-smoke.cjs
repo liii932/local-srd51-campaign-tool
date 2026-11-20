@@ -7,9 +7,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {chromium} = require('playwright');
-const {observeStorageAction} = require('./browser-action.cjs');
-const {selectStandardRules} = require('./browser-rule-library.cjs');
-const {createNode, focusSpace, placeAtFocus} = require('./browser-spaces.cjs');
+const {observeStorageAction, waitForStorageReady, waitForHistoryCount} = require('./browser-action.cjs');
+const {createNode, focusSpace, placeAtFocus, createScene, enterScene} = require('./browser-spaces.cjs');
 const [output, acknowledgement, storageRoot] = process.argv.slice(2);
 const resumeAfterRoster = acknowledgement === '--resume-after-roster';
 assert.ok(process.argv.length === 5 && (acknowledgement === '--fresh-root' || resumeAfterRoster) && path.isAbsolute(output || '') && path.isAbsolute(storageRoot || ''),
@@ -54,7 +53,7 @@ async function main(){
   await host.locator('#storage-workspace:not([disabled])').waitFor();
   if(!resumeAfterRoster){
   assert.equal(initialState.storage.state,'IDLE');await host.locator('#storage-create [name="name"]').fill('玩家入席验证战役');
-  await selectStandardRules(host);
+  assert.equal(await host.locator('#storage-create-rules').inputValue(), 'standard');
   await hostAction('create',()=>host.locator('#storage-create button[type="submit"]').click());
   for(const [name,kind]of [[PC,'PC'],[OTHER,'PC'],[SECRET,'NPC']]){await host.locator('#domain-create [name="name"]').fill(name);await host.locator('#domain-create [name="kind"]').selectOption(kind);await rule('#domain-create [name="classKey"]','class.fighter');await hostAction('domain',()=>host.locator('#domain-create button').click());}
   }else{
@@ -66,7 +65,7 @@ async function main(){
   let current=await readHost();const pcId=current.campaign.domain.characters.find(card=>card.name===PC).id,otherId=current.campaign.domain.characters.find(card=>card.name===OTHER).id;
   if(!resumeAfterRoster){
   await pane('actions');await host.locator('#domain-equipment [name="characterId"]').selectOption(pcId);await host.locator('#domain-equipment [name="kind"]').selectOption('ITEM_ACQUIRED');await rule('#domain-equipment [name="item"]','item.dagger');await hostAction('domain',()=>host.locator('#domain-equipment button').click());
-  report.checks.push('Fresh disposable campaign, two rule PCs and a hidden NPC created by real Host forms');
+  report.checks.push('Name-only standard campaign, two rule PCs and a hidden NPC created by real Host forms');
   }else report.checks.push('Exact existing roster/equipment checkpoint verified; completed preparation was not replayed');
   const anchor=await createNode(host,hostAction,'玩家探索营地');
   await focusSpace(host,hostAction,'WORLD',anchor);
@@ -134,8 +133,71 @@ async function main(){
   const secondTab=await mobileTab.context.newPage();observe(secondTab);await secondTab.goto(PLAYER+'/player');await secondTab.locator('#player-table').waitFor();await secondTab.locator('#player-takeover').click();await secondTab.locator('#player-status-title').filter({hasText:'你的席位已就绪'}).waitFor();
   await mobile.locator('#player-status-title').filter({hasText:'此设备当前只读'}).waitFor();assert.equal(await mobile.locator('#player-actions button:not([disabled])').count(),0);
   await screenshot(secondTab,'02-player-ready-mobile.png',390,844);await screenshot(secondTab,'03-player-ready-wide.png',1440,1050);await screenshot(host,'04-dm-player-management-wide.png',1440,1050);
-  await playerSetting('close',()=>host.locator('#host-players-close').click());assert.equal((await readPlayer(secondTab)).session.status,'APPROVED');
-  report.checks.push('New page began read-only; explicit takeover disabled the former page; closing invitation preserved approved members');
+  await waitForStorageReady(host);
+  let inviteCloseRefreshes = 0;
+  const observeInviteClose = request => {
+    if (request.method() === 'GET' && request.url() === HOST + '/api/host/storage/state') inviteCloseRefreshes++;
+  };
+  host.on('request', observeInviteClose);
+  try {
+    await playerSetting('close', () => host.locator('#host-players-close').click());
+    assert.equal((await readPlayer(secondTab)).session.status, 'APPROVED');
+    assert.equal(inviteCloseRefreshes, 0, 'Closing an invitation must leave the current campaign view ready');
+  } finally { host.off('request', observeInviteClose); }
+  report.checks.push('New page began read-only; explicit takeover disabled the former page; closing invitation preserved approved members and needed no campaign refresh');
+  phase='mobile exploration route and intentionally undelivered request';
+  await secondTab.setViewportSize({width: 390, height: 844});
+  const scene = await createScene(host, hostAction, '探索路线验证场景', 'RULES');
+  await enterScene(host, hostAction, scene, [[pcId, 1, 1, 0]]);
+  await host.locator('#host-player-exploration-form [name="characterId"]').selectOption(pcId);
+  await playerSetting('exploration', () => host.locator('#host-player-exploration-form button').click());
+  const routeChoice = secondTab.getByRole('button', {name: /规划探索移动路线/});
+  await routeChoice.click();
+  const composer = secondTab.getByRole('region', {name: '探索路线'});
+  await composer.waitFor();
+  const direction = name => composer.getByRole('button', {name, exact: true});
+  const sendRoute = composer.getByRole('button', {name: '提交整段路线'});
+  assert.equal(await sendRoute.isEnabled(), false);
+  await direction('向东').press('Space');
+  await direction('向北').click();
+  await composer.getByRole('button', {name: '撤销一步'}).click();
+  assert.match(await composer.getByRole('status').innerText(), /已选 1 \/ 6 格.*（2, 1）/);
+  const beforeDrop = (await readHost()).campaign;
+  await secondTab.route(PLAYER + '/api/player/command', route => route.abort('failed'), {times: 1});
+  await sendRoute.click();
+  await secondTab.getByText('上一操作的结果待查证').waitFor();
+  await secondTab.reload();
+  await secondTab.getByText('上一操作的结果待查证').waitFor();
+  await secondTab.getByRole('button', {name: '核对并结束待查证操作'}).click();
+  await secondTab.locator('#player-receipt').filter({hasText: '确认未执行'}).waitFor();
+  assert.equal(await secondTab.evaluate(() => sessionStorage.getItem('dnd.player.pending')), null);
+  assert.deepEqual((await readHost()).campaign.domain, beforeDrop.domain);
+  assert.equal(report.playerCommandPosts, 2);
+  await secondTab.locator('#player-takeover').click();
+  await secondTab.getByText('你的席位已就绪', {exact: true}).waitFor();
+  report.checks.push('A mobile command aborted before delivery stayed pending after reload and closed without a root or retry; write access required explicit takeover');
+
+  phase='mobile six-cell route advances one interval';
+  await routeChoice.click();
+  for (const label of ['向东', '向东南', '向东', '向东', '向东', '向东']) await direction(label).click();
+  assert.match(await composer.getByRole('status').innerText(), /已选 6 \/ 6 格.*（7, 2）/);
+  assert.equal(await direction('向东').isEnabled(), false);
+  await screenshot(secondTab, '05-player-exploration-route-mobile.png', 390, 844);
+  const routePost = secondTab.waitForRequest(request => request.url() === PLAYER + '/api/player/command');
+  await sendRoute.click();
+  assert.deepEqual((await routePost).postDataJSON().route,
+    [{x:2,y:1},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:6,y:2},{x:7,y:2}]);
+  await secondTab.locator('#player-receipt').filter({hasText: '上次收据：行动已完成。'}).waitFor();
+  const afterRoute = (await readHost()).campaign;
+  const sceneSecond = domain => Number(domain.space.clocks.find(clock => clock.space.id === scene).second);
+  assert.equal(afterRoute.revision, beforeDrop.revision + 1);
+  assert.equal(afterRoute.domain.roots.length, beforeDrop.domain.roots.length + 1);
+  assert.equal(sceneSecond(afterRoute.domain), sceneSecond(beforeDrop.domain) + 6);
+  assert.equal(report.playerCommandPosts, 3);
+  await waitForHistoryCount(host, afterRoute.domain.roots.length);
+  await waitForStorageReady(host);
+  report.checks.push('Six ordered neighboring cells advanced one six-second interval, and the Host history synchronized automatically');
+
   phase='end owned fixture';await hostAction('end',()=>host.locator('#storage-end').click());
   assert.equal((await readHost()).storage.state,'IDLE');assert.deepEqual(await fs.readdir(path.join(root,'runs')),[]);
   assert.deepEqual(report.pageErrors,[]);assert.deepEqual(report.cspFailures,[]);report.result='PASSED';

@@ -6,7 +6,7 @@
 
     <groupId>com.dndtool</groupId>
     <artifactId>dnd-tool-se</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>war</packaging>
 
     <name>Local 5E Campaign Tool</name>
@@ -84,8 +84,11 @@
                 <artifactId>maven-war-plugin</artifactId>
                 <version>3.4.0</version>
                 <configuration>
-                    <failOnMissingWebXml>false</failOnMissingWebXml>
-                    <packagingExcludes>WEB-INF/classes/com/dndtool/offline/**</packagingExcludes>
+                    <!-- Ship the SQLite Web surface and leave the old Web fixtures on the test classpath. -->
+                    <packagingExcludes>WEB-INF/classes/com/dndtool/offline/**,
+                        %regex[WEB-INF/classes/com/dndtool/web/(?!(?:HealthServlet|HostHomeServlet|HostStorageServlet|HostPlayerServlet|PlayerServlet|PlayerApplicationAccess|StorageApplicationListener|StorageRequestDigest|JsonSupport)(?:\$|\.)).*],
+                        WEB-INF/views/**,
+                        %regex[host/assets/(?!(?:host-storage|host-player-participation|local-invite-qr)\.).*]</packagingExcludes>
                 </configuration>
             </plugin>
         </plugins>

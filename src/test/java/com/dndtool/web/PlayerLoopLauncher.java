@@ -1,6 +1,6 @@
 package com.dndtool.web;
 
-import com.dndtool.security.*;
+import com.dndtool.security.PlayerListenerConfiguration;
 import com.dndtool.service.storage.CampaignStorageService;
 import jakarta.servlet.ServletContext;
 import java.io.IOException;
@@ -16,9 +16,7 @@ import javax.net.ssl.*;
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleState;
 import org.apache.catalina.connector.Connector;
-import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
-import org.apache.tomcat.util.descriptor.web.*;
 import org.apache.tomcat.util.net.SSLHostConfig;
 import org.apache.tomcat.util.net.SSLHostConfigCertificate;
 
@@ -89,21 +87,10 @@ public final class PlayerLoopLauncher implements AutoCloseable {
             SSLHostConfigCertificate cert = new SSLHostConfigCertificate(tls, SSLHostConfigCertificate.Type.RSA);
             cert.setCertificateKeystoreFile(keyStore.toString()); cert.setCertificateKeystorePassword(password); cert.setCertificateKeystoreType("PKCS12"); cert.setCertificateKeyAlias("player-test");
             tls.addCertificate(cert); player.addSslHostConfig(tls); tomcat.getService().addConnector(player);
-            Context context = tomcat.addContext("", Path.of("src/main/webapp").toAbsolutePath().toString());
+            Context context = StorageLoopLauncher.addWebapp(tomcat);
             context.addParameter(StorageApplicationListener.ROOT_PARAMETER, root.toString());
             context.addParameter(PlayerListenerConfiguration.ORIGIN_PARAMETER, "https://127.0.0.1:8443");
             context.addParameter(PlayerListenerConfiguration.ADDRESS_PARAMETER, "127.0.0.1");
-            context.addMimeMapping("js", "text/javascript"); context.addMimeMapping("css", "text/css");
-            context.setSessionCookieName(HostRequestSecurityFilter.SESSION_COOKIE_NAME); context.setSessionCookiePath("/"); context.setUseHttpOnly(true);
-            context.addApplicationListener(StorageApplicationListener.class.getName());
-            addFilter(context, "PlayerBoundaryFilter", PlayerBoundaryFilter.class.getName(), "/*");
-            addFilter(context, "HostBoundaryFilter", HostBoundaryFilter.class.getName(), "/host/*", "/api/host/*");
-            addFilter(context, "HostRequestSecurityFilter", HostRequestSecurityFilter.class.getName(), "/host/*", "/api/host/*");
-            servlet(context, "storage", HostStorageServlet.class.getName(), "/host/storage", "/api/host/storage/*");
-            servlet(context, "hostPlayers", HostPlayerServlet.class.getName(), "/api/host/storage/players/*");
-            servlet(context, "player", PlayerServlet.class.getName(), "/player", "/player/", "/api/player/*");
-            servlet(context, "home", HostHomeServlet.class.getName(), "/host");
-            servlet(context, "assets", DefaultServlet.class.getName(), "/host/assets/*", "/player/assets/*");
             PlayerLoopLauncher launcher = new PlayerLoopLauncher(tomcat, context, base, ssl, spki);
             tomcat.start();
             if (!host.getState().isAvailable() || host.getLocalPort() != 8080 || !player.getState().isAvailable() || player.getLocalPort() != 8443 || !context.getState().isAvailable())
@@ -150,8 +137,7 @@ public final class PlayerLoopLauncher implements AutoCloseable {
     }
 
     static void requireStorageReady(ServletContext context) {
-        if (!Boolean.TRUE.equals(context.getAttribute(StorageApplicationListener.ENABLED_ATTRIBUTE))
-                || context.getAttribute(StorageApplicationListener.ERROR_ATTRIBUTE) != null
+        if (context.getAttribute(StorageApplicationListener.ERROR_ATTRIBUTE) != null
                 || !(context.getAttribute(StorageApplicationListener.SERVICE_ATTRIBUTE) instanceof CampaignStorageService))
             throw problem("ISOLATED_STORAGE_UNAVAILABLE", "The campaign service did not initialize. Check private directory access, exclusive root ownership and the prepared application resources. No player-ready address will be published.");
         try {
@@ -182,13 +168,6 @@ public final class PlayerLoopLauncher implements AutoCloseable {
             return problem("ISOLATED_PORT_UNAVAILABLE", "A required loopback port is occupied. Identify the owning process; stop only an authorized test instance before another launch.");
         return problem("ISOLATED_START_FAILED", "The disposable server did not become ready. Check Java, test classpath and runtime resources; supplied campaign files are retained.");
     }
-    private static void servlet(Context context, String name, String type, String... paths) {
-        Tomcat.addServlet(context, name, type); for (String path : paths) context.addServletMappingDecoded(path, name);
-    }
-    private static void addFilter(Context context, String name, String type, String... paths) {
-        FilterDef definition = new FilterDef(); definition.setFilterName(name); definition.setFilterClass(type); context.addFilterDef(definition);
-        FilterMap mapping = new FilterMap(); mapping.setFilterName(name); for (String path : paths) mapping.addURLPattern(path); mapping.setDispatcher("REQUEST"); context.addFilterMap(mapping);
-    }
     @Override public void close() throws Exception {
         if (!closed.compareAndSet(false, true)) return;
         cleanupCreatedResources(tomcat, base);
@@ -212,7 +191,7 @@ public final class PlayerLoopLauncher implements AutoCloseable {
         if (args.length != 1 || !Path.of(args[0]).isAbsolute()) throw new IllegalArgumentException("Expected an absolute disposable storage root");
         try (PlayerLoopLauncher launcher = start(Path.of(args[0]))) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> { try { launcher.close(); } catch (Exception ignored) { } }, "player-prototype-close"));
-            System.out.println("DM: http://127.0.0.1:8080/host/storage\nPlayer: https://127.0.0.1:8443/player");
+            System.out.println("DM: http://127.0.0.1:8080/host\nPlayer: https://127.0.0.1:8443/player");
             System.out.println("Temporary test certificate: " + launcher.base.resolve("test-certificate.pem"));
             System.out.println("Test-only certificate SPKI: " + launcher.certificateSpki);
             launcher.tomcat.getServer().await();

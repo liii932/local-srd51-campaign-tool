@@ -24,16 +24,17 @@ mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 
 相关测试失败时先修复并重跑相关范围，不自动扩大为全量。复用本次对相同代码、资源、依赖、配置及相关环境取得的有效结果；后续改动影响证据时才重跑对应范围。不得同时运行会写同一 `target` 的 Maven 命令。
 
-规则模型归属或诊断装配变化时，先覆盖固定 canonical/hash 向量、目录 JDBC、发布门和旧单池诊断：
+当前工作台的启动、规则绑定、完整文件与就绪测试见[SQLite 结构、完整文件与运行验收](#sqlite-结构完整文件与运行验收)。
+
+维护旧 MySQL 目录或诊断代码时，按变更选择固定 canonical/hash 向量、目录 JDBC、发布门和单池诊断测试。
 
 ```bash
-mvn '-Dtest=ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,ModuleContentHasherTest,BuiltinModuleHashManifestTest,BuiltinModuleReleaseRegistryTest,JdbcModuleCatalogRepositoryTest,ModuleIntegrityServiceTest,SchemaMigrationsTest,DatabaseSchemaVerifierTest,DatabaseDiagnosticsTest,DatabaseDiagnosticsFactoryTest,DatabaseStartupListenerTest,HostDatabaseDiagnosticServletTest,CampaignArchiveCapabilityBoundaryTest' test
+mvn '-Dtest=ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,ModuleContentHasherTest,BuiltinModuleHashManifestTest,BuiltinModuleReleaseRegistryTest,JdbcModuleCatalogRepositoryTest,ModuleIntegrityServiceTest,SchemaMigrationsTest,DatabaseSchemaVerifierTest,DatabaseDiagnosticsTest,DatabaseDiagnosticsFactoryTest,HostDatabaseDiagnosticServletTest,CampaignArchiveCapabilityBoundaryTest' test
 ```
 
-再按真实引用闭包加入受影响的角色、检定、存档、规则浏览和语言投影消费者。诊断测试须证明
+再按实际调用方加入受影响的旧角色、检定、存档、规则浏览和语言投影消费者。旧诊断测试覆盖
 打包迁移/schema 在规则之前校验、失败不继续查询、只查原 `jdbc/DndToolSE`、查询资源关闭、
-无数据写入、每次 GET 更新结果及有限 HTTP/日志类别。包迁移打包时排除旧路径残留类，
-特别是旧 listener，避免重复启动诊断；这些无数据库测试不构成真实 MySQL 或部署验收。
+无数据写入、每次 GET 更新结果及有限 HTTP/日志类别。真实 MySQL 验收按第 3 节独立执行。
 
 ### Tomcat 测试依赖
 
@@ -497,7 +498,7 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 生产代码或打包资源变化后，记录候选 WAR：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的新类、JSP、JavaScript、`web.xml` 与仍保留的 V001—V042 资源；
+- 必需的运行类、Host 与玩家 HTML/JavaScript、`web.xml` 与仍保留的 V001—V042 资源；
 - SQLite 结构声明、领域引擎/严格 codec/仓储、SQLite JDBC、Host 资源，以及 `storage/rules/` 下五个准确内置 ZIP；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
@@ -524,8 +525,11 @@ WAR 审计通过不代表已经部署。
 
 ### SQLite 结构、完整文件与运行验收
 
-当前有限 SQLite 模型见[运行合同](storage-vitality-loop.md)。所有新建测试显式导入并接受准确
-原包；文件移机测试必须分别核验缺库、未接受和已接受状态。文件往返不代表接受已迁移。结构与真实 SQLite 的定向入口是
+`StorageApplicationListenerTest` 和 `StorageHttpIntegrationTest` 覆盖默认根、无 JNDI 的生产入口及显式无效根。用 `CampaignRuleBindingIntegrationTest` 验证标准战役在新根直接重开、自定义绑定仍需本机接受。`CampaignStorageServiceTest` 验证单份损坏存档隔离、未改动行保持原位及提交故障恢复。
+
+当前有限 SQLite 模型见[运行合同](storage-vitality-loop.md)。标准新建测试只提交战役名称，
+并核对标准存档可在空规则库的存储根打开且无接受写入。自定义组合测试覆盖移机时缺少原包、
+已导入但未接受、准确接受后的打开。结构与真实 SQLite 的定向入口是
 `StorageSchemaCatalogTest`、`SqliteSchemaTest`；业务/生命周期见 `CampaignStorageServiceTest`、
 `CampaignStorageLifecycleTest`。`BundledCampaignRulesTest` 核验常规组合的四包、精确数字、可执行初始化
 与基础/施法预检。`CampaignRuleBindingIntegrationTest` 核验两个组合各自的候选属性、角色初始授予、来源链与真实分支结算，
@@ -558,7 +562,7 @@ Windows JVM 执行，核验 NTFS ACL、junction 拒绝及跨进程运行锁；Li
 Windows 通过。`CampaignArcaneRecoveryIntegrationTest` 覆盖短休资格、真实位数与预算、
 每日限制、法术书、幂等、晚写回滚和保存/END/重开。
 `StorageApplicationListenerTest`、`StorageReadinessTest` 验证配置优先级、显式空根失败关闭、
-实际规则/文件/运行就绪、需恢复和损坏阻断。
+运行就绪、残留需恢复及活动库损坏阻断。独立保存文件损坏时只将该文件标为不可用。
 
 系统临时目录也必须在 Git/WAR 树外；若环境在临时根放置 `.git` 或 `WEB-INF` 标记，
 应用会拒绝其下的运行。此时为 Maven 和测试 JVM 同时指定合格的
@@ -568,7 +572,7 @@ Windows 通过。`CampaignArcaneRecoveryIntegrationTest` 覆盖短休资格、�
 
 ```bash
 python3 rule-packages/srd51-runtime/build-bundles.py --check
-mvn '-Dtest=LocalRuleLibraryTest,CampaignRuleSupportTest,CampaignRuleContextTest,BundledCampaignRulesTest,CampaignRuleBindingIntegrationTest,CampaignDomainEngineTest,CampaignCheckEffectsTest,CampaignManualIntegrationTest,CampaignDomainRootValidationTest,CampaignDomainRecoveryTest,CampaignDomainsIntegrationTest,CampaignDomainsCombatIntegrationTest,CampaignStorageLifecycleTest,StorageSchemaCatalogTest,SqliteSchemaTest,CampaignStorageServiceTest,CampaignCodecTest,CampaignFileVectorTest,CampaignStorageCrashTest,StorageHttpIntegrationTest,StorageRequestDigestTest,HostBoundaryFilterTest,HostRequestSecurityFilterTest,HostHomeServletTest,DatabaseStartupListenerTest,ProtectedHostCommandEntryTest' test
+mvn '-Dtest=LocalRuleLibraryTest,CampaignRuleSupportTest,CampaignRuleContextTest,BundledCampaignRulesTest,CampaignRuleBindingIntegrationTest,CampaignDomainEngineTest,CampaignCheckEffectsTest,CampaignManualIntegrationTest,CampaignDomainRootValidationTest,CampaignDomainRecoveryTest,CampaignDomainsIntegrationTest,CampaignDomainsCombatIntegrationTest,CampaignStorageLifecycleTest,StorageSchemaCatalogTest,SqliteSchemaTest,CampaignStorageServiceTest,CampaignCodecTest,CampaignFileVectorTest,CampaignStorageCrashTest,StorageHttpIntegrationTest,StorageRequestDigestTest,HostBoundaryFilterTest,HostRequestSecurityFilterTest,HostHomeServletTest,ProtectedHostCommandEntryTest' test
 ```
 
 人工执行同一入口（Linux/WSL、Java 21+、Maven，8080 必须空闲）：
@@ -581,7 +585,7 @@ bash tools/storage/run-local.sh "$storage_test_root"
 脚本依次显示环境检查、编译与依赖准备、应用启动。首次编译可能需要几分钟，Maven 阶段
 和原始错误保持可见；出现应用就绪地址后再打开浏览器。启动预备不等于运行测试。
 
-打开 `http://127.0.0.1:8080/host/storage`，导入并接受所需原包后选择准确组合。
+打开 `http://127.0.0.1:8080/host/storage`，输入名称直接用标准规则开团。验证自定义组合时，再导入、接受并选择所需原包。
 建立世界节点和路线，安置规则 PC/NPC，在焦点节点验证装备、检定和健康；记录 DM 本次旅行
 耗时并转移选中的主体，核对源节点推进、目标节点原钟与角色累计经历。创建规则场景，从
 锚点入场后执行所选战斗或施法动作。创建独立自由卡，编辑基础字段、职业等级/熟练与物品，
@@ -596,7 +600,19 @@ Ctrl+C 仅停止这个隔离验证实例；未 END 的运行下次启动必须�
 
 可选浏览器自动验收使用独立安装的 Playwright/Chromium，浏览器环境需有中文字库；
 不向 Maven 或 WAR 加浏览器依赖。
-聚焦短冒险体验时，先以上述启动器启用全新临时根，再执行：
+
+验证 DM 三栏工作台时，使用[玩家参与测试启动器](#玩家参与原型验证)和全新一次性私有根，以便左栏从真实玩家接口读取席位。待启动器就绪后，在另一终端使用同一根运行：
+
+```bash
+NODE_PATH=/absolute/browser-tools/node_modules \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
+node tools/storage/browser-workspace.cjs /absolute/empty/workspace-evidence \
+  --fresh-root /absolute/disposable/player-store
+```
+
+脚本通过实际表单创建角色和自由卡，在已有战斗行动者与攻击目标的情况下翻页，核对选择值和服务器刷新后的卡片身份。桌面及 390px 截图和滚动、焦点、请求检查的结果写入证据目录。详情见[工作台使用说明](storage-vitality-loop.md#战役工作台)。
+
+聚焦短冒险体验时，先用 `tools/storage/run-local.sh` 启用全新临时根，再执行：
 
 ```bash
 NODE_PATH=/absolute/browser-tools/node_modules \
@@ -669,7 +685,7 @@ db/journal、保存文件或本地根。浏览器、真实 SQLite/HTTP、纯规�
 - 领域接合：每个现行 owner 覆盖正常/边界/坏冻结数据/版本/幂等/共同回滚，以及
   完整文件字段和直接恢复的独立期望。不能仅对编码器与读取器的自洽往返宣称数据无遗漏。
 - 打包与模式：当前必需项包括应用结构 JSON、编译/验证类、领域消费者、五个受控内置
-  原包和 SQLite JDBC；默认 MySQL 及旧资源仍保留，只有明确退役后才移除旧适配。拒绝其他作者原包、来源维护 SQL、
+  原包和 SQLite JDBC；验证生产描述符仅注册 SQLite 入口，排除旧 MySQL 网页、Servlet 及 Connector/J。拒绝其他作者原包、来源维护 SQL、
   离线写入类、真实 DB/journal/档案、配置秘密和本地材料进入 WAR；审计字节数、SHA-256、
   条目数、必需/禁止文件及资源内容。
 
@@ -705,8 +721,9 @@ Servlet/Listener，也不读取或修改已安装实例的 setenv、ROOT、应�
 绑定准确 base、PID、进程创建时间及 executable，不以模糊进程名控制服务。
 
 Start 返回的 `STARTED` 只表示进程已启动，必须另查 `httpStatus=200` 且
-`readiness.ready=true`。HTTP 脚本验证 welcome JSP、注解发现、web.xml Filter/Session、
-静态资源、真实 SQLite 就绪、CSRF/epoch/摘要及 Host/Origin/方法边界和旧路由关闭；只发送
+`readiness.ready=true`。HTTP 脚本验证根入口与 `/host` 的 `303` 跳转、`web.xml` 显式注册的
+Servlet/Listener、Filter/Session、静态资源、SQLite 就绪、CSRF/epoch/摘要以及
+Host/Origin/方法边界和旧路由关闭；只发送
 必定拒绝的写请求。浏览器脚本在一次性夹具上执行被授权的实际表单业务。失败保留进程身份、
 日志与材料，用同一 base 的 Status/Stop 处置；不递归清理未知内容。
 
@@ -819,14 +836,13 @@ WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边
 
 ## 7. 手工验收
 
-只有可达路由、UI 或客户端 JavaScript 变化时才需要浏览器验收。按[部署指南](deployment.md)检查 `/health`、根重定向、`/host`、数据库诊断、安全头、错误 Host/origin 与明确排除的路由。真实业务写入必须单独授权并具备可验证恢复方案。
+只有可达路由、UI 或客户端 JavaScript 变化时才需要浏览器验收。按[部署指南](deployment.md#5-启动与验收)
+检查 `/health`、`/` 与 `/host` 转到 `/host/storage`、SQLite 就绪、安全头和请求边界。
+真实业务写入必须单独授权并具备可验证恢复方案。
 
-操作台布局验收应覆盖宽屏与手机宽度、键盘焦点和跳转操作区链接、原生折叠区展开、长名称与
-空战役/数据库不可用/模组校验失败状态。确认节点与遭遇呈现现有读取模型提供的摘要，全部原有表单
-可到达，角色卡编号建议不会改变检定执行者或版本。加载角色卡使用只读请求；保存按钮、
-检定确认和其他业务提交仍须按上述授权边界验收。核对 CSP 下同源样式和脚本正常加载，
-窄屏不截断操作区或角色卡内容；自动化页面合同由 `HostOverviewPageTest`、
-`HostConsolePageTest` 和对应表单测试覆盖。
+按[工作台验证流程](#sqlite-结构完整文件与运行验收)覆盖桌面和手机宽度、键盘焦点、
+场景操作与角色卡翻页、空闲与活动状态、加载及错误反馈。核对 CSP 下同源资源正常加载，
+角色卡翻页保持场景中的表单选择，窄屏能够访问当前操作区与角色卡。
 
 <a id="extra-attack-verification"></a>
 

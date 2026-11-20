@@ -1,36 +1,24 @@
 # 快速开始
 
-Local 5E Campaign Tool 是部署在外部 Tomcat 10.1 上的 Java 21 WAR。项目目标是完整覆盖
-SRD 5.1，但当前构建仍提供冻结的简化 v1 功能。它不是可执行 JAR，业务入口只允许本机
-精确地址 `http://127.0.0.1:8080`。
+Local 5E Campaign Tool 以 WAR 部署到外部 Apache Tomcat 10.1，运行需要 JDK 21。
+应用默认使用随 WAR 交付的 SQLite，无需 MySQL、Connector/J 或 JNDI 数据源。
+DM 入口固定为 `http://127.0.0.1:8080`，玩家 HTTPS 默认关闭。
 
-## 前提
+## 获取 WAR
 
-- JDK 21；
-- Maven 3.9；
-- Apache Tomcat 10.1；
-- MySQL 8.0；
-- Tomcat `lib` 中可用的 MySQL Connector/J；
-- 已按 [数据库说明](database.md) 准备的 schema 与最小权限运行账号。
+使用 0.2.0 发行制品 `dnd-tool-se-0.2.0.war`。从源码构建时需要 Maven 3.9，在仓库根目录执行
+`mvn clean verify`，成功后生成 `target/dnd-tool-se-0.2.0.war`。
 
-## 构建
+## 启动与验收
 
-在仓库根目录执行：
+1. 按[部署指南](deployment.md)审计 WAR，配置只绑定 `127.0.0.1:8080` 的 DM Connector，
+   将制品部署为 `webapps/ROOT.war`，再启动 Tomcat。存储默认使用 Tomcat 运行账号的
+   `${user.home}/.dndtool/campaigns`。需要另设私有根时按[配置说明](configuration.md#sqlite-当前应用存储配置)
+   设置 `DND_STORAGE_ROOT`。
+2. 打开 `http://127.0.0.1:8080`。`/` 和 `/host` 均返回 `303`，转到 `/host/storage`。
+   `GET /health` 应返回 `200` 和 `OK`。就绪接口 `GET /api/host/storage/readiness` 在健康
+   空闲或活动状态下返回 `200`、`mode=SQLITE` 和 `ready=true`。
+3. 在工作台输入战役名称，用随附的标准规则开团。首次主持可按[短冒险流程](storage-vitality-loop.md#跑一段短冒险)
+   完成建队、探索、战斗和保存后继续。
 
-```powershell
-mvn clean verify
-```
-
-成功构建会生成 `target/dnd-tool-se-0.1.0-SNAPSHOT.war`。必须以 Maven 最终退出码和 `BUILD SUCCESS` 为准；生产候选还应按[测试指南](testing.md)审计 WAR。
-
-## 配置与启动
-
-1. 复制 [ROOT.xml.example](../config/tomcat/ROOT.xml.example) 到 `%CATALINA_BASE%\conf\Catalina\localhost\ROOT.xml`。
-2. 复制 [setenv.bat.example](../config/tomcat/setenv.bat.example) 为 `%CATALINA_BASE%\bin\setenv.bat`，保留环境变量属性源设置。
-3. 在启动 Tomcat 的同一个 PowerShell 会话中安全输入运行账号口令，不要把口令写入仓库、命令行参数或 Java 选项。
-4. 按[部署指南](deployment.md)备份现有根应用并部署经审计的候选为 `ROOT.war`。
-5. 启动后访问 `http://127.0.0.1:8080/host`。
-
-最小验收包括：`/health` 返回 `200` 和 `OK`；`/` 相对重定向到 `/host`；`/host` 返回安全响应头；错误 Host、`localhost`、`::1`、`/display` 和 `/api/public/*` 不暴露应用能力。
-
-配置项见[配置说明](configuration.md)，常见失败见[故障排查](troubleshooting.md)。
+可选玩家入口见[部署指南](deployment.md#可选玩家-https-入口)，启动失败见[故障排查](troubleshooting.md)。

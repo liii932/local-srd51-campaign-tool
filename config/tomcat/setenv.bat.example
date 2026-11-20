@@ -1,12 +1,10 @@
 @echo off
 rem Windows external Tomcat 10.1, launched with startup.bat / catalina.bat.
-rem Set JAVA_HOME to a Java 21+ JDK and supply DND_STORAGE_ROOT in the launching
-rem process, or replace the ROOT.xml context parameter with its absolute path.
+rem Set JAVA_HOME to a Java 21+ JDK. To override the default campaign directory,
+rem set DND_STORAGE_ROOT in the launching environment or use the ROOT.xml example.
 rem Example operator input before startup:
 rem   set "DND_STORAGE_ROOT=C:\DndToolData\campaigns"
-rem The directory must be private and outside Git/WAR/expanded application trees.
-rem Do not invent a default root here. Missing/invalid input must fail closed.
-rem This file must remain usable by shutdown.bat; do not prompt or abort here.
-rem Windows service installations do not execute this file: configure the actual
-rem service identity, environment and JVM options through the service manager.
+rem Use a private local directory outside Git, WARs and expanded web applications.
+rem Windows services use the service identity, environment and JVM options.
+rem EnvironmentPropertySource resolves optional HTTPS Connector placeholders.
 set "CATALINA_OPTS=%CATALINA_OPTS% -Dorg.apache.tomcat.util.digester.PROPERTY_SOURCE=org.apache.tomcat.util.digester.EnvironmentPropertySource --enable-native-access=ALL-UNNAMED"

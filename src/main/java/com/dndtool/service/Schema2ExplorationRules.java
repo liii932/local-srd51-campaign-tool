@@ -14,6 +14,7 @@ public final class Schema2ExplorationRules {
     public record TimePlan(int seconds,List<HealthChange> changes,Map<UUID,Context> after) {
         public TimePlan {changes=List.copyOf(changes);after=Map.copyOf(after);}
     }
+    public record MoveBudget(Position start, int maxSteps, int stepCostFeet) { }
     public record PreparedHealth(Schema2CharacterHealthRules.PreparedHealth prepared,VitalEffectKind kind) { }
     private Schema2ExplorationRules() { }
 
@@ -53,9 +54,11 @@ public final class Schema2ExplorationRules {
         return new TimePlan(seconds,changes,after);
     }
 
-    /** One walking or crawling interval takes six seconds and preserves each cell boundary for zone reconciliation. */
-    public static void prepareMove(Map<UUID,Context> roster,Battle battle,UUID actor,List<Position> path) {
-        requireExploration(battle);requireTimeSafe(roster,6);
+    /** The shared six-second movement budget, independent of the route's occupancy. */
+    public static MoveBudget moveBudget(Map<UUID,Context> roster,Battle battle,UUID actor) {
+        requireExploration(battle);
+        if (battle.flows().size() >= Schema2CombatRules.MAX_FLOWS) throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");
+        requireTimeSafe(roster,6);
         Context context=roster.get(actor);
         if(context==null||context.character().hitPoints()==0||context.character().health().dead()) throw invalid("S2_COMBAT_ACTOR_INACTIVE");
         Combatant mover=battle.combatants().stream().filter(c->c.characterId().equals(actor)).findFirst()
@@ -67,10 +70,16 @@ public final class Schema2ExplorationRules {
         int speed=Math.max(0,movement.getFirst().definition().walkSpeedFeet()
                 -new Schema2CharacterEquipmentRules().derive(context.material(),context.character()).speedPenalty());
         int stepCostFeet=mover.prone()?10:5;
-        if(path==null||path.isEmpty()||path.size()>64||path.size()*stepCostFeet>speed) throw invalid("S2_EXPLORATION_PATH");
+        return new MoveBudget(mover.position(), Math.min(Schema2CombatRules.MAX_PATH, speed / stepCostFeet), stepCostFeet);
+    }
+
+    /** One interval preserves each cell boundary for zone reconciliation. */
+    public static void prepareMove(Map<UUID,Context> roster,Battle battle,UUID actor,List<Position> path) {
+        MoveBudget budget = moveBudget(roster, battle, actor);
+        if(path==null||path.isEmpty()||path.size()>budget.maxSteps()) throw invalid("S2_EXPLORATION_PATH");
         Set<Position> occupied=new HashSet<>();
         for(Combatant other:battle.combatants()) if(!other.characterId().equals(actor)) occupied.add(other.position());
-        Position from=mover.position();
+        Position from=budget.start();
         for(Position step:path) {
             if(step==null||from.distanceFeet(step)!=5||occupied.contains(step)) throw invalid("S2_EXPLORATION_PATH");
             from=step;

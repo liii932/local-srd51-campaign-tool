@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Application-delivered import candidates; their presence never grants acceptance. */
+/** Application-delivered standard rules and import candidates for explicit selections. */
 public final class BundledCampaignRules {
     public static final String STANDARD = "standard";
     public static final String CHECK_VARIANT = "check-variant";
@@ -22,6 +22,7 @@ public final class BundledCampaignRules {
 
     public static ProductionSchema2Projection projection() { return projection(STANDARD); }
     public static List<ProductionRuleArtifact> artifacts() { return artifacts(STANDARD); }
+    static Schema2RulesBinding standardBinding() { return selected(STANDARD).binding(); }
 
     public static ProductionSchema2Projection projection(String combination) { return selected(combination).projection(); }
     public static List<ProductionRuleArtifact> artifacts(String combination) { return selected(combination).artifacts(); }

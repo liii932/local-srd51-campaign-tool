@@ -34,7 +34,7 @@ public final class HostDatabaseDiagnosticServlet extends HttpServlet {
             throws IOException {
         DatabaseSchemaStatus status = diagnostics.get();
         ServletContext context = getServletContext();
-        context.setAttribute(DatabaseStartupListener.STATUS_ATTRIBUTE, status);
+        context.setAttribute("com.dndtool.persistence.databaseSchemaStatus", status);
 
         writeStatus(response, status);
     }

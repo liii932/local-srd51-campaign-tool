@@ -91,6 +91,10 @@ class PlayerProcessRecoveryIntegrationTest {
             JsonObject originalReceipt = accepted.getAsJsonObject("receipt").deepCopy();
             assertEquals("ACCEPTED", originalReceipt.get("state").getAsString());
             JsonObject exactIdentity = object("requestId", requestId, "candidateId", option.get("id").getAsString(), "precondition", option.get("precondition").getAsString());
+            JsonObject closedIdentity = exactIdentity.deepCopy();
+            closedIdentity.add("receiptKey", option.get("receiptKey")); secrets.add(option.get("receiptKey").getAsString());
+            JsonObject neverDelivered = closedIdentity.deepCopy();
+            neverDelivered.addProperty("requestId", UUID.randomUUID().toString());
             JsonObject acceptedState = ok(get(dm, HOST + "/api/host/storage/state"), null);
             Facts beforeRestart = facts(acceptedState); long oldEpoch = acceptedState.getAsJsonObject("storage").get("epoch").getAsLong();
             String oldSession = cookie(deviceCookies, "DNDPLAYERSESSION"), originalDevice = cookie(deviceCookies, "DNDPLAYERDEVICE");
@@ -140,6 +144,11 @@ class PlayerProcessRecoveryIntegrationTest {
                 JsonObject checked = playerPost(reconnected, deviceCookies, "receipt", csrf(resumed), exactIdentity);
                 assertTrue(originalReceipt.equals(checked.get("receipt")), "same-run recovery must return the original receipt outcome");
                 assertFalse(checked.getAsJsonObject("session").get("writeEnabled").getAsBoolean());
+                JsonObject closed = playerPost(reconnected, deviceCookies, "receipt-close", csrf(checked), closedIdentity);
+                assertEquals(originalReceipt, closed.get("receipt"), "closure must return the original acceptance if the response was lost");
+                JsonObject absent = playerPost(reconnected, deviceCookies, "receipt-close", csrf(closed), neverDelivered);
+                assertEquals("NOT_EXECUTED", absent.getAsJsonObject("receipt").get("state").getAsString());
+                assertFalse(absent.getAsJsonObject("session").get("writeEnabled").getAsBoolean());
                 assertTrue(beforeReceipt.equals(facts(ok(get(recoveredDm, HOST + "/api/host/storage/state"), null))), "identity recovery and receipt lookup must not consume RNG, append roots or modify any business fact");
                 phase = "closing only the replacement child";
             }
@@ -161,7 +170,8 @@ class PlayerProcessRecoveryIntegrationTest {
             while (System.nanoTime() < deadline) {
                 String output = Files.exists(log) ? Files.readString(log) : "";
                 String certificate = line(output, "Temporary test certificate: "), spki = line(output, "Test-only certificate SPKI: ");
-                if (output.contains("DM: " + HOST + "/host/storage") && output.contains("Player: " + PLAYER + "/player") && certificate != null && spki != null) {
+                if ((HOST + "/host").equals(line(output, "DM: ")) && (PLAYER + "/player").equals(line(output, "Player: "))
+                        && certificate != null && spki != null) {
                     Path pem = Path.of(certificate).toAbsolutePath().normalize();
                     assertTrue(pem.startsWith(childTemporary.toAbsolutePath().normalize()) && pem.getFileName().toString().equals("test-certificate.pem"), "certificate must belong to this child test directory");
                     assertTrue(Files.isRegularFile(pem, LinkOption.NOFOLLOW_LINKS), "ready child must expose its exact public test certificate");

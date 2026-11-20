@@ -6,12 +6,18 @@
   let busy = false;
   let lastSaved = null;
   let manualSelected = null;
+  let characterBrowserScope = null;
+  let characterBrowserKey = null;
+  let characterBrowserIndex = 0;
+  let campaignLogScroll = null;
   let library = null;
   let libraryBusy = false;
   let reviewedRule = null;
   let selectedRules = [];
   let previewedRules = null;
   const messages = {
+    STORAGE_ROOT_INVALID: '存储目录配置无效，请检查运行账号使用的绝对路径。',
+    STORAGE_ROOT_IN_USE: '另一个实例正在使用此存储目录。',
     STORAGE_UNAVAILABLE: '战役存储暂不可用，请检查应用配置。',
     RUN_EXISTS: '已有战役，请先保存并结束当前战役。',
     RESIDUAL_RUN_EXISTS: '有未结束的战役，请先恢复。',
@@ -65,12 +71,21 @@
     busy = value;
     byId('storage-workspace').disabled = value;
     byId('storage-workspace').setAttribute('aria-busy', String(value));
+    byId('rule-library-controls').disabled = value || libraryBusy;
     byId('storage-message').classList.toggle('is-busy', value);
     if (text) message(text);
   }
   const progressMessage = action => ({create: '正在准备战役与首份完整保存…', open: '正在核验并打开战役…', recover: '正在核验并恢复未结束战役…',
     save: '正在保存完整战役文件…', end: '正在保存并结束战役…',
     import: '正在核验并导入完整战役…', delete: '正在删除所选保存文件…', discard: '正在放弃所选未结束运行…', domain: '正在提交行动并读取结果…'})[action] || '正在处理操作…';
+  function refreshSavedFileActions() {
+    const key = byId('storage-files').value;
+    const file = view.savedCampaigns.find(entry => entry.fileKey === key);
+    const usable = view.storage.state === 'IDLE' && file?.available;
+    byId('storage-open').querySelector('button').disabled = !usable;
+    byId('storage-delete').disabled = !usable;
+    downloadLink(byId('storage-download'), usable ? key : null);
+  }
   function options(select, items, label) {
     const selected = new Set(Array.from(select.selectedOptions, option => option.value));
     select.replaceChildren();
@@ -83,34 +98,70 @@
     }
   }
   function downloadLink(link, key) {
-    link.hidden = !key;
-    if (key) link.href = endpoint + 'download?fileKey=' + encodeURIComponent(key);
+    const available = key && view.savedCampaigns.some(file => file.fileKey === key && file.available);
+    link.hidden = !available;
+    if (available) link.href = endpoint + 'download?fileKey=' + encodeURIComponent(key);
     else link.removeAttribute('href');
+  }
+  function openCampaignLog() {
+    const overlay = byId('campaign-log-overlay');
+    if (!view?.campaign || !overlay.hidden) return;
+    const center = byId('workspace-center-scroll');
+    campaignLogScroll = {top: center.scrollTop, left: center.scrollLeft};
+    center.inert = true;
+    overlay.hidden = false;
+    byId('campaign-log-toggle').setAttribute('aria-expanded', 'true');
+    byId('campaign-log-close').focus({preventScroll: true});
+  }
+  function closeCampaignLog(restoreFocus = true) {
+    const overlay = byId('campaign-log-overlay');
+    if (overlay.hidden) return;
+    const center = byId('workspace-center-scroll');
+    overlay.hidden = true;
+    byId('campaign-log-toggle').setAttribute('aria-expanded', 'false');
+    center.inert = false;
+    if (campaignLogScroll) {
+      center.scrollTop = campaignLogScroll.top;
+      center.scrollLeft = campaignLogScroll.left;
+    }
+    campaignLogScroll = null;
+    if (restoreFocus) byId('campaign-log-toggle').focus({preventScroll: true});
   }
   function render(preferredFile = null) {
     document.dispatchEvent(new CustomEvent('dnd:storage-view', {detail: view}));
     const active = view.campaign !== null;
     byId('storage-idle').hidden = active;
     byId('storage-active').hidden = !active;
+    byId('campaign-log-entry').hidden = !active;
+    const scope = active ? `${view.storage.runId}:${view.campaign.campaignId}` : null;
+    if (scope !== characterBrowserScope) {
+      characterBrowserScope = scope;
+      characterBrowserKey = null;
+      characterBrowserIndex = 0;
+      closeCampaignLog(false);
+    }
     const recoverable = [...view.storage.residualRunIds];
     if (!active && view.storage.runId && !recoverable.includes(view.storage.runId)) recoverable.push(view.storage.runId);
-    const saved = new Map((view.savedCampaigns || []).map(file => [file.fileKey, file]));
-    const files = [...saved.keys()].filter(id => view.storage.saveFiles.includes(id));
-    for (const id of view.storage.saveFiles) if (!saved.has(id)) files.push(id);
-    options(byId('storage-files'), files, (id, i) => {
-      const file = saved.get(id); return file ? `${file.name} · ${file.eventTail} 条记录 · 文件 ${id.substring(0, 8)}` : `已存战役 ${i + 1} · 文件 ${id.substring(0, 8)}`;
+    const saved = new Map(view.savedCampaigns.map(file => [file.fileKey, file]));
+    const files = [...saved.keys()];
+    options(byId('storage-files'), files, id => {
+      const file = saved.get(id);
+      const label = file.available ? `${file.name} · ${file.eventTail} 条记录` : '文件损坏、不可读或版本不受支持';
+      return `${label} · 文件 ${id.substring(0, 8)}`;
     });
     if (preferredFile && files.includes(preferredFile)) byId('storage-files').value = preferredFile;
     options(byId('storage-residuals'), recoverable, (_, i) => `未结束战役 ${i + 1}`);
-    byId('storage-open').querySelector('button').disabled = view.storage.state !== 'IDLE' || view.storage.saveFiles.length === 0;
+    refreshSavedFileActions();
     byId('storage-recover').querySelector('button').disabled = recoverable.length === 0;
     refreshCreateButton();
     byId('storage-import').querySelector('button').disabled = view.storage.state !== 'IDLE';
-    byId('storage-delete').disabled = view.storage.state !== 'IDLE' || view.storage.saveFiles.length === 0;
     byId('storage-discard').disabled = recoverable.length === 0;
-    downloadLink(byId('storage-download'), view.storage.state === 'IDLE' ? byId('storage-files').value : null);
     downloadLink(byId('storage-last-download'), lastSaved && view.storage.saveFiles.includes(lastSaved) ? lastSaved : null);
-    if (!active) return;
+    if (!active) {
+      byId('storage-history').replaceChildren();
+      renderCharacterBrowser();
+      return;
+    }
     const campaign = view.campaign;
     byId('storage-campaign-name').textContent = campaign.name;
     byId('storage-domain').hidden = false;
@@ -415,38 +466,72 @@
       return {x: cell[1], y: cell[2]};
     });
   }
+  const browsableCharacters = () => [
+    ...roster().map(character => ({source: 'RULE', character})),
+    ...manualCards().map(character => ({source: 'MANUAL', character}))
+  ];
+  const characterKey = entry => `${entry.source}:${entry.character.id}`;
+  function renderCharacterBrowser() {
+    const entries = browsableCharacters(), cards = byId('storage-characters'), manual = byId('manual-cards');
+    let index = entries.findIndex(entry => characterKey(entry) === characterBrowserKey);
+    if (index < 0 && entries.length) index = Math.min(characterBrowserIndex, entries.length - 1);
+    characterBrowserIndex = Math.max(0, index);
+    characterBrowserKey = index < 0 ? null : characterKey(entries[index]);
+    cards.replaceChildren(); manual.replaceChildren();
+    cards.hidden = index < 0 || entries[index].source !== 'RULE';
+    manual.hidden = index < 0 || entries[index].source !== 'MANUAL';
+    byId('character-browser-previous').disabled = index <= 0;
+    byId('character-browser-next').disabled = index < 0 || index >= entries.length - 1;
+    byId('character-browser-position').textContent = `${index + 1} / ${entries.length}`;
+    const empty = byId('character-browser-empty');
+    empty.hidden = entries.length > 0;
+    empty.textContent = view?.campaign ? '当前战役还没有角色。创建规则角色或自由卡后，可在这里翻阅。' : '开始战役后，可在这里翻阅规则角色与自由卡。';
+    if (index < 0) return;
+    const entry = entries[index], card = entry.source === 'RULE' ? renderRuleCharacter(entry.character) : renderManualCharacter(entry.character);
+    card.dataset.characterSource = entry.source;
+    card.dataset.characterId = entry.character.id;
+    (entry.source === 'RULE' ? cards : manual).append(card);
+  }
+  function browseCharacter(direction) {
+    const entries = browsableCharacters(), index = entries.findIndex(entry => characterKey(entry) === characterBrowserKey);
+    const next = index + direction;
+    if (index < 0 || next < 0 || next >= entries.length) return;
+    characterBrowserKey = characterKey(entries[next]);
+    renderCharacterBrowser();
+    byId('character-browser-scroll').scrollTop = 0;
+  }
+  function renderRuleCharacter(character) {
+    const card = document.createElement('article'); card.className = 'card character-card'; const current = character.state;
+    text(card, 'strong', `${character.name} · ${character.kind === 'NPC' ? 'NPC' : '角色'}${character.active ? '' : ' · 离队'}`);
+    const placement = placeFor(character.id);
+    text(card, 'p', placement ? `${spaceName(placement.space)}${inFocus(character.id) ? ' · 执行焦点' : ' · 后台冻结'}` : '尚未安置');
+    text(card, 'span', `${character.hitPoints} / ${character.maximumHitPoints}`, 'hp');
+    text(card, 'p', `${character.level} 级 · 熟练 +${current.proficiencyBonus} · ${current.health?.dead ? '已死亡' : current.health?.stable ? '稳定' : '存活'} · 临时生命值 ${current.health?.temporaryHitPoints || 0}`);
+    table(card, abilityNames, [abilities.map(key => current.abilities?.['ability.' + key] ?? '—')]);
+    text(card, 'p', `职业：${(current.classes || []).map(entry => `${ruleName(entry.characterClass)} ${entry.level}`).join('、')}`);
+    text(card, 'p', `资源：${(current.resources || []).map(resource => `${ruleName(resource.identity)} ${resource.unlimited ? '不限' : `${resource.current}/${resource.maximum}`}`).join('；') || '无'}`);
+    text(card, 'p', `生命骰：${(current.hitDicePools || []).map(pool => `${pool.current}/${pool.maximum} d${pool.sides}`).join('；') || '无'}`);
+    text(card, 'p', `装备：${(current.equipment || []).map(item => `${ruleName(item.item)}（${locationName(item.location)}）`).join('；') || '无'}`);
+    text(card, 'p', `特性：${(current.features || []).map(feature => ruleName(feature.feature)).join('；') || '无'}`);
+    text(card, 'p', `熟练：${(current.proficiencies || []).map(proficiency => ruleName(proficiency.target)).join('；') || '无'}`);
+    if (current.rest?.active) text(card, 'p', `休息中：${current.rest.active.kind || current.rest.active.restKind} · ${current.rest.active.phase}`);
+    if (current.spellbook) {
+      text(card, 'p', `已准备法术：${current.spellbook.prepared.map(ruleName).join('、') || '无'}`);
+      const day = current.spellbook.lastArcaneRecoveryDay;
+      text(card, 'p', day === null || day === undefined ? '奥术回想：尚未使用' : `奥术回想使用日：第 ${day} 日`);
+    }
+    const recentRecovery = character.history?.events?.findLast(event => Object.keys(event.command?.restInput?.recoveredSpellSlots || {}).length);
+    if (recentRecovery) text(card, 'p', `最近${arcaneRecoveryResult(recentRecovery)}`);
+    const recentCheck = character.history?.events?.findLast(event => event.checkResult);
+    if (recentCheck) { const result = recentCheck.checkResult; text(card, 'p', `最近检定：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + 熟练 ${result.proficiencyBonus} = ${result.total}，${result.success ? '成功' : '失败'}`); }
+    const recentHealth = character.history?.events?.findLast(event => event.healthResult);
+    if (recentHealth) { const result = recentHealth.healthResult; text(card, 'p', `最近健康操作：${recentHealth.before?.hitPoints ?? '—'} → ${recentHealth.after.hitPoints}；掷骰 ${[...(result.dice || []), result.deathD20, result.recoveryD4].filter(value => value !== null && value !== undefined).join('、') || '无'}`); }
+    return card;
+  }
   function renderDomain(state) {
     refreshRuleChoices();
     renderSpaces(state);
-    const cards = byId('storage-characters'); cards.replaceChildren();
-    for (const character of state.characters) {
-      const card = document.createElement('article'); card.className = 'card character-card'; const current = character.state;
-      text(card, 'strong', `${character.name} · ${character.kind === 'NPC' ? 'NPC' : '角色'}${character.active ? '' : ' · 离队'}`);
-      const placement = placeFor(character.id);
-      text(card, 'p', placement ? `${spaceName(placement.space)}${inFocus(character.id) ? ' · 执行焦点' : ' · 后台冻结'}` : '尚未安置');
-      text(card, 'span', `${character.hitPoints} / ${character.maximumHitPoints}`, 'hp');
-      text(card, 'p', `${character.level} 级 · 熟练 +${current.proficiencyBonus} · ${current.health?.dead ? '已死亡' : current.health?.stable ? '稳定' : '存活'} · 临时生命值 ${current.health?.temporaryHitPoints || 0}`);
-      table(card, abilityNames, [abilities.map(key => current.abilities?.['ability.' + key] ?? '—')]);
-      text(card, 'p', `职业：${(current.classes || []).map(entry => `${ruleName(entry.characterClass)} ${entry.level}`).join('、')}`);
-      text(card, 'p', `资源：${(current.resources || []).map(resource => `${ruleName(resource.identity)} ${resource.unlimited ? '不限' : `${resource.current}/${resource.maximum}`}`).join('；') || '无'}`);
-      text(card, 'p', `生命骰：${(current.hitDicePools || []).map(pool => `${pool.current}/${pool.maximum} d${pool.sides}`).join('；') || '无'}`);
-      text(card, 'p', `装备：${(current.equipment || []).map(item => `${ruleName(item.item)}（${locationName(item.location)}）`).join('；') || '无'}`);
-      text(card, 'p', `特性：${(current.features || []).map(feature => ruleName(feature.feature)).join('；') || '无'}`);
-      text(card, 'p', `熟练：${(current.proficiencies || []).map(proficiency => ruleName(proficiency.target)).join('；') || '无'}`);
-      if (current.rest?.active) text(card, 'p', `休息中：${current.rest.active.kind || current.rest.active.restKind} · ${current.rest.active.phase}`);
-      if (current.spellbook) {
-        text(card, 'p', `已准备法术：${current.spellbook.prepared.map(ruleName).join('、') || '无'}`);
-        const day = current.spellbook.lastArcaneRecoveryDay;
-        text(card, 'p', day === null || day === undefined ? '奥术回想：尚未使用' : `奥术回想使用日：第 ${day} 日`);
-      }
-      const recentRecovery = character.history?.events?.findLast(event => Object.keys(event.command?.restInput?.recoveredSpellSlots || {}).length);
-      if (recentRecovery) text(card, 'p', `最近${arcaneRecoveryResult(recentRecovery)}`);
-      const recentCheck = character.history?.events?.findLast(event => event.checkResult);
-      if (recentCheck) { const result = recentCheck.checkResult; text(card, 'p', `最近检定：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + 熟练 ${result.proficiencyBonus} = ${result.total}，${result.success ? '成功' : '失败'}`); }
-      const recentHealth = character.history?.events?.findLast(event => event.healthResult);
-      if (recentHealth) { const result = recentHealth.healthResult; text(card, 'p', `最近健康操作：${recentHealth.before?.hitPoints ?? '—'} → ${recentHealth.after.hitPoints}；掷骰 ${[...(result.dice || []), result.deathD20, result.recoveryD4].filter(value => value !== null && value !== undefined).join('、') || '无'}`); }
-      cards.append(card);
-    }
+    renderCharacterBrowser();
     const history = byId('storage-history'); history.replaceChildren();
     for (const root of state.roots || []) {
       if (root.kind === 'manual-check') {
@@ -680,19 +765,18 @@
       options(select, people.map(card => card.id), personName);
       if (select.form?.id === 'manual-card-load' && manualSelected && people.some(card => card.id === manualSelected)) select.value = manualSelected;
     }
-    const cards = byId('manual-cards'); cards.replaceChildren();
-    for (const card of manualCards()) {
-      const box = document.createElement('article'); box.className = 'card';
-      const totalLevel = Object.values(card.classes).reduce((sum, value) => sum + Number(value), 0), proficiency = Math.max(2, 2 + Math.floor((totalLevel - 1) / 4));
-      text(box, 'strong', `${card.name} · ${card.kind === 'PC' ? '自由角色' : '自由 NPC'}${card.active ? '' : ' · 离队'}`);
-      text(box, 'span', `${card.fields['hp.current']} / ${card.fields['hp.maximum']}`, 'hp');
-      table(box, abilityNames, [abilities.map(key => card.fields['ability.' + key])]);
-      text(box, 'p', `防护等级 ${card.fields.armor_class} · 速度 ${card.fields['speed.ground']} 英尺 · 等级 ${totalLevel} · 熟练 +${proficiency}`);
-      const items = domain().items.filter(item => item.characterId === card.id);
-      text(box, 'p', `物品：${items.map(item => `${item.name} × ${item.quantity}${item.active === false ? '（归档）' : ''}`).join('；') || '无'}`);
-      cards.append(box);
-    }
     renderManualEditor(); refreshManualCheck(); refreshManualInventory(); refreshManualEffects();
+  }
+  function renderManualCharacter(card) {
+    const box = document.createElement('article'); box.className = 'card character-card';
+    const totalLevel = Object.values(card.classes).reduce((sum, value) => sum + Number(value), 0), proficiency = Math.max(2, 2 + Math.floor((totalLevel - 1) / 4));
+    text(box, 'strong', `${card.name} · ${card.kind === 'PC' ? '自由角色' : '自由 NPC'}${card.active ? '' : ' · 离队'}`);
+    text(box, 'span', `${card.fields['hp.current']} / ${card.fields['hp.maximum']}`, 'hp');
+    table(box, abilityNames, [abilities.map(key => card.fields['ability.' + key])]);
+    text(box, 'p', `防护等级 ${card.fields.armor_class} · 速度 ${card.fields['speed.ground']} 英尺 · 等级 ${totalLevel} · 熟练 +${proficiency}`);
+    const items = domain().items.filter(item => item.characterId === card.id);
+    text(box, 'p', `物品：${items.map(item => `${item.name} × ${item.quantity}${item.active === false ? '（归档）' : ''}`).join('；') || '无'}`);
+    return box;
   }
   function renderManualEditor() {
     const parent = byId('manual-card-editor'); parent.replaceChildren();
@@ -913,9 +997,13 @@
     pendingRuleOperation = operation;
     ruleRetryable = false;
   }
+  const createsWithCustomRules = () => byId('storage-create-rules').value === 'custom';
+  const currentSelectionPreviewed = () => previewedRules !== null && previewedRules === selectionKey();
   function refreshCreateButton() {
-    byId('storage-create').querySelector('button[type="submit"]').disabled =
-      view?.storage.state !== 'IDLE' || libraryBusy || previewedRules === null || previewedRules !== selectionKey();
+    const form = byId('storage-create'), custom = createsWithCustomRules();
+    byId('storage-create-custom').hidden = !custom;
+    form.querySelector('button[type="submit"]').disabled = view?.storage.state !== 'IDLE' ||
+      libraryBusy || !form.elements.name.value || (custom && !currentSelectionPreviewed());
   }
   async function ruleRequest(action, fields = null, upload = null, requestId = null) {
     const request = fields ? await signedPost(action, view.storage.epoch, '0', fields, upload, requestId || crypto.randomUUID())
@@ -941,7 +1029,7 @@
     }
     finally {
       libraryBusy = false;
-      byId('rule-library-controls').disabled = false;
+      byId('rule-library-controls').disabled = busy;
       renderRuleOperations();
       refreshCreateButton();
     }
@@ -1303,6 +1391,19 @@
         materialItemId: values.itemId || null, slotLevel: values.slotLevel, targetCastFrameKey: null, coneDirection: null} : null};
     sendCombat(battle, {...baseCombat('READY_' + values.responseKind, values.actorId), readyInput});
   });
+  byId('character-browser-previous').addEventListener('click', () => browseCharacter(-1));
+  byId('character-browser-next').addEventListener('click', () => browseCharacter(1));
+  byId('campaign-log-toggle').addEventListener('click', () => {
+    if (byId('campaign-log-overlay').hidden) openCampaignLog();
+    else closeCampaignLog();
+  });
+  byId('campaign-log-close').addEventListener('click', () => closeCampaignLog());
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !byId('campaign-log-overlay').hidden) {
+      event.preventDefault(); closeCampaignLog();
+    }
+  });
+  window.addEventListener('pagehide', () => closeCampaignLog(false));
   for (const button of document.querySelectorAll('[data-pane]')) button.addEventListener('click', () => {
     for (const panel of document.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== button.dataset.pane;
     for (const tab of document.querySelectorAll('[data-pane]')) tab.setAttribute('aria-pressed', String(tab === button));
@@ -1321,10 +1422,17 @@
   });
   for (const select of document.querySelectorAll('.combat-choice')) select.addEventListener('change', refreshCombatActors);
   byId('domain-combat').elements.kind.addEventListener('change', refreshCombatForm);
+  byId('storage-create-rules').addEventListener('change', refreshCreateButton);
+  byId('storage-create').elements.name.addEventListener('input', refreshCreateButton);
   byId('storage-create').addEventListener('submit', event => {
     event.preventDefault();
-    if (previewedRules === null || previewedRules !== selectionKey()) { message('请先核验并预览当前有序组合。'); return; }
-    command('create', {name: [event.currentTarget.elements.name.value], members: selectedMemberTuples()});
+    if (libraryBusy) return;
+    const fields = {name: [event.currentTarget.elements.name.value]};
+    if (createsWithCustomRules()) {
+      if (!currentSelectionPreviewed()) { message('请先核验并预览当前有序组合。'); return; }
+      fields.members = selectedMemberTuples();
+    }
+    command('create', fields);
   });
   form('storage-open', 'open'); form('storage-recover', 'recover');
   byId('rule-library').addEventListener('toggle', event => {
@@ -1334,6 +1442,9 @@
     const details = byId('rule-library');
     if (details.open) libraryTask(refreshRuleLibrary);
     else details.open = true;
+    const summary = details.querySelector('summary');
+    summary.focus({preventScroll: true});
+    summary.scrollIntoView({block: 'nearest'});
   });
   byId('rule-library-refresh').addEventListener('click', () => libraryTask(async () => {
     await refreshRuleLibrary(); ruleMessage('已刷新规则库。');
@@ -1363,7 +1474,7 @@
   }, message));
   byId('storage-save').addEventListener('click', () => command('save', {}));
   byId('storage-end').addEventListener('click', () => command('end', {}));
-  byId('storage-files').addEventListener('change', () => downloadLink(byId('storage-download'), byId('storage-files').value));
+  byId('storage-files').addEventListener('change', refreshSavedFileActions);
   byId('storage-delete').addEventListener('click', () => {
     const selected = byId('storage-files').selectedOptions[0];
     if (selected && window.confirm(`永久删除“${selected.textContent}”的这个本地保存文件？请先下载需要保留的副本。`)) command('delete', {fileKey: [selected.value]});
@@ -1386,8 +1497,12 @@
     } catch (_) { setBusy(false); message('无法读取所选文件，请重新选择完整战役 JSON 文件。'); }
   });
   setBusy(true, '正在读取战役…');
-  document.addEventListener('dnd:storage-refresh', () => {
-    if (!busy) load().catch(failure => message(messages[failure.message] || '无法读取当前战役。'));
+  document.addEventListener('dnd:storage-refresh', async () => {
+    if (busy) return;
+    setBusy(true);
+    try { await load(); }
+    catch (failure) { message(messages[failure.message] || '无法读取当前战役。'); }
+    finally { setBusy(false); }
   });
   load().then(() => message(view.campaign ? '战役已就绪。' : '创建、打开或恢复一个战役。'))
     .catch(failure => message(messages[failure.message] || '无法读取战役。')).finally(() => setBusy(false));

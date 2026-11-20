@@ -66,6 +66,10 @@ class PlayerHttpIntegrationTest {
             JsonObject receipt=json("requestId",command.get("requestId").getAsString(),"candidateId",command.get("candidateId").getAsString(),"precondition",command.get("precondition").getAsString());
             JsonObject checked=ok(post(trusted,"receipt",csrf(accepted),receipt,writer,PLAYER));assertEquals(accepted.get("receipt"),checked.get("receipt"));assertEquals(before+1,storage.current().revision());
             receipt.addProperty("requestId",UUID.randomUUID().toString());assertEquals("UNVERIFIED",ok(post(trusted,"receipt",csrf(checked),receipt,writer,PLAYER)).getAsJsonObject("receipt").get("state").getAsString());
+            receipt.add("receiptKey", option.get("receiptKey"));
+            assertEquals(403, post(trusted, "receipt-close", csrf(checked), receipt, writer, "https://wrong.invalid").statusCode());
+            assertEquals("NOT_EXECUTED", ok(post(trusted, "receipt-close", csrf(checked), receipt, writer, PLAYER)).getAsJsonObject("receipt").get("state").getAsString());
+            assertEquals(before + 1, storage.current().revision());
             host("close",Map.of());assertEquals("APPROVED",ok(get(trusted,PLAYER+"/api/player/state")).getAsJsonObject("session").get("status").getAsString());
             host("pause",Map.of("paused","true"));assertFalse(ok(get(trusted,PLAYER+"/api/player/state")).getAsJsonObject("session").get("writeEnabled").getAsBoolean());
         }

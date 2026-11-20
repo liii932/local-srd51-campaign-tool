@@ -6,15 +6,14 @@
 
 “v2”是设计简称，不是所有版本字段都取数字 2。完整 SRD 族
 `dnd5e2014_srd51_se` release `"1"` 的 canonical/archive 目标仍为 `2/2`，状态仍 DRAFT。
-当前显式 SQLite 入口使用本机已接受的准确组合，并提供标准与家规所需的原包作为导入候选。
+SQLite 是 Web 应用的唯一运行库。标准规则随应用直接加载，自定义组合核验本机原包与接受记录。
 SQLite 完整文件 `RULE_BOUND_CAMPAIGN` format 3 与 MySQL archive dispatcher 分别管理。
 
 ## 模组分层目标
 
 [模组分层与应用执行架构](module-layering.md)规定运行核心、应用规则机制、规则模组和界面的
 职责及端到端采用顺序。当前准确组合、战役上下文、领域类型及本机规则库已接合。
-单 DM 同时运行一个活动战役，每次打开建立独占私有 SQLite。新建及移机打开须在本机导入并
-接受准确原包，活动和同版残留恢复使用自身冻结材料。[本机规则库](local-rule-library.md)
+单 DM 同时运行一个活动战役，每次打开建立独占私有 SQLite。标准战役可在同版应用上直接新建、重开。自定义组合须在本机导入并接受准确原包。活动和同版残留恢复使用自身冻结材料。[本机规则库](local-rule-library.md)
 
 当前 SQLite [世界与场景](world-and-scene-spaces.md)允许不同主体处于多个世界节点或局部
 二维网格场景。当前只有焦点可执行，后台时钟和游戏事实冻结。DM 显式交接与裁定旅行耗时，角色
@@ -28,7 +27,7 @@ SQLite 完整文件 `RULE_BOUND_CAMPAIGN` format 3 与 MySQL archive dispatcher 
 
 ## 当前选择与实现边界
 
-`DND_STORAGE_ROOT` 启用当前有限 SQLite 路线；未配置仍使用原 MySQL 简化模式。当前选择是：
+`DND_STORAGE_ROOT` 可覆盖默认的本机 SQLite 存储位置。
 
 - 每次新建/文件打开一个独占私有 SQLite；全领域后果、根子历史、版本与接受收据一次业务事务提交。
 - DM 明确选择本机已接受的 1–8 个有序准确成员，组合须满足现有建卡模板与机制闭包。角色创建、候选、目录与来源、结算和历史验算使用同一战役规则上下文。
@@ -52,7 +51,7 @@ SQLite 完整文件 `RULE_BOUND_CAMPAIGN` format 3 与 MySQL archive dispatcher 
 | 几何、区域与安置 | [空间与区域](spatial-and-area-contract.md) | 目标三维体积、视线与完整区域证明、联动移动、生成与强制回归 |
 | 时间、期限与日历 | [时间与日历](time-and-calendar.md) | 目标空间钟、个人经历、自然日与黎明、期限交接及消费去重 |
 | 物件、魔法物品与符文 | [物件与魔法物品](objects-and-magic-items.md) | 实物身份和互动、同调、魔杖充能、符文触发与保存 |
-| 产品、原型与网络范围 | [产品说明](../../product.md)、[架构](../../architecture.md) | 当前 SQLite/默认 MySQL、支持范围、loopback 与真实数据责任 |
+| 产品、原型与网络范围 | [产品说明](../../product.md)、[架构](../../architecture.md) | SQLite 运行与 MySQL 离线维护、支持范围、loopback 与真实数据责任 |
 | 当前领域能力与验收 | [领域接合表](domain-integration.md)、[采用边界](adoption-boundaries.md) | 实际入口、初始/当前/历史覆盖、仍需接合的旧能力与后续门 |
 | 规则身份、作者输入与组合 | [模组接口基线](module-interface-baseline.md) | 严格 schema-2、依赖、字段操作、完整链和有限机制的执行资格 |
 | 规则材料、存储与版本 | [规则存储](rule-storage-and-versioning.md) | 战役冻结材料、独立本机规则库、准确绑定与文件模型 |

@@ -63,11 +63,18 @@ final class StorageReadinessTest {
         }
     }
 
-    @Test void malformedSavedFileFailsReadinessWithoutExposingPaths() throws Exception {
+    @Test void malformedDetachedSaveIsUnavailableWithoutBlockingHealthyReadiness() throws Exception {
         Path root = temporary.resolve("private-store");
         try (CampaignStorageService service = new CampaignStorageService(root)) {
-            Files.writeString(root.resolve("saves").resolve(UUID.randomUUID() + ".json"), "not a campaign");
-            assertUnavailable(check(service));
+            String fileKey = UUID.randomUUID().toString();
+            Files.writeString(root.resolve("saves").resolve(fileKey + ".json"), "not a campaign");
+
+            Fixture result = check(service);
+            assertEquals(200, result.status);
+            assertTrue(result.body().get("ready").getAsBoolean());
+            assertFalse(result.output.toString().contains(root.toString()));
+            assertEquals(List.of(new CampaignStorageService.SavedCampaign(fileKey, "", 0, false)),
+                    service.savedCampaigns());
         }
     }
 
@@ -100,7 +107,7 @@ final class StorageReadinessTest {
     private static Fixture check(CampaignStorageService service) throws Exception {
         Fixture result = new Fixture();
         ServletContext context = proxy(ServletContext.class, (ignored, method, arguments) -> switch (method.getName()) {
-            case "getAttribute" -> StorageApplicationListener.ENABLED_ATTRIBUTE.equals(arguments[0]) ? true : service;
+            case "getAttribute" -> StorageApplicationListener.SERVICE_ATTRIBUTE.equals(arguments[0]) ? service : null;
             default -> throw new AssertionError("Unexpected context call: " + method.getName());
         });
         HttpServletRequest request = proxy(HttpServletRequest.class, (ignored, method, arguments) -> switch (method.getName()) {

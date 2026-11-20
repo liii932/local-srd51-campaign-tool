@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import static com.dndtool.service.storage.CampaignParticipationData.*;
@@ -51,7 +52,8 @@ class PlayerParticipationAcceptanceTest {
             UUID pc = f.character("战士", "PC");
             f.acquire(pc, false);
             Seat old = f.approve("玩家"); f.assign(pc, old.member); f.permit(pc); f.takeover(old);
-            JsonObject original = f.command(old, f.option(old, "装备 "));
+            JsonObject option = f.option(old, "装备 ");
+            JsonObject original = f.command(old, option);
             JsonObject accepted = f.post(old, "command", original).body();
             assertEquals("ACCEPTED", accepted.getAsJsonObject("receipt").get("state").getAsString());
             JsonObject exact = receiptIdentity(original);
@@ -75,8 +77,87 @@ class PlayerParticipationAcceptanceTest {
             var beforeLookup = f.storage.accessSnapshot();
             JsonObject result = f.post(newlyApproved, "receipt", exact).body();
             assertEquals("UNVERIFIED", result.getAsJsonObject("receipt").get("state").getAsString());
+            JsonObject closed = f.post(newlyApproved, "receipt-close", closureIdentity(original, option)).body();
+            assertEquals("UNVERIFIED", closed.getAsJsonObject("receipt").get("state").getAsString());
             assertFalse(result.getAsJsonObject("session").get("writeEnabled").getAsBoolean());
             assertEquals(beforeLookup, f.storage.accessSnapshot(), "old acceptance is neither a login credential nor a new-run replay task");
+        }
+    }
+
+    @Test void sameDeviceMayCloseUndeliveredRequestAndFenceItsOldSessionWithoutTakingOver() throws Exception {
+        try (Fixture f = new Fixture("receipt-close")) {
+            UUID pc = f.character("战士", "PC");
+            f.acquire(pc, false);
+            Seat original = f.approve("玩家"); f.assign(pc, original.member); f.permit(pc); f.takeover(original);
+            JsonObject option = f.option(original, "装备 "), delayed = f.command(original, option);
+            JsonObject close = closureIdentity(delayed, option);
+            Seat otherDevice = f.approve("同席位的另一台设备", original.member);
+            var before = f.storage.accessSnapshot();
+            assertReceipt("UNVERIFIED", f.post(original, "receipt", receiptIdentity(delayed)));
+            assertReceipt("UNVERIFIED", f.post(otherDevice, "receipt-close", close));
+            JsonObject forged = close.deepCopy();
+            forged.addProperty("receiptKey", "forged");
+            assertReceipt("UNVERIFIED", f.post(original, "receipt-close", forged));
+
+            var anonymous = f.gateway.read(null, null, true);
+            Seat resumed = new Seat(f.gateway.post(anonymous.sessionToken(), csrf(anonymous), null, "resume", object(), original.device));
+            assertReceipt("NOT_EXECUTED", f.post(resumed, "receipt-close", close));
+            assertReceipt("NOT_EXECUTED", f.post(resumed, "receipt-close", close));
+            assertFalse(f.read(resumed).getAsJsonObject("session").get("writeEnabled").getAsBoolean());
+            assertEquals("PLAYER_VIEW_EXPIRED", assertThrows(PlayerGatewayException.class, () -> f.post(original, "command", delayed)).code());
+            assertEquals(before, f.storage.accessSnapshot(), "closure and late delivery must write no business or attempt rows");
+
+            f.takeover(resumed);
+            JsonObject fresh = f.option(resumed, "装备 "), next = f.command(resumed, fresh);
+            var accepted = f.post(resumed, "command", next);
+            assertReceipt("ACCEPTED", accepted);
+            assertEquals(accepted.body().get("receipt"), f.post(resumed, "receipt-close", closureIdentity(next, fresh)).body().get("receipt"));
+            assertEquals(before.revision() + 1, f.storage.accessSnapshot().revision());
+        }
+    }
+
+    @Test void hiddenOccupancyRejectsTheWholeExplorationRouteAndAllowsReceiptClosure() throws Exception {
+        try (Fixture f = new Fixture("rejected-route")) {
+            UUID pc = f.character("战士", "PC"), hidden = f.character("秘密守卫", "NPC");
+            Seat player = f.approve("玩家"); f.assign(pc, player.member); f.takeover(player);
+            PlayerSpaceFixture.beginBattle(f.storage, pc, hidden);
+            f.combat(f.battle(), Command.action(Kind.END_COMBAT, f.battle().activeActor()));
+            var permission = object("characterId", pc.toString(), "permissionVersion", "0", "sceneId", f.battle().combatId().toString());
+            permission.addProperty("active", true);
+            JsonArray actions = new JsonArray(); actions.add("EXPLORATION_MOVE"); permission.add("actions", actions);
+            f.host("exploration", object("payload", permission.toString()));
+
+            JsonObject option = f.option(player, "规划探索移动路线");
+            assertFalse(option.toString().contains(hidden.toString()));
+            var route = JsonParser.parseString("[{\"x\":1,\"y\":1},{\"x\":2,\"y\":0},{\"x\":3,\"y\":1}]");
+            JsonObject command = f.command(player, option); command.add("route", route);
+            var before = f.storage.accessSnapshot();
+            assertEquals("PLAYER_COMMAND_REJECTED", assertThrows(PlayerGatewayException.class, () -> f.post(player, "command", command)).code());
+            assertEquals(before.snapshot(), f.storage.accessSnapshot().snapshot(), "a free prefix before a hidden blocker cannot change position, clock or roots");
+            assertEquals(before.revision(), f.storage.accessSnapshot().revision());
+            assertReceipt("UNVERIFIED", f.post(player, "receipt", receiptIdentity(command)));
+            assertReceipt("NOT_EXECUTED", f.post(player, "receipt-close", closureIdentity(command, option)));
+            assertEquals("PLAYER_VIEW_EXPIRED", assertThrows(PlayerGatewayException.class, () -> f.post(player, "command", command)).code());
+            assertEquals(before.snapshot(), f.storage.accessSnapshot().snapshot());
+        }
+    }
+
+    @Test void receiptClosureCannotClearAnUnknownCommit() throws Exception {
+        var interrupt = new AtomicBoolean();
+        try (Fixture f = new Fixture("unknown-receipt", boundary -> {
+            if (boundary == CampaignStorageService.Boundary.AFTER_BUSINESS_COMMIT && interrupt.getAndSet(false))
+                throw new IllegalStateException("Simulated lost commit result");
+        })) {
+            UUID pc = f.character("战士", "PC");
+            f.acquire(pc, false);
+            Seat player = f.approve("玩家"); f.assign(pc, player.member); f.permit(pc); f.takeover(player);
+            JsonObject option = f.option(player, "装备 "), command = f.command(player, option);
+            interrupt.set(true);
+            assertEquals("PLAYER_RESULT_UNVERIFIED", assertThrows(PlayerGatewayException.class, () -> f.post(player, "command", command)).code());
+            assertEquals("BLOCKED", f.storage.status().state());
+            assertEquals("PLAYER_RUN_UNAVAILABLE", assertThrows(PlayerGatewayException.class,
+                    () -> f.post(player, "receipt-close", closureIdentity(command, option))).code());
+            assertEquals("BLOCKED", f.storage.status().state());
         }
     }
 
@@ -178,7 +259,10 @@ class PlayerParticipationAcceptanceTest {
         final PlayerGatewayService gateway;
         String invitation;
         Fixture(String name) throws Exception {
-            storage = new CampaignStorageService(temporary.resolve(name));
+            this(name, ignored -> { });
+        }
+        Fixture(String name, CampaignStorageService.FaultInjector faults) throws Exception {
+            storage = new CampaignStorageService(temporary.resolve(name), faults);
             CampaignRuleFixtures.create(storage, "玩家边界验收");
             gateway = new PlayerGatewayService(storage, clock); invitation = host("invite", object()).get("invitation").getAsString();
         }
@@ -245,6 +329,14 @@ class PlayerParticipationAcceptanceTest {
         @Override public Clock withZone(ZoneId zone) { if (!zone.equals(ZoneOffset.UTC)) throw new IllegalArgumentException("Fixture clock uses UTC"); return this; }
         @Override public Instant instant() { return current; }
         void setMillis(long value) { current = Instant.ofEpochMilli(value); }
+    }
+    private static void assertReceipt(String expected, PlayerGatewayService.Reply reply) {
+        assertEquals(expected, reply.body().getAsJsonObject("receipt").get("state").getAsString());
+    }
+    private static JsonObject closureIdentity(JsonObject command, JsonObject option) {
+        JsonObject id = receiptIdentity(command);
+        id.add("receiptKey", option.get("receiptKey"));
+        return id;
     }
     private static JsonObject receiptIdentity(JsonObject command) { return object("requestId", command.get("requestId").getAsString(), "candidateId", command.get("candidateId").getAsString(), "precondition", command.get("precondition").getAsString()); }
     private static String csrf(PlayerGatewayService.Reply reply) { return reply.body().getAsJsonObject("session").get("csrf").getAsString(); }

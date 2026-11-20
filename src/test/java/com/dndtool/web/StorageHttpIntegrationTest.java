@@ -19,6 +19,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -62,14 +63,22 @@ class StorageHttpIntegrationTest {
             refresh();
             assertTrue(state.get("campaign").isJsonNull());
             assertEquals("0", epoch());
-            assertEquals(409, postRaw("/api/host/campaigns", "", Map.of()).statusCode());
+            assertEquals(404, postRaw("/api/host/campaigns", "", Map.of()).statusCode());
             assertEquals(404, get("/api/host/rules").statusCode());
             assertEquals(403, postRaw("/api/host/storage/create", "", Map.of("Origin", "https://invalid.example")).statusCode());
 
-            var standardMembers = prepareBundled();
-            var standardRules = result(rulePost("rule-preview", fields("members", standardMembers)));
-            var created = command("create", fields("name", "微光营地", "members", standardMembers));
+            assertError(command("create", fields("name", "空规则", "members", "")), 400, "INVALID_REQUEST");
+            assertError(command("create", fields("name", List.of("甲", "乙"))), 400, "INVALID_REQUEST");
+            var standardCandidates = RuleHttpFixture.members(library(), BundledCampaignRules.STANDARD);
+            assertRuleIssue(command("create", fields("name", "显式规则", "members",
+                    standardCandidates.stream().map(RuleHttpFixture::tuple).toList())),
+                    "RULE_PACKAGE_MISSING", standardCandidates.getFirst());
+            refresh();
+            assertTrue(state.get("campaign").isJsonNull());
+
+            var created = command("create", fields("name", "微光营地"));
             assertEquals(200, created.statusCode(), created.body());
+            assertFalse(Files.exists(root.resolve("rule-library")));
             String newEpoch = json(created).getAsJsonObject("storage").get("epoch").getAsString();
             assertNotEquals("0", newEpoch);
             var note = domainFields("note", object("text", "记下营地的路标"));
@@ -81,6 +90,8 @@ class StorageHttpIntegrationTest {
             assertEquals(404, command("characters", fields("name", "艾拉", "maximumHp", "12", "currentHp", "5")).statusCode());
             assertEquals(404, command("heal", Map.of()).statusCode());
             var standardCampaign = campaign();
+            var standardMembers = prepareBundled();
+            var standardRules = result(rulePost("rule-preview", fields("members", standardMembers)));
             assertEquals(standardRules, standardCampaign.getAsJsonObject("domain").get("rules"));
             var variantCandidates = RuleHttpFixture.members(library(), BundledCampaignRules.CHECK_VARIANT);
             var variantMember = variantCandidates.getLast();
@@ -149,9 +160,10 @@ class StorageHttpIntegrationTest {
         try (StorageLoopLauncher ignored = StorageLoopLauncher.start(Path.of("relative-root"))) {
             var unavailable = get("/api/host/storage/state");
             assertEquals(503, unavailable.statusCode());
-            assertEquals("STORAGE_UNAVAILABLE", JsonParser.parseString(unavailable.body()).getAsJsonObject().get("code").getAsString());
+            assertEquals("STORAGE_ROOT_INVALID", JsonParser.parseString(unavailable.body()).getAsJsonObject().get("code").getAsString());
             assertFalse(unavailable.body().contains("relative-root"));
-            assertEquals(409, postRaw("/api/host/campaigns", "", Map.of()).statusCode());
+            assertError(get("/api/host/storage/readiness"), 503, "STORAGE_ROOT_INVALID");
+            assertEquals(404, postRaw("/api/host/campaigns", "", Map.of()).statusCode());
         }
     }
 

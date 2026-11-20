@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class PlayerProneCandidateTest {
     private static final String DROP = "主动卧倒";
     private static final String CRAWL = "向南匍匐一格";
+    private static final String EXPLORE_CRAWL = "规划探索匍匐路线";
+    private static final String EXPLORE_WALK = "规划探索移动路线";
     private static final String STAND = "起身";
 
     @TempDir Path temporary;
@@ -64,7 +66,7 @@ class PlayerProneCandidateTest {
             assertTrue(options(view, STAND).isEmpty());
             assertEquals(1, options(view, "向南移动一格").size());
             var drop = onlyOption(view, DROP);
-            assertEquals(Set.of("id", "label", "characterId", "precondition"), drop.keySet());
+            assertEquals(Set.of("id", "label", "characterId", "precondition", "receiptKey"), drop.keySet());
             assertEquals(fighter.toString(), drop.get("characterId").getAsString());
             var dropped = submit(gateway, token, csrf, connection, request(connection, drop));
             assertTrue(options(dropped, DROP).isEmpty());
@@ -115,7 +117,7 @@ class PlayerProneCandidateTest {
             assertEquals(Status.EXPLORATION, battle(storage).status());
             assertTrue(combatant(storage, fighter).prone());
             var unauthorized = gateway.read(token, connection, false).body();
-            for (String label : List.of(DROP, CRAWL, STAND, "向南移动一格"))
+            for (String label : List.of(DROP, EXPLORE_CRAWL, EXPLORE_WALK, STAND))
                 assertTrue(options(unauthorized, label).isEmpty(), label);
 
             var scene = CampaignSpaceData.Ref.scene(battle(storage).combatId());
@@ -127,15 +129,28 @@ class PlayerProneCandidateTest {
             host(gateway, storage, "exploration", fields("payload", permission));
             var exploration = gateway.read(token, connection, false).body();
             assertTrue(options(exploration, DROP).isEmpty());
-            assertEquals(1, options(exploration, CRAWL).size());
+            assertTrue(options(exploration, CRAWL).isEmpty());
+            assertTrue(options(exploration, EXPLORE_WALK).isEmpty());
             assertTrue(options(exploration, "向南移动一格").isEmpty());
             var beforeExplorationCrawl = combatant(storage, fighter);
             long beforeCrawlSecond = storage.accessSnapshot().snapshot().domains().space().clock(scene).second();
-            var explorationCrawl = onlyOption(exploration, CRAWL);
-            assertEquals(Set.of("id", "label", "characterId", "precondition"), explorationCrawl.keySet());
-            var crawledInExploration = submit(gateway, token, csrf, connection, request(connection, explorationCrawl));
+            var explorationCrawl = onlyOption(exploration, EXPLORE_CRAWL);
+            assertEquals(Set.of("id", "label", "characterId", "precondition", "receiptKey", "route"), explorationCrawl.keySet());
+            JsonObject crawlBudget = explorationCrawl.getAsJsonObject("route");
+            assertEquals(Set.of("x", "y", "maxSteps", "stepCostFeet"), crawlBudget.keySet(), "unshared scene bounds remain private");
+            assertEquals(1, crawlBudget.get("x").getAsInt());
+            assertEquals(1, crawlBudget.get("y").getAsInt());
+            assertEquals(3, crawlBudget.get("maxSteps").getAsInt());
+            assertEquals(10, crawlBudget.get("stepCostFeet").getAsInt());
+            var beforeExcess = storage.accessSnapshot();
+            var excess = route(connection, explorationCrawl, new Position(1, 2), new Position(1, 3), new Position(1, 4), new Position(1, 5));
+            assertEquals("PLAYER_INVALID_REQUEST", assertThrows(PlayerGatewayException.class,
+                    () -> gateway.post(token, csrf, connection, "command", excess, null)).code());
+            assertEquals(beforeExcess, storage.accessSnapshot());
+            var crawledInExploration = submit(gateway, token, csrf, connection,
+                    route(connection, explorationCrawl, new Position(1, 2), new Position(2, 3), new Position(2, 4)));
             assertEquals(beforeCrawlSecond + 6, storage.accessSnapshot().snapshot().domains().space().clock(scene).second());
-            assertEquals(new Position(1, 2), combatant(storage, fighter).position());
+            assertEquals(new Position(2, 4), combatant(storage, fighter).position());
             assertTrue(combatant(storage, fighter).prone());
             assertEquals(beforeExplorationCrawl.movementSpentHalfFeet(), combatant(storage, fighter).movementSpentHalfFeet());
             assertEquals(Kind.EXPLORATION_MOVE, CampaignSpaceCommands.currentBattle(storage.accessSnapshot().snapshot().domains()).events().getLast().command().kind());
@@ -146,11 +161,22 @@ class PlayerProneCandidateTest {
             assertFalse(combatant(storage, fighter).prone());
             assertEquals(beforeExplorationStand.movementSpentHalfFeet(), combatant(storage, fighter).movementSpentHalfFeet());
             assertFalse(effects(explored).contains("倒地"));
-            assertEquals(1, options(explored, "向南移动一格").size());
+            var explorationWalk = onlyOption(explored, EXPLORE_WALK);
+            assertEquals(6, explorationWalk.getAsJsonObject("route").get("maxSteps").getAsInt());
+            assertEquals(5, explorationWalk.getAsJsonObject("route").get("stepCostFeet").getAsInt());
+            var beforeWalk = storage.accessSnapshot();
+            var walk = List.of(new Position(3, 4), new Position(4, 5), new Position(5, 5),
+                    new Position(6, 5), new Position(7, 5), new Position(8, 5));
+            var walked = submit(gateway, token, csrf, connection, route(connection, explorationWalk, walk.toArray(Position[]::new)));
+            var afterWalk = storage.accessSnapshot();
+            assertEquals(beforeWalk.revision() + 1, afterWalk.revision());
+            assertEquals(sceneSecond + 12, afterWalk.snapshot().domains().space().clock(scene).second());
+            assertEquals(new Position(8, 5), combatant(storage, fighter).position());
+            assertEquals(walk, CampaignSpaceCommands.currentBattle(afterWalk.snapshot().domains()).events().getLast().command().path());
 
             var beforeExplorationDrop = combatant(storage, fighter);
             long beforeDropSecond = storage.accessSnapshot().snapshot().domains().space().clock(scene).second();
-            var droppedInExploration = submit(gateway, token, csrf, connection, request(connection, onlyOption(explored, DROP)));
+            var droppedInExploration = submit(gateway, token, csrf, connection, request(connection, onlyOption(walked, DROP)));
             assertTrue(combatant(storage, fighter).prone());
             assertEquals(beforeDropSecond, storage.accessSnapshot().snapshot().domains().space().clock(scene).second());
             assertEquals(beforeExplorationDrop.position(), combatant(storage, fighter).position());
@@ -170,7 +196,7 @@ class PlayerProneCandidateTest {
                     () -> gateway.post(token, csrf, connection, "command", staleStand, null)).code());
             assertEquals(revoked, storage.accessSnapshot());
             var revokedView = gateway.read(token, connection, false).body();
-            for (String label : List.of(DROP, CRAWL, STAND, "向南移动一格"))
+            for (String label : List.of(DROP, EXPLORE_CRAWL, EXPLORE_WALK, STAND))
                 assertTrue(options(revokedView, label).isEmpty(), label);
             for (Kind kind : List.of(Kind.DROP_PRONE, Kind.EXPLORATION_MOVE, Kind.STAND_UP)) {
                 var input = new JsonObject();
@@ -210,6 +236,19 @@ class PlayerProneCandidateTest {
     private static JsonObject request(String connection, JsonObject option) {
         return fields("connectionId", connection, "requestId", UUID.randomUUID(),
                 "candidateId", option.get("id").getAsString(), "precondition", option.get("precondition").getAsString());
+    }
+
+    private static JsonObject route(String connection, JsonObject option, Position... path) {
+        JsonObject input = request(connection, option);
+        JsonArray cells = new JsonArray();
+        for (Position step : path) {
+            JsonObject cell = new JsonObject();
+            cell.addProperty("x", step.x());
+            cell.addProperty("y", step.y());
+            cells.add(cell);
+        }
+        input.add("route", cells);
+        return input;
     }
 
     private static JsonObject submit(PlayerGatewayService gateway, String token, String csrf, String connection, JsonObject request) {

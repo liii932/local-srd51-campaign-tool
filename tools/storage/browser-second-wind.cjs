@@ -4,7 +4,7 @@
 // Run against a fresh disposable StorageLoopLauncher instance on the protected loopback entry.
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
-const { observeStorageAction } = require('./browser-action.cjs');
+const { observeStorageAction, showCharacter } = require('./browser-action.cjs');
 const { selectStandardRules } = require('./browser-rule-library.cjs');
 const { createNode, focusSpace, placeAtFocus, beginBattle } = require('./browser-spaces.cjs');
 
@@ -89,6 +89,7 @@ async function main() {
     assert.equal(resource().current, 1);
     assert.equal(resource().maximum, 1);
     await page.locator('[data-pane="people"]').click();
+    await showCharacter(page, 'RULE', fighter);
     await form('storage-characters').locator('article').filter({hasText: fighterName})
       .getByText(/特性：.*Second Wind/).waitFor();
 

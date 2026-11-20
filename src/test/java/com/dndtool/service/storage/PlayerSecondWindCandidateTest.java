@@ -71,7 +71,7 @@ class PlayerSecondWindCandidateTest {
             var available = windOptions(playerView);
             assertEquals(1, available.size());
             var option = available.getFirst();
-            assertEquals(Set.of("id", "label", "characterId", "precondition"), option.keySet());
+            assertEquals(Set.of("id", "label", "characterId", "precondition", "receiptKey"), option.keySet());
             assertEquals(fighter.toString(), option.get("characterId").getAsString());
             var bound = PlayerCandidateFactory.candidates(before, member).stream().filter(candidate -> candidate.label().equals(LABEL)).findFirst().orElseThrow();
             assertEquals("combat-command", bound.action());

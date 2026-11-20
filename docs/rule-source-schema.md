@@ -8,7 +8,8 @@
 `V007__schema2-equipment-health-source.sql`、`V008__schema2-combat-source.sql`、
 `V009__schema2-spell-source.sql`、`V010__schema2-wizard-environment-source.sql`、
 `V011__schema2-monster-source.sql` 与 `V012__schema2-spell-save-damage-source.sql` 组成；已应用文件不可改写，后续变更追加本链下一个连续编号。
-运行 V001—V018、RELEASED v1、旧默认发布及现有 JNDI 合同保持不变。
+原 MySQL 运行迁移、RELEASED v1 目录和 JNDI 合同供独立维护与验证。
+当前 Web 战役入口使用 [SQLite 工作台](storage-vitality-loop.md)。
 
 本合同提供离线 schema 源、批准元数据、窄权限模板和独立只读账本核验器。
 离线安装分别使用[角色目录流程](rules/offline-language-installation.md)与
