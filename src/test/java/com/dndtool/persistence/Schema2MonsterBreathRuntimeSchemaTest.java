@@ -25,7 +25,7 @@ class Schema2MonsterBreathRuntimeSchemaTest {
     private static final List<String> ROOT=List.of("combat_id","event_sequence");
     private static final List<String> STATE=List.of("combat_id","event_sequence","phase");
     private static final List<String> BATCH=List.of("combat_id","event_sequence","phase","batch_index");
-    private static final Set<Schema2CombatState.Kind> SQLITE_ONLY_COMMANDS = Set.of(
+    private static final Set<Schema2CombatState.Kind> SQLITE_SPATIAL_COMMANDS = Set.of(
             Schema2CombatState.Kind.OPEN_SCENE, Schema2CombatState.Kind.SET_SCENE_ROSTER);
     private record Edge(String table,String parent,List<String> key) { }
     private static final List<Edge> GRAPH=List.of(
@@ -85,10 +85,13 @@ class Schema2MonsterBreathRuntimeSchemaTest {
 
     @Test void sqlAndJavaShareClosedFrameStageTriggerAndCommandDomains()throws Exception {
         String sql=Files.readString(MIGRATION);
-        Set<String> mysqlCommands = names(Schema2CombatState.Kind.values());
-        SQLITE_ONLY_COMMANDS.forEach(kind -> mysqlCommands.remove(kind.name()));
-        // Second Wind uses the SQLite campaign owner rather than the MySQL combat service.
-        mysqlCommands.remove(Schema2CombatState.Kind.SECOND_WIND.name());
+        Set<String> mysqlCommands = new TreeSet<>();
+        for (var kind : Schema2CombatState.Kind.values()) {
+            if (!SQLITE_SPATIAL_COMMANDS.contains(kind)
+                    && JdbcSchema2CombatRuntimeRepository.sqliteRequiredCode(kind) == null) {
+                mysqlCommands.add(kind.name());
+            }
+        }
         assertEquals(mysqlCommands,enumValues(alter(sql,"s2_combat_event"),"command_kind"));
         assertEquals(names(Schema2CombatState.FrameKind.values()),enumValues(alter(sql,"s2_combat_frame"),"frame_kind"));
         assertEquals(names(Schema2CombatState.Stage.values()),enumValues(alter(sql,"s2_combat_frame"),"stage"));
@@ -113,7 +116,7 @@ class Schema2MonsterBreathRuntimeSchemaTest {
         var versions = Map.of(first.characterId(), 0L, second.characterId(), 0L);
         UUID operation = UUID.randomUUID(), combat = UUID.randomUUID(), campaign = UUID.randomUUID();
 
-        for (var kind : SQLITE_ONLY_COMMANDS) {
+        for (var kind : SQLITE_SPATIAL_COMMANDS) {
             var command = Schema2CombatState.Command.action(kind, null);
             long expectedVersion = kind == Schema2CombatState.Kind.OPEN_SCENE ? -1 : 0;
             var error = assertThrows(IllegalArgumentException.class, () -> new Request(operation, combat, campaign,
