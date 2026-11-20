@@ -9,7 +9,7 @@ public final class PlayerApplicationAccess {
     public static final String SERVICE_ATTRIBUTE = "com.dndtool.player.gateway";
     private PlayerApplicationAccess() { }
     public static PlayerGatewayService service(ServletContext context) {
-        if (PlayerListenerConfiguration.from(context) == null || !StorageApplicationListener.enabled(context)) throw new IllegalStateException("PLAYER_DISABLED");
+        if (PlayerListenerConfiguration.from(context) == null) throw new IllegalStateException("PLAYER_DISABLED");
         synchronized (context) {
             Object existing = context.getAttribute(SERVICE_ATTRIBUTE);
             if (existing instanceof PlayerGatewayService service) return service;

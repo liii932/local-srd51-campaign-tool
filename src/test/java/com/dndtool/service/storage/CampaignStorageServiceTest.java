@@ -16,6 +16,43 @@ class CampaignStorageServiceTest {
     private Path root() { return temporary.resolve("managed"); }
     private static String id() { return UUID.randomUUID().toString(); }
 
+    @Test void aDamagedSaveIsListedIndividuallyAndLeavesTheCurrentCampaignUsable() throws Exception {
+        try (var host = new CampaignStorageService(root())) {
+            var campaign = CampaignRuleFixtures.create(host, "正在进行的战役");
+            String key = host.savedCampaigns().getFirst().fileKey();
+            Path file = root().resolve("saves").resolve(key + ".json");
+            byte[] original = Files.readAllBytes(file);
+            Files.writeString(file, "{}");
+            Files.writeString(file.resolveSibling("readme.json"), "unmanaged");
+            assertEquals(List.of(new SavedCampaign(key, "", 0, false)), host.savedCampaigns());
+            assertCode("INVALID_FILE", () -> host.savedFile(key));
+            var updated = addCard(host, id(), campaign.epoch(), 0, "角色");
+            String finalKey = host.end(id(), updated.epoch(), 1).fileKey();
+            assertTrue(host.savedCampaigns().stream().anyMatch(save -> save.available() && save.fileKey().equals(finalKey)));
+            assertCode("INVALID_FILE", () -> host.open(key));
+            Files.write(file, original);
+            assertTrue(host.savedCampaigns().stream().allMatch(SavedCampaign::available));
+            assertEquals(1, host.open(finalKey).history().size());
+        }
+    }
+
+    @Test void editingOneCharacterLeavesFrozenRulesAndAcceptedHistoryRowsInPlace() throws Exception {
+        try (var host = new CampaignStorageService(root())) {
+            var initial = CampaignRuleFixtures.create(host, "增量写入");
+            var added = addCard(host, id(), initial.epoch(), 0, "角色");
+            try (Connection c = database(host.status().runId()); Statement s = c.createStatement()) {
+                for (String table : List.of("rules_runtime_material", "history_runtime_root", "participation_state")) {
+                    s.execute("CREATE TRIGGER protect_" + table + " BEFORE DELETE ON " + table
+                            + " BEGIN SELECT RAISE(ABORT, 'existing row was rewritten'); END");
+                }
+            }
+            var edited = setHp(host, id(), added.epoch(), 1, cardId(added), 0, 8);
+            assertEquals(8, hp(edited));
+            assertEquals(2, edited.history().size());
+            assertEquals(added.history().getFirst(), edited.history().getFirst());
+        }
+    }
+
     @Test void actualLifecyclePersistsFreeCardAndCompleteHistoryAcrossSaveEndAndFreshOpen() throws Exception {
         String finalFile, firstRun, campaign; long firstEpoch;
         try (var host = new CampaignStorageService(root())) {

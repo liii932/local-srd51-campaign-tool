@@ -1,34 +1,24 @@
 # 数据库
 
-MySQL 模式使用 MySQL 8.0、InnoDB、JDBC 与 Tomcat JNDI DataSource；显式 SQLite 模式
-使用[当前有限战役运行路线](storage-vitality-loop.md)。两种模式分别以其数据库为活动权威，
-不从 Session 或 JVM 缓存补造事实，不双写，也不自动回退。
+生产应用使用 SQLite。MySQL 运行链与来源链用于独立 JDBC 验证、规则作者来源维护及
+已有数据库的保管。生产部署见[部署指南](deployment.md)。
 
-未启用 SQLite 的原简化模式把规则目录和运行状态放在 `dnd_tool_se` 单一 schema；INTERNAL
-采用独立来源与运行快照链。SQLite 每次新建/打开建立私有工作库，以当前版本 JSON 声明的
-表、列、键、约束、索引和依赖编译 DDL，初始化事务共同建立结构、静态 seed 与完整事实。
-规则作者 JSON 提供内容，完整战役 JSON 是保存点投影；同版残留保留原库并验证现有结构，
-不重建、不补表或重新 seed。实际所有者和文件生命周期见[运行合同](storage-vitality-loop.md)。
+## SQLite 生产工作库
 
-现行 MySQL JNDI、账号与迁移清单保留；`DND_STORAGE_ROOT` 显式选择有限 SQLite 模式，
-不需要连接 MySQL。当前规则来自随应用交付的四个有限原包，角色/战斗/场景、参与/裁定及完整历史以
-严格类型化文档聚合保存，并保存资源、装备、法术书、动作帧、效果与怪物的关系投影。
-`CampaignDomainRepository` 的写入只使用调用方事务；`CampaignStorageService` 将聚合、
-全部投影、根事件、revision 和请求收据在独占门及一个 `BEGIN IMMEDIATE` 中共同提交，
-无独立 C0。读取独立核对每行投影，禁止恢复时静默修复。schema-2 prepared 身份与历史
-版本保持业务引用进入完整文件；本地 core run/epoch/请求收据和玩家设备绑定属于执行空间，
-不入完整文件。文件打开建立新执行身份，同版残留恢复保留原 run/收据并建立新 epoch。
-SQLite schema 有独立初始化/验证
-协议，不重放 MySQL V001—V042 或篡改已应用账本。外部来源迁移仍需独立维护授权；
-新建应用私有空工作库属于受控产品生命周期，不能因此授予现行 MySQL 应用账号 DDL 权限。
-实际退役旧配置/读取器须在完整替换与明确真实数据处置后进行，不保留仅为跨版本兼容的双写。
-MySQL 使用应用自有迁移清单及只读 verifier，未接入 Flyway 执行器。SQLite 只接受当前
-模型的初始化和同版残留核验，不建立跨版本迁移链；来源共享账本继续使用独立 MySQL
-维护 SQL，首次建库和同版恢复分别验收。
+新建或打开战役时实例化私有工作库。受审 JSON 声明的表、键、约束和索引由
+`StorageSchemaCatalog`、`StoragePlan` 与 `SqliteSchemaVerifier` 编译并核验。
+结构、seed 与完整战役事实在受控生命周期内初始化。同版残留继续使用原库，验证
+现有结构和数据。SQLite 初始化使用独立声明。
+
+`CampaignStorageService` 通过独占门与单个 `BEGIN IMMEDIATE` 事务推进规则状态。
+`CampaignDomainRepository` 写入聚合、投影和关联业务事实，由调用方提交事件、revision 和
+收据。读取独立核对准确投影及绑定。完整文件保留冻结材料和历史，重开建立新 run；
+同版残留恢复保留原 run 与收据，并建立新 epoch。文件过程、耐久和备份见
+[运行合同](storage-vitality-loop.md)和[备份恢复](backup-and-restore.md)。
 
 ## 迁移合同
 
-当前运行链迁移位于 `src/main/resources/db/migration/`。V001—V018 是现有清单与数据库账本核对的历史；V011—V018
+原 MySQL 运行链由 JDBC 核验工具及隔离测试使用，源文件位于 `src/main/resources/db/migration/`。V001—V018 是现有清单与数据库账本核对的历史；V011—V018
 依次建立角色目录、一级创建、升级与生命骰、职业特性生命周期、多职业/ASI/专长、format 2
 角色状态来源及多职业共享法术位计算目录基础的 DRAFT 前向状态：
 
@@ -38,14 +28,14 @@ MySQL 使用应用自有迁移清单及只读 verifier，未接入 Flyway 执行
 - 仓库中的辅助 SQL 不是已执行证明。
 
 迁移历史保护用于避免把现有数据库误认为另一套结构，不构成跨应用版本存档兼容承诺。
-当前代码仍使用下述迁移链；在替代初始化与验证链路实际完成前，不能只改文档或摘要使检查通过。
+独立 MySQL 核验仍按下述清单检查结构和摘要。
 
 只读验证脚本位于 [database/verify](../database/verify/)，最小授权脚本位于 [database/grants](../database/grants/)。移动和阅读这些文件不会执行 SQL。
 
 V019 建立永久运行身份登记、不可变快照头和类型化语言镜像；V020 追加空工具镜像表。它们不复制旧
 规则目录或创建战役，当前 Repository 只接受 DRAFT PARTITION。身份、调用方事务、授权
 与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。应用迁移清单预期
-V001—V042；未安装完整迁移链的数据库不能满足这个候选版本的 schema 诊断。
+V001—V042；独立 schema 诊断按该清单校验。
 V021 追加 schema 2 INTERNAL 类型化组合、最终规则、完整覆盖链、永久守卫与操作收据；
 来源读取和原子转存合同见[来源到运行快照](rules/schema-2-runtime-snapshot.md)，增量授权见
 [schema 2 运行权限](../database/grants/schema2-runtime-snapshot.sql)。迁移和授权文件不表示已执行。
@@ -122,68 +112,27 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 分别按各自合同核验；该 INTERNAL 接入不开放完整战役，不建立第二个 JNDI，
 也不执行外部迁移或授权。
 
-## 自动化数据库拓扑与账号职责
+## MySQL 工具与账号边界
 
-当前本机运行实例只承载部署运行 schema，以及明确创建时的临时表集成测试 schema。完整迁移链
-不再通过同一实例内改名 schema 来模拟，而是在物理隔离、可销毁的 MySQL 实例或容器内使用生产
-原名 `dnd_tool_se` 重放。名称和权限是职责合同，不表示数据库、账号、迁移或授权已经实际创建或
-执行：
+| Schema | 身份 | 职责 |
+| --- | --- | --- |
+| 已有 `dnd_tool_se` | `dnd_tool_se_agent` | 只读核验、检查自身权限 |
+| 已有 `dnd_tool_se` | `dnd_tool_se_migrator` | 由独立授权批准的前向迁移和所需备份读取 |
+| 已有 `dnd_tool_se` | `dnd_tool_se_app` | 保留的最小运行权限合同，生产 SQLite WAR 使用外部文件权限 |
+| `dnd_tool_se_it` | `dnd_tool_se_it` | JDBC 事务集成测试使用连接内临时表 |
+| 隔离、可销毁实例内的 `dnd_tool_se` | 专用迁移与只读验收身份 | 原样重放 V001—V042，再只读核验 |
+| `dnd_tool_rules` | 按来源 schema 定义的独立身份 | 安装、接受、维护与核验各自的授权 |
 
-| 边界 | 用途 | Schema | MySQL 用户 | 允许职责 |
-|---|---|---|---|---|
-| 本机运行实例 | 本地部署运行 | `dnd_tool_se` | `dnd_tool_se_app` | 仅已审核的逐表 `SELECT`/最小 DML；无 DDL、账号管理或 `GRANT OPTION` |
-| 本机运行实例 | 运行库和 legacy 规则目录只读核验 | `dnd_tool_se` | `dnd_tool_se_agent` | schema 只读 `SELECT` 与自身授权检查；无任何写权限 |
-| 本机运行实例 | 正式前向迁移和备份 | `dnd_tool_se` | `dnd_tool_se_migrator` | 仅该 schema 的迁移所需 DDL/DML、索引、外键和触发器权限，以及审核过的备份读取权限；无账号管理、全局权限或 `GRANT OPTION` |
-| 本机实例（独立 schema） | JDBC 事务集成测试 | `dnd_tool_se_it` | `dnd_tool_se_it` | `SELECT`、`INSERT`、`UPDATE`、`CREATE TEMPORARY TABLES`，仅操作测试连接的临时表 |
-| 独立 disposable 实例 | V001—V042 原样重放 | `dnd_tool_se` | 生命周期内的迁移身份 | 仅该隔离实例中迁移所需 DDL/DML、索引、外键和触发器权限 |
-| 独立 disposable 实例 | 重放结果只读核验 | `dnd_tool_se` | `dnd_tool_se_validation_ro` | 仅 `SELECT`，随隔离实例销毁，不与运行库核验身份混用 |
+保留已有库时先盘点真实数据及迁移账本。迁移重放使用[隔离测试流程](testing.md#3-mysql-集成测试)，
+保留原始版本名、SQL 和 schema 名称。已保留的 `dnd_tool_se` 不作为可写集成测试
+或重复重放目标。完整触发器定义须由隔离重放中的有权限身份只读检查。
+[语言分区 JDBC 验收](rules/language-partition-equivalence.md#隔离-jdbc-入口)
+按其独立流程，在同一隔离实例内运行两条 schema 链。
 
-运行、正式迁移和运行库核验连接固定从 loopback TCP 使用 `@127.0.0.1`，不创建 `%` 或 LAN 来源
-账号。集成测试引导可同时创建 `@127.0.0.1` 与 `@localhost`，以兼容本机测试客户端的连接语义，
-但权限只限 `dnd_tool_se_it`。迁移重放实例不挂载持久 volume，默认不发布网络端口；执行只读
-JDBC 比较时才向 `127.0.0.1` 发布随机端口，并在验证完成或失败后销毁整个实例及其账号。MySQL 会
-按 `TRIGGER` 权限过滤触发器元数据，因此普通只读账号不负责完整触发器定义验收；需要该元数据的
-审核查询在迁移停止后由隔离实例内的迁移身份执行，且只能运行 `SELECT`/`SHOW`。
-
-[语言分区 JDBC 验收](rules/language-partition-equivalence.md#隔离-jdbc-入口)是另一条显式授权的
-disposable 路径：同一新实例内原样重放两条独立 schema 链，数据目录只用 tmpfs。为保持固定
-`@127.0.0.1` 账号语义，Linux 容器使用 host 网络且 MySQL 仅绑定 loopback 随机非默认端口。
-通过结构和权限审计后，分别使用源安装、源只读、运行写入和运行核验账号测试真实 JDBC；不允许
-传入现有实例，不复用部署库或临时表 IT 入口，完成或失败后销毁整个实例。
-
-账号管理员只负责一次性创建/轮换运行实例账号及应用审核过的授权，不能作为 Agent、Tomcat、测试
-或日常迁移连接。Agent 的常规运行库身份是 `dnd_tool_se_agent`；只有明确批准的迁移检查点才能向
-`dnd_tool_se_migrator` 提供当前维护进程可用的凭据。Tomcat 始终使用
-`dnd_tool_se_app`。密码只通过当前进程环境或经批准的外部秘密注入，不进入 Git、WAR、命令行、
-日志或报告；自动化不得打印完整环境。
-
-`database/test/create-integration-database.sql` 只引导 `dnd_tool_se_it` 及其临时表测试账号。
-迁移重放不使用仓库内管理员 SQL 创建同实例替代 schema；它必须在经授权的外部检查点内创建全新
-隔离实例，直接执行仓库原始迁移，并在结束时销毁。运行账号的逐表权限继续由
-`database/grants/` 中的审核脚本累加；这些脚本不创建账号，也不授予全局权限。
-
-## 现有运行库的阶段性使用
-
-当前没有真实业务使用且只含少量测试数据时，采纳 `dnd_tool_se` 作为本地开发部署和业务验收的
-运行库。它可以在完成只读盘点、停服、完整备份、迁移演练和明确授权后接收正式清单中尚未安装的
-前向迁移。已有测试数据即使可丢弃，也不能被自动清空、覆盖或当作已经备份。
-
-`dnd_tool_se` 不得作为 `MySqlIntegrationIT` 的可写目标，测试保护会按数据库名拒绝它；事务、
-回滚和故障注入测试只使用 `dnd_tool_se_it`。完整迁移链的反复安装或重建只在物理隔离的 disposable
-MySQL 实例中使用原名 `dnd_tool_se`，不能靠重跑运行库迁移验证，也不能生成改名 SQL 副本。运行库
-只读目录/Harness 比较可以使用 `dnd_tool_se_agent`，部署后的真实业务写入验收仍需单独授权和恢复
-边界。
-
-一旦运行库保存需要保留的战役数据，就不再视为 disposable：后续迁移和部署必须保留完整备份、
-回滚候选及停服维护边界，不能因它曾用于开发而降低保护等级。
-
-## Agent 自动化检查点
-
-Agent 可以在既有授权范围内自动执行数据库无关测试、对 `dnd_tool_se_it` 的显式集成测试，以及
-在已单独授权后创建并销毁物理隔离实例来原样重放迁移、用隔离实例内的只读账号验证。以下仍是彼此
-独立的外部检查点：创建/删除 schema、实例或账号，改变授权，备份或恢复运行库，向运行实例的
-`dnd_tool_se` 应用迁移，启动或停止 Tomcat，替换活动 WAR 以及真实业务写入。一次授权不能被推断
-为后续所有检查点的永久授权。
+账号管理员只负责获授权的账号和授权维护，工具按职责使用最小权限账号。旧库常规只读
+核验使用 loopback 账号。现有数据库与源库的备份、恢复、正式迁移、授权及销毁是一组独立
+外部操作，各自核对目标、作用边界和授权。保护已有数据库和存档，生产 WAR 切换只更换
+Web 应用及配套配置。
 
 ## 稳定合同
 
@@ -191,46 +140,5 @@ Agent 可以在既有授权范围内自动执行数据库无关测试、对 `dnd
 
 冻结规则详见 [rules/srd-5.1.md](rules/srd-5.1.md)。
 
-## 完整规则版的演进边界
-
-完整规则版需要新的规则定义表或关系、运行状态和存档字段时：
-
-- V011 建立 canonical-v2 类型化目录表并插入完整角色 DRAFT；V012 追加一级创建 profile、
-  空创建快照/选择/资源表；V013 追加逐级 profile、生命骰、职业等级和升级快照表；V014
-  追加职业特性执行矩阵、子职业选择等级、固定执行/恢复 profile 和五个空生命周期表；V015
-  增加多职业/ASI/专长目录 profile、扩展升级约束及四个事件关联状态表；V016 追加可重建的
-  一级职业武器、护甲、盾牌与工具熟练基线；V017 为专长和多职业熟练增加 `ADVANCEMENT` 与
-  `ARCHIVE_RESTORE` 显式来源，并用触发器分别验证正常升级父记录或重建事件；V018 为十二职业
-  增加多职业施法贡献属性，不建立法术运行状态。保留现有数据库时，后续使用下一个可用编号；
-- 先批准新的发布身份、稳定键、封闭算法和规范逻辑投影，再插入 `DRAFT` 数据；
-- 使用新的规范格式表达新增分区，不能向 `canonical_format_version=1` 的 23 个分区隐式追加字段；
-- 规则定义、运行模型和存档格式可协调更新代码、测试及文档；数据库采用前向迁移还是重建按上述边界选择，不因既有 RELEASED/DRAFT 标签默认承担旧版本兼容；
-- 只有角色、装备/冒险、战斗/状态、法术和怪物/魔法物品完成跨领域整合，并通过独立字节向量、内容摘要、archive 严格往返和不可变保护验证后，才能转为 `RELEASED`；
-- 当前支持的战役运行必须使用与其绑定一致的规则解释；应用版本变化不承诺继续运行旧战役，不得把旧状态静默当成新规则状态；
-- 存档读取只需支持当前应用版本声明的格式与规则，其他输入明确拒绝，无需保留版本 1 读取器或转换链；导入失败不得留下部分状态。当前 archive format 2 的完整运行入口尚未开放，文档政策变更不等于已实现或通过验收。
-
-完整规则族映射为 `dnd5e2014_srd51_se`、release 1、`canonical_format_version=2`、archive
-format 2。V011 文件包含该身份和角色目录的 `DRAFT` 种子，但仓库文件不是数据库执行证明，
-该身份仍不允许应用绑定或导入。规范投影和稳定键见
-[角色目录与 canonical format 2](rules/character-catalog-v2.md)，目标能力和完成标准见
-[完整 SRD 5.1 覆盖目标](rules/srd-5.1-complete.md)。
-
-V012 的 `character_creation_snapshot_v2`、`character_creation_selection_v2` 和
-`character_resource_state_v2` 是空权威运行时表。迁移本身不创建业务行。只读核验脚本是
-`database/verify/v012-level-one-character-creation.sql`；应用账户增量授权模板是
-`database/grants/level-one-character-runtime.sql`。迁移、核验和授权仍是三个独立检查点。
-
-V013 的 `character_class_level_v2`、`character_level_advancement_v2` 和
-`character_level_resource_change_v2` 保存职业等级、不可变升级结果及资源变化，并为
-`character_resource_state_v2` 增加显式无限资源状态。只读核验脚本是
-`database/verify/v013-level-advancement-hit-dice.sql`；应用账户所需的最小增量仍集中在
-`database/grants/level-one-character-runtime.sql`。这些文件存在不表示已执行迁移、核验或授权。
-
-V014 的五个 canonical-v2 生命周期表保存子职业、特性、选择、DM 裁决和资源恢复审计边界；
-V015 的 `character_advancement_choice_v2`、`character_ability_score_change_v2`、
-`character_feat_state_v2` 与 `character_multiclass_proficiency_v2` 保存多职业、ASI、专长和熟练增量；
-迁移本身保持这些表为空，并保持完整规则版为 `DRAFT`。V017 不激活 format 2，只建立当前状态
-恢复所需的显式来源；V018 只增加共享法术位计算所需的冻结职业贡献，核验脚本为
-`database/verify/v018-multiclass-spell-slot-foundation.sql`，不表示迁移已执行。相关稳定边界见
-[职业、子职业与职业特性合同](rules/class-features-v2.md)与
-[多职业共享法术位合同](rules/multiclass-spell-slots-v2.md)。
+原完整规则族 DRAFT 和 archive format 2 的身份与采用门见
+[规则覆盖目标](rules/srd-5.1-complete.md)及[类型化目录合同](rules/character-catalog-v2.md)。

@@ -1,7 +1,6 @@
 package com.dndtool.security;
 
 import com.dndtool.persistence.HostStateEpochRepository;
-import com.dndtool.persistence.JdbcHostStateEpochRepository;
 import com.dndtool.web.StorageApplicationListener;
 import java.io.IOException;
 import java.net.URI;
@@ -10,9 +9,6 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.UUID;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
-import javax.sql.DataSource;
 
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -56,11 +52,9 @@ public final class HostRequestSecurityFilter implements Filter {
 
     private static final int SESSION_TIMEOUT_SECONDS = 30 * 60;
     private static final int CSRF_TOKEN_BYTES = 32;
-    private static final String JNDI_NAME = "java:comp/env/jdbc/DndToolSE";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private transient HostStateEpochRepository hostStateEpochRepository;
-    private transient boolean privateStorageMode;
 
     public HostRequestSecurityFilter() {
         // Required by the Servlet container.
@@ -71,28 +65,16 @@ public final class HostRequestSecurityFilter implements Filter {
     }
 
     @Override
-    public void init(FilterConfig filterConfig) throws ServletException {
-        if (filterConfig != null && StorageApplicationListener.enabled(filterConfig.getServletContext())) {
-            privateStorageMode = true;
-            hostStateEpochRepository = () -> {
-                try {
-                    return StorageApplicationListener.service(filterConfig.getServletContext()).status().epoch();
-                } catch (RuntimeException failure) {
-                    throw new java.sql.SQLException("STORAGE_UNAVAILABLE");
-                }
-            };
-            return;
-        }
+    public void init(FilterConfig filterConfig) {
         if (hostStateEpochRepository != null) return;
-        try {
-            Object resource = InitialContext.doLookup(JNDI_NAME);
-            if (!(resource instanceof DataSource dataSource)) {
-                throw new NamingException("Configured resource is not a DataSource");
+        var context = filterConfig.getServletContext();
+        hostStateEpochRepository = () -> {
+            try {
+                return StorageApplicationListener.service(context).status().epoch();
+            } catch (RuntimeException | LinkageError failure) {
+                throw new java.sql.SQLException("STORAGE_UNAVAILABLE");
             }
-            hostStateEpochRepository = new JdbcHostStateEpochRepository(dataSource);
-        } catch (NamingException exception) {
-            throw new ServletException("Host state epoch validation is unavailable");
-        }
+        };
     }
 
     @Override
@@ -107,13 +89,6 @@ public final class HostRequestSecurityFilter implements Filter {
         }
 
         SameSiteResponseWrapper responseWrapper = new SameSiteResponseWrapper(httpResponse);
-        if (privateStorageMode && !isPrivateStorageRoute(httpRequest)) {
-            responseWrapper.setStatus("POST".equals(httpRequest.getMethod())
-                    ? HttpServletResponse.SC_CONFLICT : HttpServletResponse.SC_NOT_FOUND);
-            responseWrapper.setContentType("application/json; charset=UTF-8");
-            responseWrapper.getWriter().write("{\"status\":\"ERROR\",\"code\":\"STORAGE_MODE_REQUIRED\"}");
-            return;
-        }
         if ("GET".equals(httpRequest.getMethod()) || "HEAD".equals(httpRequest.getMethod())) {
             HttpSession session = httpRequest.getSession(true);
             initializeSession(session);
@@ -133,12 +108,6 @@ public final class HostRequestSecurityFilter implements Filter {
         }
 
         // HostBoundaryFilter handles unsupported methods before this filter is reached.
-        if (privateStorageMode && !isPrivateStorageCommand(httpRequest)) {
-            responseWrapper.setStatus(HttpServletResponse.SC_CONFLICT);
-            responseWrapper.setContentType("application/json; charset=UTF-8");
-            responseWrapper.getWriter().write("{\"status\":\"ERROR\",\"code\":\"STORAGE_MODE_REQUIRED\"}");
-            return;
-        }
         if (!hasAllowedWriteSource(httpRequest)) {
             responseWrapper.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
@@ -188,29 +157,13 @@ public final class HostRequestSecurityFilter implements Filter {
         chain.doFilter(httpRequest, responseWrapper);
     }
 
-    private static boolean isPrivateStorageCommand(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        String contextPath = request.getContextPath();
-        return uri != null && contextPath != null
-                && uri.startsWith(contextPath + "/api/host/storage/");
-    }
-
-    private static boolean isPrivateStorageRoute(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        String contextPath = request.getContextPath();
-        if (uri == null || contextPath == null || !uri.startsWith(contextPath)) return false;
-        String path = uri.substring(contextPath.length());
-        return path.equals("/host") || path.equals("/host/") || path.equals("/host/storage")
-                || path.startsWith("/host/assets/") || path.startsWith("/api/host/storage/");
-    }
-
     private void refreshEpochForRead(HttpSession session) {
         try {
             session.setAttribute(
                     HOST_STATE_EPOCH_SESSION_ATTRIBUTE,
                     Long.toString(currentActiveEpoch()));
         } catch (java.sql.SQLException ignored) {
-            // Keep the host shell and database diagnostics reachable. POST still fails closed.
+            // Keep the campaign table and readiness check reachable. POST still fails closed.
         }
     }
 

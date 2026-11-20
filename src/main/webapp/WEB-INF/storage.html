@@ -75,7 +75,11 @@
     <h2>开始战役</h2>
     <form id="storage-create">
       <label>战役名称<input name="name" required maxlength="160" autocomplete="off"></label>
-      <fieldset><legend>按加载顺序选择已接受的规则</legend>
+      <label>战役规则<select id="storage-create-rules">
+        <option value="standard">标准规则（SRD 5.1 与内置家规）</option>
+        <option value="custom">自定义规则组合</option>
+      </select></label>
+      <fieldset id="storage-create-custom" hidden><legend>按加载顺序选择已接受的规则</legend>
         <p>先添加一个基础包，再按依赖顺序添加所需版本。调整顺序后重新预览。</p>
         <button id="rule-members-load" type="button">打开规则库并读取候选</button>
         <label>已接受版本<select id="rule-member-choice" disabled></select></label>

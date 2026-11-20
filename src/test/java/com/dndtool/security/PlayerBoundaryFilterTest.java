@@ -30,6 +30,7 @@ class PlayerBoundaryFilterTest {
     @Test void exactOriginFetchMetadataAndActualTlsAddressAreRequiredBeforePost() throws Exception {
         Map<String,String> headers = Map.of("Origin",CONFIG.origin(),"Sec-Fetch-Site","same-origin","Sec-Fetch-Mode","cors","Sec-Fetch-Dest","empty");
         assertTrue(invoke(new PlayerBoundaryFilter(CONFIG),"/api/player/join","POST",headers).called);
+        assertTrue(invoke(new PlayerBoundaryFilter(CONFIG),"/api/player/receipt-close","POST",headers).called);
         for (String key : headers.keySet()) {
             Map<String,String> missing = new HashMap<>(headers); missing.remove(key);
             assertFalse(invoke(new PlayerBoundaryFilter(CONFIG),"/api/player/join","POST",missing).called,key);

@@ -45,8 +45,8 @@ async function expect(path, status, method, headers, body) {
   const health = await expect('/health', 200);
   assert.equal(health.text, 'OK');
   assert.match(health.headers['content-type'], /^text\/plain;.*charset=UTF-8/i);
-  const root = await expect('/', 302);
-  assert.equal(root.headers.location, '/host', 'The WAR welcome JSP must execute');
+  const root = await expect('/', 303);
+  assert.equal(root.headers.location, '/host/storage');
   const host = await expect('/host', 303);
   assert.equal(host.headers.location, '/host/storage');
   assert.equal(host.headers['cache-control'], 'no-store');
@@ -90,17 +90,20 @@ async function expect(path, status, method, headers, body) {
     'name=Rejected&members=invalid');
   assert.equal(JSON.parse(digest.text).code, 'INVALID_REQUEST_DIGEST');
   for (const value of ['localhost:8080', '[::1]:8080', 'invalid.example']) {
+    await expect('/', 404, 'GET', { Host: value });
     await expect('/host', 404, 'GET', { Host: value });
   }
   await expect('/host', 405, 'PUT');
   await expect('/api/host/rules', 404);
-  const legacy = await expect('/api/host/campaigns', 409, 'POST');
-  assert.equal(JSON.parse(legacy.text).code, 'STORAGE_MODE_REQUIRED');
+  await expect('/api/host/campaigns', 404, 'POST');
+  await expect('/api/host/diagnostics/database', 404);
+  await expect('/host/assets/host-console.css', 404);
+  await expect('/player', 404);
   await expect('/display', 404);
   await expect('/api/public/state', 404);
   const after = JSON.parse((await expect('/api/host/storage/state', 200)).text);
   assert.deepEqual(after, before, 'Readiness and rejected commands must not change business state');
   console.log(JSON.stringify({ status: 'PASS', origin: ORIGIN, checks, state: expectedState,
-    verified: ['WAR welcome JSP', 'annotated listeners/servlets', 'web.xml filters/session',
+    verified: ['WAR root route', 'web.xml listeners/servlets/filters/session',
       'static resources', 'SQLite readiness', 'CSRF/epoch/digest rejection', 'legacy routes closed'] }));
 })().catch(failure => { console.error(failure.message); process.exitCode = 1; });

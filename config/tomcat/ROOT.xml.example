@@ -1,19 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Windows external Tomcat 10.1 ROOT context for the SQLite campaign application.
-  Copy to %CATALINA_BASE%\conf\Catalina\localhost\ROOT.xml.
+  Optional external Tomcat 10.1 ROOT context.
+  Copy to %CATALINA_BASE%/conf/Catalina/localhost/ROOT.xml only to set an
+  application context override. Replace the example path before using it.
 
-  Supply an absolute private DND_STORAGE_ROOT to the actual Tomcat launch identity.
-  Enable EnvironmentPropertySource using setenv.bat.example. For a Windows service,
-  configure the service process environment/JVM property; services do not run setenv.bat.
-  A literal value can instead replace the placeholder below. This context parameter
-  takes precedence over the process environment, including an invalid/empty value.
-  Missing placeholder expansion fails closed; it never selects the MySQL application.
-  Keep this directory outside Git, WARs and all expanded web applications.
-
-  The SQLite application needs no JNDI DataSource or Connector/J. The separately
-  named ROOT-mysql.xml.example is only for an explicitly retained MySQL instance.
+  The context value wins over the DND_STORAGE_ROOT process environment.
+  With neither set, the app uses .dndtool/campaigns under the Tomcat process's
+  Java user.home. Keep the directory private and outside Git, WARs and all
+  expanded web applications. A supplied value must be an absolute local path.
 -->
 <Context>
-    <Parameter name="DND_STORAGE_ROOT" value="${DND_STORAGE_ROOT}" override="false" />
+    <Parameter name="DND_STORAGE_ROOT" value="C:/DndToolData/campaigns" override="false" />
 </Context>

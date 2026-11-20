@@ -2,29 +2,33 @@ package com.dndtool.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
+import com.dndtool.security.HostBoundaryFilter;
+import com.dndtool.security.PlayerBoundaryFilter;
+import com.dndtool.web.HealthServlet;
+import com.dndtool.web.HostHomeServlet;
+import com.dndtool.web.PlayerServlet;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.apache.tomcat.util.descriptor.web.FilterMap;
+import org.apache.tomcat.util.descriptor.web.ServletDef;
+import org.apache.tomcat.util.descriptor.web.WebXml;
+import org.apache.tomcat.util.descriptor.web.WebXmlParser;
 import org.junit.jupiter.api.Test;
 
 /** Excludes anonymous publication surfaces; the private player prototype has its own boundary. */
 final class DeferredPublicSurfaceExclusionTest {
-    private static final Pattern SERVLET_ROUTE =
-            Pattern.compile("urlPatterns\\s*=\\s*(\"[^\"]+\"|\\{[^}]+\\})");
-    private static final Pattern QUOTED_ROUTE = Pattern.compile("\"([^\"]+)\"");
     private static final Set<String> PRIVATE_PLAYER_SERVLET_ROUTES =
             Set.of("/player", "/player/", "/api/player/*");
-    private static final Pattern DESCRIPTOR_ROUTE =
-            Pattern.compile("<url-pattern>([^<]+)</url-pattern>");
     private static final Pattern FORBIDDEN_PUBLIC_IDENTIFIER = Pattern.compile(
             "(?i)(?:^|_)(?:public|publication|projection|viewer|audience|visibility)(?:_|$)");
     private static final Pattern FORBIDDEN_PUBLIC_SNAKE = Pattern.compile(
@@ -37,19 +41,46 @@ final class DeferredPublicSurfaceExclusionTest {
 
     @Test
     void everyServletRouteStaysInsideHealthHostOrTheExactPrivatePlayerSurface() throws Exception {
-        Set<String> routes = servletRoutes();
-        assertTrue(routes.contains("/health"));
-        assertTrue(routes.contains("/host"));
-        for (String route : routes) {
-            assertTrue(route.equals("/health") || route.equals("/host")
+        WebXml descriptor = new WebXml();
+        assertTrue(new WebXmlParser(false, false, true).parseWebXml(
+                Path.of("src/main/webapp/WEB-INF/web.xml").toUri().toURL(), descriptor, false));
+        assertTrue(descriptor.isMetadataComplete());
+
+        Map<String, String> routes = descriptor.getServletMappings();
+        // The empty servlet pattern maps the context root. The "/" servlet pattern is the default mapping.
+        assertTrue(routes.keySet().containsAll(Set.of("", "/health", "/host", "/host/")));
+        assertTrue(routes.keySet().containsAll(PRIVATE_PLAYER_SERVLET_ROUTES));
+        routes.forEach((route, servletName) -> {
+            boolean playerRoute = PRIVATE_PLAYER_SERVLET_ROUTES.contains(route);
+            assertTrue(route.isEmpty() || route.equals("/health") || route.equals("/host")
                             || route.startsWith("/host/") || route.startsWith("/api/host/")
-                            || PRIVATE_PLAYER_SERVLET_ROUTES.contains(route),
+                            || playerRoute, () -> "Unexpected servlet route: " + route);
+            ServletDef servlet = descriptor.getServlets().get(servletName);
+            assertNotNull(servlet, () -> "Missing servlet declaration: " + servletName);
+            assertEquals(playerRoute, PlayerServlet.class.getName().equals(servlet.getServletClass()),
                     route);
-            assertFalse(route.equals("/display") || route.startsWith("/display/")
-                    || route.startsWith("/api/public/"), route);
+        });
+        for (String route : List.of("", "/host", "/host/")) {
+            assertEquals(HostHomeServlet.class.getName(),
+                    descriptor.getServlets().get(routes.get(route)).getServletClass(), route);
         }
-        assertTrue(routes.containsAll(PRIVATE_PLAYER_SERVLET_ROUTES));
-        assertEquals(Set.of("/*", "/host/*", "/api/host/*"), descriptorRoutes());
+        assertEquals(HealthServlet.class.getName(),
+                descriptor.getServlets().get(routes.get("/health")).getServletClass());
+
+        List<FilterMap> mappings = List.copyOf(descriptor.getFilterMappings());
+        assertTrue(mappings.size() >= 2);
+        FilterMap playerBoundary = mappings.getFirst();
+        assertEquals(PlayerBoundaryFilter.class.getName(),
+                descriptor.getFilters().get(playerBoundary.getFilterName()).getFilterClass());
+        assertEquals(Set.of("/*"), Set.of(playerBoundary.getURLPatterns()));
+        assertEquals(Set.of("REQUEST", "FORWARD", "INCLUDE", "ERROR"),
+                Set.of(playerBoundary.getDispatcherNames()));
+
+        FilterMap hostBoundary = mappings.get(1);
+        assertEquals(HostBoundaryFilter.class.getName(),
+                descriptor.getFilters().get(hostBoundary.getFilterName()).getFilterClass());
+        assertEquals(Set.of("/", "/host/*", "/api/host/*"), Set.of(hostBoundary.getURLPatterns()));
+        assertEquals(Set.of("REQUEST"), Set.of(hostBoundary.getDispatcherNames()));
     }
 
     @Test
@@ -84,34 +115,10 @@ final class DeferredPublicSurfaceExclusionTest {
         }
     }
 
-    private static Set<String> servletRoutes() throws IOException {
-        Set<String> routes = new HashSet<>();
-        try (Stream<Path> files = Files.list(Path.of("src/main/java/com/dndtool/web"))) {
-            for (Path file : files.filter(path -> path.toString().endsWith("Servlet.java"))
-                    .toList()) {
-                Matcher matcher = SERVLET_ROUTE.matcher(
-                        Files.readString(file, StandardCharsets.UTF_8));
-                while (matcher.find()) {
-                    Matcher quoted = QUOTED_ROUTE.matcher(matcher.group(1));
-                    while (quoted.find()) routes.add(quoted.group(1));
-                }
-            }
-        }
-        return Set.copyOf(routes);
-    }
-
-    private static Set<String> descriptorRoutes() throws IOException {
-        Set<String> routes = new HashSet<>();
-        Matcher matcher = DESCRIPTOR_ROUTE.matcher(Files.readString(
-                Path.of("src/main/webapp/WEB-INF/web.xml"), StandardCharsets.UTF_8));
-        while (matcher.find()) routes.add(matcher.group(1));
-        return Set.copyOf(routes);
-    }
-
     private static boolean isProductionTextFile(Path path) {
         String name = path.getFileName().toString();
         return name.endsWith(".java") || name.endsWith(".jsp")
-                || name.endsWith(".js") || name.endsWith(".xml");
+                || name.endsWith(".html") || name.endsWith(".js") || name.endsWith(".xml");
     }
 
     private static void assertNoPublicIdentifier(String source, String content) {

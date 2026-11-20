@@ -42,7 +42,7 @@ SQLite 适配器按封闭类型编码；内部 MySQL JDBC 适配器按类型化�
 
 | 领域 | 操作入口及运行实现 | 权威数据、关联及当前私有库落点 | 初始化、读写和文件接合 | 关键验收 |
 |---|---|---|---|---|
-| 规则与模块 | 规则库导入、审阅、接受、有序组合预览及创建。`LocalRuleLibrary`、`CampaignRuleSupport`、`CampaignRuleContext` | 本机原包和 SQLite 接受账本。`rules_runtime_material` 保存战役解释合同、完整绑定、规则、条目与字段链 | 新建和打开复核本机准确原包及接受。冻结材料供业务、保存与残留恢复消费 | 内置与外部准确组合、缺包、未接受、错误顺序、错绑、坏规则及来源链 |
+| 规则与模块 | 标准四包直接开团；自定义组合在规则库导入、审阅、接受后预览及创建。`LocalRuleLibrary`、`CampaignRuleSupport`、`CampaignRuleContext` | 本机原包和 SQLite 接受账本。`rules_runtime_material` 保存战役解释合同、完整绑定、规则、条目与字段链 | 新建和打开使用准确原包重新组合；自定义组合另验本机接受。冻结材料供业务、保存与残留恢复消费 | 内置与外部准确组合、缺包、未接受、错误顺序、错绑、坏规则及来源链 |
 | 战役与生命周期 | create/open/recover/save/end/import/download/delete/discard | `core_*`、分配/输入/清理材料、受管保存文件；生命周期服务是唯一 owner | 全部领域由同一 Snapshot 初始化、保存、读回、恢复、封存和清理 | 中断与响应丢失、锁、旧 epoch、未接受文件、准确清理 |
 | 规则角色与初始授予 | character-create/profile；`CampaignDomainEngine`、初始授予规则 | `characters_runtime_character` 的 InitialPlan、initial event/current/history；名字/PC-NPC/离场由根历史保存 | 标准数组、语言/工具及有限职业授予；完整当前与初始分别保存 | 准确引用、初始来源、活动状态、Unicode、文件初始前缀 |
 | 自由角色卡 | manual-create/profile/field/class/proficiency；`CampaignManualData/Commands` | `scenes_world` 中独立 manual 聚合；`manual_character` 核验身份、版本及资料投影 | 六属性、HP/AC/速度、十二职业等级、技能/豁免倍数；初始卡、当前卡和每次 typed 根历史 | 范围、总等级、NFC、版本冲突、归档、与规则角色隔离 |
@@ -91,7 +91,7 @@ DM 裁定模式，规则角色、自由卡和怪物共用网格与占位；自�
 | 完整文件和恢复 | `CampaignCodecTest`、`CampaignFileVectorTest`、`CampaignDomainRecoveryTest` | 严格字节/字段向量、初始化中断、已提交响应丢失、导入初始事实不可改写 |
 | 文件系统生命周期 | `CampaignStorageServiceTest`、`CampaignStorageLifecycleTest`、`CampaignPreparationTest`、`CampaignStorageCrashTest`、`CampaignWindowsFilesystemTest` | P0—P3、准备前缀、原意图续作、未知材料保护、根/运行独占、NTFS ACL/reparse、导入/下载/删除/精确放弃；Windows 进程中断与断电保证分开 |
 | 奥术回想 | `CampaignArcaneRecoveryIntegrationTest`、`Schema2ArcaneRecoveryRulesTest` 与浏览器主用例 | 真实短休、位数/预算/法术书、每日使用、幂等与故障回滚，完整文件保留根/子历史与使用日 |
-| 应用入口 | `StorageHttpIntegrationTest`、`StorageApplicationListenerTest`、`StorageReadinessTest`；Windows 候选脚本、`verify-war-http.cjs` 与两个浏览器 smoke | 配置失败关闭、SQLite 实际就绪、真实 WAR 注解/JSP/Filter、CSRF/摘要/epoch、用户表单、装备/攻击/继续/生命法术结果、重开与导入导出 |
+| 应用入口 | `StorageHttpIntegrationTest`、`StorageApplicationListenerTest`、`StorageReadinessTest`；Windows 候选脚本、`verify-war-http.cjs` 与两个浏览器 smoke | 配置失败关闭、SQLite 实际就绪、真实 WAR 描述符、路由及 Filter、CSRF/摘要/epoch、用户表单、装备/攻击/继续/生命法术结果、重开与导入导出 |
 
 本表记录当前实际接合路径和验收责任；所有列出的领域都进入同一运行、完整文件及恢复路径。
 测试类存在不等于执行结果，每次候选须由对应源码的测试、浏览器和 WAR 审计共同确认。
@@ -108,7 +108,7 @@ BLOCKED 与元数据按对应机制拒绝执行。
 裁定，`PlayerGatewayService` 经共同门提交，`PlayerCampaignProjection/PlayerCandidateFactory`
 产生逐人投影及服务器候选。`PlayerServlet/HostPlayerServlet` 和全局 `PlayerBoundaryFilter`
 提供独立可选 HTTPS surface；默认不开监听。自由卡玩家直接检定、全部动作参数编辑、
-DM 确证未提交工具及真实手机/桌面 LAN 信任验收仍有缺口，不能据此宣布整份计划完成。
+真实手机/桌面 LAN 信任验收仍有缺口，不能据此宣布整份计划完成。
 
 当前采用聚合文档与关系投影共同校验，并把固定规则材料纳入完整文件。独占根锁和一个
 SQLite 业务/根/接受事务承担当前单实例接纳；不另建 C0 重放队列。每条命令都耐久提交，

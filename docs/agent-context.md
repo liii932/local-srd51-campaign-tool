@@ -8,9 +8,9 @@
 ## 最小项目识别
 
 - DM 固定 `http://127.0.0.1:8080`；SQLite 有默认关闭的独立 HTTPS 玩家原型，配置不创建监听；边界见[安全说明](security.md)，公网与公开 API 不在范围内。
-- Java 21 / Maven WAR / Tomcat 10.1 / Servlet-JSP / 原生 JavaScript / SQLite-JDBC（显式当前运行）/ MySQL 8-JNDI（默认简化与来源）/ Gson。
+- Java 21 / Maven WAR / Tomcat 10.1 / Servlet / 原生 JavaScript / SQLite-JDBC（唯一 Web 运行库）/ MySQL 8（离线来源与旧库维护）/ Gson。
 - 原型阶段只保证当前版本，不承诺跨版本战役延续或旧存档支持；设计修订按 [AGENTS.md](../AGENTS.md#prototype-design-and-compatibility) 与[产品说明](product.md)处理。
-- 默认 MySQL 模式以 `dnd5e2014_srd51_se_v1` release 1、canonical/archive 1 为 `RELEASED` 新战役默认。显式 SQLite 新建选择本机已接受的有序准确规则成员，使用独立的 `RULE_BOUND_CAMPAIGN` format 3。
+- 标准战役直接使用 WAR 内的准确规则，自定义战役绑定本机接受的有序成员。两者均使用 `RULE_BOUND_CAMPAIGN` format 3。
 - `dnd5e2014_srd51_se` release 1、canonical/archive 2：仍为 `DRAFT`；可协调演进，跨领域发布门前不可绑定战役或激活存档。发布门见 [完整规则目标](rules/srd-5.1-complete.md)。
 - [产品说明](product.md)与 [v2 设计导航](design/v2/README.md)记录当前可修订的目标，和实现分开阅读；理解项目不依赖本地 Agent 目录。
 - 请求解析 → `web`；校验/事务 → `service`；JDBC → `persistence`；冻结目录/规范编码 → `module`；入口安全 → `security`。随机结果、版本推进与审计由服务器拥有，事务不得部分提交。
@@ -60,14 +60,14 @@
 | schema 2 有限怪物、吐息、充能、休息、完整目标、共享伤害与专注 | [有限怪物合同](rules/schema-2-monster-breath.md) | `module/composition/Schema2MonsterCodec.java`；`persistence/JdbcSchema2MonsterSourceRows.java`、`JdbcSchema2MonsterSnapshotRows.java`、`JdbcSchema2MonsterBreathRows.java`；`service/Schema2CombatRuntimeService.java`、`Schema2SaveDamageRules.java`、`Schema2MonsterRestRules.java`、`Schema2CombatState.java`；来源 V011、镜像 V039、事实 V040；`Schema2MonsterBreathRulesTest` 及 Monster 组合/来源/镜像/服务/历史测试；INTERNAL 点格机制，完整 Host/base/archive 2 仍关闭 |
 | schema 2 法术来源范围豁免伤害与燃烧之手 | [法术共享伤害合同](rules/schema-2-spell-save-damage.md) | `Schema2SpellRules`、`Schema2ActionFlowRules`、`Schema2SaveDamageRules` 与场景/批次仓储；来源 V012、运行 V042；对应组合、来源/镜像、真实服务及 schema 测试；真实施法来源与怪物动作互斥，有限范围不授予其他法术执行资格 |
 | v2 多目标公共接口、体积空间、伤害骰后反应与完整保存 | [多目标豁免伤害](design/v2/multi-target-save-damage.md)，再读动作继续及持续效果协议 | 区分已采用的有限怪物合同与公共目标；原 PFE/Cutting Words golden、通用体积、完整文件和 Host 仍须各自消费者与验收 |
-| SQLite 当前有限战役、角色/冒险/战斗、完整文件与同版恢复 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md)、[测试入口](testing.md#sqlite-结构完整文件与运行验收) | `HostStorageServlet` / `StorageApplicationListener`（配置与 readiness）；`CampaignStorageService` / `ManagedCampaignFiles`（准备前缀、Windows NTFS/ACL）、`CampaignDomainCommands`、`CampaignDomainEngine`、`CampaignDomainData/Codec/Validation`、`CampaignDomainRepository`；领域、生命周期、准备、Windows/进程故障测试；`DND_STORAGE_ROOT` 显式启用，不连接运行 MySQL |
+| SQLite 当前有限战役、角色/冒险/战斗、完整文件与同版恢复 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md)、[测试入口](testing.md#sqlite-结构完整文件与运行验收) | `HostStorageServlet` / `StorageApplicationListener`（配置与 readiness）；`CampaignStorageService` / `ManagedCampaignFiles`（准备前缀、Windows NTFS/ACL）、`CampaignDomainCommands`、`CampaignDomainEngine`、`CampaignDomainData/Codec/Validation`、`CampaignDomainRepository`；领域、生命周期、准备、Windows/进程故障测试。SQLite 是唯一 Web 运行库，`DND_STORAGE_ROOT` 覆盖默认存储根。 |
 | SQLite 检定成功/失败分支、健康/物品/消息后果 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md) | `service/storage/CampaignCheckEffects.java`、`CampaignDomainCommands.java`；`CampaignCheckEffectsTest`；两分支全部预检后再骰，同根事务和完整文件，不接受任意算法 |
 | SQLite DM-managed 自由卡、基础字段、职业等级/熟练、MANUAL/SAVING_THROW 与共享网格 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md) | `service/storage/CampaignManualData.java`、`CampaignManualCommands.java`、`CampaignDomainCommands.java`；Host UI 与 `CampaignManualIntegrationTest` 覆盖有序效果、回滚、完整文件与混合网格。DM 裁定与自动规则分别校验 |
 | 有限生产 schema 2 组合、初始化模板、目录与限制 | [规则包指南](../rule-packages/srd51-runtime/package-guide.md)、[领域接合表](design/v2/domain-integration.md) | `BundledCampaignRules` 提供交付原包候选，`CampaignRuleSupport` 检查应用执行范围，`CampaignRuleContext` 提供初始化与绑定投影，`Material` 保存解释合同、准确绑定与完整行链。测试见 `BundledCampaignRulesTest`、`CampaignRuleSupportTest`、`CampaignRuleContextTest` |
 | v2 完整战役文件、运行空间与生命周期 | [规则存储](design/v2/rule-storage-and-versioning.md)、[完整文件](design/v2/save-and-recovery.md)、[生命周期](design/v2/runtime-and-transactions.md)、[领域接合表](design/v2/domain-integration.md) | `CampaignCodec`、`CampaignStorageService`、`CampaignDomainValidation`。本机 `RULE_BOUND_CAMPAIGN` format 3 保存完整冻结规则与业务聚合，接合 P0—P3、END 和显式恢复/放弃。周期 AUTO/轮换、通用 SRD MySQL archive format 2 独立验收 |
 | v2 JSON 建表、存储数据覆盖与替换步骤 | [结构声明与计划](design/v2/storage-schema-and-planning.md)、[数据映射](design/v2/storage-data-map-and-rollout.md)、[领域接合表](design/v2/domain-integration.md) | `resources/storage/campaign-schema.json`、`StorageSchemaCatalog`、`StoragePlan`、`SqliteSchemaVerifier`、`CampaignDomainRepository`；结构/投影/聚合与未来写入足迹共同验证；旧模式保管和剩余采用不由声明存在推定 |
 | 规则目录、canonical、hash、发布身份 | [冻结 v1](rules/srd-5.1.md) §2/§11；[v2 目录](rules/character-catalog-v2.md) | `module/ModuleCatalog.java`、`module/BuiltinModuleReleaseRegistry.java`、`module/ModuleCanonicalEncoderV1.java` / `module/ModuleCanonicalEncoderV2.java` |
-| 启动、JNDI、数据库就绪诊断 | [架构](architecture.md) §4/§8；[数据库](database.md) | `web/DatabaseDiagnosticsFactory.java`、`web/DatabaseStartupListener.java` → `service/DatabaseDiagnostics.java` → `persistence/DatabaseSchemaVerifier.java`；`DatabaseDiagnosticsTest`、`DatabaseDiagnosticsFactoryTest`、`HostDatabaseDiagnosticServletTest` |
+| 应用启动、存储根与就绪 | [架构](architecture.md)与[配置](configuration.md) | `web/StorageApplicationListener.java`、`web/HostStorageServlet.java`；`StorageApplicationListenerTest`、`StorageReadinessTest` |
 | 语言/工具作者 JSON、严格读取、纯分区投影 | [语言作者入口](rules/language-author-package.md)、[工具熟练目录](rules/tool-catalog-partition.md) | `module/CharacterCatalogAuthorPackageReader.java`、`module/CharacterCatalogPartition.java`；`CharacterCatalogAuthorPackageReaderTest`、`ToolAuthorPartitionTest`；正式作者源在仓库根 `rule-packages/srd51-complete/`，不入 WAR |
 | 源目录只读 JDBC、当前安装证据、连接归还 | [源目录读取](rules/source-language-reading.md) | `persistence/JdbcSourceLanguageRepository.java` 的 `loadCatalog()`；`JdbcSourceLanguageRepositoryTest`；返回语言与工具分区，不接生产完整目录或运行就绪 |
 | 运行语言快照、run/snapshot 身份、调用方事务 | [运行语言快照分区](rules/runtime-language-snapshot.md) | `persistence/JdbcRuntimeLanguageSnapshotRepository.java`；`JdbcRuntimeLanguageSnapshotRepositoryTest`、`V019RuntimeLanguageSnapshotSchemaTest`；V019 仅建空表，语言 PARTITION 不提供执行资格 |
@@ -75,7 +75,7 @@
 | 离线语言安装、制品清单、操作票据、提交查证 | [离线语言安装](rules/offline-language-installation.md) | `offline/rules/RulePackageCli.java`、`offline/rules/SourceInstallation.java`、`offline/rules/JdbcRuleSource.java`；`RuleArtifactTest`、`TicketStoreTest`、`SourceInstallationTest`；离线类不入 WAR |
 | 语言链路等价、独立字段/字节期望、跨快照故障 | [语言分区链路核验](rules/language-partition-equivalence.md) | 测试目录 `offline/rules/LanguagePartitionEquivalenceTest.java`；连接作者、离线安装、源只读及运行分区仓储；代理证据与真实 JDBC 分开报告 |
 | 角色语言／工具授予、来源槽、卡片和内部存档 | [角色授予合同](rules/character-proficiency-grants.md) | `service/LevelOneCharacterRules.java`、`LevelOneCharacterCreationService.java`、`persistence/JdbcCharacterProficiencyGrantRepository.java`；运行 V022；`CharacterCardService` 与内部 format 2 读写；旧 DRAFT 路径不等于 schema 2 业务初始化 |
-| v1 战役创建、角色创建、角色卡 | [冻结 v1](rules/srd-5.1.md) §3—5；[架构](architecture.md) §6 | `service/CampaignCreationService.java`、`service/CharacterCreationService.java`、`service/CharacterCardService.java` |
+| v1 战役创建、角色创建、角色卡 | [冻结 v1](rules/srd-5.1.md) §3—5；[架构](architecture.md) | `service/CampaignCreationService.java`、`service/CharacterCreationService.java`、`service/CharacterCardService.java` |
 | v2 一级创建、种族、背景、初始选择 | [一级创建](rules/character-creation-v2.md) | `service/LevelOneCharacterCreationService.java`；`LevelOneCharacterRulesTest` |
 | 升级、HP、生命骰 | [升级](rules/level-advancement-v2.md) | `service/LevelAdvancementService.java`；`LevelAdvancementRulesTest` |
 | 旧 DRAFT 职业/子职业特性与资源恢复组件 | [职业特性](rules/class-features-v2.md) | `module/ResourceRecoveryProfile.java`、`service/ClassResourceRecoveryRules.java`、`service/ClassFeatureRules.java`；`ResourceRecoveryProfileTest`、`ClassResourceRecoveryRulesTest`；schema 2 的真实休息消费者见上方成长/休息入口 |
@@ -83,14 +83,14 @@
 | 多职业施法、共享法术位、Pact Magic | [共享法术位](rules/multiclass-spell-slots-v2.md)，含未完成边界 | `service/MulticlassSpellSlotRules.java`；`V018MulticlassSpellSlotFoundationSchemaTest` |
 | 检定、骰子、简单物品、事件效果 | [冻结 v1](rules/srd-5.1.md) §6/§8—9 | `service/CheckTransactionService.java`、`service/CheckEffectExecutionService.java` |
 | 节点地图、位置、最小遭遇 | [冻结 v1](rules/srd-5.1.md) §9 | `service/EntityPositionTransactionService.java`、`service/EncounterStateTransactionService.java` |
-| 存档、导入导出、恢复 | [架构](architecture.md) §9；[format 2 角色状态](rules/archive-format-2-character-state.md) | `service/CampaignArchiveFormatDispatcher.java`；按 `CampaignArchive*Test` 定位，v2 先看 `CampaignArchiveV2CharacterStateTest` |
-| JSP、JS、Host API、页面 | [架构](architecture.md) §7；对应领域合同 | `web/Host*Servlet.java`、`src/main/webapp/WEB-INF/views/`、`src/main/webapp/host/assets/`（后两项相对仓库根）；`web/Host*Test.java` |
-| loopback、Session、CSRF、安全头 | [架构](architecture.md) §5；[安全](security.md) | `security/HostBoundaryFilter.java`、`security/HostRequestSecurityFilter.java`；API 注册见 `src/main/webapp/WEB-INF/web.xml`（仓库根） |
+| 存档、导入导出、恢复 | [架构](architecture.md)；[format 2 角色状态](rules/archive-format-2-character-state.md) | `service/CampaignArchiveFormatDispatcher.java`；按 `CampaignArchive*Test` 定位，v2 先看 `CampaignArchiveV2CharacterStateTest` |
+| 工作台、玩家页面和 API | [架构](architecture.md)与[运行合同](storage-vitality-loop.md) | `web/HostStorageServlet.java`、`web/PlayerServlet.java`、`src/main/webapp/WEB-INF/` 和 `host/assets/`、`player/assets/` |
+| loopback、Session、CSRF、安全头 | [架构](architecture.md)；[安全](security.md) | `security/HostBoundaryFilter.java`、`security/HostRequestSecurityFilter.java`；API 注册见 `src/main/webapp/WEB-INF/web.xml`（仓库根） |
 | schema、迁移、JDBC、权限、数据库诊断 | [数据库](database.md)；拆分设计仅需要时读 [规则/运行库分离](rule-database-separation.md) | `persistence/SchemaMigrations.java`、相关 `Jdbc*Repository.java`；`SchemaMigrationsTest` / `Jdbc*RepositoryTest`；SQL 在仓库根 `src/main/resources/db/migration/` 与 `database/` |
 | 独立规则库、来源账本、语言结构、来源权限 | [规则来源 schema](rule-source-schema.md)；[数据库](database.md) | `persistence/RuleSchemaMigrations.java`、`persistence/RuleDatabaseSchemaVerifier.java`；`RuleSourceSchemaContractTest`；SQL 在仓库根 `database/rules/migration/`、`database/grants/rule-source-*.sql` 与 `database/verify/rule-source-schema.sql` |
 | 构建、测试、WAR、部署、备份 | [测试](testing.md)；实际部署才读 [部署](deployment.md) / [备份恢复](backup-and-restore.md) | 仓库根 `pom.xml`、`config/`、`tools/`；MySQL 集成测试需独立授权与隔离目标 |
 | MySQL 测试连接目标保护 | [测试](testing.md) §3 | 测试目录 `persistence/MySqlIntegrationTestSupport.java`；`MySqlIntegrationTestSupportTest`，两入口在连接前仅允许专用测试目标 |
-| 新增完整规则领域、覆盖差距、发布门 | [机制覆盖矩阵](rules/srd-5.1-coverage.md)、[完整规则目标](rules/srd-5.1-complete.md)；[架构](architecture.md) §2—3 | 按机制族核对数据、真实执行和状态/恢复；只提升有实际消费者和证据的准确范围，不为未来领域编造类名 |
+| 新增完整规则领域、覆盖差距、发布门 | [机制覆盖矩阵](rules/srd-5.1-coverage.md)、[完整规则目标](rules/srd-5.1-complete.md)；[架构](architecture.md) | 按机制族核对数据、真实执行和状态/恢复；只提升有实际消费者和证据的准确范围，不为未来领域编造类名 |
 | Agent、skill、项目导航、文档 | [AGENTS.md](../AGENTS.md)、本文 | 先选本文相关入口；本地 `dnd-project-start` 可辅助导航；不预读业务源码 |
 
 ## 使用与维护

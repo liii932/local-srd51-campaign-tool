@@ -19,7 +19,7 @@ class CampaignWindowsFilesystemTest {
     @TempDir Path temporary;
 
     @Test void uncRootIsRejectedBeforeAnyFilesystemAccess() {
-        IOException failure = assertThrows(IOException.class,
+        var failure = assertThrows(CampaignStorageService.InvalidRootException.class,
                 () -> new CampaignStorageService(Path.of("\\\\invalid.test.invalid\\share\\never-created")));
         assertTrue(failure.getMessage().contains("UNC roots are unsupported"));
     }

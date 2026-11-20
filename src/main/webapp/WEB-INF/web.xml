@@ -2,7 +2,7 @@
 <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
-         version="6.0">
+         version="6.0" metadata-complete="true">
     <display-name>Local 5E Campaign Tool</display-name>
 
     <!-- First on every dispatch: no other application resource is visible on the TLS connector. -->
@@ -31,6 +31,7 @@
     </filter>
     <filter-mapping>
         <filter-name>HostBoundaryFilter</filter-name>
+        <url-pattern>/</url-pattern>
         <url-pattern>/host/*</url-pattern>
         <url-pattern>/api/host/*</url-pattern>
         <dispatcher>REQUEST</dispatcher>
@@ -44,19 +45,61 @@
     </filter>
     <filter-mapping>
         <filter-name>HostRequestSecurityFilter</filter-name>
-        <url-pattern>/host/*</url-pattern>
-        <url-pattern>/api/host/*</url-pattern>
+        <url-pattern>/host</url-pattern>
+        <url-pattern>/host/</url-pattern>
+        <url-pattern>/host/storage</url-pattern>
+        <url-pattern>/api/host/storage/*</url-pattern>
         <dispatcher>REQUEST</dispatcher>
     </filter-mapping>
 
-    <!-- Tomcat owns the pool; application code resolves it through java:comp/env. -->
-    <resource-ref>
-        <description>Local 5E Campaign Tool application database pool</description>
-        <res-ref-name>jdbc/DndToolSE</res-ref-name>
-        <res-type>javax.sql.DataSource</res-type>
-        <res-auth>Container</res-auth>
-        <res-sharing-scope>Shareable</res-sharing-scope>
-    </resource-ref>
+    <listener>
+        <listener-class>com.dndtool.web.StorageApplicationListener</listener-class>
+    </listener>
+    <servlet>
+        <servlet-name>HostHomeServlet</servlet-name>
+        <servlet-class>com.dndtool.web.HostHomeServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>HostHomeServlet</servlet-name>
+        <url-pattern></url-pattern>
+        <url-pattern>/host</url-pattern>
+        <url-pattern>/host/</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>HealthServlet</servlet-name>
+        <servlet-class>com.dndtool.web.HealthServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>HealthServlet</servlet-name>
+        <url-pattern>/health</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>HostStorageServlet</servlet-name>
+        <servlet-class>com.dndtool.web.HostStorageServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>HostStorageServlet</servlet-name>
+        <url-pattern>/host/storage</url-pattern>
+        <url-pattern>/api/host/storage/*</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>HostPlayerServlet</servlet-name>
+        <servlet-class>com.dndtool.web.HostPlayerServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>HostPlayerServlet</servlet-name>
+        <url-pattern>/api/host/storage/players/*</url-pattern>
+    </servlet-mapping>
+    <servlet>
+        <servlet-name>PlayerServlet</servlet-name>
+        <servlet-class>com.dndtool.web.PlayerServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>PlayerServlet</servlet-name>
+        <url-pattern>/player</url-pattern>
+        <url-pattern>/player/</url-pattern>
+        <url-pattern>/api/player/*</url-pattern>
+    </servlet-mapping>
 
     <session-config>
         <session-timeout>30</session-timeout>
@@ -68,8 +111,4 @@
         </cookie-config>
         <tracking-mode>COOKIE</tracking-mode>
     </session-config>
-
-    <welcome-file-list>
-        <welcome-file>index.jsp</welcome-file>
-    </welcome-file-list>
 </web-app>
