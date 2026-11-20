@@ -6,7 +6,7 @@ Local 5E Campaign Tool 帮助一名 DM 在本机主持 D&D 5e 2014 战役。打�
 
 ## 当前已实现
 
-`/` 和 `/host` 均进入 [SQLite 战役操作台](./docs/storage-vitality-loop.md)。
+DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作见 [SQLite 战役工作台](./docs/storage-vitality-loop.md)。
 首次体验可按[短冒险流程](./docs/storage-vitality-loop.md#跑一段短冒险)完成建队、探索、战斗和保存后继续；
 隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
 使用标准规则即可开始。要使用外部包或家规组合，在“自定义规则组合”中逐包审阅、接受并预览。工作台可以：
@@ -110,7 +110,7 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 
 ```text
 本机浏览器
-  └─ http://127.0.0.1:8080/host
+  └─ http://127.0.0.1:8080/host/storage
        └─ Servlet / HTML / JavaScript
             └─ Service：验证、事务、幂等与规则边界
                  └─ JDBC Repository
@@ -124,16 +124,12 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 ## 环境要求
 
 - JDK 21；
-- Maven 3.9 或兼容版本；
+- 从源码构建时需要 Maven 3.9 或兼容版本；
 - Apache Tomcat 10.1；
-- SQLite 模式使用原生 Windows 本地 NTFS/私有 ACL，或 Linux/WSL 的 POSIX 私有文件系统；文件锁、硬链接及平台落盘边界见[配置](./docs/configuration.md#sqlite-当前应用存储配置)；
+- SQLite 存储使用原生 Windows 本地 NTFS/私有 ACL，或 Linux/WSL 的 POSIX 私有文件系统；文件锁、硬链接及平台落盘边界见[配置](./docs/configuration.md#sqlite-当前应用存储配置)；
 - 支持现代 JavaScript 的本机浏览器。
 
-应用不提供内嵌服务器，也不能通过 `java -jar` 独立启动。Windows 正式路线为外部
-Tomcat 10.1 + WAR + 主机本地 SQLite；配置真实启动身份和私有根后，通过
-`/api/host/storage/readiness` 确认就绪，打开 `http://127.0.0.1:8080`。
-隔离测试和真实 WAR 验收见[测试指南](./docs/testing.md#原生-windows-外部-tomcat-候选验收)，
-正式切换及日常启停遵循[部署流程](./docs/deployment.md)。
+可直接使用发行版 `dnd-tool-se-0.2.0.war`。安装和首次启动见[快速开始](./docs/getting-started.md)。
 
 ## 构建与测试
 
@@ -146,7 +142,7 @@ mvn clean verify
 成功后生成：
 
 ```text
-target/dnd-tool-se-0.1.0-SNAPSHOT.war
+target/dnd-tool-se-0.2.0.war
 ```
 
 构建必须以 Maven 最终退出码、测试总数以及 `BUILD SUCCESS` 为准。定向测试、完整验证、
@@ -157,7 +153,8 @@ WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
 
 ## 数据库与部署
 
-正式运行使用外部 Tomcat 的根上下文。已审计的 WAR 自带 SQLite，存储根需位于应用和 Git 目录之外。部署或回滚时分别保管 WAR、存储根和启动身份。按[配置说明](./docs/configuration.md)和[部署指南](./docs/deployment.md)操作。
+在外部 Tomcat 中将发行 WAR 部署为 `ROOT.war`。WAR 自带 SQLite JDBC，启动无需配置 JNDI 或 MySQL。
+私有存储根、可回滚替换与验收见[部署指南](./docs/deployment.md)。
 
 既有 MySQL 库、账号、迁移账本及离线规则工具单独维护。数据库维护说明见[数据库文档](./docs/database.md)。
 

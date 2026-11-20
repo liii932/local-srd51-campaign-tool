@@ -721,8 +721,9 @@ Servlet/Listener，也不读取或修改已安装实例的 setenv、ROOT、应�
 绑定准确 base、PID、进程创建时间及 executable，不以模糊进程名控制服务。
 
 Start 返回的 `STARTED` 只表示进程已启动，必须另查 `httpStatus=200` 且
-`readiness.ready=true`。HTTP 脚本验证 welcome JSP、注解发现、web.xml Filter/Session、
-静态资源、真实 SQLite 就绪、CSRF/epoch/摘要及 Host/Origin/方法边界和旧路由关闭；只发送
+`readiness.ready=true`。HTTP 脚本验证根入口与 `/host` 的 `303` 跳转、`web.xml` 显式注册的
+Servlet/Listener、Filter/Session、静态资源、SQLite 就绪、CSRF/epoch/摘要以及
+Host/Origin/方法边界和旧路由关闭；只发送
 必定拒绝的写请求。浏览器脚本在一次性夹具上执行被授权的实际表单业务。失败保留进程身份、
 日志与材料，用同一 base 的 Status/Stop 处置；不递归清理未知内容。
 
@@ -835,14 +836,13 @@ WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边
 
 ## 7. 手工验收
 
-只有可达路由、UI 或客户端 JavaScript 变化时才需要浏览器验收。按[部署指南](deployment.md)检查 `/health`、根重定向、`/host`、数据库诊断、安全头、错误 Host/origin 与明确排除的路由。真实业务写入必须单独授权并具备可验证恢复方案。
+只有可达路由、UI 或客户端 JavaScript 变化时才需要浏览器验收。按[部署指南](deployment.md#5-启动与验收)
+检查 `/health`、`/` 与 `/host` 转到 `/host/storage`、SQLite 就绪、安全头和请求边界。
+真实业务写入必须单独授权并具备可验证恢复方案。
 
-操作台布局验收应覆盖宽屏与手机宽度、键盘焦点和跳转操作区链接、原生折叠区展开、长名称与
-空战役/数据库不可用/模组校验失败状态。确认节点与遭遇呈现现有读取模型提供的摘要，全部原有表单
-可到达，角色卡编号建议不会改变检定执行者或版本。加载角色卡使用只读请求；保存按钮、
-检定确认和其他业务提交仍须按上述授权边界验收。核对 CSP 下同源样式和脚本正常加载，
-窄屏不截断操作区或角色卡内容；自动化页面合同由 `HostOverviewPageTest`、
-`HostConsolePageTest` 和对应表单测试覆盖。
+按[工作台验证流程](#sqlite-结构完整文件与运行验收)覆盖桌面和手机宽度、键盘焦点、
+场景操作与角色卡翻页、空闲与活动状态、加载及错误反馈。核对 CSP 下同源资源正常加载，
+角色卡翻页保持场景中的表单选择，窄屏能够访问当前操作区与角色卡。
 
 <a id="extra-attack-verification"></a>
 

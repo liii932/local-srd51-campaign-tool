@@ -5,9 +5,9 @@
 
 ## 1. 构建候选
 
-在仓库根目录按[完整验证流程](testing.md#2-必要时的完整验证)执行构建。候选路径为
-`target/dnd-tool-se-0.1.0-SNAPSHOT.war`。复用同一代码和配置的有效测试结果时，按测试
-指南记录选取的范围和制品构建命令。
+使用发行制品 `dnd-tool-se-0.2.0.war`。从源码构建时，在仓库根目录按
+[完整验证流程](testing.md#2-必要时的完整验证)生成 `target/dnd-tool-se-0.2.0.war`。
+复用同一代码和配置的有效测试结果时，按测试指南记录选取的范围和制品构建命令。
 
 按 [WAR 审计方法](testing.md#6-war-审计)记录候选字节数、SHA-256 和 ZIP 条目数。核对
 生产描述符、Servlet 和 Filter、SQLite JDBC、结构 JSON、五个规则原包和 Host/玩家
@@ -23,10 +23,10 @@ Tomcat 配置、凭据、密钥、账号专用配置、日志、备份和真实�
 
 ## 3. 外部配置
 
-Tomcat 的 Java `user.home` 下默认使用 `.dndtool/campaigns`。需要改根时给实际 Tomcat
-进程设置绝对 `DND_STORAGE_ROOT`，或在
-`%CATALINA_BASE%\conf\Catalina\localhost\ROOT.xml` 提供优先的
-[外部 Context 参数](../config/tomcat/ROOT.xml.example)。检查无效覆盖时的就绪错误，
+WAR 自带 SQLite JDBC，启动无需 JNDI 数据源、MySQL 服务或 Connector/J。默认存储根为
+实际 Tomcat 运行账号的 `${user.home}/.dndtool/campaigns`。需要改根时给 Tomcat 进程设置
+绝对路径 `DND_STORAGE_ROOT`，或在 `%CATALINA_BASE%\conf\Catalina\localhost\ROOT.xml`
+提供优先的[外部 Context 参数](../config/tomcat/ROOT.xml.example)。检查无效覆盖时的就绪错误，
 保留真实根和残留供处理。从旧配置切换时保管完整旧 Context 和启动配置，当前 Context
 使用 SQLite 参数及所需的其他外部容器设置。
 
@@ -37,8 +37,8 @@ DM Connector 固定绑定 `127.0.0.1:8080`，shutdown listener 同样限 loopbac
 
 ### 可选玩家 HTTPS 入口
 
-默认只配置 DM Connector。确需启用玩家时，先完成候选构建、可回滚替换和 Host 基线验收，
-再按批准的网络边界配置独立 HTTPS。
+玩家 HTTPS 默认关闭。确需启用时，先完成候选准备、可回滚替换和 Host 基线验收，再按批准的
+网络边界配置独立 HTTPS。
 
 1. 选定私有、链路本地或用于隔离验收的 loopback IPv4 和固定端口 `8443`，按
    [玩家请求边界](configuration.md#可选玩家-https-原型配置)填写两项应用参数。
