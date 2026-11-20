@@ -6,7 +6,7 @@
   let busy = false;
   let lastSaved = null;
   let manualSelected = null;
-  let characterBrowserScope = null;
+  let workspaceScope;
   let characterBrowserKey = null;
   let characterBrowserIndex = 0;
   let campaignLogScroll = null;
@@ -89,8 +89,8 @@
   function options(select, items, label) {
     const selected = new Set(Array.from(select.selectedOptions, option => option.value));
     select.replaceChildren();
-    if (select.hasAttribute('data-optional') && !select.multiple) {
-      const empty = document.createElement('option'); empty.value = ''; empty.textContent = '未选择'; select.append(empty);
+    if (!select.multiple && (select.hasAttribute('data-placeholder') || select.hasAttribute('data-optional'))) {
+      const empty = document.createElement('option'); empty.value = ''; empty.textContent = select.dataset.placeholder ?? '未选择'; select.append(empty);
     }
     for (const [index, item] of items.entries()) {
       const option = document.createElement('option'); option.value = item;
@@ -128,18 +128,20 @@
     if (restoreFocus) byId('campaign-log-toggle').focus({preventScroll: true});
   }
   function render(preferredFile = null) {
-    document.dispatchEvent(new CustomEvent('dnd:storage-view', {detail: view}));
     const active = view.campaign !== null;
-    byId('storage-idle').hidden = active;
-    byId('storage-active').hidden = !active;
-    byId('campaign-log-entry').hidden = !active;
     const scope = active ? `${view.storage.runId}:${view.campaign.campaignId}` : null;
-    if (scope !== characterBrowserScope) {
-      characterBrowserScope = scope;
+    let manualCheckDraft = null;
+    if (scope !== workspaceScope) {
+      manualCheckDraft = resetManualCheck(workspaceScope === undefined ? scope : null);
+      workspaceScope = scope;
       characterBrowserKey = null;
       characterBrowserIndex = 0;
       closeCampaignLog(false);
     }
+    document.dispatchEvent(new CustomEvent('dnd:storage-view', {detail: view}));
+    byId('storage-idle').hidden = active;
+    byId('storage-active').hidden = !active;
+    byId('campaign-log-entry').hidden = !active;
     const recoverable = [...view.storage.residualRunIds];
     if (!active && view.storage.runId && !recoverable.includes(view.storage.runId)) recoverable.push(view.storage.runId);
     const saved = new Map(view.savedCampaigns.map(file => [file.fileKey, file]));
@@ -166,6 +168,7 @@
     byId('storage-campaign-name').textContent = campaign.name;
     byId('storage-domain').hidden = false;
     renderDomain(campaign.domain);
+    if (manualCheckDraft) restoreManualCheckDraft(manualCheckDraft);
   }
   const abilities = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
   const abilityNames = ['力量', '敏捷', '体质', '智力', '感知', '魅力'];
@@ -272,7 +275,6 @@
       }
     }
     refreshCheckBranches();
-    refreshManualEffects();
     refreshArcaneRecovery();
   }
   function refreshArcaneRecovery() {
@@ -743,6 +745,61 @@
   const tierNames = {NONE: '无', HALF: '半熟练', FULL: '熟练', EXPERTISE: '专精'};
   const effectNames = {HP: '调整当前生命值', GRANT_MODULE_ITEM: '给予目录物品', GRANT_TEMPORARY_ITEM: '给予临时物品', MESSAGE: '记录结果消息'};
   const manualCatalog = () => manualData()?.catalog;
+  const manualCheckForm = byId('manual-check');
+  const manualCheckDraftKey = 'dnd.manual-check-draft.v1';
+  const manualCheckFields = ['characterId', 'checkType', 'modifierSource', 'manualModifier', 'manualName', 'rollMode', 'difficultyClass'];
+  const manualCheckBranches = ['success', 'failure'];
+  const manualEffectList = branch => byId(`manual-${branch}-effects`);
+  const manualEffectLimit = 64;
+
+  function resetManualCheck(restoreScope) {
+    let draft = null;
+    try {
+      const saved = restoreScope ? sessionStorage.getItem(manualCheckDraftKey) : null;
+      sessionStorage.removeItem(manualCheckDraftKey);
+      const candidate = saved ? JSON.parse(saved) : null;
+      if (candidate?.scope === restoreScope) draft = candidate;
+    } catch (_) { /* The form still works if session storage is unavailable. */ }
+    for (const branch of manualCheckBranches) manualEffectList(branch).replaceChildren();
+    manualCheckForm.reset();
+    manualCheckForm.elements.characterId.replaceChildren();
+    manualCheckForm.elements.modifierSource.replaceChildren();
+    return draft;
+  }
+  function saveManualCheckDraft() {
+    if (!workspaceScope) return;
+    const fields = Object.fromEntries(manualCheckFields.map(name => [name, manualCheckForm.elements[name].value]));
+    const effects = branch => Array.from(manualEffectList(branch).children, row => {
+      const values = manualEffectValues(row);
+      if (row.querySelector('.manual-effect-target[aria-invalid="true"]')) values.targetUnavailable = true;
+      return values;
+    });
+    try {
+      sessionStorage.setItem(manualCheckDraftKey, JSON.stringify({scope: workspaceScope, fields, success: effects('success'), failure: effects('failure')}));
+    } catch (_) { /* The form still works if session storage is unavailable. */ }
+  }
+  function restoreManualCheckValue(input, value) {
+    if (typeof value !== 'string') return;
+    if (input instanceof HTMLSelectElement && !Array.from(input.options).some(option => option.value === value)) return;
+    input.value = value;
+  }
+  function restoreManualCheckDraft(draft) {
+    restoreManualCheckValue(manualCheckForm.elements.checkType, draft.fields?.checkType);
+    refreshManualCheck();
+    for (const name of manualCheckFields) restoreManualCheckValue(manualCheckForm.elements[name], draft.fields?.[name]);
+    for (const branch of manualCheckBranches) {
+      if (!Array.isArray(draft[branch])) continue;
+      for (const effect of draft[branch].slice(0, manualEffectLimit)) {
+        if (effect && typeof effect === 'object') addManualEffect(branch, effect);
+      }
+    }
+  }
+  const eligibleForManualCheck = card => card.active && inFocus(card.id);
+  function manualEffectTargets(kind) {
+    const focus = domain().space.focus.space;
+    const rulesScene = focus?.kind === 'SCENE' && domain().space.scenes.find(scene => scene.id === focus.id)?.resolution === 'RULES';
+    return (kind === 'HP' || rulesScene ? manualCards() : allPeople()).filter(eligibleForManualCheck);
+  }
   function manualPayload(card, extra = {}) {
     if (!card) throw new Error('请先创建或选择自由卡。');
     return {characterId: card.id, characterVersion: String(card.version), ...extra};
@@ -759,7 +816,7 @@
     refreshManualTemplates();
     for (const select of document.querySelectorAll('.manual-character-choice')) {
       const people = manualCards().filter(card => {
-        if (select.form?.id === 'manual-check') return card.active && inFocus(card.id);
+        if (select.form === manualCheckForm) return eligibleForManualCheck(card);
         return select.form?.id === 'manual-card-load' || !placeFor(card.id) || inFocus(card.id);
       });
       options(select, people.map(card => card.id), personName);
@@ -820,7 +877,7 @@
   }
   function refreshManualCheck() {
     const meta = manualCatalog(); if (!meta) return;
-    const form = byId('manual-check'), kind = form.elements.checkType.value;
+    const form = manualCheckForm, kind = form.elements.checkType.value;
     const entries = kind === 'ABILITY' ? meta.fields.filter(field => field.key.startsWith('ability.')) : kind === 'SKILL' ? meta.skills : kind === 'SAVING_THROW' ? meta.saves : [];
     options(byId('manual-check-source'), entries.map(entry => entry.key), key => entries.find(entry => entry.key === key).name);
     byId('manual-check-source').disabled = kind === 'MANUAL';
@@ -840,12 +897,13 @@
     });
     options(byId('manual-item-source'), meta.items.map(item => item.key), key => meta.items.find(item => item.key === key).name);
   }
-  function addManualEffect(branch) {
-    const meta = manualCatalog(); if (!meta) return;
-    const parent = byId(`manual-${branch}-effects`);
-    if (parent.children.length >= 64) { message('每个检定分支最多设置 64 项后果。'); return; }
+  function addManualEffect(branch, draft = null) {
+    const meta = manualCatalog(); if (!meta || (draft && !meta.effectKinds.includes(draft.kind))) return;
+    const parent = manualEffectList(branch);
+    if (parent.children.length >= manualEffectLimit) { message('每个检定分支最多设置 64 项后果。'); return; }
     const row = document.createElement('fieldset'); row.className = 'manual-effect';
     const kind = control(row, '后果', 'kind', 'select'); options(kind, meta.effectKinds, key => effectNames[key] || key);
+    if (draft) kind.value = draft.kind;
     const body = document.createElement('div'); body.className = 'manual-effect-fields'; row.append(body);
     const actions = document.createElement('div'); actions.className = 'actions';
     for (const [label, operation] of [['上移', () => { if (row.previousElementSibling) parent.insertBefore(row, row.previousElementSibling); }],
@@ -853,35 +911,63 @@
       const button = text(actions, 'button', label); button.type = 'button'; button.addEventListener('click', operation);
     }
     row.append(actions); parent.append(row);
-    const rebuild = () => {
+    const rebuild = saved => {
       body.replaceChildren();
-      if (kind.value !== 'MESSAGE') { const target = control(body, '目标', 'targetId', 'select'); target.className = 'manual-effect-target'; target.required = true; }
+      if (kind.value !== 'MESSAGE') {
+        const target = control(body, '目标', 'targetId', 'select'); target.className = 'manual-effect-target'; target.required = true;
+        target.dataset.placeholder = '请选择目标';
+        target.addEventListener('change', () => { if (target.value) setManualEffectTargetStatus(target, false); });
+        refreshManualEffectTarget(target, kind.value, typeof saved?.targetId === 'string' ? saved.targetId : '', saved?.targetUnavailable === true);
+      }
       if (kind.value === 'HP') { const amount = control(body, '生命值变化（负数为伤害）', 'amount', 'number', '1'); amount.min = '-999'; amount.max = '999'; amount.required = true; }
       if (kind.value === 'GRANT_MODULE_ITEM') { const item = control(body, '目录物品', 'itemKey', 'select'); options(item, meta.items.map(item => item.key), key => meta.items.find(item => item.key === key).name); }
       if (kind.value === 'GRANT_TEMPORARY_ITEM') { control(body, '物品名称', 'name', 'text').required = true; control(body, '物品描述', 'description', 'text'); }
       if (['GRANT_MODULE_ITEM', 'GRANT_TEMPORARY_ITEM'].includes(kind.value)) { const quantity = control(body, '数量', 'quantity', 'number', '1'); quantity.min = '1'; quantity.max = '999'; quantity.required = true; }
       if (kind.value === 'MESSAGE') control(body, '消息', 'text', 'text').required = true;
-      refreshManualEffects();
+      if (saved) {
+        for (const input of body.querySelectorAll('[name]:not(.manual-effect-target)')) restoreManualCheckValue(input, saved[input.name]);
+      }
     };
-    kind.addEventListener('change', rebuild); rebuild();
+    kind.addEventListener('change', () => rebuild(null));
+    rebuild(draft);
+  }
+  function setManualEffectTargetStatus(target, unavailable) {
+    target.options[0].textContent = unavailable ? '目标已失效，请重新选择' : target.dataset.placeholder;
+    if (unavailable) target.setAttribute('aria-invalid', 'true');
+    else target.removeAttribute('aria-invalid');
+    target.setCustomValidity(unavailable ? '后果目标已失效，请重新选择。' : '');
+  }
+  function refreshManualEffectTarget(target, kind, selected = target.value, unavailable = target.getAttribute('aria-invalid') === 'true') {
+    const people = manualEffectTargets(kind).map(card => card.id);
+    const lostTarget = unavailable || (selected !== '' && !people.includes(selected));
+    options(target, people, personName);
+    target.value = lostTarget ? '' : selected;
+    setManualEffectTargetStatus(target, lostTarget);
   }
   function refreshManualEffects() {
-    if (!manualData()) return;
-    for (const row of document.querySelectorAll('.manual-effect')) {
-      const kind = row.querySelector('[name="kind"]').value, target = row.querySelector('[name="targetId"]'); if (!target) continue;
-      const people = (kind === 'HP' ? manualCards() : allPeople()).filter(card => card.active && inFocus(card.id));
-      options(target, people.map(card => card.id), personName);
+    for (const target of manualCheckForm.querySelectorAll('.manual-effect-target')) {
+      const kind = target.closest('.manual-effect').querySelector('[name="kind"]').value;
+      refreshManualEffectTarget(target, kind);
     }
   }
-  function readManualEffects(branch) {
-    const effects = Array.from(byId(`manual-${branch}-effects`).children, row => {
-      const value = name => row.querySelector(`[name="${name}"]`).value, kind = value('kind');
-      if (kind === 'HP') return {kind, targetId: value('targetId'), amount: value('amount')};
-      if (kind === 'GRANT_MODULE_ITEM') return {kind, targetId: value('targetId'), itemKey: value('itemKey'), quantity: value('quantity')};
-      if (kind === 'GRANT_TEMPORARY_ITEM') return {kind, targetId: value('targetId'), name: value('name'), description: value('description'), quantity: value('quantity')};
-      return {kind: 'MESSAGE', text: value('text')};
-    });
+  function manualEffectValues(row) {
+    const value = name => row.querySelector(`[name="${name}"]`).value;
+    const kind = value('kind');
+    if (kind === 'HP') return {kind, targetId: value('targetId'), amount: value('amount')};
+    if (kind === 'GRANT_MODULE_ITEM') return {kind, targetId: value('targetId'), itemKey: value('itemKey'), quantity: value('quantity')};
+    if (kind === 'GRANT_TEMPORARY_ITEM') return {kind, targetId: value('targetId'), name: value('name'), description: value('description'), quantity: value('quantity')};
+    if (kind === 'MESSAGE') return {kind, text: value('text')};
+    throw new Error('请重新选择后果类型。');
+  }
+  function readManualEffects(branch, versions) {
+    const effects = Array.from(manualEffectList(branch).children, manualEffectValues);
     if (effects.filter(effect => effect.kind === 'MESSAGE').length > 1) throw new Error('每个分支最多设置一条结果消息。');
+    for (const effect of effects) {
+      if (effect.kind === 'MESSAGE') continue;
+      const target = manualEffectTargets(effect.kind).find(card => card.id === effect.targetId);
+      if (!target) throw new Error('后果目标已失效，请重新选择。');
+      versions.set(target.id, String(target.version));
+    }
     return effects;
   }
   async function load(preferredFile = null) {
@@ -1316,15 +1402,13 @@
     if (item) { form.elements.name.value = item.name; form.elements.description.value = item.description; }
     form.elements.name.readOnly = Boolean(item); form.elements.description.readOnly = Boolean(item);
   });
-  byId('manual-check').elements.checkType.addEventListener('change', refreshManualCheck);
+  manualCheckForm.elements.checkType.addEventListener('change', refreshManualCheck);
   for (const button of document.querySelectorAll('[data-add-manual-effect]')) button.addEventListener('click', () => addManualEffect(button.dataset.addManualEffect));
   domainForm('manual-check', 'manual-check', (_, values) => {
-    const card = manualCards().find(card => card.id === values.characterId), success = readManualEffects('success'), failure = readManualEffects('failure');
-    const ids = [...new Set([...success, ...failure].filter(effect => effect.kind !== 'MESSAGE').map(effect => effect.targetId))].sort();
-    const targets = ids.map(id => {
-      const person = allPeople().find(card => card.id === id); if (!person) throw new Error('后果目标已经改变，请重新选择。');
-      return {characterId: id, version: String(person.version)};
-    });
+    const card = manualCards().find(card => card.id === values.characterId && eligibleForManualCheck(card));
+    const versions = new Map();
+    const success = readManualEffects('success', versions), failure = readManualEffects('failure', versions);
+    const targets = [...versions.keys()].sort().map(characterId => ({characterId, version: versions.get(characterId)}));
     return {...manualPayload(card), checkKind: values.checkType, key: values.checkType === 'MANUAL' ? null : values.modifierSource,
       manualName: values.checkType === 'MANUAL' ? values.manualName : null, manualModifier: values.checkType === 'MANUAL' ? values.manualModifier : null,
       rollMode: values.rollMode, dc: values.difficultyClass, targets, success, failure};
@@ -1403,7 +1487,10 @@
       event.preventDefault(); closeCampaignLog();
     }
   });
-  window.addEventListener('pagehide', () => closeCampaignLog(false));
+  window.addEventListener('pagehide', () => {
+    saveManualCheckDraft();
+    closeCampaignLog(false);
+  });
   for (const button of document.querySelectorAll('[data-pane]')) button.addEventListener('click', () => {
     for (const panel of document.querySelectorAll('[data-panel]')) panel.hidden = panel.dataset.panel !== button.dataset.pane;
     for (const tab of document.querySelectorAll('[data-pane]')) tab.setAttribute('aria-pressed', String(tab === button));

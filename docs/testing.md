@@ -601,6 +601,16 @@ Ctrl+C 仅停止这个隔离验证实例；未 END 的运行下次启动必须�
 可选浏览器自动验收使用独立安装的 Playwright/Chromium，浏览器环境需有中文字库；
 不向 Maven 或 WAR 加浏览器依赖。
 
+验证自由卡检定草稿时，用 `tools/storage/run-local.sh` 启动全新隔离存储根，再向浏览器脚本传入同一目录。
+
+```bash
+NODE_PATH=/absolute/browser-tools/node_modules \
+PLAYWRIGHT_BROWSERS_PATH=/absolute/browser-tools/browsers \
+node tools/storage/browser-manual-check-draft.cjs --fresh-root /absolute/disposable/storage-root
+```
+
+脚本在同一标签页保存并结束战役 A，再进入战役 B，核对 B 发出的检定请求中成功、失败两分支及目标版本。它也验证同一运行内同步状态、刷新页面、保存和连续检定会保留草稿，以及目标失效后必须重新选择才能提交。
+
 验证 DM 三栏工作台时，使用[玩家参与测试启动器](#玩家参与原型验证)和全新一次性私有根，以便左栏从真实玩家接口读取席位。待启动器就绪后，在另一终端使用同一根运行：
 
 ```bash
