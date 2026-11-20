@@ -21,8 +21,8 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 - 建立世界节点、路线及有界网格场景，显式入退场、旅行与切换唯一执行焦点；后台时钟、角色、效果与未决动作冻结；
 - 在[战役工作台](./docs/storage-vitality-loop.md#战役工作台)左栏管理规则库与玩家，中栏主持当前场景，右栏翻阅角色卡。
 - 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、唯一安置、简单物品、角色状态与消息根历史；
-- 管理独立的 DM-managed 自由卡、基础字段、职业等级和熟练，执行 MANUAL/SAVING_THROW、
-  有序检定效果，并在共享网格上使用 DM 裁定战斗和阵营；
+- 管理独立的 DM-managed 自由卡、基础字段、职业等级和熟练，为 MANUAL/SAVING_THROW 检定设置有序后果，
+  在同一运行内复用检定草稿，并在共享网格上使用 DM 裁定战斗和阵营。
 - 在一个 SQLite 事务提交完整领域后果、历史、版本与幂等结果；保存初始及当前完整 JSON，下载/上传导入、同版重开，显式恢复或精确放弃残留。
 
 标准规则直接取自 WAR 内四个准确原包。自定义组合可选用本机规则库里已导入、接受的内置或外部原包。组合最多八包，
@@ -129,7 +129,7 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 - SQLite 存储使用原生 Windows 本地 NTFS/私有 ACL，或 Linux/WSL 的 POSIX 私有文件系统；文件锁、硬链接及平台落盘边界见[配置](./docs/configuration.md#sqlite-当前应用存储配置)；
 - 支持现代 JavaScript 的本机浏览器。
 
-可直接使用发行版 `dnd-tool-se-0.2.0.war`。安装和首次启动见[快速开始](./docs/getting-started.md)。
+可直接使用发行版 `dnd-tool-se-0.2.1.war`。安装和首次启动见[快速开始](./docs/getting-started.md)。
 
 ## 构建与测试
 
@@ -142,7 +142,7 @@ mvn clean verify
 成功后生成：
 
 ```text
-target/dnd-tool-se-0.2.0.war
+target/dnd-tool-se-0.2.1.war
 ```
 
 构建必须以 Maven 最终退出码、测试总数以及 `BUILD SUCCESS` 为准。定向测试、完整验证、

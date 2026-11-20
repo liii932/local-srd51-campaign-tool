@@ -443,12 +443,12 @@ async function main() {
     await enterScene(page, action, adjudicationScene, [[manualIds[0], 0, 0, 0], [manualIds[1], 1, 0, 1], [pc.id, 2, 0, 0]]);
     await action('domain', () => form('domain-scene-mode').locator('button').click());
     await page.locator('[data-pane="manual"]').click();
+    assert.equal(await form('manual-success-effects').locator('fieldset').count(), 0, 'A new run must start with no success consequences');
+    assert.equal(await form('manual-failure-effects').locator('fieldset').count(), 0, 'A new run must start with no failure consequences');
     await form('manual-check').locator('[name="characterId"]').selectOption({label: '自由记录员'});
     await form('manual-check').locator('[name="checkType"]').selectOption('MANUAL');
     await form('manual-check').locator('[name="manualModifier"]').fill('0');
     await form('manual-check').locator('[name="difficultyClass"]').fill('0');
-    const previousEffects = form('manual-check').getByRole('button', {name: '删除后果', exact: true});
-    while (await previousEffects.count()) await previousEffects.first().click();
     async function manualEffect(branch, kind, values) {
       await page.locator(`[data-add-manual-effect="${branch}"]`).click();
       const row = page.locator(`#manual-${branch}-effects > fieldset`).last(); await row.locator('[name="kind"]').selectOption(kind);
