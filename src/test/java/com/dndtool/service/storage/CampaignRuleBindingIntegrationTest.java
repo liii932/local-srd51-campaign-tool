@@ -206,22 +206,8 @@ class CampaignRuleBindingIntegrationTest {
         }
     }
 
-    @Test void productionVariantMatchesAuthorBytesAndRejectsAnUnknownMechanism() throws Exception {
-        var artifact = BundledCampaignRules.artifacts(BundledCampaignRules.CHECK_VARIANT).getLast();
-        assertEquals(HOUSE, artifact.moduleKey());
-        assertEquals(VARIANT_RELEASE, artifact.releaseVersion());
-        Path source = Path.of("rule-packages", "srd51-runtime");
-        Path variant = source.resolve("dm-runtime-check-variant");
-        Map<String, byte[]> original = artifact.originalMembers();
-        assertEquals(Set.of("author-package.json", "changes.json", "rules.json", "README.md", "NOTICE"), original.keySet());
-        for (var entry : original.entrySet()) {
-            Path path = switch (entry.getKey()) {
-                case "NOTICE" -> source.resolve("notice.md");
-                case "README.md" -> variant.resolve("package-guide.md");
-                default -> variant.resolve(entry.getKey());
-            };
-            assertArrayEquals(Files.readAllBytes(path), entry.getValue(), entry.getKey());
-        }
+    @Test void artifactReaderRejectsAnUnknownMechanism() throws Exception {
+        var original = BundledCampaignRules.artifacts(BundledCampaignRules.CHECK_VARIANT).getLast().originalMembers();
         var altered = new TreeMap<>(original);
         String rules = new String(original.get("rules.json"), StandardCharsets.UTF_8);
         altered.put("rules.json", rules.replace("DIRECT_VITAL_EFFECT_V1", "UNKNOWN_VITAL_EFFECT").getBytes(StandardCharsets.UTF_8));

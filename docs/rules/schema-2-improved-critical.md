@@ -67,8 +67,5 @@ Shield 仍由真实命中开启候选窗口，反应只支付原有成本一次�
 规则库更新不修改活动战役。结束后可选择新组合新建，原文件仍要求其准确原组合和本机接受。
 不为旧应用版本添加兼容层，也不执行真实数据重置或迁移。
 
-`CampaignImprovedCriticalIntegrationTest` 通过原包、本机独立接受、有序预览、新建、
-正常成长与生产命令核验行为、失败边界和完整文件；隔离浏览器使用
-`tools/storage/browser-improved-critical.cjs`。共同攻击、反应、成长和规则绑定回归按
-[验证入口](../testing.md#improved-critical-verification)选择。
+模组授予条件使用标准组合的 `--case fighter-growth`。重击行为变化时补独立命中与伤害用例。需要观察 Host 表单时，用 `tools/storage/browser-improved-critical.cjs` 验收正常成长和实战结果。修改应用共同攻击、反应、成长或规则绑定时，按[验证入口](../testing.md#improved-critical-verification)选择相关测试。`CampaignImprovedCriticalIntegrationTest` 覆盖命令失败边界和完整文件恢复。
 该切片不改变行为设计报告 16 条原轨迹的完成状态。

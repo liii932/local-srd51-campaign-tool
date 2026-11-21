@@ -1,0 +1,41 @@
+{
+  "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules"],
+  "members": ["srd51_runtime@5", "srd51_characters@5", "srd51_magic@5", "dm_runtime_house_rules@9"],
+  "driver": "BundledSrd51Scenarios",
+  "cases": [
+    "initial-character",
+    "skill-check",
+    "fixed-damage",
+    "class-templates",
+    "fighter-growth",
+    "fighter-extra-attack",
+    "cleric-growth-limit",
+    "wizard-spellbook",
+    "equipment-profiles",
+    "plate-armor",
+    "weapon-damage",
+    "monster-breath-profile",
+    "rule-origins",
+    "wizard-evocation",
+    "burning-hands"
+  ],
+  "character": {
+    "characterClass": "fighter",
+    "background": "custom_artisan",
+    "hitPoints": 12,
+    "languages": ["srd51_runtime/language.common", "srd51_runtime/language.elvish", "srd51_runtime/language.dwarvish"],
+    "tools": ["srd51_runtime/tool.smith_tools"]
+  },
+  "skillCheck": {
+    "skill": "proficiency.skill.athletics",
+    "ability": "ability.strength",
+    "rejectedAbility": "ability.wisdom",
+    "d20": 10,
+    "dc": 14,
+    "abilityModifier": 2,
+    "proficiencyBonus": 2,
+    "total": 14,
+    "success": true
+  },
+  "damage": {"effect": "vital_effect.dm_damage", "amount": 6, "hitPointsAfter": 6}
+}

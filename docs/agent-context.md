@@ -18,7 +18,7 @@
 ## 任务路由（只选相关行）
 
 下表 Java 入口相对 `src/main/java/com/dndtool/`。测试从 `src/test/java/com/dndtool/` 下的
-同包同名 `*Test.java` 开始；没有同名测试时按表中测试族搜索。路径是搜索起点，不是要全部读取的清单。
+同包同名 `*Test.java` 开始。没有同名测试时按表中测试族搜索。模组作者按内容选择[独立行为场景](../rule-packages/srd51-runtime/scenarios/README.md)。
 表中运行 V019—V042、来源迁移与 INTERNAL 说明指原 MySQL 服务；当前 SQLite 路线由
 独立聚合/事务复用这些纯规则，不能把旧 Host 关闭门误套到新有限入口。
 
@@ -63,7 +63,7 @@
 | SQLite 当前有限战役、角色/冒险/战斗、完整文件与同版恢复 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md)、[测试入口](testing.md#sqlite-结构完整文件与运行验收) | `HostStorageServlet` / `StorageApplicationListener`（配置与 readiness）；`CampaignStorageService` / `ManagedCampaignFiles`（准备前缀、Windows NTFS/ACL）、`CampaignDomainCommands`、`CampaignDomainEngine`、`CampaignDomainData/Codec/Validation`、`CampaignDomainRepository`；领域、生命周期、准备、Windows/进程故障测试。SQLite 是唯一 Web 运行库，`DND_STORAGE_ROOT` 覆盖默认存储根。 |
 | SQLite 检定成功/失败分支、健康/物品/消息后果 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md) | `service/storage/CampaignCheckEffects.java`、`CampaignDomainCommands.java`；`CampaignCheckEffectsTest`；两分支全部预检后再骰，同根事务和完整文件，不接受任意算法 |
 | SQLite DM-managed 自由卡、基础字段、职业等级/熟练、MANUAL/SAVING_THROW 与共享网格 | [运行合同](storage-vitality-loop.md)、[领域接合表](design/v2/domain-integration.md) | `service/storage/CampaignManualData.java`、`CampaignManualCommands.java`、`CampaignDomainCommands.java`；Host UI 与 `CampaignManualIntegrationTest` 覆盖有序效果、回滚、完整文件与混合网格。DM 裁定与自动规则分别校验。[自由卡检定草稿浏览器回归](../tools/storage/browser-manual-check-draft.cjs) |
-| 有限生产 schema 2 组合、初始化模板、目录与限制 | [规则包指南](../rule-packages/srd51-runtime/package-guide.md)、[领域接合表](design/v2/domain-integration.md) | `BundledCampaignRules` 提供交付原包候选，`CampaignRuleSupport` 检查应用执行范围，`CampaignRuleContext` 提供初始化与绑定投影，`Material` 保存解释合同、准确绑定与完整行链。测试见 `BundledCampaignRulesTest`、`CampaignRuleSupportTest`、`CampaignRuleContextTest` |
+| 有限生产 schema 2 组合、初始化模板、目录与限制 | [规则包指南](../rule-packages/srd51-runtime/package-guide.md)、[领域接合表](design/v2/domain-integration.md) | `BundledCampaignRules` 提供交付原包候选，`CampaignRuleSupport` 检查应用执行范围，`CampaignRuleContext` 提供初始化与绑定投影，`Material` 保存解释合同、准确绑定与完整行链。作者行为用 `tools/rule-packages/verify-module-scenario.py`。应用冻结读回、支持门与上下文见 `BundledCampaignRulesTest`、`CampaignRuleSupportTest`、`CampaignRuleContextTest` |
 | v2 完整战役文件、运行空间与生命周期 | [规则存储](design/v2/rule-storage-and-versioning.md)、[完整文件](design/v2/save-and-recovery.md)、[生命周期](design/v2/runtime-and-transactions.md)、[领域接合表](design/v2/domain-integration.md) | `CampaignCodec`、`CampaignStorageService`、`CampaignDomainValidation`。本机 `RULE_BOUND_CAMPAIGN` format 3 保存完整冻结规则与业务聚合，接合 P0—P3、END 和显式恢复/放弃。周期 AUTO/轮换、通用 SRD MySQL archive format 2 独立验收 |
 | v2 JSON 建表、存储数据覆盖与替换步骤 | [结构声明与计划](design/v2/storage-schema-and-planning.md)、[数据映射](design/v2/storage-data-map-and-rollout.md)、[领域接合表](design/v2/domain-integration.md) | `resources/storage/campaign-schema.json`、`StorageSchemaCatalog`、`StoragePlan`、`SqliteSchemaVerifier`、`CampaignDomainRepository`；结构/投影/聚合与未来写入足迹共同验证；旧模式保管和剩余采用不由声明存在推定 |
 | 规则目录、canonical、hash、发布身份 | [冻结 v1](rules/srd-5.1.md) §2/§11；[v2 目录](rules/character-catalog-v2.md) | `module/ModuleCatalog.java`、`module/BuiltinModuleReleaseRegistry.java`、`module/ModuleCanonicalEncoderV1.java` / `module/ModuleCanonicalEncoderV2.java` |

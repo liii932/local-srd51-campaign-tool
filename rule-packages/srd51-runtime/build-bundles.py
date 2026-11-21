@@ -34,13 +34,19 @@ def archive(directory: Path, notice: bytes, guide: bytes) -> bytes:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--output-dir", type=Path, help="write candidate bundles to a separate directory")
+    parser.add_argument("packages", nargs="*", metavar="PACKAGE", help="package directory names (default: all)")
     args = parser.parse_args()
+    selected = args.packages or PACKAGES
+    for name in selected:
+        if name not in PACKAGES:
+            parser.error(f"Unknown package: {name}")
     source = Path(__file__).resolve().parent
-    output = source.parent.parent / "src/main/resources/storage/rules"
+    output = args.output_dir or source.parent.parent / "src/main/resources/storage/rules"
     notice = (source / "notice.md").read_bytes()
     if not args.check:
         output.mkdir(parents=True, exist_ok=True)
-    for name in PACKAGES:
+    for name in selected:
         directory = source / name
         guide = directory / "package-guide.md"
         if not guide.is_file():
@@ -53,7 +59,7 @@ def main() -> None:
             raise SystemExit("Bundled resource differs from author source: " + str(target))
         target.write_bytes(expected)
     action = "Verified" if args.check else "Built"
-    print(f"{action} {len(PACKAGES)} deterministic rule bundles")
+    print(f"{action} {len(selected)} deterministic rule bundles")
 
 
 if __name__ == "__main__":

@@ -83,7 +83,7 @@ V041 增加 `s2_character_arcane_recovery_choice` 的类型化环级/数量子�
 | 12 保存恢复 | 原 MySQL INTERNAL 角色历史及同准确快照的直接恢复；SQLite 完整文件保留选择、位数、使用日及根/子历史，不重新发放收益；不宣称 archive format 2 可用。 |
 | 13 技术 END/清理 | 不产生新的持续过程；未完成短休/生命骰窗口如实保存。SQLite 使用共同 FINAL/封存与文件清理，MySQL INTERNAL 子表仍遵守独立迁移与清理边界。 |
 | 14 容量 | 角色预算计入全部不可变选择子行，每日事实随前后状态保存；不截断或删除历史腾空间。 |
-| 15 验证 | 原规则、运行服务及 schema 测试，加 `CampaignArcaneRecoveryIntegrationTest` 和浏览器主用例，覆盖边界、幂等、事务回滚、跨日与完整文件重开。 |
+| 15 验证 | 模组恢复声明变化时补独立场景验证实际选择和跨日表现。浏览器主用例另验收 Host 的短休表单。应用规则、恢复状态和事务按影响选运行服务、schema 或 `CampaignArcaneRecoveryIntegrationTest`，覆盖幂等、回滚与完整文件重开。 |
 | 16 入口 | SQLite 成长与休息表单及受保护的角色领域命令；原 MySQL 保留内部角色 Service。活动战斗/探索仍由原 owner 锁定，不接受客户端自由日期。 |
 | 17 合同同步 | 本合同与共享角色/施法、SQLite 运行及领域接合入口一起维护。 |
 

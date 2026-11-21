@@ -1,0 +1,24 @@
+{
+  "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-check-variant"],
+  "members": ["srd51_runtime@5", "srd51_characters@5", "srd51_magic@5", "dm_runtime_house_rules@10"],
+  "cases": ["initial-character", "skill-check", "fixed-damage"],
+  "character": {
+    "characterClass": "fighter",
+    "background": "custom_artisan",
+    "hitPoints": 12,
+    "languages": ["srd51_runtime/language.common", "srd51_runtime/language.elvish", "srd51_runtime/language.gnomish"],
+    "tools": ["srd51_runtime/tool.smith_tools"]
+  },
+  "skillCheck": {
+    "skill": "proficiency.skill.athletics",
+    "ability": "ability.wisdom",
+    "rejectedAbility": "ability.strength",
+    "d20": 10,
+    "dc": 14,
+    "abilityModifier": 1,
+    "proficiencyBonus": 2,
+    "total": 13,
+    "success": false
+  },
+  "damage": {"effect": "vital_effect.dm_damage", "amount": 3, "hitPointsAfter": 9}
+}

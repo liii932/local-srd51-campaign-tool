@@ -8,6 +8,8 @@ import com.dndtool.service.Schema2CombatRuntimeService.*;
 import com.dndtool.service.Schema2CombatRuntimeService.Status;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.testing.IsolatedJvmTest;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
@@ -182,6 +184,7 @@ class Schema2CombatRuntimeServiceTest {
     }
 
     static final class Fixture {
+        private static final byte[] AFTER_PHASE = "AFTER".getBytes(StandardCharsets.US_ASCII);
         final UUID a=UUID.fromString("10000000-0000-4000-8000-000000000001"),b=UUID.fromString("20000000-0000-4000-8000-000000000002");
         final UUID campaign=UUID.fromString("30000000-0000-4000-8000-000000000003"),combat=UUID.fromString("40000000-0000-4000-8000-000000000004");
         final ProductionSchema2Projection material;
@@ -226,7 +229,7 @@ class Schema2CombatRuntimeServiceTest {
                     var created=characterService.execute(new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),identity,campaign,character,preparation,binding,-1,initial,fullAbilities()));
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,created.status(),created.code());
                     UUID item=stable(ordinal,4); items.put(character,item);
-                    var acquired=new Schema2CharacterRuntimeService.Request(item,identity,campaign,character,preparation,binding,character(character).version(),equipment("ITEM_ACQUIRED",item,ITEM_WEAPON,"CARRIED"),Map.of());
+                    var acquired=new Schema2CharacterRuntimeService.Request(item,identity,campaign,character,preparation,binding,created.event().after().version(),equipment("ITEM_ACQUIRED",item,ITEM_WEAPON,"CARRIED"),Map.of());
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,characterService.execute(acquired).status());
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,characterService.execute(characterRequest(character,equipment("ITEM_EQUIPPED",item,null,"MAIN_HAND"))).status());
                 } else items.put(character,stable(ordinal,4));
@@ -234,12 +237,23 @@ class Schema2CombatRuntimeServiceTest {
         }
         static UUID stable(int ordinal,int kind) { return UUID.fromString(String.format("50000000-0000-4000-8000-%012d",ordinal*10+kind)); }
         Schema2CharacterRuntime.State character(UUID id)throws Exception{return characterService.read(id).current();}
+        // Request setup only needs the latest persisted version. Explicit reads still validate the complete history.
+        private long characterVersion(UUID id) {
+            byte[] characterId = ByteBuffer.allocate(16).putLong(id.getMostSignificantBits())
+                    .putLong(id.getLeastSignificantBits()).array();
+            var latest = runtime.tables.getOrDefault("s2_character_event_state", List.of()).stream()
+                    .filter(row -> Arrays.equals(characterId, (byte[]) row.get("character_id"))
+                            && Arrays.equals(AFTER_PHASE, (byte[]) row.get("phase")))
+                    .max(Comparator.comparingLong(row -> ((Number) row.get("event_sequence")).longValue()))
+                    .orElseThrow(() -> new AssertionError("Missing persisted character state for " + id));
+            return ((Number) latest.get("row_version")).longValue();
+        }
         Schema2CharacterRuntimeService.Request characterRequest(UUID id,Schema2CharacterRuntime.Command command)throws Exception {
             Member m=members.stream().filter(x->x.characterId().equals(id)).findFirst().orElseThrow();
-            return new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),m.identity(),campaign,id,m.preparationOperationId(),binding,character(id).version(),command,Map.of());
+            return new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),m.identity(),campaign,id,m.preparationOperationId(),binding,characterVersion(id),command,Map.of());
         }
         Request request(Command command)throws Exception {
-            Map<UUID,Long> versions=new LinkedHashMap<>(); for(Member m:members)versions.put(m.characterId(),character(m.characterId()).version());
+            Map<UUID,Long> versions=new LinkedHashMap<>(); for(Member m:members)versions.put(m.characterId(),characterVersion(m.characterId()));
             return new Request(UUID.randomUUID(),combat,campaign,binding,members,battle==null?-1:battle.version(),versions,command);
         }
         Result commit(Command command)throws Exception{return commit(request(command));}
