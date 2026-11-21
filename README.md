@@ -133,23 +133,18 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 
 ## 构建与测试
 
-在仓库根目录执行：
+从源码生成应用 WAR 可在仓库根目录运行 `mvn -DskipTests package`，产物为
+`target/dnd-tool-se-0.2.1.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
+JUnit 用例，例如启动逻辑用 `mvn '-Dtest=StorageApplicationListenerTest' test`。
 
-```powershell
-mvn clean verify
+规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
+
+```sh
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.2.1.war \
+  --case weapon-damage rule-packages/srd51-runtime/scenarios/standard.json
 ```
 
-成功后生成：
-
-```text
-target/dnd-tool-se-0.2.1.war
-```
-
-构建必须以 Maven 最终退出码、测试总数以及 `BUILD SUCCESS` 为准。定向测试、完整验证、
-WAR 审计与手工验收方法见[测试指南](./docs/testing.md)。
-
-需要运行真实 JDBC 集成测试时，必须使用独立、一次性的可写测试库；普通 `mvn clean verify`
-不会连接本机业务库。准备和显式启用方法也在[测试指南](./docs/testing.md)中。
+开发中的模组可单独构建候选 ZIP 并传给同一入口，见[模组场景指南](./rule-packages/srd51-runtime/scenarios/README.md)。独立 MySQL 测试库的启用条件和 WAR 审计见[测试指南](./docs/testing.md)。
 
 ## 数据库与部署
 
@@ -235,7 +230,7 @@ tracks semantic drafting and source review separately from implementation.
 | [配置](./docs/configuration.md) | SQLite 存储根、Tomcat 运行身份与可选玩家 HTTPS Connector |
 | [数据库](./docs/database.md) | SQLite 工作库与独立 MySQL 迁移、核验及账号职责 |
 | [安全](./docs/security.md) | 请求边界、权威输入、最小权限与秘密处理 |
-| [测试](./docs/testing.md) | 定向测试、完整验证、集成测试和 WAR 审计 |
+| [测试](./docs/testing.md) | 应用定向测试、独立模组场景、集成测试和 WAR 审计 |
 | [公开仓库发布检查清单](./docs/public-release-checklist.md) | 私有迁移仓库公开前的内容审计与 GitHub 设置确认 |
 | [部署](./docs/deployment.md) | 可回滚的 Tomcat 根上下文部署与验收 |
 | [备份与恢复](./docs/backup-and-restore.md) | 应用存档和数据库级恢复边界 |
@@ -253,6 +248,6 @@ tracks semantic drafting and source review separately from implementation.
 
 - 按完整 SRD 5.1 目标做最小领域切片，并准确区分当前行为与目标行为；
 - 不修改已经应用的编号迁移，应新增下一条前向迁移；
-- 先运行相关定向测试，再按变更风险运行完整验证；
+- 模组改动运行对应作者场景，应用改动验证受影响的机制及调用方；
 - 生产代码或资源变化时审计生成的 WAR；
 - 不提交构建产物、数据库秘密、Tomcat 外部配置、日志、备份或真实存档。

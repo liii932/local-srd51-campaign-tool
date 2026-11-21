@@ -83,9 +83,5 @@ MySQL INTERNAL 入口及其局部历史恢复对本命令明确拒绝，现有�
 规则库变更不修改活动战役；结束后另选组合新建，打开已有文件仍核其准确成员和本机接受。
 不加入旧格式默认值、兼容 reader 或真实数据重置步骤。
 
-真实取得、生产命令、事务及保存恢复见 `CampaignSecondWindIntegrationTest`；
-Host 表单由 `tools/storage/browser-second-wind.cjs` 验证。
-`PlayerSecondWindCandidateTest` 从邀请、审批、控制与接管进入玩家候选，验证本人回合执行、
-拒绝客户端骰点/成本、使用后候选消失及原回执查证。
-定向规则、组合、休息、历史和共享消费者按[测试入口](../testing.md#second-wind-verification)选择。
+一级授予与初始资源使用标准组合的 `--case class-templates`。治疗与休息声明改动时补独立结算场景。需要观察 Host 回气表单时在隔离应用运行 `tools/storage/browser-second-wind.cjs`。应用事务与保存恢复变化选择 `CampaignSecondWindIntegrationTest`。玩家候选或回执变化时选 `PlayerSecondWindCandidateTest`，检查本人回合执行、拒绝客户端骰点/成本、使用后候选消失及原回执查证。组合、休息、历史和共享消费者按[测试入口](../testing.md#second-wind-verification)选择。
 本切片不改变行为接口报告 16 条原轨迹的结论，也不证明其他治疗特性或通用附赠动作完成。

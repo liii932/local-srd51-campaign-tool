@@ -1,10 +1,21 @@
 # 测试指南
 
-测试分为聚焦单元/边界测试、完整 Maven 回归、显式 MySQL 集成测试、WAR 审计和必要的手工 HTTP/UI 验收。仓库文档记录可重复方法；某次运行的动态计数和哈希应留在 CI 或发布记录中。
+默认选择覆盖本次差量的最小充分验证。模组内容和可见行为使用独立工具，应用代码按受影响边界选择 Maven 定向测试。WAR 审计、真实平台和显式 MySQL 验收有各自的证据。仓库文档记录可重复方法，每次运行的计数和哈希留在验证或发布记录。
 
 ## 1. 聚焦测试
 
-默认只运行覆盖本次变化的最小充分测试集合。先检查本次任务的 diff、调用方、共用规则与资源引用，再选择相关测试类，不只按同名类匹配。执行前简述范围和理由，例如：
+先检查本次 diff、调用方、共享边界和资源引用，再选择相关证据：
+
+| 改动 | 验证 |
+|---|---|
+| 模组作者声明、目录、数值、授予、覆盖或模组行为用例 | [模组作者向量与成品行为](#模组作者向量与成品行为)。用非 Maven 工具校验实际交付内容和受影响的可见行为。 |
+| 应用机制、加载/解释、命令、权威状态、事务、持久化或 Web 边界 | 选择受影响的 JUnit 机制、调用方和失败边界，使用 `-Dtest` 定向运行。 |
+| 新增或修改应用机制，同时交付模组内容或改变其可见行为 | 应用机制及接入使用定向 JUnit，作者声明和成品表现使用独立模组验证。两边各自保留证据。 |
+| 纯文档或 skill | 核对内容、链接和格式。 |
+
+运行模组相关的应用 JUnit 用例用 [Surefire 专用夹具](../src/test/fixtures/application-rules/storage/rules) 固定输入，独立验证解释、冻结、事务和恢复。作者发布新 ZIP 时只更新交付包和相应作者场景。只有应用用例的输入合同改变时才维护夹具。浏览器启动器和 WAR 使用 `src/main/resources/storage/rules/` 中的交付包。
+
+例如，检定事务及其仓储改动可以选择：
 
 ```bash
 mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
@@ -16,9 +27,9 @@ mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 仍可导入。设计替换时同步改写或移除只固定旧模型的测试，保留当前有效的安全、事务和失败路径
 覆盖；既有测试通过或历史批准不能单独证明该设计应继续保留。
 
-纯文档或 skill 变化只检查内容、链接和格式，不运行 Maven；只确认生产代码可编译时使用 `mvn compile`。定向 `test` 已含前置编译阶段，不需要机械重复 `compile`。保留无匹配测试的失败行为，不用 `failIfNoTests=false` 或 `surefire.failIfNoSpecifiedTests=false` 隐藏选错测试。
+只确认生产代码可编译时使用 `mvn compile`。定向 `test` 已含前置编译阶段，不需要机械重复 `compile`。保留无匹配测试的失败行为，不用 `failIfNoTests=false` 或 `surefire.failIfNoSpecifiedTests=false` 隐藏选错测试。
 
-只有需要制品时才运行 `package`：相关测试尚未运行时用 `mvn '-Dtest=实际相关测试类' package`；相同代码、资源、依赖和配置已有本次定向通过证据时，可用 `mvn -DskipTests package`，并明确这是跳过测试的打包。生产代码或打包资源变化仍按第 6 节审计 WAR，不能把打包当作全量通过。
+需要制品且应用测试待执行时，可用 `mvn '-Dtest=实际相关测试类' package`。已有同输入的应用测试证据，或本次仅改模组内容并已选择独立模组验证时，使用 `mvn -DskipTests package` 并记录为跳过测试的打包。生产代码或打包资源变化仍按第 6 节审计 WAR。部署的干净构建按[部署指南](deployment.md#1-构建候选)处理。
 
 `-Dtest` 仅约束 Surefire。使用 `verify`、profile 或多模块 reactor 前检查 POM 及插件绑定，不能据此假定 Failsafe、其他插件或所有模块均已缩小范围。MySQL 集成测试仍按第 3 节单独授权和选择目标。
 
@@ -26,10 +37,10 @@ mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 
 当前工作台的启动、规则绑定、完整文件与就绪测试见[SQLite 结构、完整文件与运行验收](#sqlite-结构完整文件与运行验收)。
 
-维护旧 MySQL 目录或诊断代码时，按变更选择固定 canonical/hash 向量、目录 JDBC、发布门和单池诊断测试。
+维护旧 MySQL 应用目录或诊断代码时，按变更选择 canonical/hash 实现、目录 JDBC、发布门或单池诊断测试。下面以单池诊断为例：
 
 ```bash
-mvn '-Dtest=ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,ModuleContentHasherTest,BuiltinModuleHashManifestTest,BuiltinModuleReleaseRegistryTest,JdbcModuleCatalogRepositoryTest,ModuleIntegrityServiceTest,SchemaMigrationsTest,DatabaseSchemaVerifierTest,DatabaseDiagnosticsTest,DatabaseDiagnosticsFactoryTest,HostDatabaseDiagnosticServletTest,CampaignArchiveCapabilityBoundaryTest' test
+mvn '-Dtest=DatabaseDiagnosticsTest,DatabaseDiagnosticsFactoryTest,HostDatabaseDiagnosticServletTest' test
 ```
 
 再按实际调用方加入受影响的旧角色、检定、存档、规则浏览和语言投影消费者。旧诊断测试覆盖
@@ -50,24 +61,49 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest,StorageHttpIntegrationTest' test
 及容器提供的 Servlet API 不得进入生产 WAR；更新这些依赖不会升级外部 Tomcat 实例，
 外部容器仍按[部署指南](deployment.md)独立维护。
 
-## 2. 必要时的完整验证
+### 模组作者向量与成品行为
 
-不默认执行裸 `mvn test`、`mvn verify` 或 `mvn clean verify`。只有用户明确要求，当前发布/部署/合并检查点明确要求，或已确认跨模块/共用核心影响且定向覆盖不足时，才运行全量。执行前说明具体影响和覆盖缺口；文件数量、路径、JSP/CSS/资源变化或任务收尾本身不是触发理由。
-
-全量范围和 `clean` 分开判断。通常全量使用 `mvn verify`；有残留产物证据、删除/重命名可能遗留旧产物，或需要可重复的干净候选时才加 `clean`。发布/部署仍遵守[部署指南](deployment.md)要求的干净构建：
+作者检查以实际声明、原 ZIP、组合和独立期望为输入。受影响的用例应记录准确模组版本和组合顺序、来源与覆盖、正负例及预期。以下命令逐字节比较作者源生成的 ZIP 和仓库中待打包的 ZIP：
 
 ```bash
-mvn clean verify
+python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```
 
-所有验证报告必须来自已结束的进程，列出实际命令、退出码、测试总数、失败、错误、跳过和最终 `BUILD SUCCESS`/失败，以及未运行范围。不要从截断或仍在运行的输出宣称成功，不将定向通过、零测试或跳过测试表述成全量通过。
+可运行模组使用一份兼容的现有 WAR、Python 3 和 JDK 21+。从仓库根构建本次家规候选，运行定额伤害和运动检定两个用例：
+
+```bash
+candidates="$(mktemp -d)"
+python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.2.1.war \
+  --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
+  --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
+  rule-packages/srd51-runtime/scenarios/check-variant.json
+```
+
+按断言选 `--case`，同一组合的多个 ID 可在一个命令中重复传入，省略时执行整张清单。一批只解包、编译驱动、启动引擎 JVM 和组合一次。每项使用独立的角色或战斗状态。核对输出的有序成员、候选绝对路径和原 ZIP SHA-256。`@名称` 从 WAR 读取依赖。整个模组验证链路只调用 Python 和 JDK。若同时改了应用机制，先定向验证应用并单独构建新 WAR，再将该 WAR 传给模组入口。单项巨剑结算、新增用例及同版本错误候选的复现命令见[场景指南](../rule-packages/srd51-runtime/scenarios/README.md)。
+
+定位慢操作时，先读已有 `target/surefire-reports/TEST-*.xml` 中各 `testcase` 的 `time`，再对照该方法和共享夹具。定额伤害从合法初始状态结算，职业授予经过相应升级。应用战斗事务测试组装请求可读取夹具里的当前版本，命令提交、故障回滚、损坏拒绝及保存恢复仍走实际服务并显式读回。历史耗时只用于选择用例；测量整条命令可用 `time`，单项通过耗时另看场景输出或 Surefire 报告。
+
+需要核对真实表单、玩家候选或完整文件恢复时，在已启动的隔离应用上选用下文的浏览器脚本或可重复的人工场景。记录实际组合、步骤、断言和结果。模组验证使用独立工具，应用编译和 WAR 打包是单独步骤。
+
+## 2. 必要时的完整验证
+
+只有用户明确要求全量应用回归时才执行完整 Maven 套件。共用机制或跨域契约变化时，列出受影响的具体应用责任和覆盖缺口，补选对应测试组。发布、部署、合并、候选打包及任务收尾都按改动选择相关验证。
+
+用户要求全量时使用下列命令。`clean` 独立判断，有旧产物残留风险或需要干净候选时才使用。
+
+```bash
+mvn verify
+```
+
+Maven 验证记录实际命令、最终退出码、测试总数、失败、错误与跳过数。模组验证记录候选包、使用的 WAR（如适用）、实际运行的场景和结果。不要从截断或仍在运行的输出宣称成功，不将定向通过、零测试或跳过测试表述成全量通过。
 
 全量运行中断或修正局部失败后，可保留本次已完成、输入未受影响的通过报告，只补跑失败、
 未完成及修改影响的测试。逐类核对合并覆盖与跳过原因，分别报告原命令和补跑结果；不能把
 它描述成一次全量命令通过。需要更换构建目录时复制当前源码和资源，保持相对目录结构，
 在无旧产物的目录构建候选；不要复制秘密、真实数据或旧 `target`。
 
-普通 `clean verify` 不应写入业务数据库。数据库相关单元测试使用 mock、临时结构或静态 SQL 检查。
+普通 Maven 构建的数据库相关测试使用 mock、临时结构或静态 SQL 检查。真实数据库按第 3 节独立授权。
 
 ## 3. MySQL 集成测试
 
@@ -531,9 +567,7 @@ WAR 审计通过不代表已经部署。
 并核对标准存档可在空规则库的存储根打开且无接受写入。自定义组合测试覆盖移机时缺少原包、
 已导入但未接受、准确接受后的打开。结构与真实 SQLite 的定向入口是
 `StorageSchemaCatalogTest`、`SqliteSchemaTest`；业务/生命周期见 `CampaignStorageServiceTest`、
-`CampaignStorageLifecycleTest`。`BundledCampaignRulesTest` 核验常规组合的四包、精确数字、可执行初始化
-与基础/施法预检。`CampaignRuleBindingIntegrationTest` 核验两个组合各自的候选属性、角色初始授予、来源链与真实分支结算，
-并经完整文件重开及残留恢复核对原骰、状态和根子历史。它还覆盖未知机制、错绑材料、坏未选分支、版本拒绝、
+`CampaignStorageLifecycleTest`。标准和家规的组合、候选属性、角色初始授予和检定分支使用[独立成品场景](#模组作者向量与成品行为)。改动运行绑定或恢复时，`CampaignRuleBindingIntegrationTest` 经完整文件重开及残留恢复核对原骰、状态和根子历史，并覆盖未知机制、错绑材料、坏未选分支、版本拒绝、
 晚写回滚和提交未知后的幂等重放；外部第五包改变真实检定与伤害，并覆盖缺库活动/恢复、
 移机打开缺原包/未接受拒绝与准确接受后的重开。`LocalRuleLibraryTest` 使用临时真实 SQLite
 核验导入/接受分离、原字节身份、幂等冲突、发布中断、提交未知、重启查证和坏材料阻断。
@@ -570,12 +604,13 @@ Windows 通过。`CampaignArcaneRecoveryIntegrationTest` 覆盖短休资格、�
 `'-DargLine=-Djava.io.tmpdir=/absolute/test-temp'`（目录须已存在），保留目录保护，
 不删除未知标记或改动真实仓库。已有 `argLine` 选项须合并保留。
 
+例如，仅改规则库接受和冻结绑定时可选：
+
 ```bash
-python3 rule-packages/srd51-runtime/build-bundles.py --check
-mvn '-Dtest=LocalRuleLibraryTest,CampaignRuleSupportTest,CampaignRuleContextTest,BundledCampaignRulesTest,CampaignRuleBindingIntegrationTest,CampaignDomainEngineTest,CampaignCheckEffectsTest,CampaignManualIntegrationTest,CampaignDomainRootValidationTest,CampaignDomainRecoveryTest,CampaignDomainsIntegrationTest,CampaignDomainsCombatIntegrationTest,CampaignStorageLifecycleTest,StorageSchemaCatalogTest,SqliteSchemaTest,CampaignStorageServiceTest,CampaignCodecTest,CampaignFileVectorTest,CampaignStorageCrashTest,StorageHttpIntegrationTest,StorageRequestDigestTest,HostBoundaryFilterTest,HostRequestSecurityFilterTest,HostHomeServletTest,ProtectedHostCommandEntryTest' test
+mvn '-Dtest=LocalRuleLibraryTest,CampaignRuleBindingIntegrationTest' test
 ```
 
-人工执行同一入口（Linux/WSL、Java 21+、Maven，8080 必须空闲）：
+需要已启动的隔离应用供人工或浏览器验收时，可以准备本地实例（Linux/WSL、Java 21+，8080 必须空闲）。这个准备命令用 Maven 构建启动 classpath；已有候选实例可直接运行浏览器工具：
 
 ```bash
 storage_test_root="$(mktemp -d /var/tmp/dnd-storage-XXXXXX)"
@@ -699,8 +734,7 @@ db/journal、保存文件或本地根。浏览器、真实 SQLite/HTTP、纯规�
   离线写入类、真实 DB/journal/档案、配置秘密和本地材料进入 WAR；审计字节数、SHA-256、
   条目数、必需/禁止文件及资源内容。
 
-默认按改动及共享依赖运行定向测试。完整 Host 切换改变全部持久化和事务路径，是需要
-完整回归的检查点；真实文件系统耐久/进程中断验收独立执行，不能以单元测试通过替代。
+默认按改动及共享依赖运行定向测试。Host 切换按实际改变的持久化与事务路径选择测试。具体跨域覆盖缺口按第 2 节补选受影响的应用组。真实文件系统耐久/进程中断验收独立执行。
 现行 MySQL 数据库验收仍按第 3、4 节及其独立授权边界执行。
 
 ### 原生 Windows 外部 Tomcat 候选验收
@@ -786,8 +820,7 @@ Linux/WSL 执行，不要求迁移到 Windows。
 mvn '-Dtest=CampaignParticipationIntegrationTest,PlayerGatewayServiceTest,PlayerParticipationAcceptanceTest,PlayerProjectionAndCandidatesTest,PlayerBoundaryFilterTest,PlayerHttpIntegrationTest' test
 ```
 
-修改领域根或结构时，另外选择受影响的现有领域、codec、存储恢复及 schema 测试；不因
-有玩家页面而默认全量；正式候选仍须满足[部署完整回归门](deployment.md#1-构建候选)。
+修改领域根或结构时，另外选择受影响的领域、codec、存储恢复及 schema 测试。正式候选按[部署指南](deployment.md#1-构建候选)构建并审计。
 `PlayerHttpIntegrationTest` 创建一次性带 loopback IP SAN 的证书，
 测试客户端仅信任该证书，并验证默认客户端拒绝它；需要 JDK `keytool` 及空闲 8080/8443。
 已通过集合不为收尾重复执行；打包复用本次有效证据并审计 WAR。
@@ -846,7 +879,7 @@ WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边
 
 ## 7. 手工验收
 
-只有可达路由、UI 或客户端 JavaScript 变化时才需要浏览器验收。按[部署指南](deployment.md#5-启动与验收)
+可达路由、UI 或客户端 JavaScript 变化，以及需要通过真实表单观察的模组表现，选择相关浏览器用例。按[部署指南](deployment.md#5-启动与验收)
 检查 `/health`、`/` 与 `/host` 转到 `/host/storage`、SQLite 就绪、安全头和请求边界。
 真实业务写入必须单独授权并具备可验证恢复方案。
 
@@ -858,87 +891,59 @@ WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边
 
 ## 战士 Extra Attack 的真实链路验证
 
-先运行 `StorageHttpIntegrationTest,CampaignRuleBindingIntegrationTest,LocalRuleLibraryTest`，
-核验同一服务的原包导入、独立接受、有序预览、新建、显式保存、结束和重新打开。
-活动中导入接受另一组合不能改变已冻结战役；结束后可用新组合新建，再打开原文件恢复
-原准确组合。新制品版本不能覆盖本机已接受的同版本材料，测试不清理真实规则库。
-
-`CampaignExtraAttackIntegrationTest` 使用交付原包经真实规则库选择，正常创建与升级，
-通过 `CampaignStorageService`、真实临时 SQLite 和完整文件验证 4/5/6 级攻击额度。
-覆盖一次动作成本、第三击拒绝、击间移动/OA/换目标、放弃、Ready 单击、玩家候选、
-首击保存/END/重开、装备/检定/受伤/治疗，以及非法、过期、重复、坏文件和晚写回滚。
-能力作者/组合与共同校验的定向测试见[机制合同](rules/schema-2-extra-attack.md)。
-
-浏览器验收在全新隔离根启动 `tools/storage/run-local.sh` 后执行：
+标准组合的 `--case fighter-extra-attack` 实际推进到职业 4、5、6 级，检查授予、来源和 Attack 动作额度。应用侧的 `Schema2ExtraAttackRulesTest` 使用固定 ZIP 检查缺失、提前、重复、错误等级或来源的特性状态。另需验收 Host 表单与首击检查点时，对已启动的全新隔离候选执行：
 
 ```bash
 node tools/storage/browser-extra-attack.cjs
 ```
 
-浏览器走真实 Host 表单和 API，核对正常升级、额度展示、两击和首击检查点恢复。
-这些是有限机制的内部集成及端到端入口证据，不代表 V04 的擒抱、挣脱、拖带、释放已实现，
-也不代替真实 MySQL、原生 Windows 或部署验收。只执行相关定向测试，按 §6 另行打包审计。
+浏览器走真实 Host 表单和 API，核对正常升级、额度展示、一次动作费用、两击及首击检查点恢复。
+应用修改攻击序列或状态持久化时，选 `CampaignExtraAttackIntegrationTest` 覆盖第三击、击间移动/OA/换目标、放弃、Ready 单击、非法/过期/重复请求、坏文件和晚写回滚。修改组合器或规则库时，按[机制合同](rules/schema-2-extra-attack.md)及上文 SQLite 绑定边界选择相关应用测试。平台和 WAR 各按其实际影响验收。
 
 <a id="improved-critical-verification"></a>
 
 ## 勇士 Improved Critical 的真实链路验证
 
-严格作者/覆盖组合与规则边界先选
-`Schema2ImprovedCriticalCompositionTest,Schema2ImprovedCriticalRulesTest`，
-制品与正常授予选择 `BundledCampaignRulesTest,CampaignRuleSupportTest,CampaignRuleContextTest`。
-`CampaignImprovedCriticalIntegrationTest` 经交付原包、本机独立接受、有序预览、新建、
-正常选择勇士和装备取得，使用生产战役命令与真实临时 SQLite 核对近战 19/20 重击。
-同时覆盖相邻攻击与反应路径、原骰及成本、非法/过期/重复请求、事务回滚和完整文件恢复。
-固定数值只在服务随机源边界提供，不注入角色状态或特性授予。
-原包更新、准确组合冻结和规则库失败边界复用同轮的
-`LocalRuleLibraryTest,CampaignRuleBindingIntegrationTest,StorageHttpIntegrationTest`。
-
-在全新隔离存储根启动 `tools/storage/run-local.sh` 后，使用与浏览器匹配的 Playwright 环境执行：
+标准组合的 `--case fighter-growth` 检查勇士特性的来源、授予等级和执行算法。若模组改动影响近战重击的可见结果，另补对应的独立命中与伤害场景。需要验收真实表单时，对已启动的全新隔离候选执行：
 
 ```bash
 node tools/storage/browser-improved-critical.cjs
 ```
 
-浏览器使用实际导入/接受/新建/成长/装备/战斗/保存/END/打开表单和服务器随机源。
-浏览器不注入骰点；可重复的 19、20、劣势、Shield 和回滚数值边界由服务集成测试验证。
-被动能力复用角色特性展示与武器攻击结果入口，不新增“指定重击”的客户端控制。
-这些是隔离本机生产服务集成和浏览器证据，不是完整 SRD、真实 MySQL、原生 Windows 或部署验收。
-只补受本次改动影响的测试，按 §6 构建并审计候选 WAR；不因本切片完成重跑无关全量。
+浏览器使用实际导入/接受/新建/成长/装备/战斗/保存/END/打开表单，按服务端实际骰值检查结果。固定 19、20、劣势及 Shield 边界由可复现的独立行为场景或应用机制夹具验证，骰点只能在服务端随机源边界注入。
+应用改动按受影响的组合、攻击判定和命令/事务/恢复分别选 `Schema2ImprovedCriticalCompositionTest`、`Schema2ImprovedCriticalRulesTest` 或 `CampaignImprovedCriticalIntegrationTest`。规则库及完整冻结绑定的共同路径按其实际差量补测。
 
 <a id="second-wind-verification"></a>
 
 ## 战士一级 Second Wind 的真实链路验证
 
-严格声明、真实授予和数值边界选择 `Schema2SecondWindCompositionTest` 与
-`Schema2SecondWindRulesTest`；原包/支持门选择 `BundledCampaignRulesTest`、
-`CampaignRuleSupportTest`、`CampaignRuleContextTest`。`CampaignSecondWindIntegrationTest`
-使用实际原 ZIP、审阅接受、有序预览和新建战役，正常创建一级战士并成长，
-通过生产命令验证自己回合的附赠动作治疗、满 HP、耗尽、真实休息恢复和完整文件。
-固定骰值只进入服务随机源，不注入授予/角色状态；坏文件是明确负例。
-`PlayerSecondWindCandidateTest` 通过真实邀请、审批、控制和接管验证玩家候选、
-服务器生成命令、一次支付、过期候选拒绝及原回执查证。
-共享战斗历史、治疗/资源、休息、玩家候选及内部拒绝范围选择其对应回归；
-实际测试名与结果由当次验证记录，不缓存动态计数。
-
-全新隔离存储根按前文启动后，执行：
+标准组合的 `--case class-templates` 检查一级战士实际获得的回气特性、执行算法和初始资源。附赠动作、治疗骰或休息恢复声明改变时，按影响补对应的独立场景。需要验收 Host 的回气操作与完整文件重开时，对已启动的全新隔离候选执行：
 
 ```bash
 node tools/storage/browser-second-wind.cjs
 ```
 
-浏览器从实际导入、接受、新建和角色表单进入，使用服务器随机骰，核验回气结果、资源、
-普通动作保留及保存/END/重开后继续；服务测试负责确定数值、拒绝、幂等和晚写回滚。
-测试不触碰真实战役，不是原生 Windows、真实 MySQL 或部署验收。完成相关定向验证后
-复用结果按 §6 打包审计，不因新增按钮重跑无关全量。
+浏览器从实际导入、接受、新建和角色表单进入，使用服务器随机骰，核验回气结果、资源、普通动作保留及保存/END/重开后继续。满 HP、资源耗尽、真实短休与长休恢复按本次模组变化补独立场景。
+应用组合/解释变化可选 `Schema2SecondWindCompositionTest` 或 `Schema2SecondWindRulesTest`；事务与恢复选 `CampaignSecondWindIntegrationTest` 检查边界、幂等、晚写回滚和坏文件。玩家候选、命令和收据路径变化时，`PlayerSecondWindCandidateTest` 覆盖邀请、审批、控制、接管及过期候选。
 
 <a id="prone-verification"></a>
 
 ## 倒地姿态、爬行与起身的组内验证
 
+本组使用既有战斗与速度声明。需要观察成品姿态与成本时，对已启动的全新隔离候选执行：
+
+```bash
+node tools/storage/browser-prone.cjs
+```
+
+浏览器通过 Host 原包导入/接受/新建和角色表单执行战斗及探索的卧倒、爬行、起身，检查姿态、成本、探索路径上限、旧战斗预算保留、倒地保存后 END/重开继续，以及宽窄屏布局和 JavaScript/CSP。
+
+应用机制或共享状态变化时按差量选择以下测试。
+
 `Schema2ProneRulesTest` 检查不花动作或时间的主动卧倒、探索姿态链及旧战斗预算保留、
 双倍移动成本、Dash、25 尺速度的半尺边界、Ready 独立移动预算、OA 与失能停止；
 `Schema2ExplorationRulesTest` 检查六秒活动和整路径预检。相关既有战斗、Ready、反应和回气测试
-保护共享消费者。`CampaignProneIntegrationTest` 从交付原 ZIP 的独立审阅接受、有序
+保护共享消费者。`CampaignProneIntegrationTest` 从应用夹具 ZIP 的独立审阅接受、有序
 预览和新建开始，正常创建角色及取得装备，经真实生产命令和临时 SQLite 验证姿态、
 移动、起身、未决路径保存/END/重开、探索卧倒/爬行/起身、战斗交接和离场门、拒绝边界、幂等、过期和事务回滚。
 探索链应同时断言：卧倒不推进时钟；每段爬行最多按当前速度支付双倍成本，不能借旧 Dash；
@@ -947,22 +952,8 @@ node tools/storage/browser-second-wind.cjs
 `PlayerProneCandidateTest` 经过真实邀请、审批、控制和接管验证服务端候选，
 包括探索许可、撤权及旧候选拒绝；客户端不能指定移动成本或替他人修改姿态。
 
-本组使用既有战斗与速度声明，没有新作者内容或版本。按当前改动选择上述测试及
-`BundledCampaignRulesTest,CampaignRuleSupportTest,CampaignRuleBindingIntegrationTest,LocalRuleLibraryTest,StorageHttpIntegrationTest`
-作为共同加载、冻结和 HTTP 证据；已通过且输入未变的结果复用，不按行为重复构建。
+共同加载、冻结和 HTTP 边界改变时，选择对应的 `CampaignRuleSupportTest`、`CampaignRuleBindingIntegrationTest`、`LocalRuleLibraryTest` 或 `StorageHttpIntegrationTest`。已通过且输入未变的结果复用。
 固定骰值仅在服务随机源边界输入；构造的坏文件和纯规则状态只提供负例或补充边界证据。
-
-按前文在全新隔离根启动 `tools/storage/run-local.sh` 后执行：
-
-```bash
-node tools/storage/browser-prone.cjs
-```
-
-浏览器通过 Host 原包导入/接受/新建和角色表单执行战斗及探索的卧倒、爬行、起身，检查姿态、
-成本、探索路径上限与旧战斗预算保留，并在倒地保存后 END、重开直接继续。
-检查宽窄屏布局和 JavaScript/CSP。
-原包确定性用 `build-bundles.py --check` 核验；相关测试通过后按 §6 打包和审计 WAR。
-不运行真实 MySQL、不部署；推撞/擒抱、怪物主动姿态、复杂地形、搬运和原生 Windows 不由这些测试证明。
 
 ## Schema 2 战斗与动作继续验证
 

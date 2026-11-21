@@ -12,6 +12,12 @@
 !/src/main/resources/storage/rules/srd51-magic.zip
 !/src/main/resources/storage/rules/dm-runtime-house-rules.zip
 !/src/main/resources/storage/rules/dm-runtime-check-variant.zip
+# Fixed application test fixtures, independent from the runtime rule bundles.
+!/src/test/fixtures/application-rules/storage/rules/srd51-runtime.zip
+!/src/test/fixtures/application-rules/storage/rules/srd51-characters.zip
+!/src/test/fixtures/application-rules/storage/rules/srd51-magic.zip
+!/src/test/fixtures/application-rules/storage/rules/dm-runtime-house-rules.zip
+!/src/test/fixtures/application-rules/storage/rules/dm-runtime-check-variant.zip
 *.7z
 *.rar
 *.tar

@@ -59,7 +59,4 @@ SQLite 复用 `rules-runtime` 的 `rules_runtime_material` 保存完整声明及
 
 ## 定向验证
 
-`BundledCampaignRulesTest` 核对原包与冻结读回、正常 5/6 级授予及对装备、检定和生命的
-中性。 `CampaignRuleSupportTest` 覆盖错误声明、错误覆盖、重复或禁用的特性及混合成长
-在抽骰前拒绝。 `CampaignExtraAttackIntegrationTest` 通过规则库和真实战役写路径核对
-攻击额度、移动与续击、拒绝和完整恢复。
+模组授予与次数使用标准组合的 `--case fighter-extra-attack`。应用的伪造授予拒绝使用 `Schema2ExtraAttackRulesTest` 的固定夹具。需要观察 Host 操作或首击保存后继续时，另在隔离应用验收。应用更改声明解释时选 `CampaignRuleSupportTest` 核对错误覆盖、重复、禁用及混合成长在抽骰前拒绝；更改攻击序列或恢复时选 `CampaignExtraAttackIntegrationTest`。步骤见[真实链路验证](../testing.md#extra-attack-verification)。
