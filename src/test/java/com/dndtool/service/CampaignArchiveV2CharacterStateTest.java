@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.dndtool.persistence.BusinessWriteTestSupport;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -107,8 +108,8 @@ final class CampaignArchiveV2CharacterStateTest {
     }
 
     @Test
-    void previewReportsEveryCurrentCharacterRulesPartitionAndRawDigest() {
-        byte[] content = CampaignArchiveV2CharacterStateCodec.write(state(), CHARACTERS);
+    void previewReportsEveryCurrentCharacterRulesPartitionAndRawDigest() throws Exception {
+        byte[] content = (json() + "\n").getBytes(StandardCharsets.UTF_8);
 
         CampaignArchiveV2DraftPreview.Result result =
                 new CampaignArchiveV2DraftPreview().preview(content, CHARACTERS);
@@ -117,7 +118,8 @@ final class CampaignArchiveV2CharacterStateTest {
         assertEquals(12, result.preview().eventTail());
         assertEquals(new CampaignArchiveV2DraftPreview.Counts(
                 2, 1, 4, 1, 2, 1, 1, 1, 1, 1, 4), result.preview().counts());
-        assertEquals(CampaignArchiveDigest.sha256(content), result.preview().rawPayloadSha256());
+        byte[] expectedDigest = MessageDigest.getInstance("SHA-256").digest(content);
+        assertEquals(java.util.HexFormat.of().formatHex(expectedDigest), result.preview().rawPayloadSha256());
     }
 
     @Test
@@ -138,7 +140,7 @@ final class CampaignArchiveV2CharacterStateTest {
     @Test
     void enforcesFileUtf8NestingArrayAndIntegerBoundariesBeforeFallback() {
         assertStatus(CampaignArchiveV2CharacterStateCodec.Status.FILE_TOO_LARGE,
-                new byte[CampaignSaveFileService.MAX_BYTES + 1]);
+                new byte[16 * 1024 * 1024 + 1]);
         assertStatus(CampaignArchiveV2CharacterStateCodec.Status.INVALID_UTF8,
                 new byte[] {(byte) 0xC3, (byte) 0x28});
         assertStatus(CampaignArchiveV2CharacterStateCodec.Status.INVALID_UTF8,

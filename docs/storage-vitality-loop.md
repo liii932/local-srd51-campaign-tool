@@ -80,7 +80,8 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 `src/main/resources/storage/rules/`。`BundledCampaignRules` 经
 `ProductionRuleArtifact.read` 验证每个原始 ZIP，再调用
 `ProductionSchema2Projection.compose` 建立生产投影；不从测试 fixture 取得规则，
-不使用来源 MySQL 的安装/接受账本。WAR 随附五个原包。标准预设使用下表四个准确成员，自定义路径从本机规则库读取已接受的原包。
+不使用来源 MySQL 的安装/接受账本。WAR 随附五个原包和构建时从它们生成的身份清单。应用逐包核对槽位、模组键、发行版本、角色和原始及逻辑摘要。
+标准预设使用下表四个准确成员，自定义路径从本机规则库读取已接受的原包。
 
 | 包 | 角色与直接依赖 |
 |---|---|
@@ -93,6 +94,10 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 标准组合选择家规 @9，变体选择 @10。变体的运动技能改用感知、
 固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。这是内容覆盖，不增加新
 算法，也不代表 SRD 原文。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
+
+一个专属包缺失或与清单不符时，依赖它的内置组合返回 `BUNDLED_RULES_UNAVAILABLE`。三个共享包中任一损坏会影响两组。
+本机规则库面板逐包标记可用性。健康候选仍可导入和审阅，受损候选不能导入。标准存档始终用本次交付的准确原包重开。
+自定义存档即便模组键和版本与标准相同，只要摘要有别，仍须在本机接受文件绑定的准确原包。
 
 解释合同、原始/逻辑摘要、完整身份、最终规则和每个字段的完整链固定在本次工作库内。
 `CampaignRuleContext` 从完整冻结材料重建，核对全部摘要和当前应用机制/模板支持范围；角色

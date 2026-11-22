@@ -188,7 +188,8 @@ HP 最大值的可达范围、六能力集合和完整运行身份也必须成�
 复核准备操作收据、准确规则绑定、完整历史、预期版本和容量之后再调用服务端骰源。
 活动 legacy 或 PARTITION 状态阻止写入。叶仓储只能使用调用方受保护连接，不能提交或回滚。
 
-请求摘要使用独立域 `local-dnd/schema2-character-command/1` 后接零字节，按顺序编码
+SQLite 领域引擎和 JDBC 服务使用同一个 `Schema2CharacterRequest` 校验输入并计算摘要。
+摘要使用独立域 `local-dnd/schema2-character-command/1` 后接零字节，按顺序编码
 操作、run、snapshot、campaign、character、准备操作六个 UUID，完整 `Schema2RulesBinding`，
 预期版本、命令 union 字段及按键排序的初始能力。字符串为 UTF-8 字节长前缀，整数按
 `DataOutputStream` 大端编码。摘要不替代完整状态或历史；同一操作的不同请求拒绝，准确

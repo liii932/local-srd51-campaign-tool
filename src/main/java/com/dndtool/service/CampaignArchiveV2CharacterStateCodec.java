@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 
 /** Explicit JSON codec for the unactivated archive-format-2 character-rules projection. */
 final class CampaignArchiveV2CharacterStateCodec {
-    private static final int MAX_BYTES = CampaignSaveFileService.MAX_BYTES;
+    static final int MAX_BYTES = 16 * 1024 * 1024;
     private static final int MAX_DEPTH = 16;
     private static final int MAX_ARRAY_ELEMENTS = 100_000;
     private static final Pattern INTEGER = Pattern.compile("-?(?:0|[1-9][0-9]*)");

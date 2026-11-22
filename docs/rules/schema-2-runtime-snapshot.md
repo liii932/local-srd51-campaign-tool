@@ -124,7 +124,8 @@ CAPTURE/RESTORE、run UUID、snapshot UUID、规范 profile、组合算法、有
 
 `transferPrepared` 消费绑定准确 campaign/character/run/snapshot 的初始授予准备材料。
 它重新读取来源及重建计划，再在同一运行事务保存快照、操作收据与类型化初始计划；实际
-读回全部来源、槽、选择和授予事实，并调用 `Schema2InitialCharacterPlanService` 重建比较。准备材料不创建真实
+读回全部来源、槽、选择和授予事实。`JdbcSchema2InitialCharacterPlanner.validate` 在该连接上独立读取快照，
+调用共用的纯计划生成器重建并比较完整计划。准备材料不创建真实
 战役、角色或业务历史；完整初始化缺少必需材料时仍拒绝。共同事务、计划身份和失败边界
 见[业务写入与初始化准备](business-write-transactions.md)。
 

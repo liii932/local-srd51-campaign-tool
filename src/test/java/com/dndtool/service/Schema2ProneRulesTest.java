@@ -357,13 +357,16 @@ class Schema2ProneRulesTest {
         var material = material();
         var engine = new CampaignDomainEngine();
         var records = List.of(initialRecord(material, engine, mover), initialRecord(material, engine, opponent));
-        var start = Command.start(List.of(new Deployment(mover, cell(0), 0), new Deployment(opponent, cell(1), 1)),
-                List.of(mover, opponent));
-        var started = engine.executeCombat(material, records, null, combat, UUID.randomUUID(), start, sides -> 10);
+        long sceneSecond = 90;
+        var deployments = List.of(new Deployment(mover, cell(0), 0), new Deployment(opponent, cell(1), 1));
+        var opened = engine.executeScene(material, records, null, campaign, combat, sceneSecond, UUID.randomUUID(),
+                Command.openScene(deployments, List.of()), sides -> fail("unexpected d" + sides));
+        var started = engine.executeScene(material, opened.characters(), opened.history(), campaign, combat,
+                sceneSecond, UUID.randomUUID(), Command.reenter(mover, List.of(mover, opponent)), sides -> 10);
         Command drop = Command.action(Kind.DROP_PRONE, started.history().current().activeActor());
         var versions = started.characters().stream().collect(Collectors.toMap(record -> record.initial().characterId(),
                 record -> record.history().current().version()));
-        var request = new Schema2CombatRuntimeService.Request(UUID.randomUUID(), combat, campaign, Schema2RulesBinding.from(material),
+        var request = new Schema2CombatRequest(UUID.randomUUID(), combat, campaign, Schema2RulesBinding.from(material),
                 started.history().members(), started.history().current().version(), versions, drop);
         var source = (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(), new Class<?>[]{DataSource.class},
                 (proxy, method, args) -> fail("unexpected connection method " + method.getName()));
@@ -371,8 +374,9 @@ class Schema2ProneRulesTest {
         assertEquals(DROP_PRONE_SQLITE_REQUIRED, service.execute(request).code());
         assertEquals(DROP_PRONE_SQLITE_REQUIRED, service.inspect(request).code());
 
-        var dropped = engine.executeCombat(material, started.characters(), started.history(), combat,
-                request.operationId(), drop, sides -> fail("unexpected d" + sides));
+        var dropped = engine.executeScene(material, started.characters(), started.history(), campaign, combat,
+                sceneSecond + started.elapsedSeconds(), request.operationId(), drop, sides -> fail("unexpected d" + sides));
+        assertEquals(0, dropped.elapsedSeconds());
         var save = new Schema2CombatRuntimeService.Save(dropped.history(),
                 dropped.characters().stream().map(CampaignDomainEngine.CharacterRecord::history).toList());
         assertEquals(DROP_PRONE_SQLITE_REQUIRED, service.restore(save).code());

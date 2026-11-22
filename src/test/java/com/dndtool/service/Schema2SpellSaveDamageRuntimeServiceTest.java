@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.composition.*;
 import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
-import com.dndtool.service.Schema2CombatRuntimeService.*;
+import com.dndtool.service.Schema2CombatRuntimeService.Save;
 import com.dndtool.service.Schema2CombatRuntimeService.Status;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.service.Schema2CombatState.Command;
@@ -31,7 +31,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
                     Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",new SpellbookInput(CASTING,INITIAL_BOOK,List.of(BURNING))))).status());
             character(f,f.a,equipment("ITEM_UNEQUIPPED",f.items.get(f.a),null,null));
             UUID focus=Schema2SpellRuntimeServiceTest.focus(B);var owner=f.members.stream().filter(m->m.characterId().equals(B)).findFirst().orElseThrow();
-            var acquire=new Schema2CharacterRuntimeService.Request(focus,owner.identity(),f.campaign,B,owner.preparationOperationId(),f.binding,f.character(B).version(),equipment("ITEM_ACQUIRED",focus,Schema2SpellFixtures.HOLY_SYMBOL,"CARRIED"),Map.of());
+            var acquire=new Schema2CharacterRequest(focus,owner.identity(),f.campaign,B,owner.preparationOperationId(),f.binding,f.character(B).version(),equipment("ITEM_ACQUIRED",focus,Schema2SpellFixtures.HOLY_SYMBOL,"CARRIED"),Map.of());
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(acquire).status());
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(f.characterRequest(B,equipment("ITEM_EQUIPPED",focus,null,"OFF_HAND"))).status());
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(f.characterRequest(B,effect(TEMPORARY,"REPLACE"))).status());
@@ -53,19 +53,19 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
     }
     static Command burning(Schema2CombatRuntimeServiceTest.Fixture f,int direction,int slot) {return Command.cast(f.a,new CastInput(CASTING,BURNING,List.of(),null,slot,null,direction));}
     static SaveDamageBatch batch(Schema2CombatRuntimeServiceTest.Fixture f) {return f.battle.saveDamageBatches().getFirst();}
-    static Request apply(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {var flow=f.battle.activeFlow();return f.request(Command.continueBreath(f.a,flow.flowKey(),flow.leafFrameKey()));}
+    static Schema2CombatRequest apply(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {var flow=f.battle.activeFlow();return f.request(Command.continueBreath(f.a,flow.flowKey(),flow.leafFrameKey()));}
     static void release(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {f.nextRolls.addAll(List.of(3,4,4));f.commit(burning(f,0,1));assertTrue(f.nextRolls.isEmpty());}
     static long slots(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {return f.character(f.a).resources().stream().filter(r->r.identity().equals(SLOT1)).findFirst().orElseThrow().current();}
-    static void replay(Schema2CombatRuntimeServiceTest.Fixture f,Request request)throws Exception {var save=f.service.read(f.combat);int rolls=f.rolls,writes=f.runtime.writes;assertEquals(Status.REPLAYED,f.service.execute(request).status());assertEquals(save,f.service.read(f.combat));assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);}
+    static void replay(Schema2CombatRuntimeServiceTest.Fixture f,Schema2CombatRequest request)throws Exception {var save=f.service.read(f.combat);int rolls=f.rolls,writes=f.runtime.writes;assertEquals(Status.REPLAYED,f.service.execute(request).status());assertEquals(save,f.service.read(f.combat));assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);}
 
     @Test void realSpellSharedRollMixedTargetsConcentrationAndAfterCastReadyRestoreWithoutReexecution()throws Exception {
-        var f=prepared();int rolls=f.rolls;Request release=f.request(burning(f,0,1));f.nextRolls.addAll(List.of(3,4,4));f.commit(release);replay(f,release);
+        var f=prepared();int rolls=f.rolls;Schema2CombatRequest release=f.request(burning(f,0,1));f.nextRolls.addAll(List.of(3,4,4));f.commit(release);replay(f,release);
         assertEquals(rolls+3,f.rolls);assertEquals(1,slots(f));assertFalse(f.actor(f.a).actionAvailable());
         var raw=batch(f);assertNull(raw.action());assertEquals(BURNING,raw.spellSource().spell());assertEquals(2,raw.spellSource().proficiencyBonus());assertEquals(0,raw.spellSource().abilityModifier());assertEquals(10,raw.difficultyClass());
         assertEquals(List.of(B,H,M),raw.targetProof().targets().stream().map(CreatureRef::creatureId).toList());assertEquals(4,raw.targetProof().candidates().size());
         assertEquals(List.of(3,4,4),raw.sharedRoll().dice());assertEquals(11,raw.sharedRoll().rawTotal());assertTrue(raw.checks().isEmpty());assertTrue(raw.packets().isEmpty());assertEquals(9,f.character(B).hitPoints());assertEquals(5,f.character(B).health().temporaryHitPoints());
         Save save=f.service.read(f.combat);var restored=fixture(false);restored.source.unavailable(true);assertEquals(Status.COMMITTED,restored.service.restore(save).status());assertEquals(save,restored.service.read(f.combat));assertEquals(0,restored.rolls);restored.battle=save.combat().current();
-        Request apply=apply(restored);restored.nextRolls.addAll(List.of(7,1,1,2,8,1));restored.commit(apply);assertTrue(restored.nextRolls.isEmpty());replay(restored,apply);
+        Schema2CombatRequest apply=apply(restored);restored.nextRolls.addAll(List.of(7,1,1,2,8,1));restored.commit(apply);assertTrue(restored.nextRolls.isEmpty());replay(restored,apply);
         var done=batch(restored);assertEquals(BatchStatus.COMPLETED,done.status());assertEquals(List.of(11,0,22),done.packets().stream().map(DamagePacket::damageAmount).toList());
         assertEquals(List.of(3,45,36),done.packets().stream().map(DamagePacket::afterHitPoints).toList());assertEquals(List.of(0,0,0),done.packets().stream().map(DamagePacket::afterTemporaryHitPoints).toList());
         // SRD p.322: Hell Hound DEX 12 (+1), no listed save proficiency; its immune target still rolls 1 + 1 + 0 = 2.
@@ -74,7 +74,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
         assertEquals(EffectStatus.ACTIVE,restored.battle.ongoingEffects().getFirst().status());assertEquals(TriggerKind.CAST_COMPLETED,restored.battle.activeFlow().windows().getLast().trigger().kind());
         Save ready=restored.service.read(f.combat);var target=fixture(false);target.source.unavailable(true);assertEquals(Status.COMMITTED,target.service.restore(ready).status());assertEquals(ready,target.service.read(f.combat));assertEquals(0,target.rolls);target.battle=ready.combat().current();
         var flow=target.battle.activeFlow();var window=flow.windows().getLast();var offer=window.opportunities().stream().filter(o->o.status()==OpportunityStatus.PENDING).findFirst().orElseThrow();
-        Request respond=target.request(Command.releaseReady(B,offer.options().getFirst().readyKey(),flow.flowKey(),flow.leafFrameKey(),window.windowKey(),offer.opportunityKey()));target.commit(respond);replay(target,respond);
+        Schema2CombatRequest respond=target.request(Command.releaseReady(B,offer.options().getFirst().readyKey(),flow.flowKey(),flow.leafFrameKey(),window.windowKey(),offer.opportunityKey()));target.commit(respond);replay(target,respond);
         assertEquals(new Position(1,-1),target.actor(B).position());assertFalse(target.actor(B).reactionAvailable());assertEquals(0,target.rolls);assertEquals(1,slots(target));
         flow=target.battle.activeFlow();target.commit(new Command(Kind.CONTINUE_FLOW,target.a,null,null,List.of(),List.of(),List.of(),flow.flowKey(),flow.leafFrameKey(),flow.windows().getLast().windowKey(),null));
         assertNull(target.battle.activeFlow());assertEquals(done.packets(),batch(target).packets());assertEquals(CastStatus.RESOLVED,target.battle.flows().getLast().casts().getFirst().status());
@@ -130,7 +130,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
         var f=wizards(true);grow(f,f.b,5);
         character(f,f.b,Schema2ArcaneRecoveryTestFixture.start("LONG_REST"));character(f,f.b,Schema2ArcaneRecoveryTestFixture.time("SLEEP",480));character(f,f.b,Schema2ArcaneRecoveryTestFixture.finish(Map.of()));
         character(f,f.b,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(COUNTERSPELL))));
-        synchronizeClocks(f);f.nextRolls.addAll(List.of(20,1));f.start();int rolls=f.rolls;Request cast=f.request(burning(f,0,1));f.commit(cast);replay(f,cast);
+        synchronizeClocks(f);f.nextRolls.addAll(List.of(20,1));f.start();int rolls=f.rolls;Schema2CombatRequest cast=f.request(burning(f,0,1));f.commit(cast);replay(f,cast);
         assertEquals(1,slots(f));assertTrue(f.battle.saveDamageBatches().isEmpty());assertEquals(rolls,f.rolls);
         Save declaration=f.service.read(f.combat);var target=new Schema2CombatRuntimeServiceTest.Fixture(false,Schema2SpellSaveDamageFixtures.packages(),GrowthChoices.EMPTY,WIZARD);target.source.unavailable(true);
         assertEquals(Status.COMMITTED,target.service.restore(declaration).status());assertEquals(0,target.rolls);target.battle=declaration.combat().current();
@@ -204,7 +204,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
         var flow=f.battle.activeFlow();var window=currentWindow(f);var offer=window.opportunities().stream().filter(o->o.status()==OpportunityStatus.PENDING).findFirst().orElseThrow();assertEquals(actor,offer.actorId());
         f.commit(Command.reactionSpell(Kind.DECLARE_COUNTERSPELL,actor,new CastInput(CASTING,COUNTERSPELL,List.of(window.trigger().subjectId()),null,3,window.trigger().sourceFrameKey()),flow.flowKey(),flow.leafFrameKey(),window.windowKey(),offer.opportunityKey()));
     }
-    static Request resumeCast(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {
+    static Schema2CombatRequest resumeCast(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {
         var flow=f.battle.activeFlow();var window=currentWindow(f);assertEquals(WindowStatus.CLOSED,window.status());assertEquals(window.ownerFrameKey(),flow.leafFrameKey());
         UUID owner=flow.casts().stream().filter(v->v.frameKey().equals(window.ownerFrameKey())).findFirst().orElseThrow().actorId();
         return f.request(new Command(Kind.CONTINUE_FLOW,owner,null,null,List.of(),List.of(),List.of(),flow.flowKey(),flow.leafFrameKey(),window.windowKey(),null));
@@ -273,7 +273,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
         flow=restored.battle.activeFlow();window=currentWindow(restored);offer=window.opportunities().stream().filter(o->o.status()==OpportunityStatus.PENDING).findFirst().orElseThrow();
         assertEquals(TriggerKind.CAST_BEFORE_COMPLETION,window.trigger().kind());assertEquals(restored.a,window.trigger().subjectId());assertEquals(WindowStatus.OPEN,window.status());assertEquals(C,offer.actorId());assertFalse(restored.actor(C).reactionAvailable());
         restored.commit(Command.reaction(Kind.ADVANCE_WINDOW,C,null,flow.flowKey(),flow.leafFrameKey(),window.windowKey(),offer.opportunityKey()));
-        Request parent=resumeCast(restored);var completed=restored.commit(parent);replay(restored,parent);
+        Schema2CombatRequest parent=resumeCast(restored);var completed=restored.commit(parent);replay(restored,parent);
         assertNull(restored.battle.activeFlow());assertTrue(restored.battle.saveDamageBatches().isEmpty());assertEquals(1,slots(restored));assertEquals(0,restored.rolls);
         assertEquals(CastStatus.INTERRUPTED,restored.battle.flows().getLast().casts().getFirst().status());assertTrue(completed.event().resolution().facts().stream().anyMatch(v->v.kind().equals("CAST_INTERRUPTED")&&"CASTER_INCAPACITATED".equals(v.reason())));
     }
@@ -281,7 +281,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
         var f=prepared();var before=f.service.read(f.combat);int rolls=f.rolls,writes=f.runtime.writes;
         assertEquals("S2_SPELL_SLOT_UNAVAILABLE",f.service.execute(f.request(burning(f,0,2))).code());
         var valid=f.request(burning(f,0,1));var versions=new LinkedHashMap<>(valid.expectedCharacterVersions());versions.put(B,versions.get(B)-1);
-        assertEquals("S2_COMBAT_STALE_CHARACTER",f.service.execute(new Request(valid.operationId(),valid.combatId(),valid.campaignId(),valid.rules(),valid.members(),valid.expectedVersion(),versions,valid.command())).code());
+        assertEquals("S2_COMBAT_STALE_CHARACTER",f.service.execute(new Schema2CombatRequest(valid.operationId(),valid.combatId(),valid.campaignId(),valid.rules(),valid.members(),valid.expectedVersion(),versions,valid.command())).code());
         assertEquals(before,f.service.read(f.combat));assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);
         f.commit(burning(f,4,1));assertEquals(BatchStatus.NO_TARGETS,batch(f).status());assertNull(batch(f).sharedRoll());assertTrue(batch(f).packets().isEmpty());assertEquals(rolls,f.rolls);assertEquals(1,slots(f));
     }
@@ -297,7 +297,7 @@ class Schema2SpellSaveDamageRuntimeServiceTest {
     public static final class FaultProbe {
         public static void main(String[] args)throws Exception {
             var f=prepared();boolean suffix=!args[0].equals("rollback")||!Set.of("s2_combat_spell_damage_source","s2_combat_event").contains(args[1]);
-            if(suffix)release(f);Request request=suffix?apply(f):f.request(burning(f,0,1));Save before=f.service.read(f.combat);
+            if(suffix)release(f);Schema2CombatRequest request=suffix?apply(f):f.request(burning(f,0,1));Save before=f.service.read(f.combat);
             if(args[0].equals("corrupt")) {
                 var rows=f.runtime.rows("s2_combat_spell_damage_source");var row=rows.getLast();
                 if(args[1].equals("missing"))rows.removeLast();else if(args[1].equals("extra"))rows.add(new LinkedHashMap<>(row));else row.put("ability_modifier",1);

@@ -2,8 +2,11 @@ package com.dndtool.web;
 
 import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.service.storage.BundledCampaignRules;
+import com.dndtool.service.storage.BundledRuleTestProcess;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.dndtool.service.storage.CampaignCodec;
 import com.dndtool.service.storage.CampaignJson;
 import com.dndtool.service.storage.CampaignDomainCodec;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
@@ -44,6 +47,46 @@ class StorageHttpIntegrationTest {
             .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
             .connectTimeout(Duration.ofSeconds(5)).build();
     private JsonObject state;
+
+    @Test void damagedBundledCandidateIsListedButRejectedBeforeAnyRuleLibraryWrite() throws Exception {
+        BundledRuleTestProcess.run(temporary, "srd51-runtime", new byte[] {0}, BundledCandidateProbe.class,
+                temporary.resolve("private-store").toString());
+    }
+
+    public static final class BundledCandidateProbe {
+        public static void main(String[] args) throws Exception {
+            new StorageHttpIntegrationTest().inspectBundledCandidates(Path.of(args[0]));
+        }
+    }
+
+    private void inspectBundledCandidates(Path root) throws Exception {
+        try (StorageLoopLauncher ignored = StorageLoopLauncher.start(root)) {
+            refresh();
+            var library = library();
+            assertTrue(library.getAsJsonArray("inventory").isEmpty());
+            var candidates = library.getAsJsonArray("bundled").asList().stream().map(JsonElement::getAsJsonObject).toList();
+            assertEquals(5, candidates.size());
+            var unavailable = candidates.stream().filter(candidate -> !candidate.get("available").getAsBoolean()).toList();
+            assertEquals(1, unavailable.size());
+            var damaged = unavailable.getFirst().getAsJsonObject("member");
+            assertEquals(BundledCampaignRules.CORE_MODULE, damaged.get("moduleKey").getAsString());
+            String rejectedOperation = UUID.randomUUID().toString();
+            assertOpaqueError(rulePost("rule-import-bundled", fields("member", RuleHttpFixture.tuple(damaged)), rejectedOperation),
+                    409, "BUNDLED_RULES_UNAVAILABLE");
+            assertEquals("NOT_FOUND", result(get("/api/host/storage/rule-operation?operationId=" + rejectedOperation))
+                    .get("state").getAsString());
+            assertFalse(Files.exists(root.resolve("rule-library")));
+
+            var healthy = candidates.stream().filter(candidate -> candidate.get("available").getAsBoolean())
+                    .map(candidate -> candidate.getAsJsonObject("member"))
+                    .filter(member -> BundledCampaignRules.CHARACTER_MODULE.equals(member.get("moduleKey").getAsString()))
+                    .findFirst().orElseThrow();
+            result(rulePost("rule-import-bundled", fields("member", RuleHttpFixture.tuple(healthy))));
+            var reviewed = review(healthy);
+            assertEquals(healthy, reviewed.getAsJsonObject("imported").getAsJsonObject("member"));
+            assertTrue(reviewed.get("acceptance").isJsonNull());
+        }
+    }
 
     @Test void protectedHttpCreatesSavesReopensAndRecoversWithoutJndi() throws Exception {
         Path root = temporary.resolve("private-store");
@@ -116,9 +159,20 @@ class StorageHttpIntegrationTest {
             assertEquals(400, postRaw("/api/host/storage/domain", encode(tampered), headers).statusCode());
             var stale = postRaw("/api/host/storage/domain", encode(note), commandHeaders(newEpoch, "0", UUID.randomUUID().toString(), digest));
             assertError(stale, 409, "STALE_REVISION");
-            var noCsrf = commandHeaders(epoch(), revision(), UUID.randomUUID().toString(), StorageRequestDigest.sha256("save", epoch(), revision(), Map.of()));
-            noCsrf.remove("X-CSRF-Token");
-            assertEquals(403, postRaw("/api/host/storage/save", "", noCsrf).statusCode());
+            var beforeRejectedWrites = state;
+            String formCsrf = encode(fields("_csrf", state.get("csrf").getAsString()));
+            for (String action : List.of("save", "players/invite")) {
+                String path = "/api/host/storage/" + action;
+                var withCsrf = commandHeaders(epoch(), revision(), UUID.randomUUID().toString(),
+                        StorageRequestDigest.sha256(action, epoch(), revision(), Map.of()));
+                var withoutCsrf = new LinkedHashMap<>(withCsrf);
+                withoutCsrf.remove("X-CSRF-Token");
+                assertEquals(403, postRaw(path, "", withoutCsrf).statusCode(), path);
+                assertEquals(403, postRaw(path, formCsrf, withoutCsrf).statusCode(), path);
+                assertOpaqueError(postRaw(path, formCsrf, withCsrf), 400, "INVALID_REQUEST");
+            }
+            refresh();
+            assertEquals(beforeRejectedWrites, state);
 
             var saved = command("save", Map.of());
             assertEquals(200, saved.statusCode(), saved.body());
@@ -158,11 +212,11 @@ class StorageHttpIntegrationTest {
 
     @Test void unavailableStorageStillClosesLegacyWritesAndReturnsNoPaths() throws Exception {
         try (StorageLoopLauncher ignored = StorageLoopLauncher.start(Path.of("relative-root"))) {
-            var unavailable = get("/api/host/storage/state");
-            assertEquals(503, unavailable.statusCode());
-            assertEquals("STORAGE_ROOT_INVALID", JsonParser.parseString(unavailable.body()).getAsJsonObject().get("code").getAsString());
-            assertFalse(unavailable.body().contains("relative-root"));
-            assertError(get("/api/host/storage/readiness"), 503, "STORAGE_ROOT_INVALID");
+            assertOpaqueError(get("/api/host/storage/state"), 503, "STORAGE_ROOT_INVALID");
+            var readiness = get("/api/host/storage/readiness");
+            assertError(readiness, 503, "STORAGE_ROOT_INVALID");
+            assertEquals(object("status", "ERROR", "mode", "SQLITE", "ready", false,
+                    "state", "UNAVAILABLE", "code", "STORAGE_ROOT_INVALID"), json(readiness));
             assertEquals(404, postRaw("/api/host/campaigns", "", Map.of()).statusCode());
         }
     }
@@ -203,7 +257,10 @@ class StorageHttpIntegrationTest {
             assertEquals(200, zipResponse.statusCode());
             assertArrayEquals(zip, zipResponse.body());
             assertEquals("application/zip", zipResponse.headers().firstValue("Content-Type").orElseThrow());
-            assertTrue(zipResponse.headers().firstValue("Content-Disposition").orElseThrow().contains(".zip"));
+            assertEquals("attachment; filename=\"rule-" + house.get("rawZipSha256").getAsString() + ".zip\"",
+                    zipResponse.headers().firstValue("Content-Disposition").orElseThrow());
+            assertOpaqueError(get("/api/host/storage/rule-download?" + ruleQuery(house)
+                    + "&rawZipSha256=" + "0".repeat(64)), 409, "RULE_MEMBER_MISMATCH");
             assertEquals(400, get("/api/host/storage/rule-download?" + query + "&moduleKey=extra").statusCode());
             for (var candidate : candidates.subList(0, 3)) result(rulePost("rule-import-bundled", fields("member", RuleHttpFixture.tuple(candidate))));
             assertRuleIssue(rulePost("rule-preview", preview), "RULE_PACKAGE_NOT_ACCEPTED", candidates.getFirst());
@@ -233,10 +290,32 @@ class StorageHttpIntegrationTest {
         String residual;
         try (StorageLoopLauncher ignored = StorageLoopLauncher.start(target)) {
             refresh();
-            var importedFile = upload("import", file, ruleHeaders("import", fields("fileSha256", CampaignJson.sha256(file)), UUID.randomUUID().toString()));
+            var beforeImport = state;
+            var correctHeaders = ruleHeaders("import", fields("fileSha256", CampaignJson.sha256(file)),
+                    UUID.randomUUID().toString());
+            assertOpaqueError(postRaw("/api/host/storage/import", "archive=wrong-media", correctHeaders),
+                    400, "INVALID_REQUEST");
+            byte[] empty = new byte[0];
+            assertOpaqueError(upload("import", empty, ruleHeaders("import",
+                    fields("fileSha256", CampaignJson.sha256(empty)), UUID.randomUUID().toString())),
+                    400, "INVALID_REQUEST");
+            assertOpaqueError(upload("import", file, ruleHeaders("import", fields("fileSha256", "0".repeat(64)),
+                    UUID.randomUUID().toString())), 400, "INVALID_REQUEST_DIGEST");
+            for (int version : List.of(1, 2)) {
+                byte[] unsupported = withFileFormat(file, version);
+                var headers = ruleHeaders("import", fields("fileSha256", CampaignJson.sha256(unsupported)),
+                        UUID.randomUUID().toString());
+                var rejected = upload("import", unsupported, headers);
+                assertOpaqueError(rejected, 409, "INVALID_FILE");
+                assertTrue(rejected.headers().firstValue("Location").isEmpty());
+            }
+            refresh();
+            assertEquals(beforeImport, state);
+            var importedFile = upload("import", file, correctHeaders);
             assertEquals(200, importedFile.statusCode(), importedFile.body());
             refresh();
             assertEquals("IDLE", state.getAsJsonObject("storage").get("state").getAsString());
+            assertTrue(state.get("campaign").isJsonNull());
             var open = fields("fileKey", fileKey);
             var candidates = RuleHttpFixture.members(library(), BundledCampaignRules.CHECK_VARIANT);
             assertRuleIssue(command("open", open), "RULE_PACKAGE_MISSING", candidates.getFirst());
@@ -244,9 +323,17 @@ class StorageHttpIntegrationTest {
             assertRuleIssue(command("open", open), "RULE_PACKAGE_NOT_ACCEPTED", candidates.getFirst());
             var download = getBytes("/api/host/storage/download?fileKey=" + fileKey);
             assertEquals(200, download.statusCode()); assertArrayEquals(file, download.body());
-            assertTrue(download.headers().firstValue("Content-Disposition").orElseThrow().contains(fileKey + ".json"));
+            assertEquals("attachment; filename=\"campaign-" + fileKey + ".json\"",
+                    download.headers().firstValue("Content-Disposition").orElseThrow());
+            assertEquals("application/json;charset=UTF-8",
+                    download.headers().firstValue("Content-Type").orElseThrow().replace(" ", ""));
+            assertEquals("no-store", download.headers().firstValue("Cache-Control").orElseThrow());
+            assertEquals("nosniff", download.headers().firstValue("X-Content-Type-Options").orElseThrow());
+            assertTrue(download.headers().firstValue("Content-Security-Policy").orElseThrow().contains("frame-ancestors 'none'"));
             assertEquals(400, get("/api/host/storage/download?fileKey=" + fileKey + "&extra=value").statusCode());
             assertEquals(400, get("/api/host/storage/download?fileKey=" + fileKey + "&fileKey=" + fileKey).statusCode());
+            assertOpaqueError(get("/api/host/storage/download?fileKey=%2Fprivate%2Foperator-file.json"),
+                    409, "INVALID_FILE");
             for (var candidate : candidates) accept(candidate);
             fieldsCommand("open", open);
             assertEquals("可携带规则战役", campaign().get("name").getAsString());
@@ -261,6 +348,16 @@ class StorageHttpIntegrationTest {
             assertEquals(200, get("/api/host/storage/download?fileKey=" + fileKey).statusCode());
             assertEquals(409, command("discard", fields("runId", UUID.randomUUID().toString())).statusCode());
         }
+    }
+
+    private static byte[] withFileFormat(byte[] file, int version) {
+        var document = CampaignJson.read(file);
+        var integrity = document.remove("integrity").getAsJsonObject();
+        document.addProperty("formatVersion", version);
+        integrity.addProperty("digest",
+                CampaignJson.digest(CampaignCodec.FILE_DIGEST_DOMAIN, CampaignJson.canonical(document)));
+        document.add("integrity", integrity);
+        return CampaignJson.canonical(document);
     }
 
     private HttpResponse<String> upload(String action, byte[] bytes, Map<String, String> headers) throws Exception {
@@ -323,9 +420,14 @@ class StorageHttpIntegrationTest {
             fieldsCommand("create", fields("name", "完整领域战役", "members", prepareBundled()));
             assertTrue(campaign().get("domain").isJsonObject());
             String classKey = ruleKey("character.class", "fighter"), backgroundKey = ruleKey("character.background", "");
-            fieldsCommand("domain", domainFields("character-create", object("name", "完整角色", "kind", "PC", "classKey", classKey, "backgroundKey", backgroundKey)));
+            String name = "完整角色 \"<script>\"";
+            fieldsCommand("domain", domainFields("character-create", object("name", name, "kind", "PC", "classKey", classKey, "backgroundKey", backgroundKey)));
             var character = campaign().getAsJsonObject("domain").getAsJsonArray("characters").get(0).getAsJsonObject();
             String characterId = character.get("id").getAsString();
+            assertEquals(name, character.get("name").getAsString());
+            var page = get("/host/storage");
+            assertEquals(200, page.statusCode());
+            assertFalse(page.body().contains(name));
             assertEquals(1, character.get("level").getAsInt());
             assertTrue(character.getAsJsonObject("state").get("abilities").isJsonObject());
             fieldsCommand("domain", domainFields("node-create", object("name", "石桥")));
@@ -344,10 +446,24 @@ class StorageHttpIntegrationTest {
             String itemId = campaign().getAsJsonObject("domain").getAsJsonArray("items").get(0).getAsJsonObject().get("id").getAsString();
             conditional.add("success", checkBranch(characterId, itemId, "1", "成功备好火把"));
             conditional.add("failure", checkBranch(characterId, itemId, "-1", "失败消耗火把"));
+            var beforeCheck = campaign();
+            for (String serverField : List.of("dice", "algorithm")) {
+                var forged = conditional.deepCopy();
+                forged.getAsJsonObject("command").addProperty(serverField, "client value");
+                assertOpaqueError(command("domain", domainFields("check-effects", forged)),
+                        409, "INVALID_FILE");
+            }
+            refresh();
+            assertEquals(beforeCheck, campaign());
             fieldsCommand("domain", domainFields("check-effects", conditional));
             assertEquals(4, campaign().getAsJsonObject("domain").getAsJsonArray("items").get(0).getAsJsonObject().get("quantity").getAsInt());
             var auditRoot = campaign().getAsJsonObject("domain").getAsJsonArray("roots").asList().getLast().getAsJsonObject();
             assertEquals("check-effects", auditRoot.get("kind").getAsString());
+            var rolls = auditRoot.getAsJsonArray("rolls");
+            assertEquals(1, rolls.size());
+            var roll = rolls.get(0).getAsJsonObject();
+            assertEquals(20, roll.get("sides").getAsInt());
+            assertTrue(roll.get("value").getAsInt() >= 1 && roll.get("value").getAsInt() <= 20);
             assertEquals("成功备好火把", JsonParser.parseString(auditRoot.get("after").getAsString()).getAsJsonObject().get("message").getAsString());
             String before = revision();
             Map<String, List<String>> validNote = domainFields("note", object("text", "原意图"));
@@ -571,6 +687,10 @@ class StorageHttpIntegrationTest {
     private static void assertError(HttpResponse<String> response, int status, String code) {
         assertEquals(status, response.statusCode(), response.body());
         assertEquals(code, json(response).get("code").getAsString());
+    }
+    private static void assertOpaqueError(HttpResponse<String> response, int status, String code) {
+        assertEquals(status, response.statusCode(), response.body());
+        assertEquals(object("status", "ERROR", "code", code), json(response));
     }
     private static void assertRuleIssue(HttpResponse<String> response, String code, JsonObject member) {
         assertError(response, 409, code);

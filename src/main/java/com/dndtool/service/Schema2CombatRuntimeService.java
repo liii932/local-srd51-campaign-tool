@@ -4,9 +4,7 @@ import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CombatHistory.*;
 import com.dndtool.service.Schema2CombatState.*;
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.security.*;
+import java.security.SecureRandom;
 import java.sql.*;
 import java.util.*;
 import java.util.function.IntUnaryOperator;
@@ -16,39 +14,12 @@ import javax.sql.DataSource;
 public final class Schema2CombatRuntimeService {
     public enum Status { COMMITTED, REPLAYED, REJECTED, UNKNOWN, NOT_COMMITTED }
     public record Result(Status status, String code, Event event) { }
-    public record Request(UUID operationId, UUID combatId, UUID campaignId, Schema2RulesBinding rules,
-            List<Member> members, long expectedVersion, Map<UUID,Long> expectedCharacterVersions, Command command,
-            boolean spaceOwned) {
-        public Request(UUID operationId, UUID combatId, UUID campaignId, Schema2RulesBinding rules,
-                List<Member> members, long expectedVersion, Map<UUID,Long> expectedCharacterVersions, Command command) {
-            this(operationId, combatId, campaignId, rules, members, expectedVersion, expectedCharacterVersions, command, false);
-        }
-        public Request {
-            for (UUID id : Arrays.asList(operationId,combatId,campaignId)) uuid(id);
-            if (operationId.equals(campaignId) || combatId.equals(campaignId) || rules==null || members==null || command==null
-                    || operationId.equals(combatId) && (!spaceOwned || command.kind()!=Kind.OPEN_SCENE)
-                    || !spaceOwned && (members.size()<2 || Schema2CombatRules.placementCommand(command))
-                    || members.size()>Schema2CombatHistory.MAX_CHARACTER_MEMBERS || expectedCharacterVersions==null)
-                throw rejected("S2_COMBAT_REQUEST");
-            members = members.stream().sorted(Comparator.comparing(Member::characterId, Schema2CombatHistory.UUID_ORDER)).toList();
-            Set<UUID> ids = new HashSet<>();
-            for (Member member:members) {
-                uuid(member.characterId()); uuid(member.preparationOperationId());
-                uuid(member.identity().runId()); uuid(member.identity().snapshotId());
-                if (!ids.add(member.characterId())) throw rejected("S2_COMBAT_REQUEST");
-            }
-            if (!ids.equals(expectedCharacterVersions.keySet()) || expectedCharacterVersions.values().stream().anyMatch(v->v==null||v<0||v>=Schema2CharacterRuntime.MAX_EVENTS)
-                    || (command.kind()==Kind.START || command.kind()==Kind.OPEN_SCENE ? expectedVersion!=-1 : expectedVersion<0)) throw rejected("S2_COMBAT_REQUEST");
-            expectedCharacterVersions = Map.copyOf(expectedCharacterVersions);
-        }
-        public String digest() { return fingerprint(this); }
-    }
     public record Save(History combat, List<Schema2CharacterRuntime.History> characters) {
         public Save { characters=List.copyOf(characters); }
     }
     private record Pending(UUID combatId,String digest,Save save,boolean isolated) { }
     private record CharacterRead(Map<UUID,Schema2CharacterRuntime.History> histories,
-            Map<UUID,Schema2CharacterRuntimeService.Material> materials) { }
+            Map<UUID,Schema2CharacterMaterial> materials) { }
     private final DataSource runtime;
     private final IntUnaryOperator dice;
     private final JdbcSchema2CombatRuntimeRepository combats=new JdbcSchema2CombatRuntimeRepository();
@@ -63,7 +34,7 @@ public final class Schema2CombatRuntimeService {
         characterService=new Schema2CharacterRuntimeService(runtime);
     }
 
-    public Result execute(Request request) {
+    public Result execute(Schema2CombatRequest request) {
         Objects.requireNonNull(request);
         String unsupported = JdbcSchema2CombatRuntimeRepository.sqliteRequiredCode(request.command().kind());
         if (unsupported != null) return new Result(Status.REJECTED, unsupported, null);
@@ -103,7 +74,7 @@ public final class Schema2CombatRuntimeService {
                 var command=Schema2CombatCharacterFacts.command(context.material(),request.combatId(),request.operationId(),
                         request.command().actorId()==null?change.characterId():request.command().actorId(),change);
                 var state=change.before();
-                var childRequest=new Schema2CharacterRuntimeService.Request(child,state.identity(),state.campaignId(),state.characterId(),
+                var childRequest=new Schema2CharacterRequest(child,state.identity(),state.campaignId(),state.characterId(),
                         state.preparationOperationId(),Schema2RulesBinding.from(context.material()),state.version(),command,Map.of());
                 if (!Schema2CombatCharacterFacts.verify(context.material(),state,command,change.healthResult(),change.after()).equals(change.after()))
                     throw new SQLException("S2_COMBAT_HEALTH_RESULT");
@@ -131,7 +102,7 @@ public final class Schema2CombatRuntimeService {
         }
     }
 
-    public Result inspect(Request request) {
+    public Result inspect(Schema2CombatRequest request) {
         String unsupported = JdbcSchema2CombatRuntimeRepository.sqliteRequiredCode(request.command().kind());
         if (unsupported != null) return new Result(Status.REJECTED, unsupported, null);
         return transact(true,request.combatId(),request.digest(),null,connection->{
@@ -217,7 +188,7 @@ public final class Schema2CombatRuntimeService {
 
     private CharacterRead readCharacters(Connection c,List<Member> members) throws SQLException {
         Map<UUID,Schema2CharacterRuntime.History> found=new LinkedHashMap<>();
-        Map<UUID,Schema2CharacterRuntimeService.Material> materials=new LinkedHashMap<>();
+        Map<UUID,Schema2CharacterMaterial> materials=new LinkedHashMap<>();
         for (Member member:members) {
             var history=characters.read(c,member.characterId());
             if (history==null) throw rejected("S2_COMBAT_CHARACTER_NOT_FOUND");
@@ -229,14 +200,14 @@ public final class Schema2CombatRuntimeService {
         }
         return new CharacterRead(found,materials);
     }
-    private Map<UUID,Schema2CharacterRuntimeService.Material> readMaterials(Connection c,List<Member> members) throws SQLException {
-        Map<UUID,Schema2CharacterRuntimeService.Material> materials=new LinkedHashMap<>();
+    private Map<UUID,Schema2CharacterMaterial> readMaterials(Connection c,List<Member> members) throws SQLException {
+        Map<UUID,Schema2CharacterMaterial> materials=new LinkedHashMap<>();
         for(Member member:members) materials.put(member.characterId(),characterService.material(c,member.identity(),member.preparationOperationId()));
         return materials;
     }
     private Map<UUID,Schema2CombatRules.Context> contexts(List<Member> members,
             Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Long> versions,
-            Map<UUID,Schema2CharacterRuntimeService.Material> materials) {
+            Map<UUID,Schema2CharacterMaterial> materials) {
         return domain.contexts(members, histories, versions, materials);
     }
     private CharacterRead validate(Connection c,History history) throws SQLException {
@@ -245,7 +216,7 @@ public final class Schema2CombatRuntimeService {
         return all;
     }
     private void validateEvents(History history,Map<UUID,Schema2CharacterRuntime.History> all,
-            Map<UUID,Schema2CharacterRuntimeService.Material> materials) throws SQLException {
+            Map<UUID,Schema2CharacterMaterial> materials) throws SQLException {
         try { domain.validateCombatEvents(history, all, materials); }
         catch (Schema2RuntimeFactsException invalid) { throw new SQLException(invalid.getMessage(), invalid); }
     }
@@ -274,60 +245,10 @@ public final class Schema2CombatRuntimeService {
     }
 
     private void reserve(History previous,Schema2CombatRules.Prepared prepared,
-            Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Request request) {
+            Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Schema2CombatRequest request) {
         domain.reserve(previous, prepared, histories, contexts, request);
     }
 
-    private static String fingerprint(Request request) {
-        try {
-            var bytes=new ByteArrayOutputStream(); var out=new DataOutputStream(bytes);
-            text(out,"local-dnd/schema2-combat-command/3"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
-            var binding=request.rules(); text(out,binding.canonicalProfile()); text(out,binding.compositionAlgorithm());
-            out.writeInt(binding.members().size());
-            for (var m:binding.members()) { text(out,m.moduleKey()); text(out,m.releaseVersion()); text(out,m.role().name()); text(out,m.rawZipSha256()); text(out,m.logicalSha256()); }
-            text(out,binding.compositionSha256()); text(out,binding.finalRulesSha256()); text(out,binding.chainSha256());
-            out.writeLong(request.expectedVersion()); out.writeInt(request.members().size());
-            for (Member member:request.members()) { id(out,member.characterId()); id(out,member.identity().runId()); id(out,member.identity().snapshotId()); id(out,member.preparationOperationId()); out.writeLong(request.expectedCharacterVersions().get(member.characterId())); }
-            Command command=request.command(); text(out,command.kind().name()); id(out,command.actorId()); id(out,command.targetId()); id(out,command.itemId());
-            out.writeInt(command.path().size()); for (Position p:command.path()) { out.writeInt(p.x()); out.writeInt(p.y()); }
-            out.writeInt(command.deployments().size()); for (Deployment d:command.deployments()) { id(out,d.characterId()); out.writeInt(d.position().x()); out.writeInt(d.position().y()); out.writeInt(d.side()); }
-            out.writeInt(command.tieBreakOrder().size()); for (UUID id:command.tieBreakOrder()) id(out,id);
-            id(out,command.flowKey()); id(out,command.leafKey()); id(out,command.windowKey()); id(out,command.opportunityKey());
-            cast(out,command.castInput());
-            ReadyInput ready=command.readyInput();out.writeBoolean(ready!=null);
-            if(ready!=null) {
-                text(out,ready.trigger().kind().name());id(out,ready.trigger().subjectId());position(out,ready.trigger().position());
-                text(out,ready.responseKind().name());id(out,ready.targetId());id(out,ready.itemId());
-                out.writeInt(ready.path().size());for(Position point:ready.path())position(out,point);cast(out,ready.spell());
-            }
-            id(out,command.readyKey());ZoneInput zone=command.zoneInput();out.writeBoolean(zone!=null);
-            if(zone!=null){ruleIdentity(out,zone.rule());position(out,zone.center());}id(out,command.zoneKey());
-            var health=command.healthInput();out.writeBoolean(health!=null);
-            if(health!=null){ruleIdentity(out,health.rule());ruleIdentity(out,health.effect());text(out,Objects.toString(health.temporaryChoice(),""));text(out,health.adjudication());}
-            out.writeInt(command.seconds());
-            out.writeInt(command.monsterDeployments().size());for(MonsterDeployment d:command.monsterDeployments()) {id(out,d.monsterId());ruleIdentity(out,d.monster());position(out,d.position());out.writeInt(d.side());}
-            BreathInput breath=command.breathInput();out.writeBoolean(breath!=null);if(breath!=null) {entryIdentity(out,breath.action());out.writeInt(breath.direction());}
-            MonsterRestInput rest=command.monsterRestInput();out.writeBoolean(rest!=null);if(rest!=null) {id(out,rest.restKey());text(out,rest.kind().name());}
-            out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
-        } catch (IOException|NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
-    }
-    private static void cast(DataOutputStream out,CastInput cast)throws IOException {
-        out.writeBoolean(cast!=null);if(cast==null)return;
-        ruleIdentity(out,cast.castingRule());ruleIdentity(out,cast.spell());out.writeInt(cast.targets().size());
-        for(UUID target:cast.targets())id(out,target);id(out,cast.materialItemId());out.writeInt(cast.slotLevel());id(out,cast.targetCastFrameKey());
-        // Retain every pre-area request byte. The new branch has no legacy empty-target form.
-        if(cast.coneDirection()!=null){text(out,"S2_SPELL_CONE_DIRECTION_V1");out.writeInt(cast.coneDirection());}
-    }
-    private static void entryIdentity(DataOutputStream out,com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity identity)throws IOException {
-        ruleIdentity(out,identity.rule());text(out,identity.collectionKey());text(out,identity.moduleKey());text(out,identity.entryKey());
-    }
-    private static void ruleIdentity(DataOutputStream out,com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity identity)throws IOException {
-        out.writeBoolean(identity!=null);if(identity!=null){text(out,identity.moduleKey());text(out,identity.ruleType());text(out,identity.ruleKey());}
-    }
-    private static void position(DataOutputStream out,Position point)throws IOException {out.writeBoolean(point!=null);if(point!=null){out.writeInt(point.x());out.writeInt(point.y());}}
-    private static void text(DataOutputStream out,String value) throws IOException { byte[] bytes=value.getBytes(StandardCharsets.UTF_8); out.writeInt(bytes.length); out.write(bytes); }
-    private static void id(DataOutputStream out,UUID id) throws IOException { out.writeBoolean(id!=null); if(id!=null) { out.writeLong(id.getMostSignificantBits()); out.writeLong(id.getLeastSignificantBits()); } }
-    private static void uuid(UUID id) { if(id==null||id.version()!=4||id.variant()!=2) throw rejected("S2_COMBAT_IDENTITY"); }
     private static IllegalArgumentException rejected(String code) { return new IllegalArgumentException(code); }
     @FunctionalInterface private interface Work { Result run(Connection c) throws SQLException; }
     private Result transact(boolean inspection, UUID combatId, String digest, Save restoration, Work work) {

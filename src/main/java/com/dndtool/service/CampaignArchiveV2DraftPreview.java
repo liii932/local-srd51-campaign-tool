@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.service.storage.CampaignJson;
 import java.util.Objects;
 import java.util.Set;
 
@@ -24,7 +25,7 @@ final class CampaignArchiveV2DraftPreview {
                 state.feats().size(),
                 state.multiclassProficiencies().size(), state.proficiencyGrants().size());
         return new Result(Status.READY,
-                new Preview(state.eventTail(), counts, CampaignArchiveDigest.sha256(content)));
+                new Preview(state.eventTail(), counts, CampaignJson.sha256(content)));
     }
 
     enum Status {

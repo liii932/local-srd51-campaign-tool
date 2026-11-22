@@ -345,7 +345,7 @@ class CampaignImprovedCriticalIntegrationTest {
 
         void create() {
             var library = service.ruleLibrary();
-            var members = BundledCampaignRules.artifacts().stream().map(artifact -> {
+            var members = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD).stream().map(artifact -> {
                 var imported = library.importArtifact(id(), artifact.originalZip()).imported().member();
                 var review = library.review(imported.moduleKey(), imported.releaseVersion());
                 assertEquals(imported, review.imported().member());

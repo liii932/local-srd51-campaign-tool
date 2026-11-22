@@ -3,7 +3,8 @@ package com.dndtool.service;
 import com.dndtool.module.composition.*;
 import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
-import com.dndtool.service.Schema2CharacterRuntimeService.*;
+import com.dndtool.service.Schema2CharacterRuntimeService.Result;
+import com.dndtool.service.Schema2CharacterRuntimeService.Status;
 import com.dndtool.testing.IsolatedJvmTest;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,7 @@ class Schema2CharacterCheckServiceTest {
     @Test void preparedInitializedSkillToolAndAbilityFactsSurviveSourceLossReplayAndDirectRecovery() throws Exception {
         var fixture = new Schema2CheckTestFixture(); fixture.initialize(); fixture.prepareTools(); fixture.source.unavailable(true);
         fixture.nextRolls.addAll(List.of(4, 18));
-        Request skill = fixture.request(check("SKILL", "ability.strength", ATHLETICS, 22, true, false));
+        Schema2CharacterRequest skill = fixture.request(check("SKILL", "ability.strength", ATHLETICS, 22, true, false));
         var resolved = fixture.execute(skill); committed(resolved);
         assertEquals(new CheckResult(4, 18, 18, 2, 2, 22, true, true, false), resolved.event().checkResult());
         assertNull(resolved.event().hitDieRoll()); assertEquals(2, fixture.rolls);
@@ -44,16 +45,16 @@ class Schema2CharacterCheckServiceTest {
 
     @Test void staleRuleSourceCommandAndOperationMismatchesRejectBeforeAnyDiceOrWrites() throws Exception {
         var fixture = new Schema2CheckTestFixture(); fixture.initialize();
-        Request valid = fixture.request(check("SKILL", "ability.strength", ATHLETICS, 10, false, false));
+        Schema2CharacterRequest valid = fixture.request(check("SKILL", "ability.strength", ATHLETICS, 10, false, false));
         committed(fixture.execute(valid)); int writes = fixture.runtime.writes;
-        var stale = new Request(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, fixture.binding, 0, valid.command(), Map.of());
+        var stale = new Schema2CharacterRequest(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, fixture.binding, 0, valid.command(), Map.of());
         assertEquals("S2_CHARACTER_STALE_VERSION", fixture.service.execute(stale).code());
-        var conflict = new Request(valid.operationId(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, fixture.binding, 0,
+        var conflict = new Schema2CharacterRequest(valid.operationId(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, fixture.binding, 0,
                 check("SKILL", "ability.strength", ATHLETICS, 11, false, false), Map.of());
         assertEquals("S2_CHARACTER_OPERATION_CONFLICT", fixture.service.execute(conflict).code());
         var badBinding = new Schema2RulesBinding(fixture.binding.canonicalProfile(), fixture.binding.compositionAlgorithm(),
                 fixture.binding.members(), "0".repeat(64), fixture.binding.finalRulesSha256(), fixture.binding.chainSha256());
-        var mismatch = new Request(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, badBinding,
+        var mismatch = new Schema2CharacterRequest(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, badBinding,
                 fixture.state.version(), valid.command(), Map.of());
         assertEquals("S2_RULES_BINDING_MISMATCH", fixture.service.execute(mismatch).code());
         var badRule = new CheckInput(new Schema2CompositionKernel.RuleIdentity(EXT, "adventure.check", "check.srd2014"),
@@ -105,7 +106,7 @@ class Schema2CharacterCheckServiceTest {
     public static final class FaultProbe {
         public static void main(String[] args) throws Exception {
             var fixture = new Schema2CheckTestFixture(); fixture.initialize(); fixture.prepareTools();
-            Request request = fixture.request(check("TOOL", "ability.dexterity", TOOL, 12, true, false));
+            Schema2CharacterRequest request = fixture.request(check("TOOL", "ability.dexterity", TOOL, 12, true, false));
             History before = fixture.service.read(CHARACTER);
             if (args[0].equals("unknown")) {
                 fixture.runtime.lostCommit = Schema2RuntimeJdbcFixture.LostCommit.valueOf(args[1]);

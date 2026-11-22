@@ -2,7 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
-import com.dndtool.service.Schema2CharacterRuntimeService.*;
+import com.dndtool.service.Schema2CharacterRuntimeService.Result;
+import com.dndtool.service.Schema2CharacterRuntimeService.Status;
 import com.dndtool.testing.IsolatedJvmTest;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class Schema2CharacterEquipmentHealthServiceTest {
         assertEquals(writes, fixture.runtime.writes); assertEquals(0, fixture.rolls);
         fixture.nextRolls.addAll(List.of(10, 19, 10, 2));
         fixture.commit(deathSave()); fixture.commit(deathSave());
-        Request third = fixture.request(deathSave()); var stable = fixture.execute(third); committed(stable);
+        Schema2CharacterRequest third = fixture.request(deathSave()); var stable = fixture.execute(third); committed(stable);
         assertEquals(new HealthResult(List.of(), 10, 2, 0, 0), stable.event().healthResult());
         assertTrue(fixture.state.health().stable()); assertEquals(120L, fixture.state.health().stableRecoveryMinute());
         assertEquals(4, fixture.rolls); writes = fixture.runtime.writes;
@@ -119,7 +120,7 @@ class Schema2CharacterEquipmentHealthServiceTest {
     public static final class FaultProbe {
         public static void main(String[] args) throws Exception {
             var fixture = new Schema2CheckTestFixture(); fixture.initialize(); fixture.commit(effect(DAMAGE, null));
-            Request request = fixture.request(effect(HEALING, null)); History before = fixture.service.read(CHARACTER);
+            Schema2CharacterRequest request = fixture.request(effect(HEALING, null)); History before = fixture.service.read(CHARACTER);
             if (args[0].equals("corrupt")) {
                 UUID tool = fixture.acquire(ITEM_TOOL); fixture.commit(equipment("ITEM_EQUIPPED", tool, null, "MAIN_HAND"));
                 fixture.commit(effect(HEALING, null));

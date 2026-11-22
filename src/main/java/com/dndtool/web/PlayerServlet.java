@@ -2,14 +2,12 @@ package com.dndtool.web;
 
 import com.dndtool.service.storage.*;
 import com.google.gson.JsonObject;
-import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 /** Finite JSON transport. Authentication cookies never use the Host HttpSession. */
-@WebServlet(name = "PlayerServlet", urlPatterns = {"/player", "/player/", "/api/player/*"})
 public final class PlayerServlet extends HttpServlet {
     public static final String SESSION_COOKIE = "DNDPLAYERSESSION", DEVICE_COOKIE = "DNDPLAYERDEVICE";
     private static final int MAX_BODY = 8192;

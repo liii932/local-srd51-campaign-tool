@@ -18,9 +18,16 @@
 
 ## 迁移合同
 
-原 MySQL 运行链由 JDBC 核验工具及隔离测试使用，源文件位于 `src/main/resources/db/migration/`。V001—V018 是现有清单与数据库账本核对的历史；V011—V018
+离线维护使用同一版本的源码仓库及其 Maven 编译输出。在仓库根运行 `mvn compile` 后，
+`SchemaMigrations.loadExpectations()` 从 `target/classes/db/migration/` 读取原 MySQL 运行链 V001—V042，
+逐项核对批准载荷。SQL 原件位于 `src/main/resources/db/migration/`。来源链 V001—V012 的 SQL
+原件位于 `database/rules/migration/`，由 `RuleSchemaMigrations` 提供批准清单。
+运行 `python3 -B tools/rule-packages/verify-language-jdbc.py` 可离线核对两条清单与原 SQL。
+`tools/rule-packages/rule-package.sh` 从本次编译的 `target/classes` 启动维护 CLI。
+
+V001—V018 是现有清单与数据库账本核对的历史；V011—V018
 依次建立角色目录、一级创建、升级与生命骰、职业特性生命周期、多职业/ASI/专长、format 2
-角色状态来源及多职业共享法术位计算目录基础的 DRAFT 前向状态：
+角色状态来源及多职业施法贡献目录的 DRAFT 前向状态：
 
 - 保留现有数据库时，不修改、合并、重命名或重跑其中已应用的迁移，schema 变更使用下一个编号的前向迁移；
 - 原型版本也可选择新的初始化结构并重建数据库，不要求未来设计继承现有表形状或完整迁移链。采用时同步初始化入口、应用清单、验证器、测试和文档；真实数据库清空、重建与迁移须明确授权，设计修改本身不执行这些操作；
@@ -34,7 +41,7 @@
 
 V019 建立永久运行身份登记、不可变快照头和类型化语言镜像；V020 追加空工具镜像表。它们不复制旧
 规则目录或创建战役，当前 Repository 只接受 DRAFT PARTITION。身份、调用方事务、授权
-与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。应用迁移清单预期
+与验收合同见[运行语言快照分区](rules/runtime-language-snapshot.md)及[工具熟练目录](rules/tool-catalog-partition.md)。离线运行迁移清单预期
 V001—V042；独立 schema 诊断按该清单校验。
 V021 追加 schema 2 INTERNAL 类型化组合、最终规则、完整覆盖链、永久守卫与操作收据；
 来源读取和原子转存合同见[来源到运行快照](rules/schema-2-runtime-snapshot.md)，增量授权见
@@ -117,7 +124,7 @@ installer 仅获准确材料列 INSERT，accepter/app/agent 对作者材料只�
 | Schema | 身份 | 职责 |
 | --- | --- | --- |
 | 已有 `dnd_tool_se` | `dnd_tool_se_agent` | 只读核验、检查自身权限 |
-| 已有 `dnd_tool_se` | `dnd_tool_se_migrator` | 由独立授权批准的前向迁移和所需备份读取 |
+| 已有 `dnd_tool_se` | `dnd_tool_se_migrator` | 经独立授权的前向迁移 |
 | 已有 `dnd_tool_se` | `dnd_tool_se_app` | 保留的最小运行权限合同，生产 SQLite WAR 使用外部文件权限 |
 | `dnd_tool_se_it` | `dnd_tool_se_it` | JDBC 事务集成测试使用连接内临时表 |
 | 隔离、可销毁实例内的 `dnd_tool_se` | 专用迁移与只读验收身份 | 原样重放 V001—V042，再只读核验 |

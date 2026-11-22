@@ -2,8 +2,10 @@ package com.dndtool.service.storage;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.FinalCheck;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2PreparationIdentity;
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -42,8 +44,32 @@ class CampaignRuleContextTest {
                         "proficiency_grants", "trade_language")));
     }
 
+    @Test void initialPlanKeepsItsPortableTagsAndFieldsOnSameVersionReopen() {
+        var context = material(BundledCampaignRules.CHECK_VARIANT).restore();
+        UUID campaign = UUID.randomUUID();
+        UUID character = UUID.randomUUID();
+        var preparation = Schema2PreparationIdentity.random();
+        var plan = context.initialPlan(campaign, character, preparation, "fighter", "custom_artisan");
+        byte[] encoded = CampaignDomainCodec.encode(plan);
+        var portable = CampaignJson.read(encoded);
+        assertEquals(Set.of("type", "campaignId", "characterId", "character"), portable.keySet());
+        assertEquals("initial.InitialPlan", portable.get("type").getAsString());
+        assertEquals(campaign.toString(), portable.get("campaignId").getAsString());
+        assertEquals(character.toString(), portable.get("characterId").getAsString());
+
+        var characterPlan = portable.getAsJsonObject("character");
+        assertEquals(Set.of("type", "identity", "binding", "sources", "choices", "slots", "grants"), characterPlan.keySet());
+        assertEquals("initial.Plan", characterPlan.get("type").getAsString());
+        assertEquals(CampaignDomainCodec.toJson(preparation), characterPlan.get("identity"));
+        assertEquals(CampaignDomainCodec.toJson(context.binding()), characterPlan.get("binding"));
+
+        var restored = CampaignDomainCodec.decode(encoded, InitialPlan.class);
+        assertEquals(plan, restored);
+        assertArrayEquals(encoded, CampaignDomainCodec.encode(restored));
+    }
+
     @Test void validTypedMaterialWithoutRequiredMechanismsCannotBeRestoredForExecution() {
-        var incomplete = ProductionSchema2Projection.compose(BundledCampaignRules.artifacts().subList(0, 1));
+        var incomplete = ProductionSchema2Projection.compose(BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD).subList(0, 1));
         var restored = ProductionSchema2Projection.restore(incomplete.members(), incomplete.projection().rules(),
                 incomplete.projection().entries(), incomplete.projection().chains());
         assertEquals(incomplete.chainSha256(), restored.chainSha256());

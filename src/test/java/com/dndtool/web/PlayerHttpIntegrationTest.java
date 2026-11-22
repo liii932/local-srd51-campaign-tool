@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class PlayerHttpIntegrationTest {
     @TempDir Path temporary;
     private static final String HOST = "http://127.0.0.1:8080", PLAYER = "https://127.0.0.1:8443";
+    private static final String HOST_PLAYERS = HOST + "/api/host/storage/players/";
     private final HttpClient dm = HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).connectTimeout(Duration.ofSeconds(5)).build();
 
     @Test void trustedHttpsApplicationApprovalSingleWriterAndExactReceiptUseTheRealBoundary() throws Exception {
@@ -47,7 +48,7 @@ class PlayerHttpIntegrationTest {
             first=ok(post(trusted,"join",csrf,json("invitation",code,"nickname","同名"),null,PLAYER)); assertFalse(first.has("view"));
             JsonObject other=ok(get(second,PLAYER+"/api/player/session")); other=ok(post(second,"join",csrf(other),json("invitation",code,"nickname","同名"),null,PLAYER));
             assertFalse(other.has("view"));
-            JsonObject applications=ok(get(dm,HOST+"/api/host/storage/players/state")); assertEquals(2,applications.getAsJsonArray("applications").size());
+            JsonObject applications=hostState(); assertEquals(2,applications.getAsJsonArray("applications").size());
             host("approve",Map.of("applicationId",csrf(first),"memberId",""));
             first=ok(get(trusted,PLAYER+"/api/player/state")); assertEquals("APPROVED",first.getAsJsonObject("session").get("status").getAsString());
             assertNotEquals(csrf,csrf(first)); assertFalse(ok(get(second,PLAYER+"/api/player/state")).has("view"));
@@ -70,20 +71,43 @@ class PlayerHttpIntegrationTest {
             assertEquals(403, post(trusted, "receipt-close", csrf(checked), receipt, writer, "https://wrong.invalid").statusCode());
             assertEquals("NOT_EXECUTED", ok(post(trusted, "receipt-close", csrf(checked), receipt, writer, PLAYER)).getAsJsonObject("receipt").get("state").getAsString());
             assertEquals(before + 1, storage.current().revision());
-            host("close",Map.of());assertEquals("APPROVED",ok(get(trusted,PLAYER+"/api/player/state")).getAsJsonObject("session").get("status").getAsString());
-            host("pause",Map.of("paused","true"));assertFalse(ok(get(trusted,PLAYER+"/api/player/state")).getAsJsonObject("session").get("writeEnabled").getAsBoolean());
+            JsonObject beforeClose = hostState();
+            assertTrue(beforeClose.get("invitationOpen").getAsBoolean());
+            assertFalse(beforeClose.get("csrf").getAsString().isBlank());
+            host("close", Map.of(), beforeClose);
+
+            JsonObject afterClose = hostState();
+            assertFalse(afterClose.get("invitationOpen").getAsBoolean());
+            assertFalse(afterClose.get("paused").getAsBoolean());
+            assertFalse(afterClose.get("csrf").getAsString().isBlank());
+            assertEquals("APPROVED", ok(get(trusted, PLAYER + "/api/player/state"))
+                    .getAsJsonObject("session").get("status").getAsString());
+
+            host("pause", Map.of("paused", "true"), afterClose);
+            assertTrue(hostState().get("paused").getAsBoolean());
+            assertFalse(ok(get(trusted, PLAYER + "/api/player/state"))
+                    .getAsJsonObject("session").get("writeEnabled").getAsBoolean());
         }
     }
     private static HttpClient client(PlayerLoopLauncher launcher) { return HttpClient.newBuilder().sslContext(launcher.clientTrust()).cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).connectTimeout(Duration.ofSeconds(5)).build(); }
+    private JsonObject hostState() throws Exception {
+        return ok(get(dm, HOST_PLAYERS + "state"));
+    }
     private JsonObject host(String action,Map<String,String> fields) throws Exception {
-        JsonObject state=ok(get(dm,HOST+"/api/host/storage/state"));String epoch=state.getAsJsonObject("storage").get("epoch").getAsString(),revision=state.getAsJsonObject("campaign").get("revision").getAsString();
+        return host(action, fields, hostState());
+    }
+    private JsonObject host(String action, Map<String, String> fields, JsonObject state) throws Exception {
+        String epoch = state.get("epoch").getAsString();
+        String revision = state.get("revision").getAsString();
         Map<String,List<String>> values=new LinkedHashMap<>();fields.forEach((k,v)->values.put(k,List.of(v)));
         String encoded=String.join("&",fields.entrySet().stream().map(e->encode(e.getKey())+"="+encode(e.getValue())).toList());
-        var request=HttpRequest.newBuilder(URI.create(HOST+"/api/host/storage/players/"+action)).header("Content-Type","application/x-www-form-urlencoded; charset=UTF-8")
+        var request=HttpRequest.newBuilder(URI.create(HOST_PLAYERS+action)).header("Content-Type","application/x-www-form-urlencoded; charset=UTF-8")
                 .header("Origin",HOST).header("Sec-Fetch-Site","same-origin").header("Sec-Fetch-Mode","cors").header("Sec-Fetch-Dest","empty")
                 .header("X-CSRF-Token",state.get("csrf").getAsString()).header("X-Host-State-Epoch",epoch).header("X-Object-Row-Version",revision)
                 .header("X-Request-Id",UUID.randomUUID().toString()).header("X-Request-Digest",StorageRequestDigest.sha256("players/"+action,epoch,revision,values)).POST(HttpRequest.BodyPublishers.ofString(encoded)).build();
-        return ok(dm.send(request,HttpResponse.BodyHandlers.ofString()));
+        JsonObject reply = ok(dm.send(request, HttpResponse.BodyHandlers.ofString()));
+        assertFalse(reply.has("csrf"), () -> "Host " + action + " response contains csrf");
+        return reply;
     }
     private static HttpResponse<String> post(HttpClient client,String action,String csrf,JsonObject input,String connection,String origin) throws Exception {
         var request=HttpRequest.newBuilder(URI.create(PLAYER+"/api/player/"+action)).header("Content-Type","application/json").header("Origin",origin).header("Sec-Fetch-Site","same-origin").header("Sec-Fetch-Mode","cors").header("Sec-Fetch-Dest","empty").header("X-CSRF-Token",csrf);

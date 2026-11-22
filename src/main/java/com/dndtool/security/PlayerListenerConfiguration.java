@@ -23,7 +23,6 @@ public record PlayerListenerConfiguration(String origin, String address, String 
             if (!selected.getHostAddress().equals(address) || !(selected.isLoopbackAddress() || selected.isSiteLocalAddress() || selected.isLinkLocalAddress())) throw new IllegalArgumentException();
             URI uri = new URI(origin);
             String host = uri.getHost();
-            if (host != null && host.startsWith("[")) host = host.substring(1, host.length() - 1);
             String authority = address + ":8443";
             if (!"https".equals(uri.getScheme()) || uri.getPort() != 8443 || !address.equals(host)
                     || uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null

@@ -24,9 +24,10 @@ V014 为 236 个职业或子职业拥有的特性固定且只固定一种执行�
 13 个自动特性是：野蛮人的 Rage；吟游诗人的 Bardic Inspiration、Font of Inspiration；
 牧师的 Channel Divinity；德鲁伊的 Wild Shape；战士的 Second Wind、Action Surge、
 Indomitable；武僧的 Ki；圣武士的 Divine Sense、Lay on Hands；游荡者的 Stroke of Luck；
-术士的 Font of Magic。这里只自动处理对应资源的获得、上限和休息恢复，不宣称自动处理攻击、
-伤害、目标、动作经济、法术或叙事效果。Superior Inspiration、Perfect Self、Cleansing Touch、
-Sorcerous Restoration 等特殊触发未被休息引擎覆盖，因而保持明确阻断。
+术士的 Font of Magic。这些目录条目声明对应资源的取得、容量和休息恢复类别。旧 DRAFT 的
+一级创建和升级通过 `ClassFeatureRules` 处理特性授予，通过 `LevelAdvancementRules` 求值
+相应容量。Superior Inspiration、Perfect Self、Cleansing Touch、Sorcerous Restoration 等
+特殊触发仍属于该目录的阻断项。
 
 ## 子职业与逐级矩阵
 
@@ -53,35 +54,24 @@ Draconic Bloodline、The Fiend 为 1；Circle of the Land、School of Evocation 
 参数化测试从不可变 V011 行独立重建该矩阵，检查 236 个键唯一、等级为 1—20 且三种状态之和
 精确等于每个职业的目录总数。V014 的 schema 记录还要求全局计数精确为 13/24/199。
 
-## 资源恢复与裁决边界
+## 资源恢复声明与裁决记录
 
 16 个职业资源具有 `resource.execution_mode` 和完整覆盖 1—20 的
-`resource.recovery_profile`。Pact Magic、Mystic Arcanum 与 Arcane Recovery 的资源状态明确
-阻断；若权威状态中出现这些资源，规则层以 `AUTHORITATIVE_STATE_MISMATCH` 拒绝。其余资源使用
-`RESOURCE_CURRENT_SET_TO_MAXIMUM` 类型化效果；短休只恢复短休资源，长休同时恢复短休和长休资源。
-吟游激励在 1—4 级为长休恢复，5—20 级为短休恢复。
+`resource.recovery_profile`。Pact Magic、Mystic Arcanum 与 Arcane Recovery 在这套旧 DRAFT
+目录中的资源状态为阻断。吟游激励在 1—4 级声明长休恢复，5—20 级声明短休恢复。
 
-恢复组件的 `prepare` 接收与资源状态同一权威快照中的 `charismaScore`（1—30），在服务端
-计算魅力修正并重新求值资源上限；不使用常量 0 或从资源上限反推属性。越界属性或资源上限
-与该属性不符时使用 `AUTHORITATIVE_STATE_MISMATCH`。这一参数不属于客户端可指定的派生结果。
-
-`module.ResourceRecoveryProfile` 统一承担目录校验和 `ClassResourceRecoveryRules` 的恢复
-区间解析，业务层不另写正则或区间解释器。文本至多 200 个 ASCII 字符，以逗号分隔
+`module.ResourceRecoveryProfile` 为 canonical-v2 目录校验和 schema 2 规则组合、休息共用。
+文本至多 200 个 ASCII 字符，以逗号分隔
 `minimum-maximum:SHORT_REST` 或 `minimum-maximum:LONG_REST`；包括单级区间也必须写
 两个端点。范围须按顺序连续覆盖 1—20，拒绝未知恢复方式、前导零、空洞、重叠、乱序和坏 Unicode。
 结构化入口 `ofRanges` 接收最多 20 个类型化 `Range(minimumLevel, maximumLevel, rest)`，
-共用完整覆盖校验并复制为不可变集合；短休仅恢复 SHORT_REST，长休恢复两种资源。
+共用完整覆盖校验并复制为不可变集合。短休匹配 `SHORT_REST`，长休匹配两种恢复类别。
+canonical-v2 目录要求该属性唯一、序号为 1 且声明 `TEXT`。
 
-恢复规则在判断自动资源是否已满、尚未获得或无限之前，验证整个恢复 profile，包括当前等级
-以后的区间；属性必须唯一、序号为 1 且声明 `TEXT`。失败使用 `MALFORMED_FROZEN_CATALOG`，
-不返回部分恢复效果。旧 DRAFT 组件本身不代表完整休息命令；schema 2 的有限作者、来源、
-运行镜像和真实资源命令见[内部成长合同](schema-2-character-statistics.md)，标准休息、逐次
-生命骰、时间和治疗见[内部休息合同](schema-2-character-rest.md)。旧组件不单独证明资源
-作者源、类型化来源表、运行镜像或完整战役休息资格已采用。
-
-DM 裁决只接受 `SUCCESS`、`FAILURE`、`NO_EFFECT`，并按冻结算法绑定到一个稳定裁决键。
-自动能力不能改走 DM 裁决，阻断能力不能被裁决伪装成可执行。权威写入必须先证明角色已经获得
-该特性，再在同一事务保存根事件、裁决行、字段/资源变化、row version、事件尾和幂等结果。
+V014 的裁决表将 `SUCCESS`、`FAILURE`、`NO_EFFECT` 和裁决键存为有界字段，并通过外键
+关联角色的特性状态。旧 DRAFT 的职业特性裁决和资源恢复事件仍未接入业务执行。现行 schema 2
+资源命令见[内部成长合同](schema-2-character-statistics.md)，标准休息、逐次生命骰、时间和治疗
+见[内部休息合同](schema-2-character-rest.md)。
 
 ## V014 状态与发布门
 

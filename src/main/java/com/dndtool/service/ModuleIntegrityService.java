@@ -7,9 +7,6 @@ import com.dndtool.module.ModuleContentHasher;
 import com.dndtool.module.ModuleHashManifest;
 import com.dndtool.persistence.CampaignModuleBindingRepository;
 import com.dndtool.persistence.CharacterModuleBindingRepository;
-import com.dndtool.persistence.JdbcCampaignModuleBindingRepository;
-import com.dndtool.persistence.JdbcCharacterModuleBindingRepository;
-import com.dndtool.persistence.JdbcModuleCatalogRepository;
 import com.dndtool.module.ModuleCatalog;
 import com.dndtool.persistence.ModuleCatalogRepository;
 import java.sql.SQLException;
@@ -20,7 +17,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import javax.sql.DataSource;
 
 /** Recomputes and compares approved, published, frozen and actual module digests. */
 public final class ModuleIntegrityService {
@@ -62,14 +58,6 @@ public final class ModuleIntegrityService {
         this.releaseVerifier = new ModuleReleaseVerifier(
                 Objects.requireNonNull(moduleRepository), hasher::sha256,
                 Objects.requireNonNull(manifest), releaseRegistry);
-    }
-
-    /** Builds the production read-only verifier over the Tomcat-owned DataSource. */
-    public static ModuleIntegrityService using(DataSource dataSource) {
-        return new ModuleIntegrityService(
-                new JdbcModuleCatalogRepository(dataSource),
-                new JdbcCampaignModuleBindingRepository(dataSource),
-                new JdbcCharacterModuleBindingRepository(dataSource));
     }
 
     /**

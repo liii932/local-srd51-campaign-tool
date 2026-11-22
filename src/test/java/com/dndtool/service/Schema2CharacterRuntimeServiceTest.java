@@ -5,7 +5,8 @@ import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2PreparationIdentity;
-import com.dndtool.service.Schema2CharacterRuntimeService.*;
+import com.dndtool.service.Schema2CharacterRuntimeService.Result;
+import com.dndtool.service.Schema2CharacterRuntimeService.Status;
 import com.dndtool.testing.IsolatedJvmTest;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -58,14 +59,14 @@ class Schema2CharacterRuntimeServiceTest {
             Fixture fixture = new Fixture();
             switch (args[0]) {
                 case "commands" -> {
-                    Request initialize = fixture.request(-1, INITIAL);
+                    Schema2CharacterRequest initialize = fixture.request(-1, INITIAL);
                     Result initialized = fixture.service.execute(initialize); committed(initialized);
                     assertEquals(11, initialized.event().after().hitPoints());
                     assertEquals(0, fixture.rolls);
                     fixture.source.unavailable(true);
                     committed(fixture.service.execute(fixture.request(0, spend(ENERGY, 1))));
                     committed(fixture.service.execute(fixture.request(1, spend(EXT_ENERGY, 1))));
-                    Request advance = fixture.request(2, ROLL); Result grown = fixture.service.execute(advance); committed(grown);
+                    Schema2CharacterRequest advance = fixture.request(2, ROLL); Result grown = fixture.service.execute(advance); committed(grown);
                     assertEquals(1, fixture.rolls); assertEquals(17, grown.event().after().hitPoints());
                     assertEquals(2, resource(grown.event().after(), ENERGY).current());
                     assertEquals(1, resource(grown.event().after(), EXT_ENERGY).current());
@@ -87,16 +88,16 @@ class Schema2CharacterRuntimeServiceTest {
                 case "rejected" -> {
                     Map<String, Integer> arbitrary = new HashMap<>(abilities()); arbitrary.put("ability.strength", 30);
                     int before = fixture.runtime.writes;
-                    Request arbitraryRequest = new Request(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION,
+                    Schema2CharacterRequest arbitraryRequest = new Schema2CharacterRequest(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION,
                             fixture.binding, -1, INITIAL, arbitrary);
                     assertEquals("S2_GROWTH_STANDARD_ARRAY", fixture.service.execute(arbitraryRequest).code());
                     assertEquals(before, fixture.runtime.writes); assertEquals(0, fixture.rolls);
                     committed(fixture.service.execute(fixture.request(-1, INITIAL)));
-                    Request spend = fixture.request(0, spend(ENERGY, 2)); committed(fixture.service.execute(spend));
+                    Schema2CharacterRequest spend = fixture.request(0, spend(ENERGY, 2)); committed(fixture.service.execute(spend));
                     before = fixture.runtime.writes;
                     assertEquals("S2_CHARACTER_STALE_VERSION", fixture.service.execute(fixture.request(0, ROLL)).code());
                     assertEquals("S2_RESOURCE_INSUFFICIENT", fixture.service.execute(fixture.request(1, spend(ENERGY, 2))).code());
-                    Request conflict = new Request(spend.operationId(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, fixture.binding,
+                    Schema2CharacterRequest conflict = new Schema2CharacterRequest(spend.operationId(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, fixture.binding,
                             0, spend(ENERGY, 1), Map.of());
                     assertEquals("S2_CHARACTER_OPERATION_CONFLICT", fixture.service.execute(conflict).code());
                     assertEquals(before, fixture.runtime.writes); assertEquals(0, fixture.rolls);
@@ -148,7 +149,7 @@ class Schema2CharacterRuntimeServiceTest {
                 }
                 case "unknown" -> {
                     committed(fixture.service.execute(fixture.request(-1, INITIAL)));
-                    Request request = fixture.request(0, ROLL);
+                    Schema2CharacterRequest request = fixture.request(0, ROLL);
                     fixture.runtime.lostCommit = Schema2RuntimeJdbcFixture.LostCommit.valueOf(args[1]);
                     Result unknown = fixture.service.execute(request);
                     assertEquals(Status.UNKNOWN, unknown.status(), unknown.code()); assertNull(unknown.event());
@@ -201,8 +202,8 @@ class Schema2CharacterRuntimeServiceTest {
             assertEquals(Schema2SnapshotTransferService.Status.COMMITTED, result.status(), result.code());
             service = new Schema2CharacterRuntimeService(runtime.dataSource(), sides -> { rolls++; assertEquals(10, sides); return 5; });
         }
-        Request request(long version, Command command) {
-            return new Request(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, binding, version,
+        Schema2CharacterRequest request(long version, Command command) {
+            return new Schema2CharacterRequest(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER, PREPARATION, binding, version,
                     command, command.kind().equals("INITIALIZED") ? abilities() : Map.of());
         }
     }

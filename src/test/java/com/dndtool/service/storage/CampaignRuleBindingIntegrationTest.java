@@ -72,7 +72,7 @@ class CampaignRuleBindingIntegrationTest {
 
     @Test void standardOpenRejectsDifferentOriginalsAndForgedProjectionEvenUnderTheSameModuleVersions() throws Exception {
         var standard = BundledCampaignRules.projection();
-        var artifacts = new ArrayList<>(BundledCampaignRules.artifacts());
+        var artifacts = new ArrayList<>(BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD));
         var originals = new TreeMap<>(artifacts.getLast().originalMembers());
         var definitions = JsonParser.parseString(new String(originals.get("rules.json"), StandardCharsets.UTF_8));
         definitions.getAsJsonArray().asList().stream().map(element -> element.getAsJsonObject())
@@ -217,7 +217,7 @@ class CampaignRuleBindingIntegrationTest {
     }
 
     @Test void externalAcceptedContentRunsAndRecoversWithoutLibraryButMovingFilesRequiresLocalAcceptance() throws Exception {
-        var selected = new ArrayList<>(BundledCampaignRules.artifacts());
+        var selected = new ArrayList<>(BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD));
         var athletics = CampaignRuleSupportTest.authorRow(BASE, "rules.json", "rule_key", ATHLETICS.ruleKey());
         var mapping = CampaignRuleSupportTest.operation("set_field", athletics);
         mapping.addProperty("field", "ability_key"); mapping.addProperty("value", WIS);

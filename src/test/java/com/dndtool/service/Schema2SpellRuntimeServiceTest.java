@@ -3,7 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.composition.Schema2SpellFixtures;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
 import com.dndtool.persistence.BusinessWriteTransactions;
-import com.dndtool.service.Schema2CombatRuntimeService.*;
+import com.dndtool.service.Schema2CombatRuntimeService.Save;
 import com.dndtool.service.Schema2CombatRuntimeService.Status;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.testing.IsolatedJvmTest;
@@ -22,7 +22,7 @@ class Schema2SpellRuntimeServiceTest {
             UUID item=focus(actor);
             var owner=f.members.stream().filter(m->m.characterId().equals(actor)).findFirst().orElseThrow();
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,
-                    f.characterService.execute(new Schema2CharacterRuntimeService.Request(item,owner.identity(),f.campaign,actor,
+                    f.characterService.execute(new Schema2CharacterRequest(item,owner.identity(),f.campaign,actor,
                             owner.preparationOperationId(),f.binding,f.character(actor).version(),equipment("ITEM_ACQUIRED",item,HOLY_SYMBOL,"CARRIED"),Map.of())).status());
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,
                     f.characterService.execute(f.characterRequest(actor,equipment("ITEM_EQUIPPED",item,null,"OFF_HAND"))).status());
@@ -39,7 +39,7 @@ class Schema2SpellRuntimeServiceTest {
     }
 
     @Test void blessCostAndEffectsCommitOnceAndRestoreAlongsidePausedMovement() throws Exception {
-        var f=fixture(true,true); f.start(); Request cast=f.request(bless(f,f.a,List.of(f.a,f.b)));
+        var f=fixture(true,true); f.start(); Schema2CombatRequest cast=f.request(bless(f,f.a,List.of(f.a,f.b)));
         var accepted=f.commit(cast); assertEquals(1,slots(f,f.a));
         assertEquals("COMBAT_RESOURCE_SPENT",f.characterService.read(f.a).events().getLast().kind());
         assertEquals(1,accepted.event().after().ongoingEffects().size());
@@ -61,7 +61,7 @@ class Schema2SpellRuntimeServiceTest {
         f.commit(Command.action(Kind.BEGIN_ATTACK,f.b)); f.nextRolls.addAll(List.of(15,1));
         f.commit(Command.attack(f.b,f.a,f.items.get(f.b))); long hp=f.character(f.a).hitPoints();
         assertTrue(hp<f.character(f.a).maximumHitPoints()); f.commit(Command.action(Kind.END_TURN,f.b));
-        Request cast=f.request(cure(f.a,f.a)); f.nextRolls.add(2); var healed=f.commit(cast);
+        Schema2CombatRequest cast=f.request(cure(f.a,f.a)); f.nextRolls.add(2); var healed=f.commit(cast);
         var changes=healed.event().resolution().healthChanges(); assertEquals(2,changes.size());
         assertEquals(changes.getFirst().after(),changes.getLast().before());
         assertEquals(1,slots(f,f.a)); assertTrue(f.character(f.a).hitPoints()>hp);
@@ -79,7 +79,7 @@ class Schema2SpellRuntimeServiceTest {
         f.commit(Command.action(Kind.BEGIN_ATTACK,f.a)); f.nextRolls.addAll(List.of(20,5,5));
         f.commit(Command.attack(f.a,f.b,f.items.get(f.a)));
         assertEquals(0,f.character(f.b).hitPoints()); assertFalse(f.character(f.b).health().dead());
-        Request nextTurn=f.request(Command.action(Kind.END_TURN,f.a)); int rolls=f.rolls;
+        Schema2CombatRequest nextTurn=f.request(Command.action(Kind.END_TURN,f.a)); int rolls=f.rolls;
         f.nextRolls.addAll(List.of(6,4)); var accepted=f.commit(nextTurn);
         assertEquals(rolls+2,f.rolls); assertTrue(f.nextRolls.isEmpty());
         var child=f.characterService.read(f.b).events().getLast();
@@ -111,7 +111,7 @@ class Schema2SpellRuntimeServiceTest {
         assertEquals(Status.REJECTED,f.service.execute(f.request(bless(f,f.a,List.of(f.a)))).status());
         assertEquals(Status.REJECTED,f.service.execute(f.request(cure(f.a,UUID.randomUUID()))).status());
         assertEquals(rolls,f.rolls); assertEquals(writes,f.runtime.writes); assertEquals(2,slots(f,f.a));
-        Request stale=f.request(cure(f.a,f.a)); f.commit(cure(f.a,f.a));
+        Schema2CombatRequest stale=f.request(cure(f.a,f.a)); f.commit(cure(f.a,f.a));
         rolls=f.rolls; writes=f.runtime.writes;
         assertEquals("S2_COMBAT_STALE_VERSION",f.service.execute(stale).code());
         assertEquals(rolls,f.rolls); assertEquals(writes,f.runtime.writes);
@@ -134,7 +134,7 @@ class Schema2SpellRuntimeServiceTest {
     }
     public static final class FaultProbe {
         public static void main(String[] args) throws Exception {
-            var f=fixture(true,true); f.start(); Request cast=f.request(bless(f,f.a,List.of(f.a,f.b)));
+            var f=fixture(true,true); f.start(); Schema2CombatRequest cast=f.request(bless(f,f.a,List.of(f.a,f.b)));
             Save before=f.service.read(f.combat); int rolls=f.rolls;
             if(args[0].equals("rollback")) {
                 int count=f.runtime.rows(args[1]).size();
@@ -146,7 +146,7 @@ class Schema2SpellRuntimeServiceTest {
                 assertEquals(args[1].equals("COMMITTED")?Status.REPLAYED:Status.NOT_COMMITTED,f.service.inspect(cast).status());
                 assertEquals(writes,f.runtime.writes); assertTrue(BusinessWriteTransactions.isBlocked());
             } else {
-                f.commit(cast); Request next=f.request(Command.action(Kind.END_CONCENTRATION,f.a));
+                f.commit(cast); Schema2CombatRequest next=f.request(Command.action(Kind.END_CONCENTRATION,f.a));
                 assertFalse(f.runtime.rows(args[1]).isEmpty()); f.runtime.rows(args[1]).clear(); f.runtime.saveCommitted();
                 int writes=f.runtime.writes;
                 assertEquals(Status.REJECTED,f.service.execute(next).status()); assertEquals(writes,f.runtime.writes);

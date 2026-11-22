@@ -94,10 +94,20 @@ async function expect(path, status, method, headers, body) {
     await expect('/host', 404, 'GET', { Host: value });
   }
   await expect('/host', 405, 'PUT');
-  await expect('/api/host/rules', 404);
-  await expect('/api/host/campaigns', 404, 'POST');
-  await expect('/api/host/diagnostics/database', 404);
-  await expect('/host/assets/host-console.css', 404);
+  for (const path of ['/host/rules', '/host/archive', '/api/host/status', '/api/host/rules',
+    '/api/host/diagnostics/database', '/api/host/characters/card', '/api/host/archive/export']) {
+    await expect(path, 404);
+  }
+  for (const path of ['campaigns', 'characters', 'characters/level-one', 'characters/level-up',
+    'characters/card', 'characters/lifecycle', 'events/check', 'maps/position', 'maps/encounter',
+    'archive/validate', 'archive/import']) {
+    await expect('/api/host/' + path, 404, 'POST');
+  }
+  for (const asset of ['host-console.css', 'host-campaign.js', 'host-character.js',
+    'host-character-card.js', 'host-character-lifecycle.js', 'host-level-one-character.js',
+    'host-level-advancement.js', 'host-event.js', 'host-map.js', 'host-archive.js']) {
+    await expect('/host/assets/' + asset, 404);
+  }
   await expect('/player', 404);
   await expect('/display', 404);
   await expect('/api/public/state', 404);

@@ -143,6 +143,15 @@ public final class CampaignJson {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
         catch (NoSuchAlgorithmException e) { throw new AssertionError(e); }
     }
+    /** Receipt wire format: command kind, decimal revision, then ordered text fields. */
+    public static String commandIntent(String kind, long revision, String... fields) {
+        JsonArray values = new JsonArray();
+        values.add(kind);
+        values.add(Long.toString(revision));
+        for (String field : fields) values.add(Objects.requireNonNull(field));
+        return digest("DND-VITALITY-COMMAND", canonical(values));
+    }
+
     public static String digest(String domain, byte[] bytes) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");

@@ -51,11 +51,6 @@ public final class CampaignCodec {
         }
     }
 
-    public String sourceFingerprint(Snapshot snapshot) {
-        CampaignData.validate(snapshot);
-        return digest("DND-CAMPAIGN-SOURCE", canonical(content(snapshot)));
-    }
-
     private JsonObject content(Snapshot snapshot) {
         JsonObject root = new JsonObject(); root.addProperty("applicationModel", APPLICATION_MODEL);
         JsonObject campaign = new JsonObject(); campaign.addProperty("campaignKey", snapshot.campaignId());

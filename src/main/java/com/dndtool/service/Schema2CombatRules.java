@@ -688,7 +688,6 @@ public final class Schema2CombatRules {
     }
     private static Battle copy(Battle b,Status status,int round,long turn,int ordinal,List<Combatant> actors,List<Flow> flows) {return new Battle(b.combatId(),b.campaignId(),b.combatRule(),status,round,turn,ordinal,b.version(),actors,b.initiative(),flows,b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());}
     private static Battle replaceActor(Battle b,Combatant actor) {return copy(b,b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants().stream().map(a->a.characterId().equals(actor.characterId())?actor:a).toList(),b.flows());}
-    private static Battle replaceFlow(Battle b,Flow flow) {return copy(b,b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants(),b.flows().stream().map(f->f.flowKey().equals(flow.flowKey())?flow:f).toList());}
     private static Battle appendFlow(Battle b,Flow flow) {var flows=new ArrayList<>(b.flows());flows.add(flow);return copy(b,b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants(),flows);}
 
     public void validateState(Battle state) { Schema2CombatStateValidator.validate(state); }

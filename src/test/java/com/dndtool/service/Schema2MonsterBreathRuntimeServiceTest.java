@@ -4,7 +4,7 @@ import com.dndtool.module.composition.Schema2MonsterFixtures;
 import com.dndtool.module.composition.Schema2SpellFixtures;
 import com.dndtool.persistence.BusinessWriteTransactions;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
-import com.dndtool.service.Schema2CombatRuntimeService.*;
+import com.dndtool.service.Schema2CombatRuntimeService.Save;
 import com.dndtool.service.Schema2CombatRuntimeService.Status;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.testing.IsolatedJvmTest;
@@ -32,7 +32,7 @@ class Schema2MonsterBreathRuntimeServiceTest {
         if(initialize&&heldSpell){
             for(UUID actor:List.of(f.a,f.b)){
                 UUID focus=Schema2SpellRuntimeServiceTest.focus(actor);var owner=f.members.stream().filter(m->m.characterId().equals(actor)).findFirst().orElseThrow();
-                var acquire=new Schema2CharacterRuntimeService.Request(focus,owner.identity(),f.campaign,actor,owner.preparationOperationId(),f.binding,f.character(actor).version(),equipment("ITEM_ACQUIRED",focus,HOLY_SYMBOL,"CARRIED"),Map.of());
+                var acquire=new Schema2CharacterRequest(focus,owner.identity(),f.campaign,actor,owner.preparationOperationId(),f.binding,f.character(actor).version(),equipment("ITEM_ACQUIRED",focus,HOLY_SYMBOL,"CARRIED"),Map.of());
                 assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(acquire).status());
                 assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(f.characterRequest(actor,equipment("ITEM_EQUIPPED",focus,null,"OFF_HAND"))).status());
             }
@@ -56,20 +56,20 @@ class Schema2MonsterBreathRuntimeServiceTest {
         f.commit(Command.action(Kind.END_TURN,f.b));assertEquals(H,f.battle.activeActor());
     }
     private static Schema2CombatRuntimeServiceTest.Fixture preparedBreath()throws Exception {var f=fixture(true,true);start(f,false);readyThenSource(f);return f;}
-    private static Request release(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {return f.request(Command.breath(H,FIRE_BREATH,0));}
-    private static Request continueRaw(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {Flow flow=f.battle.activeFlow();return f.request(Command.continueBreath(H,flow.flowKey(),flow.leafFrameKey()));}
-    private static Request readyRelease(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {
+    private static Schema2CombatRequest release(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {return f.request(Command.breath(H,FIRE_BREATH,0));}
+    private static Schema2CombatRequest continueRaw(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {Flow flow=f.battle.activeFlow();return f.request(Command.continueBreath(H,flow.flowKey(),flow.leafFrameKey()));}
+    private static Schema2CombatRequest readyRelease(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {
         Flow flow=f.battle.activeFlow();Window window=flow.windows().getLast();Opportunity offer=window.opportunities().stream().filter(o->o.status()==OpportunityStatus.PENDING).findFirst().orElseThrow();
         assertEquals(f.b,offer.actorId());return f.request(Command.releaseReady(f.b,offer.options().getFirst().readyKey(),flow.flowKey(),flow.leafFrameKey(),window.windowKey(),offer.opportunityKey()));
     }
-    private static Request finishAfter(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {Flow flow=f.battle.activeFlow();return f.request(new Command(Kind.CONTINUE_FLOW,H,null,null,List.of(),List.of(),List.of(),flow.flowKey(),flow.leafFrameKey(),flow.windows().getLast().windowKey(),null));}
+    private static Schema2CombatRequest finishAfter(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {Flow flow=f.battle.activeFlow();return f.request(new Command(Kind.CONTINUE_FLOW,H,null,null,List.of(),List.of(),List.of(),flow.flowKey(),flow.leafFrameKey(),flow.windows().getLast().windowKey(),null));}
     private static void rollShared(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {f.nextRolls.addAll(SHARED);f.commit(release(f));assertTrue(f.nextRolls.isEmpty());}
     private static void applyShared(Schema2CombatRuntimeServiceTest.Fixture f)throws Exception {f.nextRolls.addAll(SAVES_AND_CON);f.commit(continueRaw(f));assertTrue(f.nextRolls.isEmpty());}
     private static SaveDamageBatch batch(Schema2CombatRuntimeServiceTest.Fixture f){return f.battle.saveDamageBatches().getFirst();}
     private static MonsterInstance monster(Schema2CombatRuntimeServiceTest.Fixture f,UUID actor){return f.battle.monsters().stream().filter(m->m.monsterId().equals(actor)).findFirst().orElseThrow();}
     private static boolean recharge(Schema2CombatRuntimeServiceTest.Fixture f){return monster(f,H).actionUses().getFirst().available();}
     private static long slots(Schema2CombatRuntimeServiceTest.Fixture f,UUID actor)throws Exception{return Schema2SpellRuntimeServiceTest.slots(f,actor);}
-    private static void noReplayWork(Schema2CombatRuntimeServiceTest.Fixture f,Request request)throws Exception {int rolls=f.rolls,writes=f.runtime.writes;Save before=f.service.read(f.combat);assertEquals(Status.REPLAYED,f.service.execute(request).status());assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);assertEquals(before,f.service.read(f.combat));}
+    private static void noReplayWork(Schema2CombatRuntimeServiceTest.Fixture f,Schema2CombatRequest request)throws Exception {int rolls=f.rolls,writes=f.runtime.writes;Save before=f.service.read(f.combat);assertEquals(Status.REPLAYED,f.service.execute(request).status());assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);assertEquals(before,f.service.read(f.combat));}
 
     @Test void independentGoldenRestoresBothRawAndReadyOpenCutsWithoutSourceDiceOrImplicitPass()throws Exception {
         JsonObject golden=golden();var f=preparedBreath();int beforeRolls=f.rolls;rollShared(f);
@@ -88,13 +88,13 @@ class Schema2MonsterBreathRuntimeServiceTest {
     }
 
     @Test void releaseApplyAndReadyRequestsReplayWithoutDiceWritesCostsOrRepeatedPackets()throws Exception {
-        var f=preparedBreath();Request release=release(f);f.nextRolls.addAll(SHARED);f.commit(release);noReplayWork(f,release);
-        Request apply=continueRaw(f);f.nextRolls.addAll(SAVES_AND_CON);f.commit(apply);noReplayWork(f,release);noReplayWork(f,apply);var packets=batch(f).packets();
-        Request ready=readyRelease(f);f.nextRolls.add(4);f.commit(ready);noReplayWork(f,ready);Request finish=finishAfter(f);f.commit(finish);noReplayWork(f,finish);assertEquals(packets,batch(f).packets());assertEquals(1,slots(f,f.a));assertEquals(1,slots(f,f.b));assertEquals(6,f.character(f.a).hitPoints());
+        var f=preparedBreath();Schema2CombatRequest release=release(f);f.nextRolls.addAll(SHARED);f.commit(release);noReplayWork(f,release);
+        Schema2CombatRequest apply=continueRaw(f);f.nextRolls.addAll(SAVES_AND_CON);f.commit(apply);noReplayWork(f,release);noReplayWork(f,apply);var packets=batch(f).packets();
+        Schema2CombatRequest ready=readyRelease(f);f.nextRolls.add(4);f.commit(ready);noReplayWork(f,ready);Schema2CombatRequest finish=finishAfter(f);f.commit(finish);noReplayWork(f,finish);assertEquals(packets,batch(f).packets());assertEquals(1,slots(f,f.a));assertEquals(1,slots(f,f.b));assertEquals(6,f.character(f.a).hitPoints());
     }
 
     @Test void lateCharacterVersionIsValidatedBeforeAnyBreathRollOrResourceWrite()throws Exception {
-        var f=preparedBreath();Request valid=release(f);var versions=new LinkedHashMap<>(valid.expectedCharacterVersions());versions.put(f.b,versions.get(f.b)-1);var stale=new Request(valid.operationId(),valid.combatId(),valid.campaignId(),valid.rules(),valid.members(),valid.expectedVersion(),versions,valid.command());
+        var f=preparedBreath();Schema2CombatRequest valid=release(f);var versions=new LinkedHashMap<>(valid.expectedCharacterVersions());versions.put(f.b,versions.get(f.b)-1);var stale=new Schema2CombatRequest(valid.operationId(),valid.combatId(),valid.campaignId(),valid.rules(),valid.members(),valid.expectedVersion(),versions,valid.command());
         Save before=f.service.read(f.combat);int rolls=f.rolls,writes=f.runtime.writes;assertEquals("S2_COMBAT_STALE_CHARACTER",f.service.execute(stale).code());assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);assertEquals(before,f.service.read(f.combat));assertTrue(recharge(f));assertTrue(f.actor(H).actionAvailable());assertEquals(Status.REJECTED,f.service.execute(f.request(Command.breath(H,new com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity(HELL_HOUND,"actions","monster_base","bite"),0))).status());assertEquals(rolls,f.rolls);assertEquals(writes,f.runtime.writes);
     }
 
@@ -154,11 +154,11 @@ class Schema2MonsterBreathRuntimeServiceTest {
             String mode=args[0],phase=args[1];Schema2CombatRuntimeServiceTest.Fixture f;
             if(phase.equals("REST")){f=fixture(true,false);start(f,true);f.commit(Command.breath(H,FIRE_BREATH,4));f.commit(Command.action(Kind.END_COMBAT,H));f.commit(Command.monsterRest(Kind.BEGIN_MONSTER_REST,H,null,MonsterRestKind.SHORT));}
             else {f=preparedBreath();if(phase.equals("APPLY"))rollShared(f);}
-            Request request=phase.equals("RAW")?release(f):phase.equals("APPLY")?continueRaw(f):f.request(Command.monsterRest(Kind.COMPLETE_MONSTER_REST,H,f.battle.monsterRests().getLast().restKey(),MonsterRestKind.SHORT));
+            Schema2CombatRequest request=phase.equals("RAW")?release(f):phase.equals("APPLY")?continueRaw(f):f.request(Command.monsterRest(Kind.COMPLETE_MONSTER_REST,H,f.battle.monsterRests().getLast().restKey(),MonsterRestKind.SHORT));
             Save before=f.service.read(f.combat);int rolls=f.rolls;
             if(mode.equals("corrupt")){
                 if(phase.equals("RAW"))rollShared(f);else if(phase.equals("APPLY"))applyShared(f);
-                Request next=phase.equals("RAW")?continueRaw(f):phase.equals("APPLY")?readyRelease(f):request;
+                Schema2CombatRequest next=phase.equals("RAW")?continueRaw(f):phase.equals("APPLY")?readyRelease(f):request;
                 var rows=f.runtime.rows(args[2]);assertFalse(rows.isEmpty());Map<String,Object> row=rows.getLast();
                 switch(args[3]){case "missing"->rows.removeLast();case "extra"->rows.add(new LinkedHashMap<>(row));case "changed"->{String column=switch(args[2]){case "s2_combat_save_damage_batch"->"raw_total";case "s2_combat_breath_candidate"->"x";case "s2_combat_breath_packet"->"damage_amount";case "s2_combat_monster"->"hit_points";default->"completes_at_second";};Object value=row.get(column);row.put(column,value instanceof Long n?n+1:((Number)value).intValue()+1);}default->throw new AssertionError(args[3]);}
                 f.runtime.saveCommitted();int writes=f.runtime.writes;rolls=f.rolls;assertThrows(SQLException.class,()->f.service.read(f.combat));assertEquals(Status.REJECTED,f.service.execute(next).status());assertEquals(writes,f.runtime.writes);assertEquals(rolls,f.rolls);return;

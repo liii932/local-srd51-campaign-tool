@@ -10,16 +10,16 @@
 复用同一代码和配置的有效测试结果时，按测试指南记录选取的范围和制品构建命令。
 
 按 [WAR 审计方法](testing.md#6-war-审计)记录候选字节数、SHA-256 和 ZIP 条目数。核对
-生产描述符、Servlet 和 Filter、SQLite JDBC、结构 JSON、五个规则原包和 Host/玩家
-静态资源。审计源码与资源差量，确认 WAR 无退役 MySQL Web 入口、Connector/J、外部
+生产描述符、Servlet 和 Filter、SQLite JDBC、结构 JSON、五个规则原包、对应的 `bundled-members.tsv` 身份清单和 Host/玩家
+静态资源。MySQL 维护使用[对应版本的仓库及编译输出](database.md#迁移合同)。审计源码与资源差量，
+确认 WAR 无 V001—V042 运行迁移、独立迁移清单加载器和来源账本核验器、退役 MySQL Web 入口、Connector/J、外部
 Tomcat 配置、凭据、密钥、账号专用配置、日志、备份和真实战役数据。
 
 ## 2. 存储前提
 
 确认 Tomcat 的实际运行账号、[私有根和文件系统](configuration.md#sqlite-当前应用存储配置)、
 锁和已有残留。Windows 使用本地固定 NTFS 私有目录。按[原生 Windows 候选验收](testing.md#原生-windows-外部-tomcat-候选验收)
-验证进程中断恢复。活动部署更换前先保管已有数据库、完整战役文件和外部配置。历史 MySQL
-数据和工具按[数据库](database.md)及[备份恢复](backup-and-restore.md)独立管理。
+验证进程中断恢复。活动部署更换前先保管已有数据库、完整战役文件和外部配置。
 
 ## 3. 外部配置
 
@@ -104,4 +104,4 @@ loopback。应用启用了玩家入口时核对精确 8443 地址，并执行设
 停止实例并保管失败候选及日志。在仓库外另外保管当前 SQLite 根，恢复相匹配的旧 WAR、
 展开目录、外部配置和已有备份，按恢复版本的合同校验活动 WAR 哈希和数据库或存储根。
 跨应用版本时使用该版本支持的数据，避免用旧程序解释新格式的文件和残留。
-MySQL 和 SQLite 数据恢复均按[备份恢复](backup-and-restore.md)独立授权。
+SQLite 数据恢复须独立授权，按[同版恢复流程](backup-and-restore.md#sqlite-完整文件与同版恢复)执行。

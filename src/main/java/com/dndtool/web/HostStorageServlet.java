@@ -19,7 +19,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -36,7 +35,6 @@ import java.util.Map;
 import java.util.Set;
 
 /** Protected Web interface for the rule-selected local campaign and its managed files. */
-@WebServlet(name = "HostStorageServlet", urlPatterns = {"/host/storage", "/api/host/storage/*"})
 public final class HostStorageServlet extends HttpServlet {
     private static final Gson JSON = new GsonBuilder().serializeNulls().disableHtmlEscaping().create();
     private static final int MAX_COMMAND_BYTES = 16 * 1024;
@@ -207,8 +205,7 @@ public final class HostStorageServlet extends HttpServlet {
             case "/rule-import" -> library.importArtifact(CampaignJson.uuid(requestId), upload);
             case "/rule-import-bundled" -> {
                 StoredMember selected = member(single(fields, "member"));
-                var artifact = BundledCampaignRules.artifactsAll().stream().filter(candidate -> bundledMember(candidate).equals(selected))
-                        .findFirst().orElseThrow(() -> new IllegalArgumentException("INVALID_REQUEST"));
+                var artifact = BundledCampaignRules.importCandidate(selected);
                 yield library.importArtifact(CampaignJson.uuid(requestId), artifact.originalZip());
             }
             case "/rule-accept" -> library.accept(CampaignJson.uuid(requestId), member(single(fields, "member")),
@@ -222,9 +219,7 @@ public final class HostStorageServlet extends HttpServlet {
             throws IOException {
         if ("/rule-library".equals(action)) {
             requireQuery(request, Set.of());
-            var candidates = BundledCampaignRules.artifactsAll().stream().map(artifact -> Map.of(
-                    "member", bundledMember(artifact), "name", artifact.authorPackage().packageDisplayName())).toList();
-            writeRuleResult(response, Map.of("inventory", library.inventory(), "bundled", candidates,
+            writeRuleResult(response, Map.of("inventory", library.inventory(), "bundled", BundledCampaignRules.candidates(),
                     "maxZipBytes", ProductionRuleArtifact.MAX_ZIP_BYTES, "maxMembers", Schema2CompositionKernel.MAX_PACKAGES));
             return;
         }
@@ -262,10 +257,6 @@ public final class HostStorageServlet extends HttpServlet {
         if (!request.getParameterMap().keySet().equals(fields)
                 || fields.stream().anyMatch(field -> request.getParameterValues(field).length != 1))
             throw new IllegalArgumentException("INVALID_REQUEST");
-    }
-
-    private static StoredMember bundledMember(ProductionRuleArtifact artifact) {
-        return new StoredMember(artifact.moduleKey(), artifact.releaseVersion(), artifact.role(), artifact.rawZipSha256(), artifact.logicalSha256());
     }
 
     private static List<StoredMember> members(Map<String, List<String>> fields) {

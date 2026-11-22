@@ -110,10 +110,7 @@ public final class CampaignCheckEffects {
         UUID checkOperation = child(rootOperation, "check", input.characterId());
         UUID successHealth = input.success().healthEffect() == null ? null : child(rootOperation, "success-health", input.success().targetId());
         UUID failureHealth = input.failure().healthEffect() == null ? null : child(rootOperation, "failure-health", input.failure().targetId());
-        Set<UUID> operations = new HashSet<>();
-        before.roots().forEach(r -> operations.add(r.operationId()));
-        before.characters().forEach(c -> c.history().events().forEach(e -> operations.add(e.operationId())));
-        before.combats().forEach(c -> c.events().forEach(e -> operations.add(e.operationId())));
+        Set<UUID> operations = CampaignDomainValidation.retainedEventOperations(before);
         for (UUID operation : Arrays.asList(rootOperation, checkOperation, successHealth, failureHealth))
             if (operation != null && !operations.add(operation)) throw new StorageException("IDEMPOTENCY_CONFLICT", "Conditional operation identity is already retained");
         // Check results never mutate HP, equipment or time. This minimum projection reserves its

@@ -35,6 +35,7 @@
     RULE_PACKAGE_CORRUPT: '本机原包未通过完整性校验。',
     RULE_PACKAGE_IDENTITY_CONFLICT: '本机同版本已绑定其他原包。',
     RULE_PACKAGE_INVALID: '规则 ZIP 未通过严格校验。',
+    BUNDLED_RULES_UNAVAILABLE: '应用交付的规则原包不可用。',
     RULE_COMPOSITION_UNSUPPORTED: '组合声明超出当前应用支持的规则范围。',
     RULE_COMPOSITION_MISMATCH: '本机原包组合与战役冻结材料不同。',
     RULE_MEMBER_MISMATCH: '本机规则包与所需准确版本不同。',
@@ -1047,19 +1048,19 @@
         : `${failureText(failure)}${refreshed ? ' 已重新读取当前战役。' : ''}`);
     } finally { setBusy(false); }
   }
-  function form(id, action, extra = () => ({})) {
+  function form(id, action) {
     byId(id).addEventListener('submit', event => {
       event.preventDefault();
       const fields = {};
       for (const [key, value] of new FormData(event.currentTarget).entries()) (fields[key] ||= []).push(value);
-      Object.assign(fields, extra()); command(action, fields);
+      command(action, fields);
     });
   }
 
   const ruleOperationKey = 'dnd.local-rule-library.operation.v1';
   const ruleMutations = new Set(['rule-import', 'rule-import-bundled', 'rule-accept']);
   const ruleRejections = new Set(['STALE_EPOCH', 'IDEMPOTENCY_CONFLICT', 'RULE_LIBRARY_BLOCKED', 'RULE_PACKAGE_INVALID',
-    'RULE_PACKAGE_IDENTITY_CONFLICT', 'RULE_OPERATION_INVALID', 'RULE_REVIEW_INVALID']);
+    'RULE_PACKAGE_IDENTITY_CONFLICT', 'RULE_OPERATION_INVALID', 'RULE_REVIEW_INVALID', 'BUNDLED_RULES_UNAVAILABLE']);
   let pendingRuleOperation = readPendingRuleOperation();
   let blockedRuleOperationId = null;
   let ruleRetryable = false;
@@ -1157,9 +1158,10 @@
       row.dataset.accepted = String(Boolean(entry.acceptance));
       ruleButton(row, '审阅', 'review', () => libraryTask(() => reviewRule(member)));
     }
-    for (const candidate of library.bundled) {
-      const member = candidate.member;
-      const row = ruleRow(bundled, member, `${ruleLabel(member)} · ${candidate.name}`);
+    if (library.bundled.length === 0) text(bundled, 'li', messages.BUNDLED_RULES_UNAVAILABLE);
+    for (const {member, name, available} of library.bundled) {
+      const row = ruleRow(bundled, member, `${ruleLabel(member)} · ${name}${available ? '' : ' · 不可用'}`);
+      if (!available) continue;
       const button = ruleButton(row, '导入此原包', 'import', () => libraryTask(() => startRuleMutation('rule-import-bundled', {member: [memberTuple(member)]})));
       button.dataset.imported = String(library.inventory.some(entry => memberTuple(entry.imported.member) === memberTuple(member)));
     }

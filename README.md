@@ -25,7 +25,8 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
   在同一运行内复用检定草稿，并在共享网格上使用 DM 裁定战斗和阵营。
 - 在一个 SQLite 事务提交完整领域后果、历史、版本与幂等结果；保存初始及当前完整 JSON，下载/上传导入、同版重开，显式恢复或精确放弃残留。
 
-标准规则直接取自 WAR 内四个准确原包。自定义组合可选用本机规则库里已导入、接受的内置或外部原包。组合最多八包，
+标准规则使用 WAR 随附身份清单中的四个准确原包。若某个原包损坏，仅依赖它的内置组合不可用。
+自定义组合可选用本机规则库里已导入、接受的内置或外部原包。组合最多八包，
 经过严格生产 reader、依赖/覆盖组合及当前机制与创建模板的完整支持校验。标准组合见[包指南](./rule-packages/srd51-runtime/package-guide.md)，第二组合见
 [家规说明](./rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)：运动改用感知、
 固定直接伤害为 3、工匠初始语言改为侏儒语。创建、候选、结算、来源展示和恢复使用同一战役
@@ -151,13 +152,13 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 在外部 Tomcat 中将发行 WAR 部署为 `ROOT.war`。WAR 自带 SQLite JDBC，启动无需配置 JNDI 或 MySQL。
 私有存储根、可回滚替换与验收见[部署指南](./docs/deployment.md)。
 
-既有 MySQL 库、账号、迁移账本及离线规则工具单独维护。数据库维护说明见[数据库文档](./docs/database.md)。
+既有 MySQL 库、账号和迁移账本单独维护。离线规则工具使用对应版本的源码仓库及其 Maven 编译输出 `target/classes`，运行与来源迁移由仓库提供。维护入口见[数据库文档](./docs/database.md#迁移合同)。
 
 ## 安全与数据约束
 
 - Host 入口只接受精确的 `http://127.0.0.1:8080` origin，不信任 `X-Forwarded-*`；
 - 可选玩家入口要求准确配置的 HTTPS 地址、端口和 origin，只开放玩家页面、资产及有限 API；
-- 主机写请求使用 Session、CSRF、Origin/Referer、Fetch Metadata、状态 epoch、对象版本和幂等键；
+- 主机写请求通过 `X-CSRF-Token` 请求头提交会话令牌，并校验 Origin/Referer、Fetch Metadata、状态 epoch、对象版本和幂等键。
 - 客户端不能指定骰点、选中骰、派生修正、最终结果、效果算法或规范业务身份；
 - 未知、重复、未发布、摘要不一致或不受支持的冻结规则必须失败关闭；
 - 权威状态、事件、骰子、效果、字段变化、版本和幂等结果在同一事务提交或回滚；
@@ -175,12 +176,12 @@ src/main/java/com/dndtool/
   web/             SQLite 启动与就绪检查、Servlet、HTTP DTO 与页面支持
 src/main/resources/db/migration/
                     独立 MySQL 维护与核验使用的 V001—V042 迁移
-src/main/webapp/    WAR 的 Host / Player HTML、web.xml、JavaScript 和 CSS。旧 JSP 供测试使用
+src/main/webapp/    WAR 的 Host / Player HTML、web.xml、JavaScript 和 CSS
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
 database/           只读验证、最小授权与独立测试库辅助 SQL
 config/tomcat/      不含秘密的外部 Tomcat 配置示例
-tools/              数据库备份和独立规则哈希验证工具
+tools/              规则制品与摘要校验、SQLite 隔离启动和验收工具
 ```
 
 ## 文档索引
@@ -225,7 +226,7 @@ tracks semantic drafting and source review separately from implementation.
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |
 | [冻结 v1 规则规范](./docs/rules/srd-5.1.md) | 现有稳定键、算法、范围、规范化和模组关系 |
 | [职业特性 v2](./docs/rules/class-features-v2.md) | 12 职业/子职业特性矩阵、资源恢复与阻断边界 |
-| [多职业共享法术位 v2](./docs/rules/multiclass-spell-slots-v2.md) | DRAFT 职业贡献、共享位上限与未完成边界 |
+| [多职业共享法术位 v2](./docs/rules/multiclass-spell-slots-v2.md) | DRAFT 施法贡献与共享位采用范围 |
 | [Archive format 2 角色投影](./docs/rules/archive-format-2-character-state.md) | DRAFT 稳定事件闭包、严格 codec 与恢复来源 |
 | [配置](./docs/configuration.md) | SQLite 存储根、Tomcat 运行身份与可选玩家 HTTPS Connector |
 | [数据库](./docs/database.md) | SQLite 工作库与独立 MySQL 迁移、核验及账号职责 |

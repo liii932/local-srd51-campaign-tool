@@ -318,10 +318,6 @@ public final class JdbcSchema2RuntimeSnapshotRepository {
                 identity.snapshotBytes(), index, ascii(key.moduleKey()), ascii(key.ruleType()), ascii(key.ruleKey()), value.displayName(), value.description(), value.sourcePage(),
                 parent == null ? null : ascii(parent.moduleKey()), parent == null ? null : ascii(parent.ruleType()), parent == null ? null : ascii(parent.ruleKey()), value.authorNote(), bit(source.enabled()));
     }
-    private static RuleIdentity ownerClass(ResultSet result) throws SQLException {
-        exact(result, "owner_class_type", "character.class");
-        return new RuleIdentity(binaryAscii(result, "owner_class_module", 64), "character.class", binaryAscii(result, "owner_class_key", 128));
-    }
     private static RuleIdentity nullableReference(ResultSet result, String prefix, String type) throws SQLException {
         Object module = result.getObject(prefix + "module_key"), ruleType = result.getObject(prefix + "rule_type"), key = result.getObject(prefix + "rule_key");
         if (module == null) { require(ruleType == null && key == null); return null; }

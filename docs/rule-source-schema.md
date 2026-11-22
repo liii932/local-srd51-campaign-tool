@@ -19,8 +19,8 @@
 
 ## 两条独立批准链
 
-`RuleSchemaMigrations` 编入 WAR 的只有角色、版本、准确脚本名和固定批准载荷摘要；
-不从数据库或作者制品学习期望值。规则 SQL、grants、核验 SQL 均不进入 WAR。
+离线维护在同版仓库的 `target/classes` 中使用 `RuleSchemaMigrations` 的角色、版本、准确脚本名和
+固定批准载荷摘要，独立账本核验使用 `RuleDatabaseSchemaVerifier`。来源 SQL、grants 与核验 SQL 由仓库提供。
 规则链文件名为 `V` 加至少三位补零十进制版本、`__`、小写 kebab-case 责任名和 `.sql`。
 `rule_schema_meta` 保存 `schema_version INT` 正整数主键、唯一 `script_name VARBINARY(255)`、
 严格小写 64 位 hex `script_sha256 VARBINARY(64)` 和数据库生成的 UTC `applied_at DATETIME(6)`。

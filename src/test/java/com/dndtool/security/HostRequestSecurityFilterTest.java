@@ -9,7 +9,9 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -33,7 +35,7 @@ final class HostRequestSecurityFilterTest {
             new HostRequestSecurityFilter(() -> currentEpoch);
 
     @Test
-    void getBootstrapsSessionAndExposesCsrfTokenOnlyAsRequestAttribute() throws Exception {
+    void getBootstrapsSessionAndMakesCsrfAvailableToHandlers() throws Exception {
         SessionFixture session = new SessionFixture();
         RequestFixture request = request("GET", session, Map.of());
         ResponseFixture response = new ResponseFixture();
@@ -45,15 +47,12 @@ final class HostRequestSecurityFilterTest {
         String token = (String) request.attributes.get(HostRequestSecurityFilter.CSRF_TOKEN_REQUEST_ATTRIBUTE);
         assertNotNull(token);
         assertEquals(43, token.length());
+        assertEquals(token, session.attributes.get(HostRequestSecurityFilter.CSRF_TOKEN_SESSION_ATTRIBUTE));
         assertEquals(HostRequestSecurityFilter.INITIAL_VERSION,
                 session.attributes.get(HostRequestSecurityFilter.HOST_STATE_EPOCH_SESSION_ATTRIBUTE));
-        assertEquals("0", request.attributes.get(
-                HostRequestSecurityFilter.HOST_STATE_EPOCH_REQUEST_ATTRIBUTE));
-        assertEquals("0", request.attributes.get(
-                HostRequestSecurityFilter.ROW_VERSION_REQUEST_ATTRIBUTE));
         assertEquals(30 * 60, session.maxInactiveInterval);
         assertTrue(response.headers.get("set-cookie").contains("SameSite=Strict"));
-        assertFalse(response.headers.get("set-cookie").contains(TOKEN));
+        assertFalse(response.headers.get("set-cookie").contains(token));
     }
 
     @Test
@@ -73,6 +72,7 @@ final class HostRequestSecurityFilterTest {
         filter.doFilter(request.proxy(), response.proxy(), chain);
 
         assertTrue(chain.called);
+        assertEquals(List.of(), request.parameterReads);
         assertEquals(REQUEST_ID, request.attributes.get(HostRequestSecurityFilter.REQUEST_ID_ATTRIBUTE));
         assertEquals(DIGEST, request.attributes.get(HostRequestSecurityFilter.REQUEST_DIGEST_ATTRIBUTE));
         assertEquals("0", request.attributes.get(
@@ -95,8 +95,6 @@ final class HostRequestSecurityFilterTest {
         assertTrue(chain.called);
         assertEquals("73", session.attributes.get(
                 HostRequestSecurityFilter.HOST_STATE_EPOCH_SESSION_ATTRIBUTE));
-        assertEquals("73", request.attributes.get(
-                HostRequestSecurityFilter.HOST_STATE_EPOCH_REQUEST_ATTRIBUTE));
         assertTrue(response.headers.get("set-cookie").contains("new-session"));
         assertTrue(response.headers.get("set-cookie").contains("SameSite=Strict"));
     }
@@ -163,35 +161,58 @@ final class HostRequestSecurityFilterTest {
     }
 
     @Test
-    void badCsrfTokenIsRejected() throws Exception {
-        ResponseFixture response = new ResponseFixture();
-        ChainFixture chain = new ChainFixture();
-        RequestFixture request = request("POST", sessionWithToken(), Map.of(
+    void matchingCsrfParameterWithoutHeaderIsRejected() throws Exception {
+        RequestFixture request = postWithHeaders(Map.of(
                 "Origin", HostRequestSecurityFilter.EXPECTED_ORIGIN,
-                HostRequestSecurityFilter.CSRF_HEADER, "wrong",
                 HostRequestSecurityFilter.EPOCH_HEADER, "0",
-                HostRequestSecurityFilter.ROW_VERSION_HEADER, "0"));
+                HostRequestSecurityFilter.ROW_VERSION_HEADER, "0",
+                HostRequestSecurityFilter.REQUEST_ID_HEADER, REQUEST_ID,
+                HostRequestSecurityFilter.REQUEST_DIGEST_HEADER, DIGEST));
+        request.parameters.put("_csrf", TOKEN);
 
-        filter.doFilter(request.proxy(), response.proxy(), chain);
-
-        assertFalse(chain.called);
-        assertEquals(HttpServletResponse.SC_FORBIDDEN, response.status);
+        assertRejected(request);
+        assertEquals(List.of(), request.parameterReads);
     }
 
     @Test
-    void staleHostEpochIsRejectedBeforeRequestIdIsAccepted() throws Exception {
+    void wrongCsrfHeaderIsRejectedEvenWithMatchingParameter() throws Exception {
+        RequestFixture request = postWithHeaders(Map.of(
+                "Origin", HostRequestSecurityFilter.EXPECTED_ORIGIN,
+                HostRequestSecurityFilter.CSRF_HEADER, "wrong",
+                HostRequestSecurityFilter.EPOCH_HEADER, "0",
+                HostRequestSecurityFilter.ROW_VERSION_HEADER, "0",
+                HostRequestSecurityFilter.REQUEST_ID_HEADER, REQUEST_ID,
+                HostRequestSecurityFilter.REQUEST_DIGEST_HEADER, DIGEST));
+        request.parameters.put("_csrf", TOKEN);
+
+        assertRejected(request);
+        assertEquals(List.of(), request.parameterReads);
+    }
+
+    @Test
+    void postUsingEpochFromBeforeReadRefreshIsRejectedBeforeDispatch() throws Exception {
+        var session = sessionWithToken();
+        currentEpoch = 73L;
+        var readChain = new ChainFixture();
+        filter.doFilter(request("GET", session, Map.of()).proxy(), new ResponseFixture().proxy(), readChain);
+        assertTrue(readChain.called);
+        assertEquals("73", session.attributes.get(HostRequestSecurityFilter.HOST_STATE_EPOCH_SESSION_ATTRIBUTE));
+
         ResponseFixture response = new ResponseFixture();
         ChainFixture chain = new ChainFixture();
-        RequestFixture request = request("POST", sessionWithToken(), Map.of(
+        RequestFixture request = request("POST", session, Map.of(
                 "Origin", HostRequestSecurityFilter.EXPECTED_ORIGIN,
                 HostRequestSecurityFilter.CSRF_HEADER, TOKEN,
-                HostRequestSecurityFilter.EPOCH_HEADER, "1",
-                HostRequestSecurityFilter.ROW_VERSION_HEADER, "0"));
+                HostRequestSecurityFilter.EPOCH_HEADER, "0",
+                HostRequestSecurityFilter.ROW_VERSION_HEADER, "0",
+                HostRequestSecurityFilter.REQUEST_ID_HEADER, REQUEST_ID,
+                HostRequestSecurityFilter.REQUEST_DIGEST_HEADER, DIGEST));
 
         filter.doFilter(request.proxy(), response.proxy(), chain);
 
         assertFalse(chain.called);
         assertEquals(HttpServletResponse.SC_CONFLICT, response.status);
+        assertFalse(request.attributes.containsKey(HostRequestSecurityFilter.REQUEST_ID_ATTRIBUTE));
     }
 
     @Test
@@ -235,8 +256,7 @@ final class HostRequestSecurityFilterTest {
     }
 
     @Test
-    void aggregateRowVersionIsForwardedInsteadOfComparedWithSessionPlaceholder()
-            throws Exception {
+    void postForwardsSubmittedAggregateRowVersion() throws Exception {
         SessionFixture session = sessionWithToken();
         RequestFixture request = request("POST", session, Map.of(
                 "Origin", HostRequestSecurityFilter.EXPECTED_ORIGIN,
@@ -297,7 +317,6 @@ final class HostRequestSecurityFilterTest {
         SessionFixture session = new SessionFixture();
         session.attributes.put(HostRequestSecurityFilter.CSRF_TOKEN_SESSION_ATTRIBUTE, TOKEN);
         session.attributes.put(HostRequestSecurityFilter.HOST_STATE_EPOCH_SESSION_ATTRIBUTE, "0");
-        session.attributes.put(HostRequestSecurityFilter.ROW_VERSION_SESSION_ATTRIBUTE, "0");
         return session;
     }
 
@@ -313,7 +332,7 @@ final class HostRequestSecurityFilterTest {
             Cookie[] cookies) {
         Map<String, String> headers = new HashMap<>();
         additionalHeaders.forEach((name, value) -> headers.put(name.toLowerCase(Locale.ROOT), value));
-        return new RequestFixture(method, session, headers, new HashMap<>(), cookies);
+        return new RequestFixture(method, session, headers, cookies);
     }
 
     private static void assertRejected(RequestFixture request) throws Exception {
@@ -329,15 +348,24 @@ final class HostRequestSecurityFilterTest {
 
     private record RequestFixture(
             String method, SessionFixture session, Map<String, String> headers,
-            Map<String, Object> attributes, Cookie[] cookies) {
-        private RequestFixture(String method, SessionFixture session, Map<String, String> headers) {
-            this(method, session, headers, new HashMap<>(), null);
+            Map<String, Object> attributes, Map<String, String> parameters,
+            List<String> parameterReads, Cookie[] cookies) {
+        private RequestFixture(
+                String method, SessionFixture session, Map<String, String> headers, Cookie[] cookies) {
+            this(method, session, headers, new HashMap<>(), new HashMap<>(), new ArrayList<>(), cookies);
         }
 
         HttpServletRequest proxy() {
             InvocationHandler handler = (proxy, invoked, args) -> switch (invoked.getName()) {
                 case "getMethod" -> method;
                 case "getHeader" -> headers.get(((String) args[0]).toLowerCase(Locale.ROOT));
+                case "getParameter" -> {
+                    String name = (String) args[0];
+                    parameterReads.add(name);
+                    yield parameters.get(name);
+                }
+                case "getParameterMap", "getParameterNames", "getParameterValues" ->
+                        throw new AssertionError("Unexpected request parameter access: " + invoked.getName());
                 case "getSession" -> session == null ? null : session.proxy();
                 case "getCookies" -> cookies;
                 case "setAttribute" -> {

@@ -71,8 +71,9 @@ mvn '-Dtest=LanguagePartitionEquivalenceTest,CharacterCatalogChainTest,MySqlInte
 ### 隔离 JDBC 入口
 
 Linux/WSL 的复用入口为
-[`verify-language-jdbc.py`](../../tools/rule-packages/verify-language-jdbc.py)。默认仅核对生产清单和
-批准 SQL 载荷，不连接 Docker 或数据库：
+[`verify-language-jdbc.py`](../../tools/rule-packages/verify-language-jdbc.py)。默认在本地核对
+运行 V001—V042、来源 V001—V012 的生产清单和批准 SQL 载荷。超出已审范围的迁移会在访问
+Docker 或数据库前被拒绝。
 
 ```bash
 python3 -B tools/rule-packages/verify-language-jdbc.py

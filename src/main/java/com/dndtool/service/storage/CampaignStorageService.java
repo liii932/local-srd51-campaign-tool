@@ -192,9 +192,8 @@ public final class CampaignStorageService implements AutoCloseable {
             if (!input.fileKey().equals(fileKey)) throw new StorageException("INVALID_FILE", "Filename and portable file identity differ");
             var frozen = input.snapshot().domains().material();
             var members = frozen.binding().members();
-            var projection = members.equals(BundledCampaignRules.standardBinding().members())
-                    ? BundledCampaignRules.projection()
-                    : prepareRules(members).projection();
+            var projection = BundledCampaignRules.standardProjectionFor(members)
+                    .orElseGet(() -> prepareRules(members).projection());
             if (!frozen.equals(CampaignDomainData.Material.of(projection)))
                 throw new StorageException("RULE_COMPOSITION_MISMATCH", "The original packages differ from the complete frozen campaign material");
             return initialize(input.snapshot());
@@ -774,11 +773,9 @@ public final class CampaignStorageService implements AutoCloseable {
         if (repository.saves(c).stream().anyMatch(s -> !s.accepted())) throw new StorageException("SAVE_PENDING", "Complete the exact pending save before changing game facts");
     }
 
-    private static String intent(String action, long revision, Object... values) {
+    private static String intent(String action, long revision, String... values) {
         if (revision < 0) throw new StorageException("STALE_REVISION", "Revision must be nonnegative");
-        JsonArray a = new JsonArray(); a.add(action); a.add(Long.toString(revision));
-        for (Object value : values) a.add(value.toString());
-        return CampaignJson.digest("DND-VITALITY-COMMAND", CampaignJson.canonical(a));
+        return CampaignJson.commandIntent(action, revision, values);
     }
 
     // Saving, recovery and the filesystem/transaction boundary are below; no leaf commits.

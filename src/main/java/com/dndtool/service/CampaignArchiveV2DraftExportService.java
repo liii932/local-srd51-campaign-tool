@@ -40,7 +40,7 @@ final class CampaignArchiveV2DraftExportService {
                         .collect(java.util.stream.Collectors.toUnmodifiableSet());
                 byte[] bytes = CampaignArchiveV2CharacterStateCodec.write(
                         state.validated(characters, catalog), characters);
-                if (bytes.length > CampaignSaveFileService.MAX_BYTES) {
+                if (bytes.length > CampaignArchiveV2CharacterStateCodec.MAX_BYTES) {
                     throw new IllegalArgumentException("Internal character archive exceeds byte limit");
                 }
                 connection.commit();

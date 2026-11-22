@@ -194,8 +194,8 @@ V012 的[一级角色创建合同](character-creation-v2.md)、V013 的
 [职业、子职业与职业特性合同](class-features-v2.md)以及 V015 的
 [多职业、ASI 与专长合同](multiclass-asi-feats-v2.md)只扩充该 DRAFT 身份。多职业施法和专长的
 战斗效果仍明确阻断。这些迁移不会开放 archive format 2。V017 及内部 DRAFT codec 已为当前角色状态建立稳定事件
-闭包、严格写入/读取、预览与原子恢复基础；V018 固定多职业施法贡献并提供共享法术位上限计算，
-但尚未建立法术权威状态或接入升级事务。它们均未接入完整战役文件、released dispatcher 或 Host
+闭包、严格写入/读取、预览与原子恢复基础。V018 冻结[多职业施法贡献](multiclass-spell-slots-v2.md)，
+共享法术位的计算、权威状态和升级接合仍待采用。它们均未接入完整战役文件、released dispatcher 或 Host
 路由；后续领域仍须渐进补齐新增权威状态，最终由跨领域发布门统一激活。
 
 ## 6. 完成判定

@@ -21,7 +21,9 @@ bash tools/rule-packages/rule-package.sh verify /controlled/new-artifact EXTERNA
 `build` 只接受新的输出目录；五个文件保留准确原始字节。输出清单含作者 schema、
 manifest 版本、精确发布身份、canonical/archive 格式、算法、PARTITION、
 `partition_keys` 和五项 `files`。每项恰为 path、role、byte_length、raw_sha256。
-分区集合准确为 `character.language`、`character.tool`。
+分区集合准确为 `character.language`、`character.tool`。`verify` 成功后输出
+`PARTITION`、这两个分区各自通过核验的条目数，以及与输入一致的 manifest SHA-256。
+摘要不符或文件缺失时，命令以非零状态退出。
 包展示名只来自作者头；PARTITION 清单禁止 `observed_content_sha256`，连 null 也拒绝。
 清单自身不在 files 内；命令打印其原始 SHA-256，操作者另存于制品外的受控交付记录。
 清单及哈希不是作者认证或发布批准，不随作者材料提供连接目标、凭据或 schema 升级。

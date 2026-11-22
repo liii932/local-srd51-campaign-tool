@@ -4,6 +4,7 @@ import com.dndtool.module.CharacterProficiencyGrant.GrantKind;
 import com.dndtool.module.composition.Schema2GrantFixtures;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.service.Schema2PreparationIdentity;
+import com.dndtool.persistence.JdbcSchema2InitialCharacterPlanner;
 import com.dndtool.persistence.Schema2RuntimeJdbcFixture;
 import com.dndtool.persistence.Schema2SourceReadFixture;
 import com.dndtool.service.Schema2InitialProficiencyRules.*;
@@ -59,7 +60,7 @@ class Schema2InitialCharacterPlanIntegrationTest {
         try (Connection reader = fixture.runtime.dataSource().getConnection()) {
             reader.setReadOnly(true);
             reader.setAutoCommit(false);
-            var service = new Schema2InitialCharacterPlanService();
+            var service = new JdbcSchema2InitialCharacterPlanner();
             var binding = Schema2RulesBinding.from(actual);
             var plan = service.prepare(reader, IDENTITY, binding, REQUEST);
             assertEquals(SOURCES, plan.sources());
@@ -105,7 +106,7 @@ class Schema2InitialCharacterPlanIntegrationTest {
         var result = fixture.transfer();
         assertEquals(Schema2SnapshotTransferService.Status.COMMITTED, result.status(), result.code());
         var binding = Schema2RulesBinding.from(result.snapshot().projection());
-        var service = new Schema2InitialCharacterPlanService();
+        var service = new JdbcSchema2InitialCharacterPlanner();
         try (Connection reader = fixture.runtime.dataSource().getConnection()) {
             reader.setReadOnly(true);
             reader.setAutoCommit(false);

@@ -68,7 +68,7 @@
         'X-CSRF-Token':context.csrf,'X-Host-State-Epoch':context.epoch,'X-Object-Row-Version':context.revision,'X-Request-Id':crypto.randomUUID(),'X-Request-Digest':requestDigest},body:body.toString()});
       const data = await response.json();
       if (!response.ok || data.status === 'ERROR') { const failure = new Error(data.code || 'PLAYER_UNAVAILABLE'); failure.definitive = response.status < 500; throw failure; }
-      state = {...state,...data,csrf:data.csrf || state.csrf};
+      state = {...state,...data};
       render();
       synchronizeStorageView();
       message(action === 'approve' ? '该申请已逐人核对并批准。接下来可分配玩家角色。' : action === 'proposal-execute' ? '裁定已明确执行，请核对实际业务结果。' : '玩家设置已更新。');
@@ -230,7 +230,8 @@
     if (!sceneId || active && !isFocused(characterId)) { message('请核对角色的准确探索范围。'); return; }
     governance('exploration', {characterId, permissionVersion:String(permission?.version ?? 0), sceneId, actions, active});
   });
-  const shareForm=$('host-player-share-form');shareForm.elements.kind.querySelector('[value="CARD"]').value='CHARACTER';shareForm.elements.kind.addEventListener('change',renderShareSubjects);
+  const shareForm=$('host-player-share-form');
+  shareForm.elements.kind.addEventListener('change',renderShareSubjects);
   shareForm.elements.subjectId.addEventListener('change',renderSharePolicy);
   shareForm.elements.audience.addEventListener('change',()=>$('host-player-share-members').hidden=shareForm.elements.audience.value!=='SELECTED');
   shareForm.addEventListener('submit',event=>{event.preventDefault();const values=new FormData(event.currentTarget),share=(participation().shares || []).find(share=>share.kind===values.get('kind')&&share.subjectId===values.get('subjectId'));const selected=Array.from($('host-player-share-members').querySelectorAll('input:checked'),input=>input.value).sort();if(values.get('audience')==='SELECTED'&&!selected.length){message('请至少选择一位接收成员。');return;}governance('share',{shareId:share?.id||null,shareVersion:String(share?.version??0),kind:values.get('kind'),subjectId:values.get('subjectId'),audience:{type:'participation.Audience',kind:values.get('audience')==='SELECTED'?'SPECIFIC':'ALL',memberIds:values.get('audience')==='SELECTED'?selected:[]},active:values.get('audience')!=='NONE'});});

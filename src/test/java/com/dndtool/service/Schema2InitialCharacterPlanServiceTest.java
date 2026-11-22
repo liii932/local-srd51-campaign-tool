@@ -2,6 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
 import com.dndtool.service.Schema2PreparationIdentity;
+import com.dndtool.persistence.JdbcSchema2InitialCharacterPlanner;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Snapshot;
 import com.dndtool.service.Schema2InitialCharacterPlanService.Plan;
 import com.dndtool.service.Schema2InitialProficiencyRules.*;
@@ -21,23 +22,23 @@ class Schema2InitialCharacterPlanServiceTest {
 
     @Test void actualReadIdentityAndCompleteProductionBindingAreRequiredBeforePlanning() throws Exception {
         var projection = projection(); var binding = Schema2RulesBinding.from(projection); var reads = new AtomicInteger();
-        var service = new Schema2InitialCharacterPlanService((connection, identity) -> {
+        var service = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> {
             assertEquals(IDENTITY, identity); reads.incrementAndGet(); return new Snapshot(IDENTITY, projection);
         });
         var plan = service.prepare(null, IDENTITY, binding, request());
         assertEquals(IDENTITY, plan.identity()); assertEquals(binding, plan.binding()); assertEquals(SOURCES, plan.sources());
         assertEquals(new Schema2InitialProficiencyRules().prepare(projection, request()).grants(), plan.grants());
         assertEquals(plan, service.validate(null, IDENTITY, binding, plan)); assertEquals(2, reads.get());
-        var wrongSnapshot = new Schema2InitialCharacterPlanService((connection, identity) -> new Snapshot(Schema2PreparationIdentity.random(), projection));
+        var wrongSnapshot = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> new Snapshot(Schema2PreparationIdentity.random(), projection));
         assertEquals("S2_INITIAL_SNAPSHOT_MISMATCH", assertThrows(IllegalArgumentException.class,
                 () -> wrongSnapshot.prepare(null, IDENTITY, binding, request())).getMessage());
-        var missing = new Schema2InitialCharacterPlanService((connection, identity) -> null);
+        var missing = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> null);
         assertThrows(IllegalArgumentException.class, () -> missing.prepare(null, IDENTITY, binding, request()));
     }
 
     @Test void everyBindingDigestVersionAndMemberOrderMustMatchEvenWhenFinalRulesAreUnchanged() {
         var projection = projection(); var original = Schema2RulesBinding.from(projection);
-        var service = new Schema2InitialCharacterPlanService((connection, identity) -> new Snapshot(IDENTITY, projection));
+        var service = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> new Snapshot(IDENTITY, projection));
         List<Schema2RulesBinding> changed = new ArrayList<>();
         changed.add(binding(original, original.members(), "0".repeat(64), original.finalRulesSha256(), original.chainSha256()));
         changed.add(binding(original, original.members(), original.compositionSha256(), "0".repeat(64), original.chainSha256()));
@@ -57,7 +58,7 @@ class Schema2InitialCharacterPlanServiceTest {
 
     @Test void retainedPlanRebuildRejectsForgedSuppressionSourceSlotMissingFactsAndChangedSelections() throws Exception {
         var projection = projection(); var binding = Schema2RulesBinding.from(projection); var reads = new AtomicInteger();
-        var service = new Schema2InitialCharacterPlanService((connection, identity) -> {
+        var service = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> {
             reads.incrementAndGet(); return new Snapshot(IDENTITY, projection);
         });
         var original = service.prepare(null, IDENTITY, binding, request());
@@ -104,7 +105,7 @@ class Schema2InitialCharacterPlanServiceTest {
         Connection caller = (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[]{Connection.class},
                 (proxy, method, args) -> { throw new AssertionError("Plan service must not invoke Connection." + method.getName()); });
         var reads = new AtomicInteger();
-        var service = new Schema2InitialCharacterPlanService((connection, identity) -> {
+        var service = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> {
             assertSame(caller, connection); assertEquals(IDENTITY, identity); reads.incrementAndGet();
             return new Snapshot(IDENTITY, projection);
         });
@@ -115,9 +116,9 @@ class Schema2InitialCharacterPlanServiceTest {
 
     @Test void readFailureNeverPublishesAPlanAndPlanCollectionsRemainImmutable() throws Exception {
         var projection = projection(); var binding = Schema2RulesBinding.from(projection); var failure = new SQLException("broken runtime");
-        var broken = new Schema2InitialCharacterPlanService((connection, identity) -> { throw failure; });
+        var broken = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> { throw failure; });
         assertSame(failure, assertThrows(SQLException.class, () -> broken.prepare(null, IDENTITY, binding, request())));
-        var service = new Schema2InitialCharacterPlanService((connection, identity) -> new Snapshot(IDENTITY, projection));
+        var service = new JdbcSchema2InitialCharacterPlanner((connection, identity) -> new Snapshot(IDENTITY, projection));
         var plan = service.prepare(null, IDENTITY, binding, request());
         assertThrows(UnsupportedOperationException.class, () -> plan.choices().clear());
         assertThrows(UnsupportedOperationException.class, () -> plan.choices().get(LANGUAGE_SLOT).clear());
@@ -131,7 +132,7 @@ class Schema2InitialCharacterPlanServiceTest {
         assertEquals(plan, copied);
     }
 
-    private static void rejects(Schema2InitialCharacterPlanService service, Schema2RulesBinding binding, Plan plan) {
+    private static void rejects(JdbcSchema2InitialCharacterPlanner service, Schema2RulesBinding binding, Plan plan) {
         assertEquals("S2_INITIAL_PLAN_MISMATCH", assertThrows(IllegalArgumentException.class,
                 () -> service.validate(null, IDENTITY, binding, plan)).getMessage());
     }
