@@ -35,7 +35,6 @@ public final class CampaignSpaceCommands {
         if (!ADMIN.contains(action) || supplied.has("focus")) requireFocus(state, supplied);
         JsonObject input = supplied.deepCopy(); input.remove("focus"); return input;
     }
-    public static boolean administrative(String action) { return ADMIN.contains(action); }
     public static boolean focused(CampaignDomainData.State state, UUID subject) {
         Position p = position(state, subject); return p != null && p.space().equals(state.space().focus().space());
     }
@@ -100,6 +99,11 @@ public final class CampaignSpaceCommands {
     }
 
     public static Result resolve(CampaignData.Snapshot snapshot, String action, JsonObject input, UUID operation, IntUnaryOperator dice) {
+        return resolve(snapshot, action, input, operation, dice, CampaignDomainValidation.retainedEventOperations(snapshot.domains()));
+    }
+
+    static Result resolve(CampaignData.Snapshot snapshot, String action, JsonObject input, UUID operation,
+            IntUnaryOperator dice, Set<UUID> retainedOperations) {
         CampaignDomainData.State before = snapshot.domains(); CampaignDomainData.State state = before;
         Ref current = before.space().focus().space(); UUID subject = UUID.fromString(snapshot.campaignId()), combatId = null;
         if (!action.equals("focus-set")) requireNoPending(before);
@@ -117,7 +121,7 @@ public final class CampaignSpaceCommands {
                 CampaignSpaceData.State space = scene(before.space(), created); List<Clock> clocks = new ArrayList<>(space.clocks()); clocks.add(new Clock(Ref.scene(subject), 0, 0));
                 state = withSpace(before, ordered(space.focus(), space.scenes(), clocks, space.monsters()), before.positions());
                 if (created.resolution().equals("RULES")) {
-                    state = sceneRoster(snapshot.campaignId(), before, state, subject, operation, dice); combatId = subject;
+                    state = sceneRoster(snapshot.campaignId(), before, state, subject, operation, dice, retainedOperations); combatId = subject;
                 }
             }
             case "position" -> {
@@ -131,7 +135,7 @@ public final class CampaignSpaceCommands {
                 Node source = before.nodes().stream().filter(n -> n.id().equals(current.id())).findFirst().orElseThrow();
                 if (!source.adjacent().contains(target)) throw new StorageException("WORLD_ROUTE_INVALID", "The selected destination has no outgoing route from this node");
                 long minutes = minutes(input); reason(input); transferable(before, selected);
-                state = elapsed(before, minutes, operation, dice);
+                state = elapsed(before, minutes, operation, dice, retainedOperations);
                 List<Position> positions = new ArrayList<>(state.positions());
                 for (Position old : selected) positions = replace(positions, new Position(old.characterId(), Ref.world(target), null, old.side(), old.version() + 1));
                 state = withSpace(state, focus(state.space(), Ref.world(target)), positions); subject = target;
@@ -148,7 +152,7 @@ public final class CampaignSpaceCommands {
                     positions = replace(positions, new Position(old.characterId(), Ref.scene(destination), grid, integer(row, "side"), old.version() + 1));
                 }
                 uniqueCells(positions); state = withSpace(before, focus(before.space(), Ref.scene(destination)), positions);
-                if (target.resolution().equals("RULES")) { state = sceneRoster(snapshot.campaignId(), before, state, destination, operation, dice); combatId = destination; }
+                if (target.resolution().equals("RULES")) { state = sceneRoster(snapshot.campaignId(), before, state, destination, operation, dice, retainedOperations); combatId = destination; }
                 subject = destination;
             }
             case "scene-leave" -> {
@@ -157,7 +161,7 @@ public final class CampaignSpaceCommands {
                 List<Position> positions = new ArrayList<>(before.positions());
                 for (Position old : selected) positions = replace(positions, new Position(old.characterId(), Ref.world(source.nodeId()), null, old.side(), old.version() + 1));
                 state = withSpace(before, focus(before.space(), Ref.world(source.nodeId())), positions);
-                if (source.resolution().equals("RULES")) { state = sceneRoster(snapshot.campaignId(), before, state, source.id(), operation, dice); combatId = source.id(); }
+                if (source.resolution().equals("RULES")) { state = sceneRoster(snapshot.campaignId(), before, state, source.id(), operation, dice, retainedOperations); combatId = source.id(); }
                 subject = source.id();
             }
             case "scene-close" -> {
@@ -165,7 +169,7 @@ public final class CampaignSpaceCommands {
                 if (before.positions().stream().anyMatch(p -> p.space().equals(current))) throw new StorageException("SCENE_OCCUPIED", "Move every subject out before closing a scene");
                 requireIdleScene(before, source.id());
                 if (source.resolution().equals("RULES")) {
-                    state = sceneCommand(snapshot.campaignId(), before, source.id(), operation, Schema2CombatState.Command.action(Schema2CombatState.Kind.CLOSE_SCENE, null), dice); combatId = source.id();
+                    state = sceneCommand(snapshot.campaignId(), before, source.id(), operation, Schema2CombatState.Command.action(Schema2CombatState.Kind.CLOSE_SCENE, null), dice, retainedOperations); combatId = source.id();
                 }
                 state = withSpace(state, focus(scene(state.space(), new Scene(source.id(), source.name(), source.nodeId(), source.width(), source.height(), source.resolution(), "CLOSED", source.version() + 1)), Ref.world(source.nodeId())), state.positions()); subject = source.id();
             }
@@ -176,7 +180,7 @@ public final class CampaignSpaceCommands {
             }
             case "space-time" -> {
                 CampaignJson.fields(input, "minutes", "adjudication"); requireDirectClock(before); reason(input); long minutes = minutes(input);
-                if (minutes == 0) throw CampaignJson.bad("Time advance must be positive"); state = elapsed(before, minutes, operation, dice); subject = current.id();
+                if (minutes == 0) throw CampaignJson.bad("Time advance must be positive"); state = elapsed(before, minutes, operation, dice, retainedOperations); subject = current.id();
             }
             case "space-unplace" -> {
                 CampaignJson.fields(input, "characterId", "version", "adjudication"); subject = id(input, "characterId"); requireWorld(before, current == null ? null : current.id());
@@ -193,7 +197,7 @@ public final class CampaignSpaceCommands {
                 var from = old.grid(); JsonArray path = CampaignJson.array(input, "path"); if (path.isEmpty() || path.size() > 64) throw CampaignJson.bad("Invalid movement path");
                 for (var element : path) { JsonObject cell = element.getAsJsonObject(); CampaignJson.fields(cell, "x", "y"); var next = new Schema2CombatState.Position(integer(cell, "x"), integer(cell, "y")); checkCell(scene, next);
                     if (from.distanceFeet(next) != 5 || occupied(before.positions(), old.space(), next, old.characterId())) throw new StorageException("SCENE_PATH_INVALID", "A path step is not adjacent or is occupied"); from = next; }
-                state = elapsed(before, minutes, operation, dice);
+                state = elapsed(before, minutes, operation, dice, retainedOperations);
                 state = withSpace(state, state.space(), replace(state.positions(), new Position(subject, old.space(), from, old.side(), old.version() + 1)));
             }
             case "monster-create" -> {
@@ -210,7 +214,8 @@ public final class CampaignSpaceCommands {
         return new Result(state, subject, combatId);
     }
 
-    private static CampaignDomainData.State elapsed(CampaignDomainData.State before, long minutes, UUID operation, IntUnaryOperator dice) {
+    private static CampaignDomainData.State elapsed(CampaignDomainData.State before, long minutes, UUID operation,
+            IntUnaryOperator dice, Set<UUID> retainedOperations) {
         if (minutes == 0) return before;
         var advanced = advance(before.space(), Math.multiplyExact(minutes, 60));
         List<CampaignDomainEngine.CharacterRecord> members = focusedRecords(before), changed = members;
@@ -218,17 +223,26 @@ public final class CampaignSpaceCommands {
             UUID target = members.getFirst().initial().characterId(); var rest = members.getFirst().history().current().rest();
             var command = new Schema2CharacterRuntime.Command("TIME_ADVANCED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY,
                     new Schema2CharacterRuntime.RestInput(null, rest.active() == null ? "NONE" : "LIGHT", minutes, 0, Map.of()));
-            changed = new CampaignDomainEngine().executeSpaceCharacter(before.material().restore().projection(), members, target, command, operation, dice);
+            changed = new CampaignDomainEngine().executeSpaceCharacter(before.material().restore().projection(),
+                    members, target, command, operation, dice, retainedOperations);
         }
         return new CampaignDomainData.State(before.material(), merge(before.characters(), changed), before.combats(), before.nodes(), before.positions(), before.items(), before.roots(), before.manual(), before.participation(), advanced);
     }
     public static CampaignDomainData.State sceneCommand(String campaign, CampaignDomainData.State before, UUID scene, UUID operation, Schema2CombatState.Command command, IntUnaryOperator dice) {
+        return sceneCommand(campaign, before, scene, operation, command, dice, CampaignDomainValidation.retainedEventOperations(before));
+    }
+
+    static CampaignDomainData.State sceneCommand(String campaign, CampaignDomainData.State before, UUID scene,
+            UUID operation, Schema2CombatState.Command command, IntUnaryOperator dice, Set<UUID> retainedOperations) {
         var previous = before.combats().stream().filter(h -> h.current().combatId().equals(scene)).findFirst().orElse(null);
         var records = CampaignDomainValidation.records(before).stream().filter(r -> { Position p = position(before, r.initial().characterId()); return p != null && p.space().equals(Ref.scene(scene)); }).toList();
-        var result = new CampaignDomainEngine().executeScene(before.material().restore().projection(), records, previous, UUID.fromString(campaign), scene, before.space().clock(Ref.scene(scene)).second(), operation, command, dice);
+        var result = new CampaignDomainEngine().executeScene(before.material().restore().projection(), records, previous,
+                UUID.fromString(campaign), scene, before.space().clock(Ref.scene(scene)).second(), operation,
+                command, Map.of(), dice, retainedOperations);
         return applyScene(before, scene, result);
     }
-    private static CampaignDomainData.State sceneRoster(String campaign, CampaignDomainData.State before, CampaignDomainData.State after, UUID scene, UUID operation, IntUnaryOperator dice) {
+    private static CampaignDomainData.State sceneRoster(String campaign, CampaignDomainData.State before, CampaignDomainData.State after,
+            UUID scene, UUID operation, IntUnaryOperator dice, Set<UUID> retainedOperations) {
         var previous = before.combats().stream().filter(h -> h.current().combatId().equals(scene)).findFirst().orElse(null);
         Set<UUID> union = new HashSet<>();
         for (Position p : before.positions()) if (p.space().equals(Ref.scene(scene))) union.add(p.characterId());
@@ -242,7 +256,9 @@ public final class CampaignSpaceCommands {
             if (previous == null || previous.current().monsters().stream().noneMatch(m -> m.monsterId().equals(monster.id()))) instances.put(monster.id(), new Schema2CombatState.MonsterInstance(monster.id(), monster.rule(), monster.hitPoints(), monster.dead(), monster.actions()));
         } }
         var command = previous == null ? Schema2CombatState.Command.openScene(characters, monsters) : Schema2CombatState.Command.sceneRoster(characters, monsters);
-        var result = new CampaignDomainEngine().executeScene(after.material().restore().projection(), records, previous, UUID.fromString(campaign), scene, after.space().clock(Ref.scene(scene)).second(), operation, command, instances, dice);
+        var result = new CampaignDomainEngine().executeScene(after.material().restore().projection(), records, previous,
+                UUID.fromString(campaign), scene, after.space().clock(Ref.scene(scene)).second(), operation,
+                command, instances, dice, retainedOperations);
         return applyScene(after, scene, result);
     }
     public static CampaignDomainData.State applyScene(CampaignDomainData.State before, UUID sceneId, CampaignDomainEngine.CombatResult result) {

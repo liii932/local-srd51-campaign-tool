@@ -10,6 +10,7 @@ import com.dndtool.persistence.JdbcSchema2SnapshotControlRepository.Operation;
 import com.dndtool.persistence.JdbcSourceSchema2Repository;
 import com.dndtool.persistence.Schema2SourceLedger;
 import com.dndtool.persistence.BusinessWriteTransactions;
+import com.dndtool.persistence.JdbcSchema2InitialCharacterPlanner;
 import com.dndtool.persistence.JdbcSchema2InitialPlanRepository;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import java.io.ByteArrayOutputStream;
@@ -72,6 +73,7 @@ public final class Schema2SnapshotTransferService {
     private final JdbcSchema2SnapshotControlRepository controls = new JdbcSchema2SnapshotControlRepository();
     private final JdbcSchema2InitialPlanRepository initialPlans = new JdbcSchema2InitialPlanRepository();
     private final Schema2InitialCharacterPlanService planner = new Schema2InitialCharacterPlanService();
+    private final JdbcSchema2InitialCharacterPlanner jdbcPlanner = new JdbcSchema2InitialCharacterPlanner();
     private Intent pending;
     private boolean pendingIsolated;
 
@@ -193,7 +195,7 @@ public final class Schema2SnapshotTransferService {
                 controls.append(connection, control, intent.operationId(), intent.kind().name(), intent.digest(),
                         intent.identity().runId(), intent.identity().snapshotId());
                 if (intent.initialPlan() != null) {
-                    planner.validate(connection, intent.identity(), intent.rules(), intent.initialPlan().character());
+                    jdbcPlanner.validate(connection, intent.identity(), intent.rules(), intent.initialPlan().character());
                     initialPlans.store(connection, intent.operationId(), intent.initialPlan());
                 }
                 var after = controls.read(connection, new JdbcSchema2SnapshotControlRepository.Control(

@@ -1,29 +1,22 @@
 package com.dndtool.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
-import com.dndtool.persistence.CharacterCardMutationRepository;
 import com.dndtool.persistence.CharacterCardRepository;
 import com.dndtool.module.ModuleCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 final class CharacterCardServiceTest {
     private static final String CHARACTER_KEY =
             "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-    private static final String REQUEST_ID =
-            "123e4567-e89b-42d3-a456-426614174000";
     private static final String SHA = "a".repeat(64);
 
     @Test
     void loadBuildsVerifiedCardAndRuntimeDerivedValues() throws Exception {
-        CharacterCardService service = service(snapshot(), command -> null);
+        CharacterCardService service = service(snapshot());
 
         CharacterCardService.LoadResult result = service.load(CHARACTER_KEY);
 
@@ -51,86 +44,9 @@ final class CharacterCardServiceTest {
                 valid, valid.binding(), valid.fields().subList(0, valid.fields().size() - 1));
 
         assertEquals(CharacterCardService.LoadStatus.MODULE_HASH_MISMATCH,
-                service(drifted, command -> null).load(CHARACTER_KEY).status());
+                service(drifted).load(CHARACTER_KEY).status());
         assertEquals(CharacterCardService.LoadStatus.INVALID_STATE,
-                service(incomplete, command -> null).load(CHARACTER_KEY).status());
-    }
-
-    @Test
-    void validFieldMutationPassesOnlyNormalizedAuthoritativeInput() throws Exception {
-        AtomicReference<CharacterCardMutationRepository.Command> captured =
-                new AtomicReference<>();
-        CharacterCardService service = service(snapshot(), command -> {
-            captured.set(command);
-            return new CharacterCardMutationRepository.Result(
-                    CharacterCardMutationRepository.Status.UPDATED, 8L);
-        });
-        String digest = CharacterCardRequestDigest.sha256(
-                CHARACTER_KEY, 7, "SET_FIELD", "ability.strength", "15", "", "");
-
-        CharacterCardService.MutationResult result = service.mutate(
-                CHARACTER_KEY, "7", "SET_FIELD", "ability.strength", "15", "", "",
-                REQUEST_ID, digest);
-
-        assertEquals(CharacterCardService.MutationStatus.UPDATED, result.status());
-        assertEquals(8, result.rowVersion());
-        assertEquals(15, captured.get().integerValue());
-        assertNull(captured.get().textValue());
-        assertEquals(10, captured.get().integerFieldRules().size());
-    }
-
-    @Test
-    void invalidRangeOrDigestNeverCallsMutationRepository() throws Exception {
-        AtomicBoolean called = new AtomicBoolean();
-        CharacterCardService service = service(snapshot(), command -> {
-            called.set(true);
-            return null;
-        });
-        String outOfRangeDigest = CharacterCardRequestDigest.sha256(
-                CHARACTER_KEY, 7, "SET_FIELD", "ability.strength", "31", "", "");
-
-        assertEquals(CharacterCardService.MutationStatus.INVALID_REQUEST,
-                service.mutate(
-                        CHARACTER_KEY, "7", "SET_FIELD", "ability.strength", "31", "", "",
-                        REQUEST_ID, outOfRangeDigest).status());
-        assertEquals(CharacterCardService.MutationStatus.INVALID_REQUEST,
-                service.mutate(
-                        CHARACTER_KEY, "7", "SET_FIELD", "ability.strength", "15", "", "",
-                        REQUEST_ID, "0".repeat(64)).status());
-        assertFalse(called.get());
-    }
-
-    @Test
-    void moduleAndTemporaryItemsUseReviewedSnapshotsAndNormalizedText() throws Exception {
-        List<CharacterCardMutationRepository.Command> captured = new ArrayList<>();
-        CharacterCardService service = service(snapshot(), command -> {
-            captured.add(command);
-            return new CharacterCardMutationRepository.Result(
-                    CharacterCardMutationRepository.Status.UPDATED, 8L);
-        });
-        String moduleDigest = CharacterCardRequestDigest.sha256(
-                CHARACTER_KEY, 7, "ADD_MODULE_ITEM", "item.torch", "", "", "2");
-        String normalizedName = "Café";
-        String temporaryDigest = CharacterCardRequestDigest.sha256(
-                CHARACTER_KEY, 7, "ADD_TEMPORARY_ITEM", "",
-                normalizedName, "普通物品", "3");
-
-        assertEquals(CharacterCardService.MutationStatus.UPDATED,
-                service.mutate(
-                        CHARACTER_KEY, "7", "ADD_MODULE_ITEM", "item.torch", "", "", "2",
-                        REQUEST_ID, moduleDigest).status());
-        assertEquals(CharacterCardService.MutationStatus.UPDATED,
-                service.mutate(
-                        CHARACTER_KEY, "7", "ADD_TEMPORARY_ITEM", "",
-                        "  Cafe\u0301  ", "普通物品", "3",
-                        REQUEST_ID, temporaryDigest).status());
-
-        assertEquals("火把", captured.get(0).textValue());
-        assertEquals("普通照明用火把", captured.get(0).description());
-        assertEquals(2, captured.get(0).integerValue());
-        assertEquals(normalizedName, captured.get(1).textValue());
-        assertEquals("普通物品", captured.get(1).description());
-        assertEquals(3, captured.get(1).integerValue());
+                service(incomplete).load(CHARACTER_KEY).status());
     }
 
     @Test
@@ -172,7 +88,7 @@ final class CharacterCardServiceTest {
                 List.of("language.celestial", "language.common"), List.of("tool.smith_tools"));
         var valid = withGrants(initial, grants, basis);
         var result = new CharacterCardService((key, version) -> Optional.of(catalog),
-                key -> Optional.of(valid), command -> null, ignored -> SHA, ignored -> SHA)
+                key -> Optional.of(valid), ignored -> SHA, ignored -> SHA)
                 .load(CHARACTER_KEY);
         assertEquals(CharacterCardService.LoadStatus.READY, result.status());
         assertEquals(4, result.card().proficiencyGrants().size());
@@ -181,7 +97,7 @@ final class CharacterCardServiceTest {
         var missing = withGrants(initial, grants.subList(1, grants.size()), basis);
         assertEquals(CharacterCardService.LoadStatus.INVALID_STATE,
                 new CharacterCardService((key, version) -> Optional.of(catalog),
-                        key -> Optional.of(missing), command -> null, ignored -> SHA, ignored -> SHA)
+                        key -> Optional.of(missing), ignored -> SHA, ignored -> SHA)
                         .load(CHARACTER_KEY).status());
     }
 
@@ -195,14 +111,11 @@ final class CharacterCardServiceTest {
                 source.saveProficiencies(), source.items(), grants, basis);
     }
 
-    private static CharacterCardService service(
-            CharacterCardRepository.Snapshot snapshot,
-            CharacterCardMutationRepository mutationRepository) {
+    private static CharacterCardService service(CharacterCardRepository.Snapshot snapshot) {
         ModuleCatalog catalog = catalog();
         return new CharacterCardService(
                 (key, version) -> Optional.of(catalog),
                 key -> Optional.of(snapshot),
-                mutationRepository,
                 ignored -> SHA,
                 ignored -> SHA);
     }

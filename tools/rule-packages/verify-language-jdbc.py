@@ -30,23 +30,11 @@ MAVEN = "/usr/bin/mvn"
 SOURCE = "dnd_tool_rules"
 RUNTIME = "dnd_tool_se"
 LABEL = "com.dndtool.language-jdbc-acceptance"
-SOURCE_TABLES = sorted(("rule_schema_meta", "rule_release", "rule_language", "rule_tool",
-                       "rule_package_installation", "rule_package_installation_partition",
-                       "rule_installation_control", "rule_schema2_artifact", "rule_schema2_acceptance",
-                       "rule_schema2_control", "rule_schema2_character_source", "rule_schema2_proficiency_grant", "rule_schema2_character_change",
-                       "rule_schema2_class_progression", "rule_schema2_resource", "rule_schema2_advancement_change",
-                       "rule_schema2_subclass", "rule_schema2_feature", "rule_schema2_feat", "rule_schema2_proficiency", "rule_schema2_proficiency_set", "rule_schema2_class_level", "rule_schema2_proficiency_member", "rule_schema2_growth_grant", "rule_schema2_ability_requirement", "rule_schema2_rest", "rule_schema2_check", "rule_schema2_equipment_item", "rule_schema2_execution_change", "rule_schema2_health", "rule_schema2_vital_effect"))
-SCHEMA2_RUNTIME_TABLES = sorted(("s2_runtime_identity", "s2_runtime_snapshot", "s2_runtime_member",
-                                "s2_runtime_language", "s2_runtime_language_set", "s2_runtime_language_entry",
-                                "s2_runtime_field_chain", "s2_runtime_chain_step", "s2_runtime_operation",
-                                "s2_runtime_control", "s2_runtime_tool", "s2_runtime_tool_set", "s2_runtime_tool_entry",
-                                "s2_runtime_character_source", "s2_runtime_proficiency_grant",
-                                "s2_initial_plan", "s2_initial_plan_slot", "s2_initial_plan_choice", "s2_initial_plan_grant",
-                                "s2_runtime_class_progression", "s2_runtime_resource", "s2_character_runtime",
-                                "s2_character_event", "s2_character_event_state", "s2_character_event_resource",
-                                "s2_runtime_subclass", "s2_runtime_feature", "s2_runtime_feat", "s2_runtime_proficiency", "s2_runtime_proficiency_set", "s2_runtime_rest", "s2_runtime_check", "s2_character_check", "s2_runtime_equipment_item", "s2_runtime_health", "s2_runtime_vital_effect", "s2_character_event_equipment", "s2_character_equipment_command", "s2_character_health_event", "s2_character_health_die", "s2_runtime_class_level_entry", "s2_runtime_proficiency_entry", "s2_runtime_growth_grant", "s2_runtime_rule_prerequisite", "s2_runtime_chain_prerequisite", "s2_character_event_class", "s2_character_event_hit_die", "s2_character_event_subclass", "s2_character_event_feature", "s2_character_event_feat", "s2_character_event_proficiency", "s2_character_command_ability", "s2_character_command_proficiency", "s2_character_command_hit_die"))
-RUNTIME_TABLES = sorted(("runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language", "runtime_rule_tool",
-                         "business_write_guard", *SCHEMA2_RUNTIME_TABLES))
+PROFILE_ENDS = {RUNTIME: 42, SOURCE: 12}
+REPLAY_USERS = {RUNTIME: "dnd_tool_se_migration_replay", SOURCE: "dnd_tool_rules_migrator"}
+PARTITION_TABLES = {"runtime_run_identity", "runtime_rule_snapshot", "runtime_rule_language",
+                    "runtime_rule_tool", "business_write_guard"}
+PARTITION_GRANTS = ("runtime-language-snapshot.sql", "runtime-tool-snapshot.sql", "business-write-guard.sql")
 ACCOUNTS = {
     "root": "localhost",
     "dnd_tool_se_migration_replay": "localhost",
@@ -83,6 +71,7 @@ def manifests():
     pattern = r"new Definition\((V[0-9]{3})_VERSION, \1_SCRIPT_NAME, \1_APPROVED_SHA256\)"
     prefixes = re.findall(pattern, block[1])
     require(re.sub(pattern, "", block[1]).replace(",", "").strip() == "", "Unexpected manifest entry")
+    require(len(prefixes) == PROFILE_ENDS[RUNTIME], "This acceptance profile requires review when the runtime chain changes")
     result = []
     for number, prefix in enumerate(prefixes, 1):
         require(prefix == f"V{number:03d}", "Unordered runtime migration manifest")
@@ -91,23 +80,102 @@ def manifests():
         digest = re.search(rf'{prefix}_APPROVED_SHA256 =\s*"([0-9a-f]{{64}})";', java)
         require(name and digest and name[1].startswith(prefix + "__"), "Invalid migration constant")
         result.append((RUNTIME, number, name[1], digest[1], ROOT / "src/main/resources/db/migration" / name[1]))
-    require(len(result) == 31, "This acceptance profile requires review when the runtime chain changes")
     java = (ROOT / "src/main/java/com/dndtool/persistence/RuleSchemaMigrations.java").read_text("utf-8")
     block = re.search(r"APPROVED = List[.]of\((.*?)\);", java, re.S)
     require(block is not None, "Rules manifest not recognized")
     pattern = r'new Expectation\(\s*SCHEMA_ROLE, ([0-9]+), "([a-zA-Z0-9_.-]+[.]sql)",\s*"([0-9a-f]{64})"\)'
     rules = re.findall(pattern, block[1])
     require(re.sub(pattern, "", block[1]).replace(",", "").strip() == "", "Unexpected rules manifest entry")
-    require(len(rules) == 7, "This acceptance profile requires review when the RULES chain changes")
+    require(len(rules) == PROFILE_ENDS[SOURCE], "This acceptance profile requires review when the RULES chain changes")
     for expected, (version, name, digest) in enumerate(rules, 1):
         require(int(version) == expected and name.startswith(f"V{expected:03d}__"), "Unordered rules manifest")
         result.append((SOURCE, expected, name, digest, ROOT / "database/rules/migration" / name))
+    for schema in (RUNTIME, SOURCE):
+        approved_paths = {path for side, _, _, _, path in result if side == schema}
+        directory = next(iter(approved_paths)).parent
+        require(set(directory.glob("V*.sql")) == approved_paths, "Unexpected migration files: " + schema)
     checked = []
     for schema, version, name, approved, path in result:
         raw = path.read_bytes()
         require(payload_digest(raw) == approved, "Approved digest mismatch: " + name)
         checked.append((schema, version, name, approved, path, raw))
     return checked
+
+
+def runtime_audit_tables(tables):
+    return PARTITION_TABLES | {"character_proficiency_grant_v2"} | {
+        table for table in tables if table.startswith("s2_")}
+
+
+def profile_objects(migrations):
+    """Inventory the approved DDL shape. This only recognizes this profile's declarations."""
+    tables = {schema: set() for schema in PROFILE_ENDS}
+    triggers = {schema: {} for schema in PROFILE_ENDS}
+    trigger_ddl = re.compile(
+        r"^CREATE TRIGGER (\w+) (BEFORE|AFTER) (INSERT|UPDATE|DELETE) ON (\w+)\s+FOR EACH ROW\s+(.*?)\$\$"
+        r"|^DROP TRIGGER (\w+)(?:;|\$\$)", re.M | re.S | re.ASCII)
+    for schema, version, name, _, _, raw in migrations:
+        sql = raw.decode("utf-8")
+        declared = re.findall(r"^CREATE TABLE `?(\w+)`?\s*\(", sql, re.M | re.ASCII)
+        require(len(declared) == len(re.findall(r"^CREATE TABLE\b", sql, re.M))
+                and not re.search(r"^(?:DROP|RENAME) TABLE\b", sql, re.M), "Unexpected table DDL: " + name)
+        require(not tables[schema].intersection(declared) and len(set(declared)) == len(declared),
+                "Duplicate table declaration: " + name)
+        tables[schema].update(declared)
+        # The pre-split runtime triggers remain in the captured evidence. The language
+        # profile compares trigger bodies from runtime V019 onward and all RULES versions.
+        if schema == RUNTIME and version < 19:
+            continue
+        statements = trigger_ddl.findall(sql)
+        require(len(statements) == len(re.findall(r"^(?:CREATE|DROP) TRIGGER\b", sql, re.M)),
+                "Unexpected trigger DDL: " + name)
+        for trigger, timing, event, table, body, dropped in statements:
+            if dropped:
+                require(dropped in triggers[schema], "Unknown dropped trigger: " + dropped)
+                del triggers[schema][dropped]
+            else:
+                require(table in tables[schema] and trigger not in triggers[schema],
+                        "Unexpected trigger declaration: " + trigger)
+                triggers[schema][trigger] = (event, table, timing, body)
+    runtime_tables = runtime_audit_tables(tables[RUNTIME])
+    require(len(tables[SOURCE]) == 53 and len(tables[RUNTIME]) == 206
+            and len(runtime_tables) == 144 and runtime_tables <= tables[RUNTIME]
+            and len(triggers[SOURCE]) == 159 and len(triggers[RUNTIME]) == 305
+            and all(definition[1] in runtime_tables for definition in triggers[RUNTIME].values()),
+            "DDL inventory differs from the reviewed language JDBC profile")
+    return tables, triggers
+
+
+def validate_access_grants(captures, source_tables):
+    """Check the read-only roles and narrow PARTITION runtime account using SHOW GRANTS."""
+    expected = {
+        "dnd_tool_rules_app": {(SOURCE, table, "SELECT") for table in source_tables},
+        "dnd_tool_se_validation_ro": {(RUNTIME.replace("_", r"\_"), "*", "SELECT")},
+        "dnd_tool_se_app": {
+            (RUNTIME, table, privilege)
+            for table, privileges in {
+                "runtime_run_identity": ("SELECT", "INSERT"),
+                "runtime_rule_snapshot": ("SELECT", "INSERT", "DELETE"),
+                "runtime_rule_language": ("SELECT", "INSERT", "DELETE"),
+                "runtime_rule_tool": ("SELECT", "INSERT", "DELETE"),
+                "business_write_guard": ("SELECT",),
+                "campaign": ("SELECT",),
+                "s2_runtime_identity": ("SELECT",),
+            }.items() for privilege in privileges
+        },
+    }
+    for user, permitted in expected.items():
+        actual = set()
+        user_target = f" TO `{user}`@`{ACCOUNTS[user]}`"
+        for statement in captures["grants-" + user].splitlines():
+            if statement == "GRANT USAGE ON *.*" + user_target:
+                continue
+            grant = re.fullmatch(r"GRANT ([A-Z, ]+) ON `([^`]+)`[.](?:`([^`]+)`|([*]))"
+                                 + re.escape(user_target), statement)
+            require(grant is not None, "Unexpected grant: " + user)
+            table = grant[3] or grant[4]
+            actual.update((grant[2], table, privilege.strip()) for privilege in grant[1].split(","))
+        require(actual == permitted, "Unexpected effective access grants: " + user)
 
 
 def report_assertions(report, expected_tests=None):
@@ -183,8 +251,10 @@ def stop_process_group(process):
 
 
 class Acceptance:
-    def __init__(self, migrations):
+    def __init__(self, migrations, tables, triggers):
         self.migrations = migrations
+        self.tables = tables
+        self.triggers = triggers
         self.passwords = {name: secrets.token_hex(24) for name in ACCOUNTS}
         self.container = None
         self.token = secrets.token_hex(12)
@@ -323,13 +393,15 @@ class Acceptance:
             require(value["State"]["Running"], "Disposable MySQL exited during startup")
             try:
                 ready = self.mysql("SELECT @@port, @@skip_networking, @@server_uuid, @@version, @@GLOBAL.partial_revokes;").strip().split("\t")
-                if ready[0:2] == [str(self.port), "0"]:
-                    self.server_uuid = ready[2]
-                    require(ready[3].startswith("8.0.") and ready[4] == "0", "Unsupported MySQL or grant mode")
-                    self.version = ready[3]
-                    break
             except RuntimeError:
-                pass
+                time.sleep(1)
+                continue
+            require(len(ready) == 5, "Unexpected MySQL readiness response")
+            require(ready[3].startswith("8.0.") and ready[4] == "0", "Unsupported MySQL or grant mode")
+            if ready[0:2] == [str(self.port), "0"]:
+                self.server_uuid = ready[2]
+                self.version = ready[3]
+                break
             time.sleep(1)
         require(self.server_uuid is not None, "Disposable MySQL readiness timeout")
         value = self.inspect()
@@ -351,10 +423,10 @@ class Acceptance:
                    "CREATE TEMPORARY TABLES ON `dnd\\_tool\\_se`.* TO 'dnd_tool_se_migration_replay'@'localhost';")
         self.mysql(path=ROOT / "database/grants/rule-source-migrator.sql")
         for schema, _, name, approved, path, _ in self.migrations:
-            user = "dnd_tool_rules_migrator" if schema == SOURCE else "dnd_tool_se_migration_replay"
-            self.mysql(user=user, schema=schema, path=path, approved=approved)
+            self.mysql(user=REPLAY_USERS[schema], schema=schema, path=path, approved=approved)
             print("Replayed " + schema + "/" + name, flush=True)
-        for name in ("rule-source-installer.sql", "rule-source-app.sql", "runtime-language-snapshot.sql", "runtime-tool-snapshot.sql", "business-write-guard.sql"):
+        # The language/tool profile does not write Schema 2 runtime facts.
+        for name in ("rule-source-installer.sql", "rule-source-app.sql", *PARTITION_GRANTS):
             self.mysql(path=ROOT / "database/grants" / name)
         self.mysql("GRANT SELECT ON `dnd\\_tool\\_se`.* TO 'dnd_tool_se_validation_ro'@'127.0.0.1';")
 
@@ -368,12 +440,13 @@ class Acceptance:
             expected = "".join(f"{v}\t{n}\t{d}\n" for s, v, n, d, _, _ in self.migrations if s == schema)
             require(actual == expected, "Live ledger differs from approved manifest: " + schema)
             captures[schema + "-ledger"] = actual
-        for schema, tables in ((SOURCE, SOURCE_TABLES), (RUNTIME, RUNTIME_TABLES)):
-            auditor = "dnd_tool_rules_migrator" if schema == SOURCE else "dnd_tool_se_migration_replay"
-            if schema == SOURCE:
-                actual = self.mysql(f"SELECT table_name FROM information_schema.tables WHERE table_schema='{schema}' ORDER BY table_name;", user=auditor)
-                require(actual.splitlines() == tables, "Unexpected source objects")
-            for table in tables:
+        runtime_tables = runtime_audit_tables(self.tables[RUNTIME])
+        for schema in (SOURCE, RUNTIME):
+            auditor = REPLAY_USERS[schema]
+            actual = self.mysql(f"SELECT table_name FROM information_schema.tables WHERE table_schema='{schema}' ORDER BY table_name;", user=auditor)
+            require(actual.splitlines() == sorted(self.tables[schema]), "Unexpected schema objects: " + schema)
+            details = self.tables[schema] if schema == SOURCE else runtime_tables
+            for table in sorted(details):
                 captures[schema + "." + table] = self.mysql(f"SHOW CREATE TABLE {schema}.{table};", user=auditor)
             for kind, query in {
                 "columns": "SELECT table_name, column_name, ordinal_position, column_type, is_nullable, column_default, extra, collation_name FROM information_schema.columns",
@@ -392,21 +465,19 @@ class Acceptance:
             require(self.mysql(f"SELECT COUNT(*) FROM information_schema.events WHERE event_schema='{schema}';").strip() == "0", "Unexpected events")
             require(self.mysql(f"SELECT COUNT(*) FROM information_schema.views WHERE table_schema='{schema}';").strip() == "0", "Unexpected views")
         self.save("audit/live-definitions.json", json.dumps(captures, ensure_ascii=False, indent=2) + "\n")
-        # Compare all source and runtime snapshot trigger bodies to the immutable migration SQL.
-        for schema, definer in ((SOURCE, "dnd_tool_rules_migrator@127.0.0.1"),
-                                (RUNTIME, "dnd_tool_se_migration_replay@localhost")):
-            original = "\n".join(raw.decode("utf-8") for side, version, _, _, _, raw in self.migrations
-                                 if side == schema and (side == SOURCE or version >= 19))
-            expected = {name: (event, table, timing, body) for name, timing, event, table, body in re.findall(
-                r"CREATE TRIGGER (\w+) (BEFORE|AFTER) (INSERT|UPDATE|DELETE) ON (\w+) FOR EACH ROW\s+(.*?)\$\$", original, re.S)}
+        # Compare all source and reviewed runtime trigger bodies to the final replayed definition.
+        for schema in (SOURCE, RUNTIME):
+            expected = self.triggers[schema]
+            auditor = REPLAY_USERS[schema]
+            definer = f"{auditor}@{ACCOUNTS[auditor]}"
             actual = {}
             for row in captures[schema + "-triggers"].splitlines():
-                name, event, table, timing, owner, body, *_ = row.split("\t")
-                if schema == SOURCE or table in RUNTIME_TABLES:
+                name, event, table, timing, owner, *_ = row.split("\t")
+                original_statement = self.mysql(f"SHOW CREATE TRIGGER {schema}.{name};", user=auditor)
+                captures[schema + ".trigger." + name] = original_statement
+                if schema == SOURCE or table in runtime_tables or name in expected:
+                    require(name not in actual, "Duplicate live trigger: " + name)
                     require(owner == definer, "Trigger definer mismatch: " + name)
-                    auditor = "dnd_tool_rules_migrator" if schema == SOURCE else "dnd_tool_se_migration_replay"
-                    original_statement = self.mysql(f"SHOW CREATE TRIGGER {schema}.{name};", user=auditor)
-                    captures[schema + ".trigger." + name] = original_statement
                     actual[name] = (event, table, timing, show_trigger_body(original_statement, name))
             require(actual.keys() == expected.keys(), "Unexpected trigger set")
             for name, definition in expected.items():
@@ -424,6 +495,7 @@ class Acceptance:
         require(captures["roles"] == "", "Unexpected inherited roles")
         captures["accounts"] = self.mysql("SELECT user,host,account_locked FROM mysql.user ORDER BY user,host;")
         validate_accounts(captures["accounts"])
+        validate_access_grants(captures, self.tables[SOURCE])
         captures["connections"] = self.mysql("SELECT user,host,db,command FROM information_schema.processlist ORDER BY user,host;")
         captures["server"] = self.mysql("SELECT @@server_uuid, @@version, @@sql_mode, @@global.partial_revokes, @@port, @@bind_address, @@skip_networking, @@log_bin;")
         captures["fresh-history"] = self.mysql(
@@ -431,7 +503,8 @@ class Acceptance:
             "SELECT (SELECT COUNT(*) FROM rule_release),(SELECT COUNT(*) FROM rule_language),(SELECT COUNT(*) FROM rule_tool),"
             "(SELECT COUNT(*) FROM rule_package_installation),(SELECT COUNT(*) FROM rule_package_installation_partition);", user="dnd_tool_rules_app", schema=SOURCE)
         require(captures["fresh-history"] == "1\t1\t1\t0\n0\t0\t0\t0\t0\n", "Source is not freshly migrated")
-        schema2_source_content_tables = [table for table in SOURCE_TABLES if table.startswith("rule_schema2_") and table != "rule_schema2_control"]
+        schema2_source_content_tables = sorted(table for table in self.tables[SOURCE]
+                                                if table.startswith("rule_schema2_") and table != "rule_schema2_control")
         captures["schema2-fresh-history"] = self.mysql(
             "SELECT control_id,protocol_version,metadata_row_count,installation_count,acceptance_count,raw_zip_byte_count,row_version FROM rule_schema2_control;"
             "SELECT " + ",".join(f"(SELECT COUNT(*) FROM {table})" for table in schema2_source_content_tables) + ";",
@@ -444,7 +517,8 @@ class Acceptance:
         captures["business-write-guard"] = self.mysql(
             "SELECT guard_id,protocol_version FROM business_write_guard;", user="dnd_tool_se_app", schema=RUNTIME)
         require(captures["business-write-guard"] == "1\t1\n", "Business write guard is not valid")
-        schema2_content_tables = [table for table in SCHEMA2_RUNTIME_TABLES if table != "s2_runtime_control"]
+        schema2_content_tables = sorted(table for table in runtime_tables
+                                        if table.startswith("s2_") and table != "s2_runtime_control")
         captures["schema2-runtime-history"] = self.mysql(
             "SELECT " + ",".join(f"(SELECT COUNT(*) FROM {table})" for table in schema2_content_tables) + ";"
             "SELECT control_id,protocol_version,row_version,snapshot_count FROM s2_runtime_control;",
@@ -508,6 +582,7 @@ def main():
     parser.add_argument("--execute-disposable", action="store_true", help="execute authorized disposable migrations and JDBC acceptance")
     args = parser.parse_args()
     migrations = manifests()
+    tables, triggers = profile_objects(migrations)
     runtime_version = max(version for schema, version, *_ in migrations if schema == RUNTIME)
     source_version = max(version for schema, version, *_ in migrations if schema == SOURCE)
     print(f"Approved payloads verified: runtime V001-V{runtime_version:03d} and RULES V001-V{source_version:03d}. SQL files remain unchanged.", flush=True)
@@ -516,7 +591,7 @@ def main():
     require(os.name == "posix" and Path("/var/run/docker.sock").is_socket(), "Requires native Linux/WSL and the local Docker socket")
     os.umask(0o077)
     signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
-    acceptance = Acceptance(migrations)
+    acceptance = Acceptance(migrations, tables, triggers)
     try:
         acceptance.maven(["MySqlIntegrationTestSupportTest", "LanguageJdbcAcceptanceTest"])
         acceptance.start()

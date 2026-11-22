@@ -27,7 +27,7 @@ class Schema2ExplorationRuntimeServiceTest {
         var f=new Schema2CombatRuntimeServiceTest.Fixture(initialize,packages(),initialChoices());
         if(initialize)for(UUID actor:List.of(f.a,f.b)) {
             UUID focus=Schema2SpellRuntimeServiceTest.focus(actor);var member=f.members.stream().filter(m->m.characterId().equals(actor)).findFirst().orElseThrow();
-            var request=new Schema2CharacterRuntimeService.Request(focus,member.identity(),f.campaign,actor,member.preparationOperationId(),f.binding,f.character(actor).version(),equipment("ITEM_ACQUIRED",focus,HOLY_SYMBOL,"CARRIED"),Map.of());
+            var request=new Schema2CharacterRequest(focus,member.identity(),f.campaign,actor,member.preparationOperationId(),f.binding,f.character(actor).version(),equipment("ITEM_ACQUIRED",focus,HOLY_SYMBOL,"CARRIED"),Map.of());
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(request).status());
             assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,f.characterService.execute(f.characterRequest(actor,equipment("ITEM_EQUIPPED",focus,null,"OFF_HAND"))).status());
         }

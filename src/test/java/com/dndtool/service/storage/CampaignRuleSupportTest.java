@@ -51,7 +51,7 @@ class CampaignRuleSupportTest {
         var change = operation("set_field", athletics);
         change.addProperty("field", "ability_key");
         change.addProperty("value", "ability.wisdom");
-        var selected = BundledCampaignRules.artifacts();
+        var selected = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD);
         var external = extension(LOCAL, selected, List.of(newCheck, newLanguage), List.of(newSlot, localGrant),
                 List.of(disabled(originalCheck), disabled(originalSlot), change));
         var material = compose(selected, external);
@@ -83,7 +83,7 @@ class CampaignRuleSupportTest {
     }
 
     @Test void compositionRejectsMissingMechanismAndWeaponAttackBeforeRuntime() throws Exception {
-        var selected = BundledCampaignRules.artifacts();
+        var selected = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD);
         var health = authorRow(CHARACTERS, "rules.json", "rule_key", "health.srd2014");
         var noHealth = compose(selected, extension(LOCAL, selected, List.of(), List.of(), List.of(disabled(health))));
         assertRejected("STORAGE_RULE_SUPPORT_HEALTH", noHealth);
@@ -94,7 +94,7 @@ class CampaignRuleSupportTest {
     }
 
     @Test void eightMemberLocalCompositionRestoresAndOldJdbcRejectsItBeforeSql() throws Exception {
-        var selected = new ArrayList<>(BundledCampaignRules.artifacts());
+        var selected = new ArrayList<>(BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD));
         var common = authorRow(CORE, "rules.json", "rule_key", "language.common");
         for (int index = 1; index <= 4; index++) {
             String module = "local_metadata_" + index;
@@ -116,7 +116,7 @@ class CampaignRuleSupportTest {
     }
 
     @Test void unownedAutomaticFeatureMustBeDisabledToRemainMetadata() throws Exception {
-        var selected = new ArrayList<>(BundledCampaignRules.artifacts());
+        var selected = new ArrayList<>(BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD));
         var feature = declare(authorRow(CHARACTERS, "rules.json", "rule_key", "feature.life_domain_spellcasting"),
                 LOCAL, "feature.unowned_automatic");
         feature.addProperty("execution_algorithm", "AUTOMATIC_RESOURCE_LIFECYCLE_V1");
@@ -137,7 +137,7 @@ class CampaignRuleSupportTest {
     }
 
     @Test void extraAttackChecksTheOriginalDeclarationAndTheFinalComposition() throws Exception {
-        var selected = BundledCampaignRules.artifacts();
+        var selected = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD);
         var original = authorRow(CHARACTERS, "rules.json", "rule_key", "feature.fighter_extra_attack");
         var extraAttack = declare(original, LOCAL, "feature.additional_extra_attack");
         var duplicate = extension(LOCAL, selected, List.of(extraAttack), List.of(), List.of());
@@ -272,7 +272,7 @@ class CampaignRuleSupportTest {
     }
 
     static JsonObject authorRow(String module, String file, String identityKey, String value) {
-        var artifact = BundledCampaignRules.artifacts().stream().filter(member -> member.moduleKey().equals(module))
+        var artifact = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD).stream().filter(member -> member.moduleKey().equals(module))
                 .findFirst().orElseThrow();
         var rows = JsonParser.parseString(new String(artifact.originalMembers().get(file), StandardCharsets.UTF_8)).getAsJsonArray();
         for (var element : rows) {

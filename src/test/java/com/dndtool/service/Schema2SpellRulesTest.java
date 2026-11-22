@@ -1,6 +1,7 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
+import com.dndtool.module.composition.Schema2GrantFixtures;
 import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatRules.Context;
@@ -11,7 +12,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 import static com.dndtool.module.composition.Schema2SpellFixtures.*;
+import static com.dndtool.module.composition.Schema2ProgressionFixtures.ALT_CLASS;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.fullAbilities;
+import static com.dndtool.module.composition.Schema2ProgressionFixtures.fullMulticlassChoices;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.fullPlan;
 import static com.dndtool.service.Schema2CombatTestFixture.withState;
 import static com.dndtool.service.Schema2CombatTestFixture.withHealth;
@@ -25,8 +28,8 @@ class Schema2SpellRulesTest {
     private final UUID campaign=UUID.randomUUID(),combat=UUID.randomUUID(),a=UUID.randomUUID(),b=UUID.randomUUID();
     private final Map<UUID,Context> roster=new HashMap<>();
     private Battle battle;
-    Schema2SpellRulesTest() {roster.put(a,context(a));roster.put(b,context(b));}
-    private Context context(UUID id) {
+    Schema2SpellRulesTest() {roster.put(a,context(a,material));roster.put(b,context(b,material));}
+    private Context context(UUID id, ProductionSchema2Projection material) {
         var initial=fullPlan(material,new Schema2PreparationIdentity(UUID.randomUUID(),UUID.randomUUID()),campaign,id);
         State state=new Schema2CharacterProgressionRules().initial(material,initial,UUID.randomUUID(),fullAbilities(),initialChoices());
         Context c=new Context(material,initial,state); UUID symbol=UUID.randomUUID();
@@ -164,6 +167,31 @@ class Schema2SpellRulesTest {
         var unknown=new com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity(BLESS.moduleKey(),"adventure.spell","spell.unpublished");
         // Resolve declaration before cost: an unknown spell remains unavailable even with no slots.
         rejected(Command.cast(a,new CastInput(CASTING,unknown,List.of(a),null)),"S2_SPELL_UNAVAILABLE");
+    }
+    @Test void legalMulticlassGrowthDoesNotAuthorizeCastingEvenWithTheOriginalSlot() {
+        var files = packages();
+        // Keep the second class free of unrelated blocked features so the casting boundary is exercised.
+        Schema2GrantFixtures.edit(files, 1, "rules.json", root -> root.getAsJsonArray().asList().removeIf(row ->
+                row.getAsJsonObject().getAsJsonObject("identity").get("rule_key").getAsString().equals("feature.training")));
+        var castingMaterial = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+        roster.replaceAll((actor, unused) -> context(actor, castingMaterial));
+        start();
+
+        var casting = new Schema2SpellRules();
+        var input = new CastInput(CASTING, CURE_WOUNDS, List.of(a), null);
+        assertEquals(SLOT_RESOURCE, casting.prepare(roster, battle, a, input).slotResource());
+        Context caster = roster.get(a);
+        var progression = new Schema2CharacterProgressionRules();
+        var advance = progression.prepareAdvance(castingMaterial, caster.character(), ALT_CLASS, 2,
+                "FIXED_AVERAGE", fullMulticlassChoices());
+        State multiclass = progression.advance(castingMaterial, advance, null);
+        assertEquals(2, multiclass.classes().size());
+        assertEquals(caster.character().features(), multiclass.features());
+        roster.put(a, withState(caster, multiclass));
+
+        assertEquals("S2_SPELL_EFFECT_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
+                () -> casting.prepare(roster, battle, a, input)).getMessage());
+        assertEquals(2, slots(a));
     }
     @Test void sourceIdentityAndTargetDistanceCannotBeInventedByTheCaller() {
         start();

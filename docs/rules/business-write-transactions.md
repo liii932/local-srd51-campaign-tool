@@ -1,8 +1,7 @@
 # 共同业务写入与初始化准备
 
-本合同连接既有业务事务与 [v2 运行设计](../design/v2/runtime-and-transactions.md)。
-共同接纳不改变 RELEASED v1 的规则、事件、幂等摘要和存档编码，也不赋予不完整 schema 2
-基础模组游戏执行资格。完整角色、业务历史及保存/结束生命周期仍按各领域采用条件接入。
+本合同说明 MySQL 内部写入及初始化准备，并连接 [v2 运行设计](../design/v2/runtime-and-transactions.md)。
+当前工作台的战役命令与保存使用 [SQLite 运行合同](../storage-vitality-loop.md)。旧 MySQL 战役及 format 1 整档由匹配的已发行应用处理。
 
 ## 唯一写入边界
 
@@ -20,18 +19,9 @@
 
 | 事务 owner | 写入责任 |
 |---|---|
-| `JdbcCampaignCreationRepository.create` | legacy 战役创建 |
-| `JdbcCharacterCreationRepository.create` | legacy 角色创建 |
-| `JdbcCharacterCardMutationRepository.mutate` | 角色卡修改 |
-| `JdbcCharacterLifecycleMutationRepository.mutate` | 角色生命周期命令 |
 | `JdbcCharacterAggregateMutationRepository.mutate` | 角色聚合修改 |
 | `JdbcLevelOneCharacterCreationRepository.confirm` | DRAFT 一级角色创建 |
 | `JdbcLevelAdvancementRepository.confirm` | DRAFT 角色成长 |
-| `CheckTransactionService.execute` | 检定、效果、版本及幂等结果 |
-| `EncounterCommandTransactionService.initialize` | 带命令身份的遭遇初始化 |
-| `EncounterStateTransactionService.initialize` | 内部遭遇初始化 |
-| `EntityPositionTransactionService.position` | 实体位置修改 |
-| `CampaignArchiveConfirmationService.confirm` | 完整 legacy 战役导入 |
 | `CampaignArchiveV2DraftImportService.importState` | 内部 DRAFT 角色状态导入 |
 | `Schema2SnapshotTransferService` | INTERNAL 快照及绑定初始计划的原子转存 |
 | `Schema2CharacterRuntimeService` | INTERNAL 角色成长、资源、单角色时间／标准休息、检定、装备和健康及完整局部状态/历史直接恢复；不开放完整战役初始化或 Host 执行 |
@@ -79,8 +69,9 @@
 初始化准备还覆盖跨来源身份、同键不同计划、来源关闭失败、读回被修改和中途失败无
 部分快照/计划/收据。固定期望不得由被测计划器生成。
 
-前向迁移、最小授权和只读核验脚本必须分别审核。新增迁移进入候选 WAR 及完整 schema
-诊断清单；文件存在、静态 SQL 测试和 JDBC 代理测试都不表示真实 MySQL 已迁移或已通过
+前向迁移、最小授权和只读核验脚本必须分别审核。MySQL 运行迁移由仓库和编译后的
+`target/classes/db/migration/` 提供，新增版本须纳入完整 schema 诊断清单。
+文件存在、静态 SQL 测试和 JDBC 代理测试都不表示真实 MySQL 已迁移或已通过
 锁、触发器、权限及连接池失效验收。数据库安装、授权、真实数据库验收和部署仍为独立
 检查点，普通应用启动不执行这些操作。
 

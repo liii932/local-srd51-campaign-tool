@@ -2,8 +2,8 @@ package com.dndtool.persistence;
 
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.service.Schema2CombatHistory.Member;
+import com.dndtool.service.Schema2CombatRequest;
 import com.dndtool.service.Schema2CombatRuntimeService;
-import com.dndtool.service.Schema2CombatRuntimeService.Request;
 import com.dndtool.service.Schema2CombatState;
 import com.dndtool.service.Schema2CombatTestFixture;
 import com.dndtool.service.Schema2CombatTimeRules;
@@ -119,10 +119,10 @@ class Schema2MonsterBreathRuntimeSchemaTest {
         for (var kind : SQLITE_SPATIAL_COMMANDS) {
             var command = Schema2CombatState.Command.action(kind, null);
             long expectedVersion = kind == Schema2CombatState.Kind.OPEN_SCENE ? -1 : 0;
-            var error = assertThrows(IllegalArgumentException.class, () -> new Request(operation, combat, campaign,
+            var error = assertThrows(IllegalArgumentException.class, () -> new Schema2CombatRequest(operation, combat, campaign,
                     binding, members, expectedVersion, versions, command));
             assertEquals("S2_COMBAT_REQUEST", error.getMessage());
-            var request = new Request(operation, combat, campaign, binding, members, expectedVersion, versions,
+            var request = new Schema2CombatRequest(operation, combat, campaign, binding, members, expectedVersion, versions,
                     command, true);
             assertEquals(new Schema2CombatRuntimeService.Result(Schema2CombatRuntimeService.Status.REJECTED,
                     "S2_COMBAT_REQUEST", null), service.execute(request));

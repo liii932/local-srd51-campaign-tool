@@ -1,5 +1,7 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.persistence.storage.CampaignRepository;
+import com.dndtool.persistence.storage.CampaignRepository.SaveReceipt;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.*;
@@ -137,8 +139,42 @@ class CampaignStorageServiceTest {
         try (var restarted = new CampaignStorageService(root())) {
             assertTrue(restarted.status().saveFiles().isEmpty()); assertCode("RESIDUAL_RUN", () -> restarted.savedFile(pending));
             var v = restarted.recover(run); assertEquals(1, v.revision()); assertEquals(11, hp(v));
+            assertTrue(saveReceipts(run).stream().anyMatch(receipt -> receipt.accepted()
+                    && receipt.requestId().equals(request) && receipt.revision() == 1 && receipt.fileKey().equals(pending)),
+                    "Recovery must accept the original request and revision before any retry");
             assertEquals(pending, restarted.save(request, v.epoch(), 1).fileKey()); assertTrue(Files.exists(restarted.savedFile(pending)));
             assertEquals(2, restarted.status().saveFiles().size());
+        }
+    }
+
+    @Test void recoveryRejectsAValidSaveFromAnotherSourceAndPreservesThePendingIntent() throws Exception {
+        AtomicReference<Boundary> fail = new AtomicReference<>();
+        String request = id(), run, sourceCampaign;
+        try (var host = faultHost(fail)) {
+            var campaign = CampaignRuleFixtures.create(host, "本地来源");
+            run = host.status().runId();
+            sourceCampaign = campaign.campaignId();
+            fail.set(Boundary.AFTER_P0);
+            assertThrows(IllegalStateException.class, () -> host.save(request, campaign.epoch(), campaign.revision()));
+        }
+
+        var originalReceipts = saveReceipts(run);
+        var pending = originalReceipts.stream().filter(receipt -> receipt.requestId().equals(request)).findFirst().orElseThrow();
+        assertFalse(pending.accepted());
+        var codec = new CampaignCodec();
+        var foreign = new CampaignData.Document(pending.fileKey(), CampaignRuleFixtures.snapshot(id(), "外部来源"));
+        byte[] foreignBytes = codec.encode(foreign);
+        assertEquals(foreign, codec.decode(foreignBytes));
+        assertNotEquals(sourceCampaign, foreign.snapshot().campaignId());
+        assertEquals(pending.byteSize(), foreignBytes.length);
+        assertNotEquals(pending.rawDigest(), CampaignJson.sha256(foreignBytes));
+        Path target = root().resolve("saves").resolve(pending.fileKey() + ".json");
+        Files.write(target, foreignBytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+
+        try (var restarted = new CampaignStorageService(root())) {
+            assertCode("STORAGE_INTEGRITY", () -> restarted.recover(run));
+            assertEquals(originalReceipts, saveReceipts(run));
+            assertArrayEquals(foreignBytes, Files.readAllBytes(target));
         }
     }
 
@@ -253,14 +289,36 @@ class CampaignStorageServiceTest {
         }
     }
 
+    @Test void storedCommandAndSaveIntentsMatchIndependentWireVectors() throws Exception {
+        String run;
+        try (var host = new CampaignStorageService(root())) {
+            var campaign = CampaignRuleFixtures.create(host, "意图向量");
+            long epoch = campaign.epoch();
+            assertCode("STALE_REVISION", () -> addCard(host, id(), epoch, -1, "守卫"));
+            assertCode("STALE_REVISION", () -> host.save(id(), epoch, -1));
+            addCard(host, id(), epoch, 0, "守卫");
+            host.save(id(), epoch, 1);
+            run = host.status().runId();
+        }
+        // Independent SHA-256 vectors for the DM's manual-create at revision 0 and SAVE_MANUAL at 1.
+        try (Connection c = database(run); Statement s = c.createStatement();
+             ResultSet r = s.executeQuery("SELECT (SELECT intent FROM core_command WHERE result_revision=1), "
+                     + "(SELECT intent FROM core_save WHERE purpose='MANUAL')")) {
+            assertTrue(r.next());
+            assertEquals("04580eda157272c1e55601a46d74e3f24d2e31998493c2c994a9f404082238fe",
+                    HexFormat.of().formatHex(r.getBytes(1)));
+            assertEquals("46c0cccf5ef1fa1ef73bf07a46ab5e39327a9e2b9912d055eb2bd1f75f386b2c",
+                    HexFormat.of().formatHex(r.getBytes(2)));
+        }
+    }
+
     @Test void acceptedCheckpointRevisionCannotClaimAnotherValidHistoryPrefix() throws Exception {
         String run;
         try (var host = new CampaignStorageService(root())) {
             var v = CampaignRuleFixtures.create(host, "保存版本"); v = addCard(host, id(), v.epoch(), 0, "角色");
             host.save(id(), v.epoch(), 1); setHp(host, id(), v.epoch(), 1, cardId(v), 0, 8); run = host.status().runId();
         }
-        var intent = new com.google.gson.JsonArray(); intent.add("SAVE_MANUAL"); intent.add("2");
-        byte[] digest = HexFormat.of().parseHex(CampaignJson.digest("DND-VITALITY-COMMAND", CampaignJson.canonical(intent)));
+        byte[] digest = HexFormat.of().parseHex("0da8d811373d242952421f63b8a2d2a812b04aa9727c4d748e883bb20ab21fc2");
         try (Connection c = database(run); PreparedStatement s = c.prepareStatement("UPDATE core_save SET revision=2,intent=? WHERE purpose='MANUAL'")) { s.setBytes(1, digest); s.executeUpdate(); }
         try (var restarted = new CampaignStorageService(root())) { assertCode("STORAGE_INTEGRITY", () -> restarted.recover(run)); }
     }
@@ -334,6 +392,9 @@ class CampaignStorageServiceTest {
 
     private CampaignStorageService faultHost(AtomicReference<Boundary> failure) throws Exception {
         return new CampaignStorageService(root(), boundary -> { if (failure.compareAndSet(boundary, null)) throw new IllegalStateException("injected " + boundary); });
+    }
+    private List<SaveReceipt> saveReceipts(String run) throws SQLException {
+        try (Connection c = database(run)) { return new CampaignRepository().saves(c); }
     }
     private Connection database(String run) throws SQLException { return DriverManager.getConnection("jdbc:sqlite:" + root().resolve("runs").resolve(run).resolve("run.db")); }
     private static void assertCode(String code, Runnable action) { assertEquals(code, assertThrows(StorageException.class, action::run).code()); }

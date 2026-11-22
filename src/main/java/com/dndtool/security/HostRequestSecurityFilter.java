@@ -25,25 +25,22 @@ import jakarta.servlet.http.HttpSession;
 /**
  * Enforces request-level protections after {@link HostBoundaryFilter} has accepted the origin.
  *
- * <p>GET and HEAD bootstrap a short-lived host session so the page can render a CSRF token into a
- * future form. POST validates the source, Fetch Metadata, session token, state versions, request
- * identifier, and digest syntax in the same order as the design. Durable idempotency and the
- * digest of a canonical business payload are revalidated by the reached Service/DAO transaction.
+ * <p>GET and HEAD make the Host session's CSRF token available to handlers. POST validates the
+ * source, Fetch Metadata, session, CSRF header, versions, request identifier, and digest syntax
+ * in order. The business transaction enforces durable idempotency and verifies the canonical
+ * payload digest.
  */
 public final class HostRequestSecurityFilter implements Filter {
     public static final String SESSION_COOKIE_NAME = "DNDHOSTSESSION";
     public static final String CSRF_TOKEN_REQUEST_ATTRIBUTE = "dndtool.csrfToken";
-    public static final String HOST_STATE_EPOCH_REQUEST_ATTRIBUTE = "dndtool.hostStateEpoch";
     public static final String ROW_VERSION_REQUEST_ATTRIBUTE = "dndtool.rowVersion";
     public static final String CSRF_TOKEN_SESSION_ATTRIBUTE = "dndtool.csrfToken";
     public static final String HOST_STATE_EPOCH_SESSION_ATTRIBUTE = "dndtool.hostStateEpoch";
-    public static final String ROW_VERSION_SESSION_ATTRIBUTE = "dndtool.rowVersion";
     public static final String REQUEST_ID_ATTRIBUTE = "dndtool.requestId";
     public static final String REQUEST_DIGEST_ATTRIBUTE = "dndtool.requestDigest";
 
     static final String EXPECTED_ORIGIN = "http://127.0.0.1:8080";
     static final String CSRF_HEADER = "X-CSRF-Token";
-    static final String CSRF_PARAMETER = "_csrf";
     static final String EPOCH_HEADER = "X-Host-State-Epoch";
     static final String ROW_VERSION_HEADER = "X-Object-Row-Version";
     static final String REQUEST_ID_HEADER = "X-Request-Id";
@@ -97,12 +94,6 @@ public final class HostRequestSecurityFilter implements Filter {
             httpRequest.setAttribute(
                     CSRF_TOKEN_REQUEST_ATTRIBUTE,
                     session.getAttribute(CSRF_TOKEN_SESSION_ATTRIBUTE));
-            httpRequest.setAttribute(
-                    HOST_STATE_EPOCH_REQUEST_ATTRIBUTE,
-                    session.getAttribute(HOST_STATE_EPOCH_SESSION_ATTRIBUTE));
-            httpRequest.setAttribute(
-                    ROW_VERSION_REQUEST_ATTRIBUTE,
-                    session.getAttribute(ROW_VERSION_SESSION_ATTRIBUTE));
             chain.doFilter(httpRequest, responseWrapper);
             return;
         }
@@ -222,9 +213,6 @@ public final class HostRequestSecurityFilter implements Filter {
     private static boolean hasMatchingCsrfToken(HttpServletRequest request, HttpSession session) {
         Object stored = session.getAttribute(CSRF_TOKEN_SESSION_ATTRIBUTE);
         String supplied = request.getHeader(CSRF_HEADER);
-        if (supplied == null) {
-            supplied = request.getParameter(CSRF_PARAMETER);
-        }
         if (!(stored instanceof String expected) || supplied == null) {
             return false;
         }
@@ -252,9 +240,6 @@ public final class HostRequestSecurityFilter implements Filter {
         }
         if (session.getAttribute(HOST_STATE_EPOCH_SESSION_ATTRIBUTE) == null) {
             session.setAttribute(HOST_STATE_EPOCH_SESSION_ATTRIBUTE, INITIAL_VERSION);
-        }
-        if (session.getAttribute(ROW_VERSION_SESSION_ATTRIBUTE) == null) {
-            session.setAttribute(ROW_VERSION_SESSION_ATTRIBUTE, INITIAL_VERSION);
         }
     }
 

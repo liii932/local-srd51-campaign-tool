@@ -3,16 +3,22 @@ package com.dndtool.service.storage;
 import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.HealthInput;
 import com.dndtool.service.Schema2CombatHistory;
 import com.dndtool.service.Schema2CombatState.*;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 
 import static com.dndtool.service.storage.CampaignSpaceData.Ref;
@@ -155,6 +161,170 @@ class CampaignSpacesIntegrationTest {
             send(service, "scene-mode", object("mode", "EXPLORATION"));
             assertEquals("EXPLORATION", state(service).space().scene(scene).mode());
         }
+    }
+
+    @Test void campaignOperationOwnershipIsEnforcedBeforeDiceAndOnPortableReopen() throws Exception {
+        AtomicInteger dice = new AtomicInteger();
+        AtomicInteger commandWrites = new AtomicInteger();
+        try (var service = new CampaignStorageService(temporary.resolve("operation-owners"), boundary -> {
+            if (boundary == CampaignStorageService.Boundary.AFTER_CHARACTER_UPDATE) commandWrites.incrementAndGet();
+        }, sides -> {
+            dice.incrementAndGet();
+            return 1;
+        })) {
+            service.create("跨场景操作身份");
+            UUID world = node(service, "营地");
+            focus(service, Ref.world(world));
+            UUID a1 = fighter(service, "甲");
+            var creation = state(service).roots().getLast();
+            assertEquals(List.of(creation.operationId()), creation.characterOperations());
+            assertEquals(creation.operationId(), character(service, a1).history().events().getFirst().operationId());
+            UUID a2 = fighter(service, "乙");
+            UUID b1 = fighter(service, "丙");
+            UUID b2 = fighter(service, "丁");
+            for (UUID character : List.of(a1, a2, b1, b2)) place(service, character, world);
+
+            UUID sceneA = scene(service, world, "北侧庭院", "RULES");
+            enter(service, sceneA, a1, a2);
+            combat(service, sceneA, Command.advanceTime(a1, 6));
+            var advance = state(service).roots().getLast();
+            var sceneEvent = sceneHistory(service, sceneA).events().getLast();
+            assertEquals(advance.operationId(), sceneEvent.operationId());
+            assertEquals(2, advance.characterOperations().size());
+            assertEquals(2, sceneEvent.characterOperations().size());
+            assertEquals(Set.copyOf(advance.characterOperations()), Set.copyOf(sceneEvent.characterOperations()));
+            UUID retainedChild = character(service, a1).history().events().getLast().operationId();
+            assertNotEquals(advance.operationId(), retainedChild);
+            assertTrue(advance.characterOperations().contains(retainedChild));
+
+            UUID healingRoot = UUID.randomUUID();
+            UUID occupied = combatChild(healingRoot, b1, 0);
+            send(service, occupied.toString(), "note", object("text", "北侧庭院记录"));
+            focus(service, Ref.world(world));
+            UUID sceneB = scene(service, world, "南侧庭院", "RULES");
+            enter(service, sceneB, b1, b2);
+
+            var rules = CampaignRuleFixtures.rules();
+            var damage = new HealthInput(rules.rule("adventure.health", "health.srd2014"),
+                    rules.rule("adventure.vital_effect", "vital_effect.dm_damage"), null, "DM裁定落石伤害");
+            combat(service, sceneB, Command.worldHealth(b1, b1, damage));
+            JsonObject reenter = combatInput(service, sceneB, Command.reenter(b1, List.of(b1, b2)));
+            assertRejectedWithoutCommandWrites(service, dice, commandWrites, "IDEMPOTENCY_CONFLICT",
+                    () -> CampaignSpaceFixtures.command(service, retainedChild.toString(), "combat-command", reenter));
+            int beforeInitiative = dice.get();
+            CampaignSpaceFixtures.command(service, "combat-command", reenter);
+            assertEquals(beforeInitiative + 2, dice.get());
+            assertEquals(b1, sceneHistory(service, sceneB).current().activeActor());
+
+            JsonObject healing = combatInput(service, sceneB, Command.action(Kind.SECOND_WIND, b1));
+            assertRejectedWithoutCommandWrites(service, dice, commandWrites, "DOMAIN_REJECTED",
+                    () -> CampaignSpaceFixtures.command(service, healingRoot.toString(), "combat-command", healing));
+
+            var beforeRetry = service.accessSnapshot();
+            JsonObject retry = CampaignSpaceFixtures.focused(beforeRetry.snapshot().domains(), healing);
+            String retryId = uuid();
+            int beforeDraws = dice.get();
+            int beforeWrites = commandWrites.get();
+            long hitPoints = character(service, b1).history().current().hitPoints();
+            var accepted = service.domainCommand(retryId, beforeRetry.epoch(), beforeRetry.revision(), "combat-command", retry);
+            assertFalse(accepted.lastCommand().replayed());
+            assertEquals(beforeRetry.revision() + 1, accepted.revision());
+            assertEquals(hitPoints + 2, character(service, b1).history().current().hitPoints());
+            assertEquals(beforeDraws + 1, dice.get());
+            assertEquals(beforeWrites + 1, commandWrites.get());
+            var retryRoot = state(service).roots().getLast();
+            assertEquals(2, retryRoot.characterOperations().size());
+            assertEquals(Set.of(combatChild(retryRoot.operationId(), b1, 0), combatChild(retryRoot.operationId(), b1, 1)),
+                    Set.copyOf(retryRoot.characterOperations()));
+            assertTrue(service.domainCommand(retryId, beforeRetry.epoch(), beforeRetry.revision(), "combat-command", retry)
+                    .lastCommand().replayed());
+            assertEquals(beforeDraws + 1, dice.get());
+            assertEquals(beforeWrites + 1, commandWrites.get());
+            assertEquals(accepted.domain(), service.current().domain());
+
+            send(service, healingRoot.toString(), "note", object("text", "南侧庭院记录"));
+            var original = service.current();
+            String key = service.end(uuid(), original.epoch(), original.revision()).fileKey();
+            byte[] complete = Files.readAllBytes(service.savedFile(key));
+            assertEquals(3, CampaignJson.read(complete).get("formatVersion").getAsInt());
+            assertPortableOperationOwnership(complete, key, original, advance, sceneA, retainedChild);
+        }
+    }
+
+    private void assertPortableOperationOwnership(byte[] complete, String key, CampaignStorageService.CampaignView original,
+            CampaignDomainData.Root advance, UUID scene, UUID retainedChild) throws Exception {
+        AtomicInteger importWrites = new AtomicInteger();
+        try (var target = new CampaignStorageService(temporary.resolve("operation-import"), boundary -> {
+            if (boundary == CampaignStorageService.Boundary.AFTER_IMPORT_TEMP) importWrites.incrementAndGet();
+        }, sides -> { throw new AssertionError("Portable verification drew a d" + sides); })) {
+            var empty = target.status();
+            assertTrue(empty.saveFiles().isEmpty());
+
+            JsonObject conflict = CampaignJson.read(complete);
+            fileRoots(conflict).asList().getLast().getAsJsonObject().addProperty("operationId", retainedChild.toString());
+            assertEquals("INVALID_FILE", assertThrows(StorageException.class, () -> target.importFile(resign(conflict))).code());
+
+            JsonObject orphan = CampaignJson.read(complete);
+            var rootChildren = fileRoot(orphan, advance).getAsJsonArray("characterOperations");
+            var sceneEvents = orphan.getAsJsonObject("domains").getAsJsonArray("combats").asList().stream()
+                    .map(JsonElement::getAsJsonObject)
+                    .filter(history -> history.getAsJsonObject("current").get("combatId").getAsString().equals(scene.toString()))
+                    .findFirst().orElseThrow().getAsJsonArray("events");
+            var sceneChildren = sceneEvents.asList().getLast().getAsJsonObject().getAsJsonArray("characterOperations");
+            assertTrue(rootChildren.asList().removeIf(id -> id.getAsString().equals(retainedChild.toString())));
+            assertTrue(sceneChildren.asList().removeIf(id -> id.getAsString().equals(retainedChild.toString())));
+            assertEquals("INVALID_FILE", assertThrows(StorageException.class, () -> target.importFile(resign(orphan))).code());
+
+            JsonObject forgedTime = CampaignJson.read(complete);
+            var clocks = fileRoot(forgedTime, advance).getAsJsonObject("space").getAsJsonObject("after")
+                    .getAsJsonArray("clocks");
+            var clock = clocks.asList().stream().map(JsonElement::getAsJsonObject)
+                    .filter(value -> value.getAsJsonObject("space").get("id").getAsString().equals(scene.toString()))
+                    .findFirst().orElseThrow();
+            assertEquals("6", clock.get("second").getAsString());
+            clock.addProperty("second", "7");
+            assertEquals("INVALID_FILE", assertThrows(StorageException.class, () -> target.importFile(resign(forgedTime))).code());
+
+            assertEquals(0, importWrites.get());
+            assertEquals(empty, target.status());
+            assertEquals(key, target.importFile(complete).fileKey());
+            var opened = target.open(key);
+            assertEquals(original.domain(), opened.domain());
+            assertEquals(original.history(), opened.history());
+        }
+    }
+
+    private static void assertRejectedWithoutCommandWrites(CampaignStorageService service, AtomicInteger dice,
+            AtomicInteger writes, String code, Executable command) {
+        var before = service.accessSnapshot();
+        int draws = dice.get();
+        int updates = writes.get();
+        assertEquals(code, assertThrows(StorageException.class, command).code());
+        assertEquals(draws, dice.get());
+        assertEquals(updates, writes.get());
+        assertEquals(before, service.accessSnapshot());
+    }
+
+    private static UUID combatChild(UUID operation, UUID character, int ordinal) {
+        byte[] identity = ("schema2-combat-character/1/" + operation + "/" + character + "/" + ordinal)
+                .getBytes(StandardCharsets.US_ASCII);
+        UUID derived = UUID.nameUUIDFromBytes(identity);
+        return new UUID((derived.getMostSignificantBits() & ~0xf000L) | 0x4000L, derived.getLeastSignificantBits());
+    }
+
+    private static JsonArray fileRoots(JsonObject file) {
+        return file.getAsJsonObject("domains").getAsJsonArray("roots");
+    }
+
+    private static JsonObject fileRoot(JsonObject file, CampaignDomainData.Root root) {
+        return fileRoots(file).get(Math.toIntExact(root.sequence() - 1)).getAsJsonObject();
+    }
+
+    private static byte[] resign(JsonObject file) {
+        var integrity = file.remove("integrity").getAsJsonObject();
+        integrity.addProperty("digest", CampaignJson.digest(CampaignCodec.FILE_DIGEST_DOMAIN, CampaignJson.canonical(file)));
+        file.add("integrity", integrity);
+        return CampaignJson.canonical(file);
     }
 
     private static UUID node(CampaignStorageService service, String name) {

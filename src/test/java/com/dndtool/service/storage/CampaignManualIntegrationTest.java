@@ -16,6 +16,29 @@ import static org.junit.jupiter.api.Assertions.*;
 class CampaignManualIntegrationTest {
     @TempDir Path temporary;
 
+    @Test void freeCardCreationRejectsNonNfcAndKeepsEqualNamesIndependent() throws Exception {
+        try (var service = new CampaignStorageService(temporary.resolve("manual-names"))) {
+            CampaignRuleFixtures.create(service, "角色姓名");
+            var before = service.accessSnapshot();
+            String request = uuid();
+            for (String name : List.of("　 ", "Cafe\u0301")) {
+                var invalid = object("name", name, "kind", "PC", "template", "blank");
+                assertEquals("INVALID_FILE", assertThrows(StorageException.class,
+                        () -> CampaignSpaceFixtures.command(service, request, "manual-create", invalid)).code());
+                assertEquals(before, service.accessSnapshot());
+            }
+
+            var valid = object("name", "Caf\u00e9", "kind", "PC", "template", "blank");
+            var first = CampaignSpaceFixtures.command(service, request, "manual-create", valid).lastCommand();
+            var second = CampaignSpaceFixtures.command(service, "manual-create", valid).lastCommand();
+            assertFalse(first.replayed());
+            assertNotEquals(first.subjectId(), second.subjectId());
+            var cards = service.accessSnapshot().snapshot().domains().manual().characters();
+            assertEquals(List.of("Caf\u00e9", "Caf\u00e9"),
+                    cards.stream().map(card -> card.current().name()).toList());
+        }
+    }
+
     @Test void freeCardOrderedEffectsRollbackAndCompleteFileKeepInitialAndCurrentDistinct() throws Exception {
         boolean[] fail={false};
         try(var service=new CampaignStorageService(temporary.resolve("manual"),b->{if(fail[0]&&b==CampaignStorageService.Boundary.AFTER_CHARACTER_UPDATE)throw new IllegalStateException("manual fault");})){

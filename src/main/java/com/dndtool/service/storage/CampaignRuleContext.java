@@ -2,7 +2,6 @@ package com.dndtool.service.storage;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
-import com.dndtool.service.Schema2CharacterRuntime.Event;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2InitialCharacterPlanService;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
@@ -109,18 +108,6 @@ public final class CampaignRuleContext {
                     "ability.intelligence", 15, "ability.wisdom", 12, "ability.charisma", 10);
             default -> throw new IllegalArgumentException("STORAGE_CLASS_UNAVAILABLE");
         };
-    }
-
-    void validateInitialTemplate(InitialPlan retained, Event initialized) {
-        var sources = retained.character().sources();
-        String characterClass = sources.characterClass().ruleKey();
-        var expected = initialRequest(characterClass, sources.background().ruleKey());
-        // The domain engine independently validates the plan's grants, slots and binding.
-        if (!expected.sources().equals(sources) || !expected.choices().equals(retained.character().choices())
-                || !"INITIALIZED".equals(initialized.kind())
-                || !initialAbilities(characterClass).equals(initialized.after().abilities())
-                || !initialChoices(characterClass).equals(initialized.command().growthChoices()))
-            throw new IllegalArgumentException("STORAGE_INITIAL_TEMPLATE_MISMATCH");
     }
 
     private EntryIdentity slot(RuleIdentity owner, String collection, String key) {

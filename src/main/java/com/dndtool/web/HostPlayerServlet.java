@@ -3,7 +3,6 @@ package com.dndtool.web;
 import com.dndtool.security.HostRequestSecurityFilter;
 import com.dndtool.service.storage.*;
 import com.google.gson.JsonObject;
-import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,7 +10,6 @@ import java.security.MessageDigest;
 import java.util.*;
 
 /** Uses the unchanged Host boundary, CSRF, epoch and canonical HTTP request digest. */
-@WebServlet(name = "HostPlayerServlet", urlPatterns = "/api/host/storage/players/*")
 public final class HostPlayerServlet extends HttpServlet {
     private static final Map<String,Set<String>> FIELDS = Map.ofEntries(
             Map.entry("invite",Set.of()), Map.entry("close",Set.of()), Map.entry("approve",Set.of("applicationId","memberId")),
@@ -52,7 +50,6 @@ public final class HostPlayerServlet extends HttpServlet {
             if (supplied == null || !MessageDigest.isEqual(supplied.getBytes(StandardCharsets.US_ASCII),digest.getBytes(StandardCharsets.US_ASCII))) throw new IllegalArgumentException();
             JsonObject body = PlayerApplicationAccess.service(request.getServletContext()).hostCommand(action,input,
                     (String) request.getAttribute(HostRequestSecurityFilter.REQUEST_ID_ATTRIBUTE),Long.parseLong(epoch),Long.parseLong(revision));
-            body.addProperty("csrf",Objects.toString(request.getAttribute(HostRequestSecurityFilter.CSRF_TOKEN_REQUEST_ATTRIBUTE),""));
             body.addProperty("playerOrigin",com.dndtool.security.PlayerListenerConfiguration.from(request.getServletContext()).origin()); write(response,body);
         } catch (PlayerGatewayException failure) { PlayerServlet.error(response,failure.status(),failure.code()); }
         catch (StorageException failure) { PlayerServlet.error(response,409,failure.code()); }

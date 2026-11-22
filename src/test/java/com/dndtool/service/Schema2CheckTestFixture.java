@@ -68,11 +68,11 @@ final class Schema2CheckTestFixture {
         });
     }
     void initialize() { commit(new Command("INITIALIZED", null, 0, null, null, null, INITIAL_CHOICES)); }
-    Schema2CharacterRuntimeService.Request request(Command command) {
-        return new Schema2CharacterRuntimeService.Request(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER,
+    Schema2CharacterRequest request(Command command) {
+        return new Schema2CharacterRequest(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER,
                 PREPARATION, binding, state == null ? -1 : state.version(), command, state == null ? fullAbilities() : Map.of());
     }
-    Schema2CharacterRuntimeService.Result execute(Schema2CharacterRuntimeService.Request request) {
+    Schema2CharacterRuntimeService.Result execute(Schema2CharacterRequest request) {
         var result = service.execute(request);
         if (result.status() == Schema2CharacterRuntimeService.Status.COMMITTED) state = result.event().after();
         return result;
@@ -83,7 +83,7 @@ final class Schema2CheckTestFixture {
     UUID acquire(RuleIdentity item) {
         UUID operation = UUID.randomUUID();
         var command = equipment("ITEM_ACQUIRED", operation, item, "CARRIED");
-        var request = new Schema2CharacterRuntimeService.Request(operation, IDENTITY, CAMPAIGN, CHARACTER, PREPARATION,
+        var request = new Schema2CharacterRequest(operation, IDENTITY, CAMPAIGN, CHARACTER, PREPARATION,
                 binding, state.version(), command, Map.of());
         var result = execute(request); assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED, result.status(), result.code()); return operation;
     }

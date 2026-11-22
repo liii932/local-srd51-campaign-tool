@@ -102,10 +102,6 @@ public final class LocalRuleLibrary {
             }));
     }
 
-    public List<ImportRecord> listImports() {
-        return inventory().stream().map(InventoryEntry::imported).toList();
-    }
-
     public List<InventoryEntry> inventory() {
         return locked("INVENTORY", null, false, List::of, () ->
             query(connection -> {

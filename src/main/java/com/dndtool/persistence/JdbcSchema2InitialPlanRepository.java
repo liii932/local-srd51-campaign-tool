@@ -3,7 +3,6 @@ package com.dndtool.persistence;
 import com.dndtool.module.CharacterProficiencyGrant.GrantKind;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository.Snapshot;
-import com.dndtool.service.Schema2InitialCharacterPlanService;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2InitialCharacterPlanService.Plan;
 import com.dndtool.service.Schema2InitialProficiencyRules.*;
@@ -16,7 +15,7 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Append-only INTERNAL initialization preparation; never creates business characters or history. */
 public final class JdbcSchema2InitialPlanRepository {
-    private final Schema2InitialCharacterPlanService planner = new Schema2InitialCharacterPlanService();
+    private final JdbcSchema2InitialCharacterPlanner planner = new JdbcSchema2InitialCharacterPlanner();
 
     /** The snapshot and immutable transfer receipt must exist in the same caller transaction. */
     public void store(Connection connection, UUID operationId, InitialPlan initial) throws SQLException {

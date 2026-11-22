@@ -2,6 +2,10 @@
 
 默认选择覆盖本次差量的最小充分验证。模组内容和可见行为使用独立工具，应用代码按受影响边界选择 Maven 定向测试。WAR 审计、真实平台和显式 MySQL 验收有各自的证据。仓库文档记录可重复方法，每次运行的计数和哈希留在验证或发布记录。
 
+SQLite WAR 供外部 Tomcat 部署和独立作者场景使用。离线 MySQL 工具使用同一源码构建的
+`target/classes`。迁移核对使用仓库中的原始 SQL，实际 MySQL schema、权限和数据由另行
+授权的现场验收确认。打包与离线交付的核查范围见 [WAR 审计](#6-war-审计)。
+
 ## 1. 聚焦测试
 
 先检查本次 diff、调用方、共享边界和资源引用，再选择相关证据：
@@ -13,12 +17,12 @@
 | 新增或修改应用机制，同时交付模组内容或改变其可见行为 | 应用机制及接入使用定向 JUnit，作者声明和成品表现使用独立模组验证。两边各自保留证据。 |
 | 纯文档或 skill | 核对内容、链接和格式。 |
 
-运行模组相关的应用 JUnit 用例用 [Surefire 专用夹具](../src/test/fixtures/application-rules/storage/rules) 固定输入，独立验证解释、冻结、事务和恢复。作者发布新 ZIP 时只更新交付包和相应作者场景。只有应用用例的输入合同改变时才维护夹具。浏览器启动器和 WAR 使用 `src/main/resources/storage/rules/` 中的交付包。
+运行模组相关的应用 JUnit 用例用 [Surefire 专用夹具](../src/test/fixtures/application-rules/storage/rules) 固定输入，独立验证解释、冻结、事务和恢复。作者发布新 ZIP 时只更新交付包和相应作者场景。只有应用用例的输入合同改变时才维护夹具。Surefire 从这些夹具独立生成内置包身份清单。浏览器启动器和 WAR 使用 `src/main/resources/storage/rules/` 中的交付包及其构建生成的清单。
 
-例如，检定事务及其仓储改动可以选择：
+验证当前战役的检定、条件效果和事务回滚时，可以运行
 
 ```bash
-mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
+mvn '-Dtest=CampaignCheckEffectsTest' test
 ```
 
 根据变更覆盖正常行为、边界值、Unicode 码点/NFC、非法冻结数据、过期 `row_version`、幂等冲突、事务失败与禁止部分写入。重命名批次还应覆盖受影响的 Servlet 注册、反射字符串、页面资源和脚本引用。
@@ -37,15 +41,14 @@ mvn '-Dtest=CheckTransactionServiceTest,JdbcCheckExecutionRepositoryTest' test
 
 当前工作台的启动、规则绑定、完整文件与就绪测试见[SQLite 结构、完整文件与运行验收](#sqlite-结构完整文件与运行验收)。
 
-维护旧 MySQL 应用目录或诊断代码时，按变更选择 canonical/hash 实现、目录 JDBC、发布门或单池诊断测试。下面以单池诊断为例：
+验证 SQLite Web 入口时，由 `HostHomeServletTest` 核对首页和退役 URL，由 `StorageHttpIntegrationTest` 核对就绪、文件下载、规则绑定及拒绝写入后的状态。
+维护旧 MySQL 目录诊断时，用下列服务测试验证先核对 schema、再读取模组，以及连接或校验失败时停止后续查询。
 
 ```bash
-mvn '-Dtest=DatabaseDiagnosticsTest,DatabaseDiagnosticsFactoryTest,HostDatabaseDiagnosticServletTest' test
+mvn '-Dtest=DatabaseDiagnosticsTest' test
 ```
 
-再按实际调用方加入受影响的旧角色、检定、存档、规则浏览和语言投影消费者。旧诊断测试覆盖
-打包迁移/schema 在规则之前校验、失败不继续查询、只查原 `jdbc/DndToolSE`、查询资源关闭、
-无数据写入、每次 GET 更新结果及有限 HTTP/日志类别。真实 MySQL 验收按第 3 节独立执行。
+真实 MySQL 验收按第 3 节独立执行。
 
 ### Tomcat 测试依赖
 
@@ -109,11 +112,10 @@ Maven 验证记录实际命令、最终退出码、测试总数、失败、错�
 
 `MySqlIntegrationIT` 默认不参加普通构建。它只允许连接独立、一次性的可写测试库，并在连接中创建临时表，用于验证：
 
-- JDBC 提交、回滚、`row_version` 与幂等重放；
-- 调用方拥有的 `SERIALIZABLE` 事务；
-- 整战役导入失败时无半成品；
-- Tomcat DBCP 连接借出/归还及连接状态恢复；
-- 权威检定、骰子、效果、事件、字段变化、版本和幂等结果的原子提交/回滚。
+- 角色聚合 DAO 在版本匹配时提交、版本过期时拒绝、子写失败时回滚；
+- Tomcat DBCP 连接借出、归还及连接状态恢复。
+
+当前战役的检定原子性由 `CampaignCheckEffectsTest` 验证，完整文件的接纳、打开与拒绝由 `StorageHttpIntegrationTest` 验证。
 
 运行临时表套件时，可在数据库管理工具中审核并执行
 [database/test/create-integration-database.sql](../database/test/create-integration-database.sql)，建立专用
@@ -160,7 +162,7 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 1. 普通 `mvn clean verify` 不连接任何业务数据库。
 2. `MySqlIntegrationIT` 只连接 `dnd_tool_se_it`，由 `dnd_tool_se_it` 用户创建连接级临时表；测试结束后不得留下持久业务表或数据。
 3. V001—V042 完整迁移链只在物理隔离且可销毁的 MySQL 实例或容器中演练；该实例内部创建原名 `dnd_tool_se`，不与运行实例共享 schema、账号或持久 volume。
-4. 自动化直接按生产清单读取仓库中的原始迁移文件，不生成 SQL 副本、不改写 `USE`、不重算摘要。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`；这是 V007 本身没有 `USE` 时仍能正确定位的必要条件。
+4. 自动化按批准清单从仓库读取原始迁移文件并核对载荷摘要，授权执行时原样提交 SQL。每个迁移使用新的客户端连接并显式把默认数据库设为 `dnd_tool_se`，使没有 `USE` 的 V007 也定位到正确的库。
 5. 迁移完成后，使用该隔离实例内的 `dnd_tool_se_validation_ro` 核对完整 `schema_meta`、可见结构和目录计数。MySQL 按 `TRIGGER` 权限过滤的触发器定义由隔离实例内的迁移身份在停止迁移写入后核对，但验证步骤只能执行审核过的 `SELECT`/`SHOW`。
 6. 运行实例的 `dnd_tool_se` 只允许 `dnd_tool_se_agent` 做只读盘点/Harness 比较。向它应用迁移、授权或测试写入不是测试套件的一部分，必须转入独立部署检查点。
 
@@ -215,7 +217,8 @@ mvn '-DargLine=-Xmx256m' '-Dtest=JdbcSourceSchema2RepositoryTest,JdbcSchema2Runt
 精确恢复绑定、逐表写入失败、回读篡改、幂等冲突、提交结果未知和隔离后的无来源查证。
 有限基础包仅作为账本完整性测试材料；测试不通过离线安装资格门，也不授予游戏执行资格。
 V021/V023 静态结构与授权测试不能代替真实 MySQL 迁移、权限、锁、连接池或持久化验收。
-WAR 包含运行仓储、协调器、生产组合类和 V021/V023；来源 SQL、原包及测试向量仍排除。
+WAR 保留运行仓储、协调器和生产组合类。离线核验通过仓库迁移源和 `target/classes/db/migration/` 中的
+V021/V023 资源进行。来源 SQL、运行迁移、外部原包及测试向量均在 WAR 外。
 
 [schema 2 工具组合与运行材料](rules/schema-2-runtime-snapshot.md)的定向命令：
 
@@ -237,11 +240,12 @@ mvn '-DargLine=-Xmx256m' '-Dtest=Schema2GrantCompositionTest,Schema2InitialProfi
 标准库 oracle 从固定作者 JSON 独立复算原始 ZIP、逻辑、组合、最终字段、完整链及摘要，
 默认只做逐字节核对。测试覆盖真实来源/父关系、完整槽身份、跨模组目标、原子授予覆盖、
 固定与选择授予、禁用与重复选择、源类型化行和原包不一致、运行行/历史损坏以及事务失败。
-完整链路测试通过实际源仓储、转存协调器、运行仓储和默认初始计划服务，核对手写的八条授予事实，
+完整链路测试通过实际源仓储、转存协调器、运行仓储和 `JdbcSchema2InitialCharacterPlanner`，核对手写的八条授予事实，
 并证明源连接关闭或不可用后只读计划不访问来源、不提交调用方事务、不写业务数据。
 改动共用 ledger、快照或迁移清单时，补选上面的原包安装、转存、工具及 schema 测试；
 V004/V024 静态与 JDBC 代理证据不替代真实 MySQL 约束、触发器和权限验收。
-WAR 包含初始计划服务、类型化仓储和运行 V024；来源 V004、作者包、oracle 及全部测试向量均排除。
+WAR 保留初始计划服务和类型化仓储。来源 V004 与运行 V024 由离线迁移核验读取，作者包、
+oracle 和全部测试向量也留在 WAR 外。
 
 [语言分区链路等价核验](rules/language-partition-equivalence.md) 的无数据库定向命令：
 
@@ -258,7 +262,9 @@ mvn '-Dtest=LanguagePartitionEquivalenceTest,CharacterCatalogChainTest,MySqlInte
 真实语言/工具目录 JDBC 验收入口为 `tools/rule-packages/verify-language-jdbc.py --execute-disposable`，
 须先获得隔离实例、迁移和测试写入授权。它先重验两组无数据库连接保护，再创建 tmpfs MySQL，
 原样迁移并等待独立现场结构/权限审计；实际用例为 `LanguagePartitionJdbcIT`，测试跳过不算
-成功。默认不带执行参数时只检查迁移清单。前置条件、账号、清理及故障注入边界见
+成功。运行 `python3 -B tools/rule-packages/verify-language-jdbc.py` 可离线核对仓库内两条 Java
+清单及对应 SQL 的文件集合、载荷摘要、结构和触发器范围。已审范围为运行 V001—V042 与来源 V001—V012。
+增加迁移时需要先复核结构、触发器和权限，再更新验收范围。前置条件、账号、清理及故障注入边界见
 [隔离 JDBC 入口](rules/language-partition-equivalence.md#隔离-jdbc-入口)。
 
 [语言作者分区](rules/language-author-package.md) 的无数据库定向命令：
@@ -282,6 +288,8 @@ mvn '-Dtest=RuleArtifactTest,TicketStoreTest,SourceInstallationTest' test
 错误、实际查询结果被篡改后的整笔回滚，以及提交/回滚/查证失败的分类。JDBC 代理测试不证明
 真实 MySQL 权限、触发器、并发屏障、响应丢失或介质断电耐久性；这些按操作说明在另行授权的
 隔离实例上验收。安装仍只产生 DRAFT 语言/工具 PARTITION，不提供完整规则就绪或发布资格。
+离线命令 `tools/rule-packages/rule-package.sh` 使用同一源码构建的 `target/classes`。连接 MySQL
+的子命令另需提供外部 Connector/J。
 WAR 必须排除 `com/dndtool/offline/` 全部类、安装工具、作者包、安装清单和测试向量。
 
 [源语言分区读取](rules/source-language-reading.md) 的无数据库定向命令：
@@ -293,8 +301,9 @@ mvn '-Dtest=JdbcSourceLanguageRepositoryTest,RuleDatabaseSchemaVerifierTest,Char
 它核对同一只读事务中的准确源库/账本、当前 PARTITION 证据、55 项独立字段矩阵、严格 JDBC
 类型与 Unicode、有界固定 SELECT，以及失败时资源关闭和连接状态恢复。历史 COMPLETE 不得
 替代当前证据；超量或坏行失败关闭，不从旧目录或作者文件补齐。连接池、真实驱动类型、快照
-一致性和实际 SELECT-only 权限需另行授权隔离 MySQL 验收，不能用代理测试替代。新适配器
-进入 WAR，但不自动装配为生产规则加载入口，也不改变 DRAFT 发布门。
+一致性和实际 SELECT-only 权限须另行授权在隔离 MySQL 实例验收。离线 DRAFT 分区读取和
+独立账本核验使用同一源码构建的 `target/classes`。`JdbcSourceLanguageRepository` 继续随 WAR
+打包。SQLite 规则加载由工作台的本地规则库处理。
 
 [运行语言快照分区](rules/runtime-language-snapshot.md) 的无数据库定向命令：
 
@@ -304,14 +313,16 @@ mvn '-Dtest=JdbcRuntimeLanguageSnapshotRepositoryTest,V019RuntimeLanguageSnapsho
 
 它核对 UUIDv4 网络字节、永久身份冲突、跨快照拒绝、18 项语言分区的严格读取、实际 SELECT
 回读与调用方事务所有权，并用事务代理验证插入、回读及后续调用方失败后的整笔回滚。V019
-的结构和授权文件另有静态合同测试，旧迁移摘要保持不变。代理与静态测试不证明真实 MySQL
+在仓库中保留原批准载荷，构建后也可从 `target/classes/db/migration/` 读取。结构和授权文件
+另有静态合同测试。代理与静态测试不证明真实 MySQL
 的 CHECK、触发器、FK、权限或持久化回滚；这些需在独立授权的隔离实例上完成。只有语言的
 PARTITION 不接入新建、导入或执行视图，也不获得完整规则摘要或发布资格。
 
 [工具熟练目录](rules/tool-catalog-partition.md)的组合快照使用 `JdbcRuntimeCharacterCatalogRepository`。
 相关命令为 `mvn '-Dtest=CharacterCatalogChainTest,ToolCatalogSchemaTest' test`，核对 55 项双领域
 内容、独立 canonical 字节、每个工具写点和后续调用方失败的整笔回滚、来源断开、错误类型及
-跨快照拒绝。运行 V020 和来源 V002 的实际约束与授权仍须隔离实例验收。
+跨快照拒绝。运行 V020 来自仓库及 `target/classes/db/migration/`，来源 V002 来自
+`database/rules/migration/`。实际约束与授权仍须在隔离实例验收。
 
 [离线规则源 schema](rule-source-schema.md) 的无数据库定向命令：
 
@@ -321,8 +332,7 @@ mvn '-Dtest=RuleSchemaMigrationsTest,RuleSourceSchemaContractTest,RuleDatabaseSc
 
 它检查独立源清单/严格 UTF-8/载荷摘要、表与授权结构防回归，以及完整只读账本比较、准确默认库、
 有界查询和 JDBC 资源关闭。SQL 结构测试不能替代真实引擎对 CHECK、触发器、FK、Unicode 和
-权限/并发的验证。规则 SQL 必须留在 WAR 外；完整构建同时保护运行 V001—V018 原批准摘要，
-并核对 V001—V042 完整运行清单及来源 V001—V012（两链共 54 份迁移源）。
+权限/并发的验证。来源迁移和运行迁移均留在 WAR 外。改变共同迁移清单时，以各链的中央清单测试保护既有批准摘要，并核对运行 V001—V042 和来源 V001—V012 的完整清单（两链共 54 份迁移源）。
 规则源 disposable 验收须先通过测试连接两入口保护的无 DB 回归，再单独授权隔离实例；
 不得借临时表 IT 入口对部署源库试写，也不得扩大该 IT 库及账号用途。步骤见该 schema 合同。
 
@@ -364,38 +374,35 @@ DRAFT 发布门保持关闭。
 [角色语言／工具授予](rules/character-proficiency-grants.md)的无数据库定向命令：
 
 ```bash
-mvn '-DargLine=-Xmx256m' '-Dtest=CharacterProficiencyGrantTest,CharacterProficiencyGrantSchemaTest,LevelOneCharacterRulesTest,LevelOneCharacterCreationServiceTest,JdbcLevelOneCharacterCreationRepositoryTest,JdbcCharacterProficiencyGrantRepositoryTest,CharacterCardServiceTest,JdbcCharacterCardRepositoryTest,HostCharacterCardServletTest,CampaignArchiveV2CharacterStateTest,JdbcCampaignArchiveV2CharacterStateRepositoryTest,JdbcCampaignArchiveV2CharacterStateImportRepositoryTest,JdbcCampaignArchiveImportRepositoryTest,CampaignArchiveCapabilityBoundaryTest' test
+mvn '-DargLine=-Xmx256m' '-Dtest=CharacterProficiencyGrantTest,CharacterProficiencyGrantSchemaTest,LevelOneCharacterRulesTest,LevelOneCharacterCreationServiceTest,JdbcLevelOneCharacterCreationRepositoryTest,JdbcCharacterProficiencyGrantRepositoryTest,CharacterCardServiceTest,JdbcCharacterCardRepositoryTest,CampaignArchiveV2CharacterStateTest,JdbcCampaignArchiveV2CharacterStateRepositoryTest,JdbcCampaignArchiveV2CharacterStateImportRepositoryTest,CampaignArchiveCapabilityBoundaryTest' test
 ```
 
 覆盖固定和选择授予的准确父来源/槽、完整候选检查、幂等与写入失败回滚、角色卡真实读取、
 严格内部文件、来源缺失/伪造拒绝及直接恢复。V022 静态前置检查要求旧 DRAFT 创建快照为空；
 这些测试不执行迁移，不证明真实 MySQL 触发器或权限，也不将该旧目录链路视作 schema 2 业务运行。
-WAR 须包含授予模型、消费者和 V022；账号增量见[授予权限](../database/grants/character-proficiency-grants.sql)。
+WAR 保留授予模型与消费者。离线结构核验使用运行 V022，账号增量见[授予权限](../database/grants/character-proficiency-grants.sql)。
 
 升级的定向验证包括 `AdvancementValueProfileTest`、`LevelAdvancementRulesTest`、
-`LevelAdvancementServiceTest`、`JdbcLevelAdvancementRepositoryTest`、
-`HostLevelAdvancementServletTest` 和 `V013LevelAdvancementSchemaTest`。它们覆盖逐级 profile
+`LevelAdvancementServiceTest`、`JdbcLevelAdvancementRepositoryTest` 和
+`V013LevelAdvancementSchemaTest`。它们覆盖逐级 profile
 畸形、跳级、资源状态不一致、固定值/服务端掷骰、stale row version、事务失败和禁止部分写入，
 并证明过期状态或幂等重放不会消耗随机性。
 
-成长与恢复区间的共用模型使用 `AdvancementValueProfileTest`、`ResourceRecoveryProfileTest`、
-`ModuleCanonicalEncoderV2Test`、`LevelAdvancementRulesTest` 和 `ClassResourceRecoveryRulesTest`
-验证：结构化区间与文本共用校验、集合不可变、逐个等级破坏熟练加值、恢复方式组合、未来区间
-错误及资源已满/不可用/无限时仍拒绝坏规则；恢复组件另验证权威魅力值、最低一次公式及容量
-不匹配拒绝。涉及这些纯模型时保留 canonical v1 独立向量，
-并按真实调用闭包选择一级创建和升级 Service 测试；不以纯规则测试替代领域存储或 MySQL 验收。
+成长与恢复区间的共用模型使用 `AdvancementValueProfileTest`、`ResourceRecoveryProfileTest` 和
+`ModuleCanonicalEncoderV2Test` 验证结构化区间与文本共用校验、集合不可变、熟练加值逐级拒绝
+坏值、恢复方式组合及区间完整性。涉及这些纯模型时保留 canonical v1 独立向量，并按受影响的
+调用方选择一级创建和升级 Service 测试。标准休息的执行和恢复按下文 schema 2 休息用例核验。
 
-职业特性的定向验证包括 `ClassFeatureRulesTest`、`ClassFeatureAdjudicationRulesTest`、
-`ClassResourceRecoveryRulesTest`、`V014ClassFeatureCoverageMatrixTest`、
-`V014ClassFeatureLifecycleSchemaTest`、`CharacterAdvancementChoiceRulesTest` 和
+职业特性的定向验证包括 `ClassFeatureRulesTest`、`V014ClassFeatureCoverageMatrixTest`、
+`V014ClassFeatureLifecycleSchemaTest`、`CharacterAdvancementChoiceRulesTest`、
 `V015MulticlassAsiFeatSchemaTest`、`V016StartingProficiencyBaselineSchemaTest` 与
-`V017CharacterArchiveV2OriginSchemaTest`。V018 的职业贡献、共享施法者等级、半施法职业合并取整、
-Pact Magic 隔离、1—9 环上限及畸形目录由 `V018MulticlassSpellSlotFoundationSchemaTest` 与
-`MulticlassSpellSlotRulesTest` 覆盖。format 2 的角色投影另由
+`V017CharacterArchiveV2OriginSchemaTest`。V018 的十二职业贡献与批准载荷由
+`V018MulticlassSpellSlotFoundationSchemaTest` 核对。旧 DRAFT 目录拒绝未知贡献标识由
+`ModuleCanonicalEncoderV2Test` 验证。format 2 的角色投影另由
 `CampaignArchiveV2CharacterStateTest` 和 `JdbcCampaignArchiveV2CharacterStateImportRepositoryTest`
 覆盖规范写出/严格读取、稳定事件闭包、预览、调用方事务、失败回滚及无 commit/rollback 的
-Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业特性；规则
-测试验证自动、裁决、阻断三态、子职业选择边界、动态恢复等级、阻断法术资源和畸形冻结目录。
+Repository 合同。参数化矩阵逐职业覆盖全部 236 个职业/子职业特性。目录和成长测试验证
+自动、裁决、阻断三态、子职业选择边界和畸形冻结目录。
 
 辅助验证 SQL 只读，位于 [database/verify](../database/verify/)；静态测试不会把这些文件的存在当作数据库已验收证据。
 
@@ -452,7 +459,8 @@ mvn '-Dtest=Schema2ProgressionCompositionTest,Schema2CharacterProgressionRulesTe
 代理，覆盖失效前拒绝、随机性顺序、幂等、写入失败回滚、源库断开和直接恢复，不替代真实
 MySQL 外键、触发器、权限或部署证据。成长/休息集成测试还覆盖子职业、ASI、专长、多职业、
 逐次生命骰、活动中断、长休收益间隔及完整历史恢复；不声称通用效果或多角色生命周期已完成。
-WAR 必须包含成长/休息服务、规则、类型化仓储及运行 V027；来源 V005、测试 oracle 和向量排除。
+WAR 保留成长/休息服务、规则和类型化仓储。离线结构核验使用运行 V027 与来源 V005。
+迁移、测试 oracle 和向量均留在 WAR 外。
 
 ## Schema 2 检定、装备与健康镜像和事实存储验证
 
@@ -467,8 +475,8 @@ mvn '-Dtest=JdbcSchema2CheckSnapshotTest,JdbcSchema2EquipmentHealthSnapshotTest,
 核对封闭输入/结果、有效骰模式、完整装备健康前后状态、有序原骰、追加读回、直接恢复、
 孤儿与类型化行缺失、结构/邻接/预算限制及整笔回滚；这些测试保存已经准备的事实，不执行新业务。
 
-运行链为 V001—V042，来源为 V001—V012，共 54 份迁移源。WAR 须包含镜像/事实仓储及
-全部运行迁移，排除来源 SQL、离线写入工具、测试向量和真实存档。Check/Equipment/Health
+运行链为 V001—V042，来源为 V001—V012，共 54 份迁移源。WAR 保留镜像/事实仓储，排除两条
+迁移链、离线写入工具、测试向量和真实存档。Check/Equipment/Health
 消费者、请求幂等和 RuntimeService 命令使用下节验证；仓储测试本身只作为存储事实的证据。
 现有成长/休息测试保护新增字段的中性保留，DRAFT、Host、archive 2 和安装门保持。
 静态 SQL/JDBC 代理不代替真实 MySQL 的 CHECK、生成列、外键、触发器、权限与持久化验收。
@@ -490,7 +498,8 @@ mvn '-Dtest=Schema2CharacterCheckRulesTest,Schema2CharacterCheckServiceTest,Sche
 覆盖真实授予去重、装备产生的实际骰模式、手位/AC、穿脱时间、环境效果原骰、临时 HP、零 HP/即死、
 死亡豁免、恰抵达稳定恢复期限、长休清临时 HP、跨命令状态保持，以及缺失/损坏子表、幂等、随机性前拒绝、
 故障整体回滚与直接恢复不重掷。未知运行时故障遵循共同守卫冻结，不能把回滚视作允许盲目重试。
-WAR 包含基础消费者与运行 V028—V031；来源 SQL、测试向量和离线写入工具不得入包。
+WAR 保留基础消费者。运行 V028—V031 供离线结构核验使用，来源和运行迁移、测试向量与
+离线写入工具均留在 WAR 外。
 这些测试不授予真实 MySQL、部署、Host、战斗回合或完整初始化验收。
 
 ## 共同业务事务与初始化准备验证
@@ -515,15 +524,17 @@ python3 -B src/test/resources/schema2-grants/expected/initial-plan-fingerprint.p
 迁移清单变化选择两条链的中央清单测试及相关 schema 诊断测试；涉及工具分区或角色目录合同
 时，再加入 `ToolCatalogSchemaTest` 或 `V011CompleteCharacterCatalogDraftTest`。
 PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像及链路测试。
-`python3 -B tools/rule-packages/tests/verify-language-jdbc-test.py` 使用明确有界的代表材料测试
-隔离验收脚本的原样 SQL、身份、默认数据库和授权编排，并独立验证未审查迁移链的入口拒绝；
-它不启动 MySQL，也不替代另行授权的真实数据库验收。代表材料不是完整可执行迁移链，测试
-通过不表示固定验收 profile 已接受当前全部迁移；profile 和结构／权限审计范围须一并复核。
-候选 WAR 必须包含共同 Session、初始准备服务/仓储及 V025/V026，排除测试工具和来源 SQL。
+`python3 -B tools/rule-packages/tests/verify-language-jdbc-test.py` 核对已审迁移链，
+验证未知迁移在外部操作前被拒绝。模拟回放检查原样 SQL、执行身份、默认数据库和授权编排。
+实际驱动、现场权限和持久化行为需要在另行授权的隔离实例中验收。
+候选 WAR 保留共同 Session、初始准备服务与仓储。离线迁移核验检查 V025/V026，测试工具和两条迁移链均留在 WAR 外。
 
 ## 5. Web 与安全测试
 
 覆盖精确 loopback/Host/scheme/port、伪造 `X-Forwarded-*`、方法限制、Session Cookie、CSRF、Origin/Referer、Fetch Metadata、安全响应头、epoch、对象版本、幂等键和摘要。错误入口应返回一致的普通错误且不能到达业务写入。
+
+验证 Host 写请求时，先取得会话和令牌。仅以 `_csrf` 参数提交正确令牌应返回 `403` 且无业务写入。
+以 `X-CSRF-Token` 请求头提交时，分别检查合法命令成功，以及额外的业务参数仍按入口合同被拒绝。
 
 客户端权威边界测试应确认浏览器不能指定骰点、选中骰、派生修正、最终结果、效果算法、
 数据库身份或版本推进。相应领域实现后，还必须确认浏览器不能指定服务器候选集合之外的
@@ -531,30 +542,46 @@ PARTITION 调用方采用共同 Session 后，还应覆盖语言、工具镜像�
 
 ## 6. WAR 审计
 
-生产代码或打包资源变化后，记录候选 WAR：
+生产代码或打包资源变化后，记录 SQLite 候选 WAR 的检查结果：
 
 - 字节数、SHA-256 与 ZIP 条目数；
-- 必需的运行类、Host 与玩家 HTML/JavaScript、`web.xml` 与仍保留的 V001—V042 资源；
-- SQLite 结构声明、领域引擎/严格 codec/仓储、SQLite JDBC、Host 资源，以及 `storage/rules/` 下五个准确内置 ZIP；
+- 必需的运行类、Host 与玩家 HTML/JavaScript 和 `web.xml`；
+- SQLite 结构声明、领域引擎/严格 codec/仓储、SQLite JDBC、Host 资源，以及 `storage/rules/` 下五个准确内置 ZIP 和 `bundled-members.tsv`；
+- `WEB-INF/classes/db/migration/` 下没有 V001—V042 的任何 SQL，包内也没有来源 SQL；
+- `WEB-INF/classes/com/dndtool/persistence/` 下没有 `SchemaMigrations.class`、`RuleDatabaseSchemaVerifier.class` 及两类各自的全部内类；
 - 私钥/证书秘密、凭据、Tomcat 外部配置、日志、备份、真实存档、结果捕获与本地路径文件名的匹配数；
 - 生产资源和示例配置差异中的秘密扫描结果。
+
+同一源码的 Maven 构建通过 `target/classes` 交付离线工具、上述迁移及核验类，并在
+`target/classes/db/migration/` 保留全部 42 份运行迁移。运行迁移源保存在
+`src/main/resources/db/migration/`，来源迁移源保存在 `database/rules/migration/`。
+`SchemaMigrationsTest` 检查 classpath 中的运行迁移及清单，`RuleSchemaMigrationsTest` 核对
+仓库中的来源迁移，`RuleDatabaseSchemaVerifierTest` 覆盖独立的只读账本核验。
 
 本文前述原包排除项针对离线来源包、测试向量和作者工作目录；
 `storage/rules/{srd51-runtime,srd51-characters,srd51-magic,dm-runtime-house-rules,dm-runtime-check-variant}.zip`
 是当前显式交付的有限生产资源，逐个核对生产读取、许可和准确内容。每个内置运行组合包含四个包，按序共享
 `srd51_runtime@5`、`srd51_characters@5`、`srd51_magic@5`。标准组合的第四包是
 `dm_runtime_house_rules@9`，家规组合的第四包是 `dm_runtime_house_rules@10`。
+从候选 WAR 取出这五个 ZIP，用同一构建 `target/classes` 中的 `com.dndtool.service.storage.BundledRuleManifestGenerator`
+运行 `<ZIP 目录> <输出文件>`，逐字节核对 WAR 中的清单。生成器只随构建类输出交付。
+用 `CampaignRuleBundleIsolationTest` 检查专属包或共享包损坏时的建档、重开和原文件保留；
+用 `StorageHttpIntegrationTest#damagedBundledCandidateIsListedButRejectedBeforeAnyRuleLibraryWrite` 检查候选状态和导入写入边界。
 变体使用感知进行运动检定，将定额直接伤害设为 3，并将自定义工匠背景的固定语言改为侏儒语。
 这些数值、属性映射和授予属于项目家规。见[家规作者包](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
 核对 WAR 内 `WEB-INF/classes/com/dndtool/service/` 下的 `Schema2CharacterRuntime`、
-`Schema2CombatHistory`、`Schema2PreparationIdentity`、`Schema2FeatureSupport`、`storage/CampaignRuleContext`、
+`Schema2CombatHistory`、`Schema2CharacterRequest`、`Schema2CombatRequest`、`Schema2PreparationIdentity`、`Schema2FeatureSupport`、`storage/CampaignRuleContext`、
 `storage/CampaignRuleSupport`、`storage/LocalRuleLibrary` 与 `persistence/storage/LocalRuleLibraryLedger` 类。
 旧 `storage/CampaignRules.class` 及独立 HP 表/创建入口不应保留。
 核对迁出的 JDBC 仓储嵌套领域类型均已排除，包括 `JdbcSchema2CharacterRuntimeRepository$Command.class`、
 `JdbcSchema2CharacterRuntimeRepository$State.class`、`JdbcSchema2CharacterRuntimeRepository$History.class`、
 `JdbcSchema2CombatRuntimeRepository$History.class` 和 `JdbcSchema2RuntimeSnapshotRepository$Identity.class`。
 仍在用的 JDBC 仓储类是持久化适配入口。
+作者场景通过 `CampaignRuleContext.initialPlan` 取得角色计划，WAR 须保留
+`Schema2InitialCharacterPlanService$InitialPlan` 和 `Schema2InitialCharacterPlanService$Plan`。
+检查包内没有 `Schema2CharacterRuntimeService$Request`、`Schema2CombatRuntimeService$Request`、
+`Schema2CharacterRuntimeService$Material` 或 `Schema2InitialCharacterPlanService$SnapshotReader`。
 `rule-packages/` 作者源、外部导入原包及离线安装写入工具仍不得进入 WAR。
 
 WAR 审计通过不代表已经部署。
@@ -730,9 +757,9 @@ db/journal、保存文件或本地根。浏览器、真实 SQLite/HTTP、纯规�
 - 领域接合：每个现行 owner 覆盖正常/边界/坏冻结数据/版本/幂等/共同回滚，以及
   完整文件字段和直接恢复的独立期望。不能仅对编码器与读取器的自洽往返宣称数据无遗漏。
 - 打包与模式：当前必需项包括应用结构 JSON、编译/验证类、领域消费者、五个受控内置
-  原包和 SQLite JDBC；验证生产描述符仅注册 SQLite 入口，排除旧 MySQL 网页、Servlet 及 Connector/J。拒绝其他作者原包、来源维护 SQL、
-  离线写入类、真实 DB/journal/档案、配置秘密和本地材料进入 WAR；审计字节数、SHA-256、
-  条目数、必需/禁止文件及资源内容。
+  原包、构建生成的身份清单和 SQLite JDBC。验证生产描述符仅注册 SQLite 入口，排除旧 MySQL 网页、Servlet、Connector/J、
+  两条迁移链和第 6 节列出的离线核验类。其他作者原包、离线写入类、真实 DB/journal/档案、
+  配置秘密和本地材料均留在 WAR 外。审计字节数、SHA-256、条目数、必需/禁止文件及资源内容。
 
 默认按改动及共享依赖运行定向测试。Host 切换按实际改变的持久化与事务路径选择测试。具体跨域覆盖缺口按第 2 节补选受影响的应用组。真实文件系统耐久/进程中断验收独立执行。
 现行 MySQL 数据库验收仍按第 3、4 节及其独立授权边界执行。
@@ -823,6 +850,7 @@ mvn '-Dtest=CampaignParticipationIntegrationTest,PlayerGatewayServiceTest,Player
 修改领域根或结构时，另外选择受影响的领域、codec、存储恢复及 schema 测试。正式候选按[部署指南](deployment.md#1-构建候选)构建并审计。
 `PlayerHttpIntegrationTest` 创建一次性带 loopback IP SAN 的证书，
 测试客户端仅信任该证书，并验证默认客户端拒绝它；需要 JDK `keytool` 及空闲 8080/8443。
+该用例从玩家管理 GET 取得 Host 令牌，检查各次管理 POST 的成功响应均省略 `csrf`。关闭邀请后再读取管理状态，并用刷新所得令牌提交暂停，核对玩家此时的写权限。
 已通过集合不为收尾重复执行；打包复用本次有效证据并审计 WAR。
 `PlayerParticipationAcceptanceTest` 使用可控时钟和独立 SQLite，补查邀请轮换及准确到期、
 END 后新运行的身份/收据隔离、后来成员的共享范围、控制转交与排队命令的串行边界，
@@ -969,7 +997,7 @@ mvn '-Dtest=Schema2CombatCompositionTest,JdbcSchema2CombatSourceTest,JdbcSchema2
 故障整笔回滚、UNKNOWN 原操作查证，以及 OPEN/CLOSED 窗口和健康／计时完整直接恢复。
 原始骰、预算和未实现来源拒绝在纯规则与存储测试中分别验证；不以过往测试计数代替本次结果。
 
-WAR 包含战斗消费者／仓储和运行 V032—V034，排除来源 V008、离线写入工具与测试向量。
+WAR 保留战斗消费者与仓储。运行 V032—V034 与来源 V008 供离线迁移核验使用，离线写入工具与测试向量也留在 WAR 外。
 JDBC 代理及静态 SQL 检查不代替真实 MySQL、迁移执行、授权、部署、Host 或 archive format 2 验收。
 
 ## Schema 2 有限施法与持续效果验证
@@ -1000,8 +1028,8 @@ mvn '-Dtest=Schema2WizardRuntimeServiceTest,Schema2ExplorationRuntimeServiceTest
 并发和持久化验收。
 
 当前批准链为运行 V001—V042 与来源 V001—V012，共 54 份迁移源；来源为 53 张表、159 个触发器，
-其中 schema 2 为三个账本表与 43 张类型化作者材料表。WAR 须包含施法／场景消费者、类型化仓储和
-运行 V035—V038，排除来源 V009/V010、离线写入工具、作者包与测试向量。
+其中 schema 2 为三个账本表与 43 张类型化作者材料表。WAR 保留施法与场景消费者、类型化仓储。
+运行 V035—V038 和来源 V009/V010 供离线核验使用，离线写入工具、作者包与测试向量也留在 WAR 外。
 这些命令描述可重复验证方法，不表示真实数据库或完整发布门已验收。
 
 ## Schema 2 有限怪物与多目标豁免伤害验证
@@ -1044,8 +1072,8 @@ temp HP 全吸收、零 HP／即死／倒地掉物、全部 APPLY 后强制结�
 本人真实 turn START，短／长休恢复须由真实有限怪物休息 owner 产生，GET／恢复均不抽骰或补时间。
 
 全链为运行 V001—V042、来源 V001—V012，共 54 份迁移源；来源 53 表、159 触发器，
-其中 schema 2 有三个账本表和 43 张类型化作者材料表。WAR 包含怪物／批次消费者、
-类型化仓储及运行 V039/V040；排除来源 V011、离线写入能力、作者包、独立 oracle 与测试向量。
+其中 schema 2 有三个账本表和 43 张类型化作者材料表。WAR 保留怪物与批次消费者及类型化仓储。
+运行 V039/V040 和来源 V011 供离线核验使用，离线写入工具、作者包、独立 oracle 与测试向量也留在 WAR 外。
 JDBC 代理和静态 SQL 不替代真实 MySQL、权限／锁并发、完整文件、Host、技术 END／清理、
 部署或跨域发布门；本节是验证方法，不缓存历史测试计数或宣称迁移已执行。
 
@@ -1083,6 +1111,6 @@ mvn '-DargLine=-Xmx256m' '-Dtest=Schema2SpellSaveDamageCompositionTest,Schema2Sp
 共用动作、场景、角色与批次消费变化时，按具体差量加入既有施法、反应/Ready、怪物吐息、
 角色仓储及迁移/发布边界测试；已通过且输入未变化的结果按本文规则复用。真实 MySQL 的
 CHECK/FK/触发器、权限和锁语义须另行授权验收，JDBC 代理与静态 SQL 检查不能代替。
-WAR 须包含新增规则/消费者、类型化仓储及运行 V041/V042；来源 V012、测试向量、离线工具、
-参考文件与本地 Agent 工作区必须排除。完整规则仍为 DRAFT；这些内部测试不单独证明
+WAR 保留规则、消费者和类型化仓储。运行 V041/V042 和来源 V012 供离线核验使用。测试向量、
+离线工具、参考文件与本地 Agent 工作区均留在 WAR 外。完整规则仍为 DRAFT；这些内部测试不单独证明
 Host 或完整文件接合，当前 SQLite 采用范围与额外验收见[领域接合表](design/v2/domain-integration.md)。

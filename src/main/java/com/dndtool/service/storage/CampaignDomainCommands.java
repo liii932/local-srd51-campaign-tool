@@ -23,7 +23,8 @@ public final class CampaignDomainCommands {
         IntUnaryOperator dice = sides -> { int value = random.applyAsInt(sides); rolls.add(new CampaignSpaceData.Die(sides, value)); return value; };
         if (before == null) throw new StorageException("RULE_NOT_SELECTED", "Select the current campaign runtime module");
         if (before.roots().size() >= 100000) throw new StorageException("CAPACITY", "Complete root history is full");
-        if (before.roots().stream().anyMatch(r -> r.operationId().equals(operationId))) throw new StorageException("IDEMPOTENCY_CONFLICT", "This business identity already belongs to retained history");
+        Set<UUID> retainedOperations = CampaignDomainValidation.retainedEventOperations(before);
+        if (retainedOperations.contains(operationId)) throw new StorageException("IDEMPOTENCY_CONFLICT", "This business identity already belongs to retained history");
         CampaignParticipationCommands.validateActor(before, action, supplied, actor);
         JsonObject input = CampaignSpaceCommands.input(before, action, supplied);
         CampaignParticipationCommands.requireExecutionPermission(before, action, input, actor);
@@ -36,7 +37,7 @@ public final class CampaignDomainCommands {
         var space = before.space();
         UUID subject = UUID.fromString(snapshot.campaignId()), combatId = null; String oldText = "", newText = "";
         if (CampaignSpaceCommands.ACTIONS.contains(action)) {
-            var result = CampaignSpaceCommands.resolve(snapshot, action, input, operationId, dice);
+            var result = CampaignSpaceCommands.resolve(snapshot, action, input, operationId, dice, retainedOperations);
             var changed = result.state(); subject = result.subject(); combatId = result.combatId();
             characters = new ArrayList<>(changed.characters()); combats = new ArrayList<>(changed.combats());
             positions = new ArrayList<>(changed.positions()); space = changed.space();
@@ -91,7 +92,7 @@ public final class CampaignDomainCommands {
                             new Schema2CharacterRuntime.EquipmentInput(operationId, e.item(), e.location(), e.adjudication()), null);
                 }
                 var members = unplaced ? List.of(new CampaignDomainEngine.CharacterRecord(target.name(), target.kind(), target.initial(), target.history())) : CampaignSpaceCommands.focusedRecords(before);
-                var changed = engine.executeSpaceCharacter(material, members, subject, command, operationId, dice);
+                var changed = engine.executeSpaceCharacter(material, members, subject, command, operationId, dice, retainedOperations);
                 characters = new ArrayList<>(CampaignSpaceCommands.merge(characters, changed));
                 long elapsed = personalSecond(characters.get(characterIndex(characters, subject))) - personalSecond(target);
                 if (elapsed > 0) space = CampaignSpaceCommands.advance(space, elapsed);
@@ -119,7 +120,8 @@ public final class CampaignDomainCommands {
                 if (Set.of("START", "OPEN_SCENE", "SET_SCENE_ROSTER", "CLOSE_SCENE").contains(command.kind().name())) throw CampaignJson.bad("Use the explicit spatial lifecycle command");
                 combatId = existing.current().combatId(); subject = combatId;
                 preflightGrid(before, command);
-                var changed = CampaignSpaceCommands.sceneCommand(snapshot.campaignId(), before, combatId, operationId, command, dice);
+                var changed = CampaignSpaceCommands.sceneCommand(snapshot.campaignId(), before, combatId, operationId,
+                        command, dice, retainedOperations);
                 characters = new ArrayList<>(changed.characters()); combats = new ArrayList<>(changed.combats()); positions = new ArrayList<>(changed.positions()); space = changed.space();
             }
             case "note" -> {
@@ -157,8 +159,7 @@ public final class CampaignDomainCommands {
             }
             default -> throw new StorageException("UNSUPPORTED_COMMAND", "Unsupported campaign command");
         }
-        Set<UUID> oldOperations = new HashSet<>(); before.characters().forEach(c -> c.history().events().forEach(e -> oldOperations.add(e.operationId())));
-        List<UUID> childOperations = characters.stream().flatMap(c -> c.history().events().stream()).map(Schema2CharacterRuntime.Event::operationId).filter(id -> !oldOperations.contains(id)).sorted(Comparator.comparing(UUID::toString)).toList();
+        List<UUID> childOperations = characterOperations(before.characters(), characters, retainedOperations);
         characters.sort(Comparator.comparing(c -> c.id().toString())); combats.sort(Comparator.comparing(c -> c.current().combatId().toString()));
         nodes.sort(Comparator.comparing(n -> n.id().toString())); positions.sort(Comparator.comparing(p -> p.characterId().toString())); items.sort(Comparator.comparing(i -> i.id().toString()));
         var audit = new CampaignSpaceData.Audit(before.space(), space, before.positions(), positions, new String(CampaignJson.canonical(supplied), java.nio.charset.StandardCharsets.UTF_8));
@@ -167,6 +168,23 @@ public final class CampaignDomainCommands {
         var after = new State(before.material(), characters, combats, nodes, positions, items, roots,manual,participation,space);
         CampaignParticipationCommands.validateCurrent(after);
         return after;
+    }
+
+    private static List<UUID> characterOperations(List<Character> before, List<Character> after, Set<UUID> retainedOperations) {
+        Map<UUID, Integer> previousLengths = new HashMap<>();
+        for (Character character : before) previousLengths.put(character.id(), character.history().events().size());
+        Set<UUID> appended = new HashSet<>();
+        for (Character character : after) {
+            var events = character.history().events();
+            int start = previousLengths.getOrDefault(character.id(), 0);
+            if (start > events.size()) throw CampaignJson.bad("Command truncated character history");
+            for (var event : events.subList(start, events.size())) {
+                UUID operation = event.operationId();
+                if (retainedOperations.contains(operation) || !appended.add(operation))
+                    throw new StorageException("IDEMPOTENCY_CONFLICT", "Character operation already belongs to retained history");
+            }
+        }
+        return appended.stream().sorted(Comparator.comparing(UUID::toString)).toList();
     }
     private static int characterIndex(List<Character> characters, UUID id) {
         for (int i = 0; i < characters.size(); i++) if (characters.get(i).id().equals(id)) return i;

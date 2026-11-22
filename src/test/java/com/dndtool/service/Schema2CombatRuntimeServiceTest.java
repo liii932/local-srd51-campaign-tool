@@ -4,7 +4,8 @@ import com.dndtool.module.composition.*;
 import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CombatHistory.Member;
 import com.dndtool.service.Schema2PreparationIdentity;
-import com.dndtool.service.Schema2CombatRuntimeService.*;
+import com.dndtool.service.Schema2CombatRuntimeService.Result;
+import com.dndtool.service.Schema2CombatRuntimeService.Save;
 import com.dndtool.service.Schema2CombatRuntimeService.Status;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.testing.IsolatedJvmTest;
@@ -56,7 +57,7 @@ class Schema2CombatRuntimeServiceTest {
     @Test void actualOpportunityAttackCommitsBeforeMovementAndResumesExactlyOnce() throws Exception {
         Fixture f=new Fixture(true); f.start();
         long hp=f.character(f.a).hitPoints();
-        Request move=f.request(Command.move(f.a,List.of(new Position(-1,0))));
+        Schema2CombatRequest move=f.request(Command.move(f.a,List.of(new Position(-1,0))));
         var paused=f.commit(move); Flow flow=f.battle.activeFlow();
         assertNotNull(flow); assertEquals(new Position(0,0),f.actor(f.a).position());
         assertEquals(0,f.actor(f.a).movementSpentHalfFeet());
@@ -68,7 +69,7 @@ class Schema2CombatRuntimeServiceTest {
         assertEquals("S2_CHARACTER_COMBAT_ACTIVE",f.characterService.execute(ordinary).code());
         assertEquals(oldCharacter,f.character(f.a));
         f.nextRolls.addAll(List.of(15,1));
-        Request reaction=f.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK);
+        Schema2CombatRequest reaction=f.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK);
         var hit=f.commit(reaction);
         assertEquals(1,hit.event().resolution().healthChanges().size());
         assertTrue(f.character(f.a).hitPoints()<hp); assertFalse(f.actor(f.b).reactionAvailable());
@@ -76,7 +77,7 @@ class Schema2CombatRuntimeServiceTest {
         assertEquals(WindowStatus.CLOSED,f.battle.activeFlow().windows().getLast().status());
         rolls=f.rolls; writes=f.runtime.writes;
         assertEquals(Status.REPLAYED,f.service.execute(reaction).status()); assertEquals(rolls,f.rolls); assertEquals(writes,f.runtime.writes);
-        Request resume=f.continuation(); f.commit(resume);
+        Schema2CombatRequest resume=f.continuation(); f.commit(resume);
         assertNull(f.battle.activeFlow()); assertEquals(new Position(-1,0),f.actor(f.a).position()); assertEquals(10,f.actor(f.a).movementSpentHalfFeet());
         assertEquals(WindowStatus.CONSUMED,f.battle.flows().getLast().windows().getLast().status());
         assertEquals(Status.REPLAYED,f.service.execute(resume).status()); assertEquals(rolls,f.rolls);
@@ -121,7 +122,7 @@ class Schema2CombatRuntimeServiceTest {
         int rolls=f.rolls,writes=f.runtime.writes;
         assertEquals(Status.REJECTED,f.service.execute(f.request(Command.attack(f.a,f.b,f.items.get(f.a)))).status());
         assertEquals(rolls,f.rolls); assertEquals(writes,f.runtime.writes);
-        var childRequest=new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),child.after().identity(),f.campaign,f.b,
+        var childRequest=new Schema2CharacterRequest(UUID.randomUUID(),child.after().identity(),f.campaign,f.b,
                 child.after().preparationOperationId(),f.binding,child.after().version(),child.command(),Map.of());
         assertEquals("S2_CHARACTER_COMBAT_OWNER_REQUIRED",f.characterService.execute(childRequest).code());
         Save saved=f.service.read(f.combat); Fixture restored=new Fixture(false);
@@ -136,12 +137,12 @@ class Schema2CombatRuntimeServiceTest {
     }
 
     @Test void staleVersionsUnknownTokensBadPathAndCapacityRejectBeforeRandomnessOrWrites() throws Exception {
-        Fixture f=new Fixture(true); f.start(); Request stale=f.request(Command.action(Kind.DASH,f.a));
+        Fixture f=new Fixture(true); f.start(); Schema2CombatRequest stale=f.request(Command.action(Kind.DASH,f.a));
         f.commit(Command.action(Kind.DISENGAGE,f.a)); int rolls=f.rolls,writes=f.runtime.writes;
         assertEquals("S2_COMBAT_STALE_VERSION",f.service.execute(stale).code());
         assertEquals(Status.REJECTED,f.service.execute(f.request(Command.move(f.a,List.of(new Position(10,0))))).status());
         var request=f.request(Command.move(f.a,List.of(new Position(-1,0)))); var versions=new HashMap<>(request.expectedCharacterVersions()); versions.put(f.a,0L);
-        assertEquals("S2_COMBAT_STALE_CHARACTER",f.service.execute(new Request(request.operationId(),request.combatId(),request.campaignId(),request.rules(),
+        assertEquals("S2_COMBAT_STALE_CHARACTER",f.service.execute(new Schema2CombatRequest(request.operationId(),request.combatId(),request.campaignId(),request.rules(),
                 request.members(),request.expectedVersion(),versions,request.command())).code());
         assertEquals(rolls,f.rolls); assertEquals(writes,f.runtime.writes);
         f.commit(Command.move(f.a,List.of(new Position(-1,0)))); assertNull(f.battle.activeFlow());
@@ -160,7 +161,7 @@ class Schema2CombatRuntimeServiceTest {
     public static final class FaultProbe {
         public static void main(String[] args) throws Exception {
             Fixture f=new Fixture(true); f.start(); f.commit(Command.move(f.a,List.of(new Position(-1,0))));
-            Request reaction=f.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK); Save before=f.service.read(f.combat);
+            Schema2CombatRequest reaction=f.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK); Save before=f.service.read(f.combat);
             f.nextRolls.addAll(List.of(15,1)); int rolls=f.rolls;
             if(args[0].equals("rollback")) {
                 int count=f.runtime.rows(args[1]).size();
@@ -174,7 +175,7 @@ class Schema2CombatRuntimeServiceTest {
                 assertEquals(args[1].equals("COMMITTED")?Status.REPLAYED:Status.NOT_COMMITTED,f.service.inspect(reaction).status());
                 assertEquals(writes,f.runtime.writes); assertEquals(rolls+2,f.rolls); assertTrue(BusinessWriteTransactions.isBlocked());
             } else {
-                f.commit(reaction); Request continuation=f.continuation(); assertFalse(f.runtime.rows(args[1]).isEmpty()); f.runtime.rows(args[1]).clear(); f.runtime.saveCommitted();
+                f.commit(reaction); Schema2CombatRequest continuation=f.continuation(); assertFalse(f.runtime.rows(args[1]).isEmpty()); f.runtime.rows(args[1]).clear(); f.runtime.saveCommitted();
                 int writes=f.runtime.writes; rolls=f.rolls;
                 assertEquals(Status.REJECTED,f.service.execute(continuation).status());
                 assertEquals(writes,f.runtime.writes); assertEquals(rolls,f.rolls);
@@ -226,10 +227,10 @@ class Schema2CombatRuntimeServiceTest {
                 assertEquals(Schema2SnapshotTransferService.Status.COMMITTED,transfer.status(),transfer.code());
                 if(initialize) {
                     var initial=new Schema2CharacterRuntime.Command("INITIALIZED",null,0,null,null,null,characterChoices.getOrDefault(character,choices));
-                    var created=characterService.execute(new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),identity,campaign,character,preparation,binding,-1,initial,fullAbilities()));
+                    var created=characterService.execute(new Schema2CharacterRequest(UUID.randomUUID(),identity,campaign,character,preparation,binding,-1,initial,fullAbilities()));
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,created.status(),created.code());
                     UUID item=stable(ordinal,4); items.put(character,item);
-                    var acquired=new Schema2CharacterRuntimeService.Request(item,identity,campaign,character,preparation,binding,created.event().after().version(),equipment("ITEM_ACQUIRED",item,ITEM_WEAPON,"CARRIED"),Map.of());
+                    var acquired=new Schema2CharacterRequest(item,identity,campaign,character,preparation,binding,created.event().after().version(),equipment("ITEM_ACQUIRED",item,ITEM_WEAPON,"CARRIED"),Map.of());
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,characterService.execute(acquired).status());
                     assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED,characterService.execute(characterRequest(character,equipment("ITEM_EQUIPPED",item,null,"MAIN_HAND"))).status());
                 } else items.put(character,stable(ordinal,4));
@@ -248,23 +249,23 @@ class Schema2CombatRuntimeServiceTest {
                     .orElseThrow(() -> new AssertionError("Missing persisted character state for " + id));
             return ((Number) latest.get("row_version")).longValue();
         }
-        Schema2CharacterRuntimeService.Request characterRequest(UUID id,Schema2CharacterRuntime.Command command)throws Exception {
+        Schema2CharacterRequest characterRequest(UUID id,Schema2CharacterRuntime.Command command)throws Exception {
             Member m=members.stream().filter(x->x.characterId().equals(id)).findFirst().orElseThrow();
-            return new Schema2CharacterRuntimeService.Request(UUID.randomUUID(),m.identity(),campaign,id,m.preparationOperationId(),binding,characterVersion(id),command,Map.of());
+            return new Schema2CharacterRequest(UUID.randomUUID(),m.identity(),campaign,id,m.preparationOperationId(),binding,characterVersion(id),command,Map.of());
         }
-        Request request(Command command)throws Exception {
+        Schema2CombatRequest request(Command command)throws Exception {
             Map<UUID,Long> versions=new LinkedHashMap<>(); for(Member m:members)versions.put(m.characterId(),characterVersion(m.characterId()));
-            return new Request(UUID.randomUUID(),combat,campaign,binding,members,battle==null?-1:battle.version(),versions,command);
+            return new Schema2CombatRequest(UUID.randomUUID(),combat,campaign,binding,members,battle==null?-1:battle.version(),versions,command);
         }
         Result commit(Command command)throws Exception{return commit(request(command));}
-        Result commit(Request request) {var result=service.execute(request);assertEquals(Status.COMMITTED,result.status(),result.code());battle=result.event().after();return result;}
+        Result commit(Schema2CombatRequest request) {var result=service.execute(request);assertEquals(Status.COMMITTED,result.status(),result.code());battle=result.event().after();return result;}
         void start()throws Exception {commit(Command.start(List.of(new Deployment(a,new Position(0,0),0),new Deployment(b,new Position(1,0),1)),List.of(a,b)));}
         Combatant actor(UUID id){return battle.combatants().stream().filter(x->x.characterId().equals(id)).findFirst().orElseThrow();}
-        Request reaction(Kind kind)throws Exception {
+        Schema2CombatRequest reaction(Kind kind)throws Exception {
             Flow flow=battle.activeFlow();Window window=flow.windows().getLast();Opportunity opportunity=window.opportunities().stream().filter(o->o.status()==OpportunityStatus.PENDING).findFirst().orElseThrow();
             return request(Command.reaction(kind,opportunity.actorId(),kind==Kind.DECLARE_OPPORTUNITY_ATTACK?items.get(opportunity.actorId()):null,
                     flow.flowKey(),flow.leafFrameKey(),window.windowKey(),opportunity.opportunityKey()));
         }
-        Request continuation()throws Exception {Flow flow=battle.activeFlow();return request(Command.continuation(flow.movement().actorId(),flow.flowKey(),flow.leafFrameKey(),flow.windows().getLast().windowKey()));}
+        Schema2CombatRequest continuation()throws Exception {Flow flow=battle.activeFlow();return request(Command.continuation(flow.movement().actorId(),flow.flowKey(),flow.leafFrameKey(),flow.windows().getLast().windowKey()));}
     }
 }

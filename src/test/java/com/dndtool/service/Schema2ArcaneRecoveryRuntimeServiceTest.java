@@ -2,7 +2,8 @@ package com.dndtool.service;
 
 import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
-import com.dndtool.service.Schema2CharacterRuntimeService.*;
+import com.dndtool.service.Schema2CharacterRuntimeService.Result;
+import com.dndtool.service.Schema2CharacterRuntimeService.Status;
 import com.dndtool.testing.IsolatedJvmTest;
 import java.sql.SQLException;
 import java.util.*;
@@ -15,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class Schema2ArcaneRecoveryRuntimeServiceTest {
     @Test void actualShortRestPersistsChoicesDailyUseReplayAndDirectRestoreWithoutSourceOrRandomness() throws Exception {
         var f = new Fixture(true); f.spend(1); f.ready();
-        Request request = f.request(finish(Map.of(1, 1)));
+        Schema2CharacterRequest request = f.request(finish(Map.of(1, 1)));
         f.commit(request);
         assertEquals(2, slot(f.state(), 1).current()); assertEquals(0L, f.state().spellbook().lastArcaneRecoveryDay());
         assertEquals(1, f.base.runtime.rows("s2_character_arcane_recovery_choice").size());
@@ -23,7 +24,7 @@ class Schema2ArcaneRecoveryRuntimeServiceTest {
         assertEquals(1, row.get("slot_rank")); assertEquals(1, row.get("recovered_value"));
         int writes = f.base.runtime.writes;
         assertEquals(Status.REPLAYED, f.service.execute(request).status()); assertEquals(writes, f.base.runtime.writes);
-        Request conflicting = new Request(request.operationId(), request.identity(), request.campaignId(), request.characterId(),
+        Schema2CharacterRequest conflicting = new Schema2CharacterRequest(request.operationId(), request.identity(), request.campaignId(), request.characterId(),
                 request.preparationOperationId(), request.rules(), request.expectedVersion(), finish(Map.of()), Map.of());
         assertNotEquals(request.digest(), conflicting.digest());
         assertEquals("S2_CHARACTER_OPERATION_CONFLICT", f.service.execute(conflicting).code());
@@ -39,7 +40,7 @@ class Schema2ArcaneRecoveryRuntimeServiceTest {
 
     @Test void actualConsumerRejectsStaleEarlyLongRestAndOverAllocationWithoutAnyPartialBenefit() throws Exception {
         var f = new Fixture(true); f.spend(1); f.commit(start("SHORT_REST"));
-        Request early = f.request(finish(Map.of(1, 1))); int writes = f.base.runtime.writes;
+        Schema2CharacterRequest early = f.request(finish(Map.of(1, 1))); int writes = f.base.runtime.writes;
         assertEquals("S2_REST_REQUIREMENTS", f.service.execute(early).code()); assertEquals(writes, f.base.runtime.writes);
         f.commit(time("LIGHT", 60));
         writes = f.base.runtime.writes;
@@ -90,7 +91,7 @@ class Schema2ArcaneRecoveryRuntimeServiceTest {
     public static final class FaultProbe {
         public static void main(String[] args) throws Exception {
             var f = new Fixture(true); f.spend(1); f.ready();
-            Request request = f.request(finish(Map.of(1, 1)));
+            Schema2CharacterRequest request = f.request(finish(Map.of(1, 1)));
             if (args[0].equals("rollback")) {
                 History before = f.service.read(f.base.a);
                 f.base.runtime.afterWrite = runtime -> {
@@ -124,9 +125,9 @@ class Schema2ArcaneRecoveryRuntimeServiceTest {
             if (initialize) commit(Command.spellbook("SPELLBOOK_INITIALIZED", new SpellbookInput(CASTING, INITIAL_BOOK, List.of(SHIELD))));
         }
         State state() throws SQLException { return service.read(base.a).current(); }
-        Request request(Command command) throws Exception { return base.characterRequest(base.a, command); }
+        Schema2CharacterRequest request(Command command) throws Exception { return base.characterRequest(base.a, command); }
         void commit(Command command) throws Exception { commit(request(command)); }
-        void commit(Request request) { committed(service.execute(request)); }
+        void commit(Schema2CharacterRequest request) { committed(service.execute(request)); }
         void spend(int count) throws Exception { commit(new Command("RESOURCE_SPENT", SLOT1, count, null, null)); }
         void ready() throws Exception { commit(start("SHORT_REST")); commit(time("LIGHT", 60)); }
     }

@@ -3,10 +3,10 @@
 本合同属于 `dnd5e2014_srd51_se` release `1`、canonical format `2`、archive format `2`。
 该发布版仍为 `DRAFT`；V013—V018 的代码、目录或表存在不代表数据库已经迁移，也不允许创建战役、
 执行规则或导入格式 2 存档。正式发布及 archive format 2 激活属于主要规则领域整合后的跨领域发布门。
+当前 SQLite 工作台通过 `POST /api/host/storage/domain` 的 `character-command` 执行受支持的角色成长。旧发行物的 `POST /api/host/characters/level-up` 已退役。
 
 ## 冻结身份
 
-- Host 路由：`POST /api/host/characters/level-up`；
 - HP 选择：`FIXED_AVERAGE`、`SERVER_ROLL`；
 - HP 算法：`HIT_DIE_OR_FIXED_PLUS_CONSTITUTION_MINIMUM_ONE_V1`；
 - 随机算法：`SERVER_UNIFORM_HIT_DIE_V1`；

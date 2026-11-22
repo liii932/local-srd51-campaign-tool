@@ -1,7 +1,10 @@
 package com.dndtool.offline.rules;
 
+import com.dndtool.module.LanguagePartition;
+import com.dndtool.module.ToolPartition;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Locale;
 
 /** Explicit offline commands only. No startup hooks, Web entry, migration, release or automatic retry. */
 public final class RulePackageCli {
@@ -29,7 +32,13 @@ public final class RulePackageCli {
         }
         if(args.length==3 && args[0].equals("verify")) {
             var artifact=RuleArtifact.read(Path.of(args[1]),args[2]);
-            System.out.println("PARTITION character.language: 18 languages; manifest="+artifact.manifestSha256());return 0;
+            var author = artifact.author();
+            System.out.printf(Locale.ROOT, "%s %s=%d %s=%d manifest=%s%n",
+                    author.verificationScope(),
+                    LanguagePartition.KEY, author.languages().languages().size(),
+                    ToolPartition.KEY, author.tools().tools().size(),
+                    artifact.manifestSha256());
+            return 0;
         }
         boolean prepare=args.length==4&&args[0].equals("prepare"),install=args.length==5&&args[0].equals("install"),resolve=args.length==3&&args[0].equals("resolve");
         if(!prepare&&!install&&!resolve)throw new IllegalArgumentException("Usage: build SOURCE NEW_OUTPUT | verify ARTIFACT MANIFEST_SHA256 | prepare EVIDENCE ARTIFACT MANIFEST_SHA256 | install EVIDENCE TICKET_FILE ARTIFACT MANIFEST_SHA256 | resolve EVIDENCE TICKET_FILE");

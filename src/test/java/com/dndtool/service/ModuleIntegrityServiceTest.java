@@ -1,5 +1,7 @@
 package com.dndtool.service;
 
+import static com.dndtool.module.BuiltinModuleReleaseRegistry.LEGACY_MODULE_KEY;
+import static com.dndtool.module.BuiltinModuleReleaseRegistry.RELEASE_VERSION_1;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -32,8 +34,8 @@ final class ModuleIntegrityServiceTest {
     void matchingFrozenCampaignBindingReusesVerifiedRelease() throws Exception {
         CountingModules modules = new CountingModules(Optional.of(catalog("RELEASED", SHA)));
         CampaignModuleBindingRepository.Binding binding = binding(
-                CampaignCreationService.MODULE_KEY,
-                CampaignCreationService.RELEASE_VERSION,
+                LEGACY_MODULE_KEY,
+                RELEASE_VERSION_1,
                 SHA);
 
         assertEquals(ModuleIntegrityService.Status.READY,
@@ -45,22 +47,22 @@ final class ModuleIntegrityServiceTest {
     void rejectsCharacterSavedIdentityOrHashThatDiffersFromItsCampaignBinding()
             throws Exception {
         CampaignModuleBindingRepository.Binding binding = binding(
-                CampaignCreationService.MODULE_KEY,
-                CampaignCreationService.RELEASE_VERSION,
+                LEGACY_MODULE_KEY,
+                RELEASE_VERSION_1,
                 SHA);
         for (CharacterModuleBindingRepository.Binding character : List.of(
                 character("0".repeat(64)),
                 new CharacterModuleBindingRepository.Binding(
                         binding.campaignKey(), "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
-                        "module.other", CampaignCreationService.RELEASE_VERSION, SHA),
+                        "module.other", RELEASE_VERSION_1, SHA),
                 new CharacterModuleBindingRepository.Binding(
                         binding.campaignKey(), "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
-                        CampaignCreationService.MODULE_KEY, "2", SHA),
+                        LEGACY_MODULE_KEY, "2", SHA),
                 new CharacterModuleBindingRepository.Binding(
                         "cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa",
                         "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
-                        CampaignCreationService.MODULE_KEY,
-                        CampaignCreationService.RELEASE_VERSION, SHA))) {
+                        LEGACY_MODULE_KEY,
+                        RELEASE_VERSION_1, SHA))) {
             ModuleIntegrityService service = service(
                     new CountingModules(Optional.of(catalog("RELEASED", SHA))),
                     List.of(binding), List.of(character), SHA);
@@ -76,8 +78,8 @@ final class ModuleIntegrityServiceTest {
         assertMismatch(Optional.of(catalog("RELEASED", "0".repeat(64))), List.of(), SHA);
         assertMismatch(Optional.of(catalog("RELEASED", SHA)), List.of(), "0".repeat(64));
         assertMismatch(Optional.of(catalog("RELEASED", SHA)),
-                List.of(binding(CampaignCreationService.MODULE_KEY,
-                        CampaignCreationService.RELEASE_VERSION, "0".repeat(64))), SHA);
+                List.of(binding(LEGACY_MODULE_KEY,
+                        RELEASE_VERSION_1, "0".repeat(64))), SHA);
     }
 
     @Test
@@ -152,16 +154,16 @@ final class ModuleIntegrityServiceTest {
         return new CharacterModuleBindingRepository.Binding(
                 "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
                 "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
-                CampaignCreationService.MODULE_KEY,
-                CampaignCreationService.RELEASE_VERSION,
+                LEGACY_MODULE_KEY,
+                RELEASE_VERSION_1,
                 savedSha);
     }
 
     private static ModuleCatalog catalog(String status, String publishedSha) {
         return new ModuleCatalog(
                 new ModuleCatalog.Release(
-                        CampaignCreationService.MODULE_KEY,
-                        CampaignCreationService.RELEASE_VERSION,
+                        LEGACY_MODULE_KEY,
+                        RELEASE_VERSION_1,
                         1,
                         "SHA-256",
                         publishedSha,

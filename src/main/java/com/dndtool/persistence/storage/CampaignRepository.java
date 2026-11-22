@@ -1,7 +1,6 @@
 package com.dndtool.persistence.storage;
 
 import com.dndtool.service.storage.*;
-import com.google.gson.JsonArray;
 import java.nio.ByteBuffer;
 import java.nio.charset.*;
 import java.sql.*;
@@ -56,7 +55,7 @@ public final class CampaignRepository {
             while (r.next()) {
                 if (r.getLong("result_revision") != ++count || count > revision || !text(r, "kind").equals("DOMAIN_COMMAND")) throw integrity("Domain receipt sequence differs");
                 var root = roots.get(Math.toIntExact(imported + count - 1));
-                String exactIntent = commandIntent("DOMAIN_COMMAND", count - 1, root.kind(),
+                String exactIntent = CampaignJson.commandIntent("DOMAIN_COMMAND", count - 1, root.kind(),
                         root.space().request(), CampaignDomainCodec.text(root.actor()));
                 if (!root.intent().equals(exactIntent)) throw integrity("Domain request differs from its exact accepted intent");
                 if (!root.operationId().toString().equals(uuid(r.getBytes("request_id"))) || !root.intent().equals(digest(r.getBytes("intent")))
@@ -71,7 +70,7 @@ public final class CampaignRepository {
             if (save.revision() > revision || save.byteSize() < 1 || save.byteSize() > CampaignJson.MAX_BYTES || !Set.of("INITIAL", "MANUAL", "FINAL").contains(save.purpose())) throw integrity("Invalid save receipt");
             if (save.purpose().equals("INITIAL") && (save.revision() != 0 || ++initial > 1)) throw integrity("Initialization checkpoint identity differs");
             if (save.purpose().equals("FINAL") && (save.revision() != revision || ++finals > 1)) throw integrity("Final checkpoint does not seal the exact current revision");
-            if (!save.intent().equals(commandIntent("SAVE_" + save.purpose(), save.revision()))) throw integrity("Save intent differs from its exact purpose and revision");
+            if (!save.intent().equals(CampaignJson.commandIntent("SAVE_" + save.purpose(), save.revision()))) throw integrity("Save intent differs from its exact purpose and revision");
             if (!save.accepted() && ++pending > 1) throw integrity("Multiple pending saves");
         }
     }
@@ -137,11 +136,6 @@ public final class CampaignRepository {
         } catch (StorageException e) {
             throw new StorageException("STORAGE_INTEGRITY", "Stored text violates the Unicode contract", e);
         }
-    }
-    private static String commandIntent(String kind, long revision, Object... fields) {
-        JsonArray a = new JsonArray(); a.add(kind); a.add(Long.toString(revision));
-        for (Object field : fields) a.add(field.toString());
-        return CampaignJson.digest("DND-VITALITY-COMMAND", CampaignJson.canonical(a));
     }
     private static int update(Connection c, String sql, Object... values) throws SQLException {
         try (PreparedStatement s = c.prepareStatement(sql)) {

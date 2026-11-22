@@ -22,6 +22,7 @@ import static com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.SECOND_
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2SecondWindRulesTest {
+    private static final long SCENE_SECOND = 90;
     private final CampaignDomainEngine domain = new CampaignDomainEngine();
     private final Schema2CombatRules combat = new Schema2CombatRules();
     private final CampaignRuleContext rules = CampaignRuleSupport.validate(BundledCampaignRules.projection());
@@ -87,7 +88,7 @@ class Schema2SecondWindRulesTest {
         var versions = started.characters().stream().collect(Collectors.toMap(row -> row.initial().characterId(),
                 row -> row.history().current().version()));
         var command = Command.action(Kind.SECOND_WIND, actor);
-        var request = new Schema2CombatRuntimeService.Request(UUID.randomUUID(), scene, campaign, rules.binding(),
+        var request = new Schema2CombatRequest(UUID.randomUUID(), scene, campaign, rules.binding(),
                 started.history().members(), started.history().current().version(), versions, command);
         DataSource inaccessible = (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(),
                 new Class<?>[]{DataSource.class}, (proxy, method, arguments) -> fail("Unexpected JDBC call " + method.getName()));
@@ -111,19 +112,25 @@ class Schema2SecondWindRulesTest {
     }
 
     private CombatResult start() {
-        var command = Command.start(List.of(new Deployment(actor, new Position(0, 0), 0),
-                new Deployment(opponent, new Position(1, 0), 1)), List.of(actor, opponent));
-        return domain.executeCombat(rules.projection(), List.of(fighter, cleric), null, scene, UUID.randomUUID(), command, sides -> 10);
+        var deployments = List.of(new Deployment(actor, new Position(0, 0), 0),
+                new Deployment(opponent, new Position(1, 0), 1));
+        var opened = domain.executeScene(rules.projection(), List.of(fighter, cleric), null, campaign, scene,
+                SCENE_SECOND, UUID.randomUUID(), Command.openScene(deployments, List.of()),
+                sides -> fail("Unexpected d" + sides));
+        return domain.executeScene(rules.projection(), opened.characters(), opened.history(), campaign, scene,
+                SCENE_SECOND, UUID.randomUUID(), Command.reenter(actor, List.of(actor, opponent)), sides -> 10);
     }
 
     private CombatResult apply(CombatResult before, Kind kind, UUID subject) {
-        return domain.executeCombat(rules.projection(), before.characters(), before.history(), scene, UUID.randomUUID(),
-                Command.action(kind, subject), sides -> fail("Unexpected d" + sides));
+        assertEquals(0, before.elapsedSeconds());
+        return domain.executeScene(rules.projection(), before.characters(), before.history(), campaign, scene,
+                SCENE_SECOND, UUID.randomUUID(), Command.action(kind, subject), sides -> fail("Unexpected d" + sides));
     }
 
     private CombatResult apply(CombatResult before, Kind kind, UUID subject, int expectedSides, int roll) {
-        return domain.executeCombat(rules.projection(), before.characters(), before.history(), scene, UUID.randomUUID(),
-                Command.action(kind, subject), sides -> {
+        assertEquals(0, before.elapsedSeconds());
+        return domain.executeScene(rules.projection(), before.characters(), before.history(), campaign, scene,
+                SCENE_SECOND, UUID.randomUUID(), Command.action(kind, subject), sides -> {
                     assertEquals(expectedSides, sides);
                     return roll;
                 });

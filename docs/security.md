@@ -3,19 +3,23 @@
 DM 管理面保持本机边界；SQLite 的[玩家参与原型](design/v2/player-participation.md#当前原型与剩余采用)
 使用独立、默认关闭的 HTTPS 入口。不得把现有主机服务暴露到局域网或互联网。
 
+当前 Web 运行时已彻底弃用 MySQL，Host 和玩家入口均使用 SQLite。MySQL Host
+兼容模式仅属旧发行物。既有数据库和离线规则工具的维护边界见[数据库说明](database.md)。
+
 ## 网络与请求边界
 
 - Host HTTP Connector 只监听 `127.0.0.1:8080`；可选玩家 Connector 使用下节的独立边界。
 - 主机路由要求 TCP 对端、本地端口、scheme 和精确 `Host: 127.0.0.1:8080` 全部匹配。
 - `localhost`、`::1`、局域网地址、错误端口/scheme/Host 与伪造转发头不得放宽边界。
-- 主机写请求还要验证 Session、CSRF、Origin/Referer、Fetch Metadata、对象版本、幂等键和请求摘要；MySQL 使用 `host_state_epoch`，SQLite 使用自身运行 epoch。
+- 主机写请求通过来源和 Fetch Metadata 校验后，必须带现有 Host 会话，并在 `X-CSRF-Token` 请求头提交该会话的令牌。缺少会话返回 `401`。有会话但请求头缺失或令牌不匹配时返回 `403`，即使表单或查询参数含有正确的 `_csrf`。
+- 令牌通过后，过滤器用 SQLite 存储服务的当前运行 epoch 核对会话，并检查对象版本、请求标识和摘要的格式。各入口继续严格校验其业务参数。
+- DM 玩家管理面板从 `GET /api/host/storage/players/state` 的 `csrf` 字段取得 Host 会话令牌。管理命令的 POST 成功响应省略该字段。面板更新操作结果时保留已有令牌，刷新后使用最新 GET 返回的令牌提交下一次写请求。
 - 响应设置 `Cache-Control: no-store`、CSP、`nosniff`、`frame-ancestors 'none'` 与 `Referrer-Policy: no-referrer`。
 
 ## 可选玩家原型的安全边界
 
 `PlayerBoundaryFilter` 是全局首个过滤器，非 Host Connector 只能命中明确配置的玩家
-HTTPS 地址和固定路径。玩家服务仅在默认的 SQLite 运行且显式配置玩家入口时可用，
-MySQL 兼容模式只开放本机 Host。
+HTTPS 地址和固定路径。玩家服务仅在显式配置玩家入口时可用。
 Host Filter、Cookie 和 8080 端口保持上节合同。应用不会自行创建 Connector 或改动网络配置。
 
 - 玩家使用独立 HTTPS 8443 入口，配置必须是同一个规范 IPv4 地址与 `https://IP:8443`。
@@ -74,7 +78,7 @@ SQLite 已接合的角色、战斗、法术、装备、资源和持续状态仍�
 
 ## 数据库权限
 
-MySQL 模式的数据库职责分离：migrator 负责 DDL 和前向迁移；应用账号只获得所需 DML 与不可变目录读取；验收账号只读。不要通过授予广泛 schema 权限解决缺表或权限错误。授权脚本见 [database/grants](../database/grants/)。
+既有 MySQL 库按职责分配权限。migrator 负责 DDL 和前向迁移，旧应用账号只获得所需 DML 与不可变目录读取权限，验收账号只读。不要通过授予广泛 schema 权限解决缺表或权限错误。授权脚本见 [database/grants](../database/grants/)。
 
 ## 秘密与私人数据
 

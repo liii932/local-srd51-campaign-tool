@@ -101,7 +101,11 @@ schema 2 任意多组选择的作者合同。
 只改类别、种类或引用而留下另一种授予的残余字段。来源、槽、集合、成员和目标的存在及
 类型在最终模型中校验，禁用不能掩盖损坏引用，包括未选候选。
 
-`Schema2InitialCharacterPlanService.prepare` 默认通过
+`CampaignRuleContext.initialPlan` 使用已冻结的战役规则材料。其纯计划生成器
+`Schema2InitialCharacterPlanService.prepareMaterial` 核对规则绑定，再从角色来源和选择计算槽与授予事实。
+完整文件以 `initial.InitialPlan` 保存战役、角色和计划，以 `initial.Plan` 保存该计划的准备身份、规则绑定、来源、选择、槽和授予。
+
+离线入口 `JdbcSchema2InitialCharacterPlanner.prepare` 默认通过
 `JdbcSchema2RuntimeSnapshotRepository.read` 读取调用方指定的同一 run/snapshot，
 独立读回全部类型字段和字段链，并比较准确 `Schema2RulesBinding`。绑定包括 profile、
 算法、成员顺序、版本、原包/逻辑双摘要及组合、最终规则、完整链摘要。请求不提交
@@ -182,7 +186,7 @@ V022 不推测回填旧 DRAFT 平面数据，前置检查要求创建快照为�
 | 5 快照与执行身份 | schema 2 计划绑定真实 run/snapshot 及准确规则成员和摘要；共同 campaign 初始化和业务提交尚未接合 |
 | 6 输入与选择 | 旧请求由服务器有界回退分配；schema 2 按完整槽提供选择，重验全部候选、数量和跨槽重复，禁用候选不可新选 |
 | 7 时机与资源 | 随初始创建一次产生，不另消费动作、时间、骰子或职业资源；无跨命令 pending 选择，其他授予时机不在本切片 |
-| 8 计划与消费者 | 旧 profile → 创建 Command → JDBC append；schema 2 真实运行快照 → `Schema2InitialCharacterPlanService` → 不可变初始计划，尚不执行角色业务提交 |
+| 8 计划与消费者 | 旧 profile 的创建命令经 JDBC 写入。SQLite 冻结投影与 JDBC 独立读回的运行快照共用纯计划生成器，产出不可变的初始计划。 |
 | 9 校验与事务 | 事实在借连接前有界校验，同父创建事务提交；JDBC 写入故障测试核对整体回滚，尚不替代新 v2 共同守卫 |
 | 10 幂等与提交结果 | 沿用父创建操作和摘要，不新增独立授予请求；完整 v2 提交未知与共同查证仍待采用 |
 | 11 状态与历史 | 创建快照是父身份，授予表保存不可变来源事实，原 selection 是规范目标投影；创建根事件及审计同事务，未宣称完整 v2 历史 |

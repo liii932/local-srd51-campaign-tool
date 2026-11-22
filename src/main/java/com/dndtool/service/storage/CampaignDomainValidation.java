@@ -39,11 +39,70 @@ public final class CampaignDomainValidation {
     public static List<CampaignDomainEngine.CharacterRecord> records(State state) {
         return state.characters().stream().map(c -> new CampaignDomainEngine.CharacterRecord(c.name(), c.kind(), c.initial(), c.history())).toList();
     }
+
+    static Set<UUID> retainedEventOperations(State state) {
+        Set<UUID> existing = new HashSet<>();
+        for (Root root : state.roots()) {
+            existing.add(root.operationId());
+            existing.addAll(root.characterOperations());
+        }
+        for (var character : state.characters()) for (var event : character.history().events())
+            existing.add(event.operationId());
+        for (var history : state.combats()) for (var event : history.events()) {
+            existing.add(event.operationId());
+            existing.addAll(event.characterOperations());
+        }
+        return existing;
+    }
+
+    /** Joins recorded ownership to actual histories before a cached or replayed prefix is used. */
+    private static void validateEventIdentities(State state) {
+        Map<UUID, Root> roots = new HashMap<>();
+        Map<UUID, Root> characterOwners = new HashMap<>();
+        Set<UUID> missingScenes = new HashSet<>(), sceneOperations = new HashSet<>();
+        for (Root root : state.roots()) {
+            if (roots.putIfAbsent(root.operationId(), root) != null)
+                throw CampaignJson.bad("Duplicate campaign root operation");
+            if (root.combatId() != null) missingScenes.add(root.operationId());
+            for (UUID child : root.characterOperations()) if (characterOwners.putIfAbsent(child, root) != null)
+                throw CampaignJson.bad("Character operation belongs to more than one root occurrence");
+        }
+        for (var history : state.combats()) {
+            if (history.current() == null || history.current().combatId() == null)
+                throw CampaignJson.bad("Scene history has no identity");
+            UUID scene = history.current().combatId();
+            for (var event : history.events()) {
+                Root root = roots.get(event.operationId());
+                if (root == null || !scene.equals(root.combatId()) || !sceneOperations.add(event.operationId()))
+                    throw CampaignJson.bad("Scene operation has no unique campaign root");
+                if (event.characterOperations().size() != root.characterOperations().size()
+                        || !new HashSet<>(event.characterOperations()).equals(new HashSet<>(root.characterOperations())))
+                    throw CampaignJson.bad("Scene operation children differ from its campaign root");
+                missingScenes.remove(event.operationId());
+            }
+        }
+        if (!missingScenes.isEmpty()) throw CampaignJson.bad("Campaign root has no scene operation");
+        for (var character : state.characters()) for (var event : character.history().events()) {
+            UUID operation = event.operationId();
+            Root owner = characterOwners.remove(operation), root = roots.get(operation);
+            // An INITIALIZED or direct character event can carry its own root's ID.
+            if (owner == null || (root != null && root != owner) || sceneOperations.contains(operation)
+                    || event.command() == null)
+                throw CampaignJson.bad("Character operation has no unique campaign root");
+            var combat = event.command().combatInput();
+            if (owner.combatId() == null ? combat != null : combat == null
+                    || !owner.combatId().equals(combat.combatId()) || !owner.operationId().equals(combat.combatOperationId()))
+                throw CampaignJson.bad("Combat character operation has a different scene or root");
+        }
+        if (!characterOwners.isEmpty()) throw CampaignJson.bad("Campaign root has no character operation");
+    }
+
     public static CampaignData.Snapshot validate(CampaignData.Snapshot snapshot) {
         State retained = snapshot.domains();
         if (retained.characters().size() > 16 || retained.combats().size() > 128 || retained.roots().size() > 100000
                 || retained.nodes().size() > 10000 || retained.items().size() > 10000 || retained.space().monsters().size() > 1024)
             throw CampaignJson.bad("Campaign domain capacity exceeded");
+        validateEventIdentities(retained);
         State prefix = verifiedPrefix(snapshot);
         if (prefix == null) prefix = State.initial(retained.material().restore().projection());
         var reducer = new CampaignDomainCommands();
