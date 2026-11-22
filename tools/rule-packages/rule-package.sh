@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Use a reviewed Maven build from this checkout. No download/build/migration happens here.
+# Use the offline tool classes from a reviewed application build of this checkout.
 project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 if [[ ! -d "$project_root/target/classes/com/dndtool/offline/rules" ]]; then
-  printf '%s\n' 'Compile the project first: mvn -DskipTests compile' >&2
+  printf '%s\n' 'Expected reviewed application build outputs under target/classes (including offline rule tools).' >&2
   exit 1
 fi
 if [[ ${1:-} == build || ${1:-} == verify || ${1:-} == schema2-verify ]]; then

@@ -1,11 +1,12 @@
 # Schema 2 内部角色成长、HP、生命骰与职业资源
 
-本合同限定 schema 2 的内部成长与资源业务消费者。它连接已保留的初始身份／授予计划、类型化
+本合同限定旧 MySQL schema 2 的内部成长与资源业务入口及其规则语义。它连接已保留的初始身份／授予计划、类型化
 运行规则、有界成长选择、HP／混合生命骰、职业资源及不可变历史。
 `CHARACTER_ADVANCEMENT` 声明本合同的完整成长能力，`STATISTICS_AND_RESOURCES_ONLY` 仅声明
 原有限统计能力；两者不能互相代称。完整战役初始化、全部职业特性执行仍未开放；真实休息见
 [内部休息合同](schema-2-character-rest.md)。
-它不改变旧 `RELEASED` 规则、现有持久化摘要域、默认新战役规则或 archive format 2 发布门。
+当前 SQLite 工作台采用的有界成长、休息及完整文件见[领域接合表](../design/v2/domain-integration.md)。
+完整规则的 archive format 2 限内部 DRAFT 角色片段。
 
 初始授予沿用[初始熟练来源与选择合同](schema-2-proficiency-grants.md)，运行材料沿用
 [schema 2 运行快照](schema-2-runtime-snapshot.md)，写入保护沿用

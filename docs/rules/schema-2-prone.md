@@ -92,12 +92,13 @@ Ready 释放的 reaction、已走前缀和原骰均保留，不因停止退还�
 
 ## 行为证据
 
+`tools/storage/browser-prone.cjs` 验证真实 Host 表单、姿态和成本展示及重开继续。应用姿态机制、命令或共享状态改变时，按受影响责任选择下列测试。
+
 `Schema2ProneRulesTest` 覆盖姿态、探索零耗时卧倒、精确预算、Ready/OA 与失能中断；
 `Schema2ExplorationRulesTest` 保护六秒活动、路径预检、冻结移动声明和到期效果；
-`CampaignProneIntegrationTest` 从原 ZIP 导入、审阅接受、有序预览和新建开始，
+`CampaignProneIntegrationTest` 从标准组合原 ZIP 的导入、接受、有序预览和自定义新建开始，
 通过正常角色取得、生产命令、临时 SQLite 和完整文件核对组内每个行为，包括探索姿态链、
 旧战斗预算保留、战斗交接、幂等不重付时间和晚写回滚。
 `PlayerProneCandidateTest` 验证邀请、审批、控制后的服务端候选和共同动作入口。
-`tools/storage/browser-prone.cjs` 验证真实 Host 表单、姿态和成本展示及重开继续。
 定向范围和隔离启动见[测试指南](../testing.md#prone-verification)。这些证据不提升擒抱、
 推撞、怪物主动姿态或整个 Prone producer 族的完成状态。

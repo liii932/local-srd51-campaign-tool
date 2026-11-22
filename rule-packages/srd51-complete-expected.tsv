@@ -1,0 +1,56 @@
+key	display_name	description	category	source_page	sort_order
+language.abyssal	Abyssal	Abyssal is an SRD 5.1 language catalog entry.	EXOTIC	59	1
+language.celestial	Celestial	Celestial is an SRD 5.1 language catalog entry.	EXOTIC	59	2
+language.common	Common	Common is an SRD 5.1 language catalog entry.	STANDARD	59	3
+language.deep_speech	Deep Speech	Deep Speech is an SRD 5.1 language catalog entry.	EXOTIC	59	4
+language.draconic	Draconic	Draconic is an SRD 5.1 language catalog entry.	EXOTIC	59	5
+language.druidic	Druidic	Druidic is an SRD 5.1 language catalog entry.	SECRET	59	6
+language.dwarvish	Dwarvish	Dwarvish is an SRD 5.1 language catalog entry.	STANDARD	59	7
+language.elvish	Elvish	Elvish is an SRD 5.1 language catalog entry.	STANDARD	59	8
+language.giant	Giant	Giant is an SRD 5.1 language catalog entry.	STANDARD	59	9
+language.gnomish	Gnomish	Gnomish is an SRD 5.1 language catalog entry.	STANDARD	59	10
+language.goblin	Goblin	Goblin is an SRD 5.1 language catalog entry.	STANDARD	59	11
+language.halfling	Halfling	Halfling is an SRD 5.1 language catalog entry.	STANDARD	59	12
+language.infernal	Infernal	Infernal is an SRD 5.1 language catalog entry.	EXOTIC	59	13
+language.orc	Orc	Orc is an SRD 5.1 language catalog entry.	STANDARD	59	14
+language.primordial	Primordial	Primordial is an SRD 5.1 language catalog entry.	EXOTIC	59	15
+language.sylvan	Sylvan	Sylvan is an SRD 5.1 language catalog entry.	EXOTIC	59	16
+language.thieves_cant	Thieves Cant	Thieves Cant is an SRD 5.1 language catalog entry.	SECRET	59	17
+language.undercommon	Undercommon	Undercommon is an SRD 5.1 language catalog entry.	EXOTIC	59	18
+tool.alchemist_supplies	Alchemist Supplies	Alchemist Supplies is an SRD 5.1 tool catalog entry.	ARTISAN	70	1
+tool.bagpipes	Bagpipes	Bagpipes is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	2
+tool.brewer_supplies	Brewer Supplies	Brewer Supplies is an SRD 5.1 tool catalog entry.	ARTISAN	70	3
+tool.calligrapher_supplies	Calligrapher Supplies	Calligrapher Supplies is an SRD 5.1 tool catalog entry.	ARTISAN	70	4
+tool.carpenter_tools	Carpenter Tools	Carpenter Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	5
+tool.cartographer_tools	Cartographer Tools	Cartographer Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	6
+tool.cobbler_tools	Cobbler Tools	Cobbler Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	7
+tool.cook_utensils	Cook Utensils	Cook Utensils is an SRD 5.1 tool catalog entry.	ARTISAN	70	8
+tool.dice_set	Dice Set	Dice Set is an SRD 5.1 tool catalog entry.	GAMING_SET	70	9
+tool.disguise_kit	Disguise Kit	Disguise Kit is an SRD 5.1 tool catalog entry.	KIT	70	10
+tool.drum	Drum	Drum is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	11
+tool.dulcimer	Dulcimer	Dulcimer is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	12
+tool.flute	Flute	Flute is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	13
+tool.forgery_kit	Forgery Kit	Forgery Kit is an SRD 5.1 tool catalog entry.	KIT	70	14
+tool.glassblower_tools	Glassblower Tools	Glassblower Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	15
+tool.herbalism_kit	Herbalism Kit	Herbalism Kit is an SRD 5.1 tool catalog entry.	KIT	70	16
+tool.horn	Horn	Horn is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	17
+tool.jeweler_tools	Jeweler Tools	Jeweler Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	18
+tool.leatherworker_tools	Leatherworker Tools	Leatherworker Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	19
+tool.lute	Lute	Lute is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	20
+tool.lyre	Lyre	Lyre is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	21
+tool.mason_tools	Mason Tools	Mason Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	22
+tool.navigator_tools	Navigator Tools	Navigator Tools is an SRD 5.1 tool catalog entry.	NAVIGATION	70	23
+tool.painter_supplies	Painter Supplies	Painter Supplies is an SRD 5.1 tool catalog entry.	ARTISAN	70	24
+tool.pan_flute	Pan Flute	Pan Flute is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	25
+tool.playing_card_set	Playing Card Set	Playing Card Set is an SRD 5.1 tool catalog entry.	GAMING_SET	70	26
+tool.poisoner_kit	Poisoner Kit	Poisoner Kit is an SRD 5.1 tool catalog entry.	KIT	70	27
+tool.potter_tools	Potter Tools	Potter Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	28
+tool.shawm	Shawm	Shawm is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	29
+tool.smith_tools	Smith Tools	Smith Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	30
+tool.thieves_tools	Thieves Tools	Thieves Tools is an SRD 5.1 tool catalog entry.	KIT	70	31
+tool.tinker_tools	Tinker Tools	Tinker Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	32
+tool.vehicles_land	Vehicles (Land)	Vehicles (Land) is an SRD 5.1 tool catalog entry.	VEHICLE	70	33
+tool.vehicles_water	Vehicles (Water)	Vehicles (Water) is an SRD 5.1 tool catalog entry.	VEHICLE	70	34
+tool.viol	Viol	Viol is an SRD 5.1 tool catalog entry.	MUSICAL_INSTRUMENT	70	35
+tool.weaver_tools	Weaver Tools	Weaver Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	36
+tool.woodcarver_tools	Woodcarver Tools	Woodcarver Tools is an SRD 5.1 tool catalog entry.	ARTISAN	70	37

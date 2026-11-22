@@ -13,8 +13,8 @@ Dreadful Glare 等元数据不取得执行资格，也不能由通用健康输�
 [角色基础](schema-2-character-foundations.md)、[内部战斗](schema-2-combat.md)和
 [有限施法](schema-2-spells.md)。[多目标公共合同](../design/v2/multi-target-save-damage.md)
 保留更广的目标接口；本文记录已经接入的封闭分支及其适用差异。
-这一 INTERNAL 接合不开放完整基础包、非空内容包安装资格、Host、完整战役文件或
-archive format 2；`dnd5e2014_srd51_se` 继续为 DRAFT，旧 RELEASED 默认不变。
+这一 INTERNAL 服务属于旧 MySQL 链路。SQLite 工作台接入有限怪物部署、充能及吐息，并按 format 3 保存战斗。
+完整规则 `dnd5e2014_srd51_se` 仍为 DRAFT，archive format 2 限内部角色片段。[领域接合表](../design/v2/domain-integration.md)
 
 原文先读本地 SRD：Hell Hound [p.321](../references/srd-5.1/pages/page-321.md)／
 [p.322](../references/srd-5.1/pages/page-322.md)、Mummy [p.333](../references/srd-5.1/pages/page-333.md)、

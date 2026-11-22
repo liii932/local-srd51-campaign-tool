@@ -3,7 +3,8 @@
 本合同连接[角色成长与资源](schema-2-character-statistics.md)中的真实角色状态和
 [共同业务事务](business-write-transactions.md)。支持范围是准确运行快照下的单角色
 INTERNAL 运行：标准短休、逐次生命骰选择、标准长休、职业资源恢复和对应时间历史。
-完整战役、多角色共同时间推进、Host 入口和 archive format 2 发布仍遵循原采用边界。
+此 INTERNAL 服务属于旧 MySQL 链路。SQLite 工作台复用有限休息语义并按战役规则绑定保存 format 3。
+[领域接合表](../design/v2/domain-integration.md)
 
 ## 模组声明与执行责任
 

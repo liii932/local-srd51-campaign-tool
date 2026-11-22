@@ -1,7 +1,8 @@
 # Archive format 2 DRAFT 角色状态投影
 
 本合同描述 `dnd5e2014_srd51_se` release `1` 的内部 archive format 2 角色切片。该发布仍为
-`DRAFT`；本文不激活格式 2、不改变 format 1、不开放 Host 导入/导出，也不切换新战役默认版。
+`DRAFT`，格式 2 保持内部使用。当前 SQLite Host 的文件导入和导出使用 `RULE_BOUND_CAMPAIGN` format 3。
+[运行合同](../storage-vitality-loop.md)
 
 ## 当前投影
 

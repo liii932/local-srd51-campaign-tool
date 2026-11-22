@@ -4,8 +4,8 @@
 当前包含 `character.language` 的 18 项与 `character.tool` 的 37 项目录；包目录名不表示全部 SRD 已完成。
 本页规定共同作者入口和语言字段；工具字段见[工具熟练目录分区](tool-catalog-partition.md)。
 作者 schema 1、canonical 2、archive 2 是三个独立协议字段。只接受这个准确目标，合法但未支持
-的其他身份/格式仍拒绝；沿用[发布身份合同](module-release-identity.md)，不改变注册表、默认
-RELEASED v1、既有摘要或 V001—V018。
+的其他身份/格式仍拒绝。该分区使用完整规则的 DRAFT 身份，与旧 MySQL 注册表和摘要域的关系见
+[发布身份合同](module-release-identity.md)。
 
 ## 输入与资源边界
 
@@ -126,12 +126,21 @@ JSON、离线入口/写入适配器、生成安装载荷和测试夹具不得进
 
 ## 独立验证
 
+修改 DRAFT 作者源后，从仓库根用 Python 3 执行只读核对。参数也可指向编辑后的候选目录：
+
 ```bash
-mvn '-Dtest=CharacterCatalogAuthorPackageReaderTest,ToolAuthorPartitionTest,ModuleCanonicalEncoderV1Test,ModuleCanonicalEncoderV2Test,BuiltinModuleReleaseRegistryTest,CampaignArchiveCapabilityBoundaryTest' test
-mvn '-Dtest=CharacterCatalogAuthorPackageReaderTest,ToolAuthorPartitionTest' '-DargLine=-Xmx64m' test
+python3 -B tools/rule-packages/catalog-vector.py --check rule-packages/srd51-complete
 ```
 
-测试从正式作者源读取真实字节，逐项对照独立手写矩阵；采用测试专用窄适配将纯分区送入
+脚本核对作者身份、两个分区声明和每行六字段，将 18 项语言与 37 项工具同[独立作者期望](../../rule-packages/srd51-complete-expected.tsv)逐项比较，再独立编码并核对固定的 DRAFT 规范字节摘要。这个摘要用于验证当前两分区，发布摘要仍由完整领域决定。应用 reader、JDBC 安装和运行资格分别有自己的证据，离线安装按[安装合同](offline-language-installation.md)另验。
+
+修改应用 reader 时可选下列定向测试，工程容量场景加 `-DargLine=-Xmx64m`：
+
+```bash
+mvn '-Dtest=CharacterCatalogAuthorPackageReaderTest,ToolAuthorPartitionTest' test
+```
+
+应用测试从 `src/test/resources/character-catalog-author/` 读取独立夹具，逐项对照手写矩阵，并采用测试专用窄适配将纯分区送入
 既有 canonical-v2 encoder，与 `src/test/resources/module-canonical-v2-languages.hex` 比较。
 该 hex 由独立大端 u32/标量标签编码过程根据本页矩阵构造，未调用生产 reader/mapper/encoder，
 覆盖 release 四字段、18 定义、36 属性、零关系。它是现有 DRAFT 编码的测试向量，不是新分区

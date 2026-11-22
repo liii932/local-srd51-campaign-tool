@@ -82,7 +82,7 @@ DM 裁定模式，规则角色、自由卡和怪物共用网格与占位；自�
 | 检查 | 测试或实际入口 | 必须证明的结果 |
 |---|---|---|
 | 声明与组合 | `StorageSchemaCatalogTest`、`SqliteSchemaTest`、`CampaignSelectedSchemaTest` | 严格 JSON、直接依赖、确定性完整 runtime 计划、实际 SQLite 约束、索引及种子 |
-| 准确规则 | `LocalRuleLibraryTest`、`BundledCampaignRulesTest`、`CampaignRuleSupportTest`、`CampaignRuleBindingIntegrationTest`。包构建器 `--check` | 准确导入与本机接受、内置及外部覆盖、候选与初始化、同骰的不同结算和条件后果、缺包或未接受阻断打开、健康残留的直接恢复 |
+| 准确规则 | `LocalRuleLibraryTest`、`BundledCampaignRulesTest`、`CampaignRuleSupportTest`、`CampaignRuleBindingIntegrationTest`。模组行为用独立场景，随附原包与作者源的一致性用包构建器 `--check` | 准确导入与本机接受、内置及外部覆盖、候选与初始化、同骰的不同结算和条件后果、缺包或未接受阻断打开、健康残留的直接恢复 |
 | 规则角色与共享机制 | `CampaignDomainEngineTest`、`CampaignDomainsIntegrationTest`、现有 schema-2 机制测试族 | 完整初始/当前及历史、独立空间秒和角色累计秒、成长/资源/装备/健康、引用和版本边界 |
 | 自由卡与条件后果 | `CampaignManualIntegrationTest`、`CampaignCheckEffectsTest` | 自由字段/职业/熟练、混合网格、两分支事前验证、服务端骰、明确顺序、目标版本、一次共同提交与回滚 |
 | 根历史与因果 | `CampaignDomainRootValidationTest` | 节点/物品语义、历史前缀、准确子事件归属及逐根空间时钟，拒绝最终值自洽但过程伪造的文件 |

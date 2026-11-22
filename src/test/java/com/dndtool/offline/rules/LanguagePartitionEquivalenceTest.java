@@ -223,11 +223,8 @@ class LanguagePartitionEquivalenceTest {
 
     private RuleArtifact artifact(String change) throws Exception {
         Path parent = Files.createDirectory(temp.resolve("input-" + UUID.randomUUID()));
-        Path author = Files.createDirectory(parent.resolve("author")); Files.createDirectory(author.resolve("character"));
-        for (String name : List.of("author-package.json", "character/languages.json", "character/tools.json", "package-guide.md", "notice.md")) {
-            Files.copy(Path.of("rule-packages/srd51-complete").resolve(name), author.resolve(name));
-        }
-        Path file = parent.resolve("author/character/languages.json");
+        Path author = OfflineTestSupport.authorDirectory(parent);
+        Path file = author.resolve("character/languages.json");
         JsonArray rows = JsonParser.parseString(Files.readString(file)).getAsJsonArray();
         if (change.equals("reverse")) {
             JsonArray reversed = new JsonArray(); for (int i = 17; i >= 0; i--) reversed.add(rows.get(i)); rows = reversed;
@@ -248,8 +245,8 @@ class LanguagePartitionEquivalenceTest {
         }
         if (!change.isEmpty()) Files.writeString(file, rows.toString());
         // Exercise the author entry separately as well as the artifact's production reader.
-        var direct = new CharacterCatalogAuthorPackageReader().read(Files.readAllBytes(parent.resolve("author/author-package.json")), Files.readAllBytes(file), Files.readAllBytes(parent.resolve("author/character/tools.json")));
-        Path output = parent.resolve("changed"); String hash = RuleArtifact.build(parent.resolve("author"), output);
+        var direct = new CharacterCatalogAuthorPackageReader().read(Files.readAllBytes(author.resolve("author-package.json")), Files.readAllBytes(file), Files.readAllBytes(author.resolve("character/tools.json")));
+        Path output = parent.resolve("changed"); String hash = RuleArtifact.build(author, output);
         var result = RuleArtifact.read(output, hash); assertEquals(direct.languages(), result.author().languages()); return result;
     }
 

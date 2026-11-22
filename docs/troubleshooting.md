@@ -14,6 +14,13 @@
 
 单份保存文件提示不可用时，仍可操作当前战役或打开其他有效保存点。可从保管副本重新取得该文件。
 
+## 标准规则或内置候选不可用
+
+标准新建或打开标准存档返回 `BUNDLED_RULES_UNAVAILABLE` 时，核对活动 WAR 中的标准组合及
+`bundled-members.tsv`。如果某个内置候选单独标为不可用，核对该包及其身份清单项。检查方法见
+[WAR 审计](testing.md#6-war-审计)。自定义战役返回 `RULE_PACKAGE_NOT_ACCEPTED` 时，按
+[运行合同](storage-vitality-loop.md#有限-schema-2-规则材料)在本机接受战役绑定的准确原包。
+
 ## 页面返回 404
 
 DM 精确使用 `http://127.0.0.1:8080`。该入口上的 `localhost`、`::1`、局域网 IP、HTTPS、
@@ -41,9 +48,11 @@ SQLite 的 `SAVE_PENDING` 应完成准确待保存请求；`COMMIT_UNKNOWN` 或 
 `PLAYER_DEVICE_REAPPROVAL_REQUIRED` 需重新审批。`PLAYER_VIEW_EXPIRED` 要刷新合法候选，
 响应丢失或 `PLAYER_RESULT_UNVERIFIED` 先查证原收据；仍待查证时可关闭原提交，取得已接受或确定未执行的结果。
 
-## 集成测试被跳过
+## 离线 MySQL 集成测试未运行
 
-普通 `clean verify` 不连接真实 MySQL。显式集成测试需要独立测试库、确认写入开关和同一 PowerShell 会话中的口令变量。全部测试被跳过不构成验收，详见[测试指南](testing.md)。
+需要离线 JDBC 验收时，用 `-Dtest=MySqlIntegrationIT` 显式选择测试，配置获授权的独立测试库、
+启用和确认写入开关，并向运行 Maven 的同一 shell 会话提供口令变量。选中后仍被跳过时，检查
+Surefire 报告中的跳过原因及最终测试计数。命令与目标限制见 [MySQL 集成测试](testing.md#3-mysql-集成测试)。
 
 ## WAR 或部署不一致
 

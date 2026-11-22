@@ -1,9 +1,10 @@
 # 规则发布身份与批准描述符
 
-本合同规定 `BuiltinModuleReleaseRegistry` 的纯值校验和应用独立批准边界。
+本合同规定旧 MySQL 规则身份注册表 `BuiltinModuleReleaseRegistry` 的纯值校验和应用独立批准边界。
 它不证明规则已安装、源目录完整或可执行。冻结 v1 的规范字节仍由
 [SRD 5.1 v1](srd-5.1.md#11-规范哈希要求) 定义；完整规则族的发布门见
-[完整规则目标](srd-5.1-complete.md)。
+[完整规则目标](srd-5.1-complete.md)。当前 SQLite 战役从应用随附的标准组合或本机接受的自定义组合绑定规则。
+[运行合同](../storage-vitality-loop.md#有限-schema-2-规则材料)
 
 ## 1. 精确身份
 
@@ -51,14 +52,14 @@ null 前置条件抛出 `NullPointerException`，其他非法纯值抛出 `Illeg
 
 标准注册表仅有以下映射：
 
-| module key / release version | canonical | archive | 应用状态 | 默认 |
+| module key / release version | canonical | archive | 注册表状态 | 注册表默认 |
 |---|---:|---:|---|---|
 | `dnd5e2014_srd51_se_v1` / `1` | 1 | 1 | RELEASED | 是 |
 | `dnd5e2014_srd51_se` / `1` | 2 | 2 | DRAFT | 否 |
 
 v1 的唯一固定批准摘要为
 `8c58297049084b808fcf27b888efb7b9345989cafef137a1200f092853c3731e`。
-完整规则族没有批准摘要；登记其开发格式映射不会激活 archive 2 或切换新战役默认。
+完整规则族没有批准摘要，archive format 2 仍限内部 DRAFT 角色片段。
 
 ## 3. 批准摘要与观测摘要
 

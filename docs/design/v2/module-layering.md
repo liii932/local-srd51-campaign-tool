@@ -84,8 +84,7 @@ flowchart LR
 
 ### 数据扩展与行为扩展
 
-改变已支持字段的合法值、增加同类规则条目或引用已有机制，属于内容扩展。应用必须验证
-实际消费者使用了新值，不能以目录展示成功代替结算差异。规则说明文字不产生行为。
+改变已支持字段的合法值、增加同类规则条目或引用已有机制，属于内容扩展。作者将候选模组交给已有应用 WAR，用独立场景指定输入和预期后果，核对真实消费者的结算差异。规则说明文字不产生行为。
 
 新增触发时机、选骰方式、目标关系、资源消费、效果种类或允许参数之外的表达式，属于
 行为扩展：先补领域合同与应用实现，再开放声明。沿[机制接入清单](mechanism-integration-checklist.md)
@@ -175,8 +174,8 @@ flowchart LR
 
 | 边界 | 当前实现 | 后续采用责任 |
 |---|---|---|
-| 准确组合 | DM 从本机已接受材料中选择 1–8 个有序准确成员。内置原包可导入，外部包走同一 reader/compose 与应用支持门。现有建卡模板及有限机制的完整性决定可执行范围。[本机规则库](local-rule-library.md)、[CampaignRuleSupport](../../../src/main/java/com/dndtool/service/storage/CampaignRuleSupport.java) | 新机制扩展按消费和恢复闭包验收。存储需求由应用机制映射 |
-| 冻结与恢复 | SQLite 和完整文件保存解释合同、准确成员与摘要、全部最终规则、条目和来源链。打开时复核本机接受并重新组合，逐项与文件材料核对。活动与同版残留重建自身投影，最多共享两份以完整不可变材料为键的已核验上下文。[Material](../../../src/main/java/com/dndtool/service/storage/CampaignDomainData.java)、[CampaignDomainValidation](../../../src/main/java/com/dndtool/service/storage/CampaignDomainValidation.java) | 扩展机制须保留同版解释、完整事实与不回源恢复 |
+| 准确组合 | 标准建团直接使用 WAR 随附四包。自定义建团由 DM 选择 1–8 个本机已接受的有序准确成员。内置原包可导入，外部包走同一 reader/compose 与应用支持门。现有建卡模板及有限机制的完整性决定可执行范围。[本机规则库](local-rule-library.md)、[CampaignRuleSupport](../../../src/main/java/com/dndtool/service/storage/CampaignRuleSupport.java) | 新机制扩展按消费和恢复闭包验收。存储需求由应用机制映射 |
+| 冻结与恢复 | SQLite 和完整文件保存解释合同、准确成员与摘要、全部最终规则、条目和来源链。打开时按文件的准确绑定重组随附标准四包或本机已接受的原包，逐项核对冻结材料。活动与同版残留重建自身投影，最多共享两份以完整不可变材料为键的已核验上下文。[Material](../../../src/main/java/com/dndtool/service/storage/CampaignDomainData.java)、[CampaignDomainValidation](../../../src/main/java/com/dndtool/service/storage/CampaignDomainValidation.java) | 扩展机制须保留同版解释、完整事实与不回源恢复 |
 | 规则消费 | 创建、初始计划和选择、候选、目录及来源、执行和历史验算使用同一战役冻结材料。[CampaignRuleContext](../../../src/main/java/com/dndtool/service/storage/CampaignRuleContext.java)、[CampaignDomainCommands](../../../src/main/java/com/dndtool/service/storage/CampaignDomainCommands.java) | 新机制沿相同边界登记自己的消费者、状态和恢复闭包 |
 | 领域模型 | 角色事实和历史、战斗历史、准备身份由领域类型拥有。领域验证结构和规则语义，JDBC 与文件负责读写适配，共同事务由调用方协调。[角色事实](../../../src/main/java/com/dndtool/service/Schema2CharacterRuntime.java)、[战斗历史](../../../src/main/java/com/dndtool/service/Schema2CombatHistory.java)、[准备身份](../../../src/main/java/com/dndtool/service/Schema2PreparationIdentity.java)、[领域引擎](../../../src/main/java/com/dndtool/service/CampaignDomainEngine.java) | 按新机制扩展领域与适配边界，维持原子后果和完整恢复 |
 | 代表检定 | 家规组合用感知处理 Athletics，工匠授予侏儒语，直接伤害定额为 3。标准组合分别使用力量、矮人语与定额 6。两套共享检定机制和两分支预检，实际分支与根子后果随完整事实保存。[检定规则](../../../src/main/java/com/dndtool/service/Schema2CharacterCheckRules.java)、[两分支后果](../../../src/main/java/com/dndtool/service/storage/CampaignCheckEffects.java) | 其他机制各自依真实入口和机制清单验收 |
@@ -213,9 +212,9 @@ flowchart LR
 | 多战役先后运行 | 每个战役自己的完整组合、实例与来源；切换后无缓存/会话泄漏 | 外战役目标、旧 epoch/候选以及不同组合错误引用拒绝 |
 | 多场景单焦点 | 背景状态/时钟/效果剩余时间不变，切回不追赶，切换事实入根历史 | 跨场景未支持的影响和转移依赖拒绝；失败不半切换 |
 | 保存任意已提交中途状态 | 所有场景、角色、原骰、资源、根子历史、时钟、焦点和待继续叶子 | 篡改材料/链/状态/历史拒绝；恢复不调用游戏执行或 RNG、不补字段 |
-| 文件移机与本机残留 | 新打开具备准确原包/本机接受；残留直接核本库完整冻结事实 | 文件不能自报接受；缺包阻断新打开，来源离线不阻断活动/残留 |
+| 文件移机与本机残留 | 新打开核对标准随附组合或目标机器接受的自定义组合；残留直接核本库完整冻结事实 | 文件不能自报接受；缺包阻断新打开，来源离线不阻断活动/残留 |
 
-规则绑定的定向入口包括 `BundledCampaignRulesTest`、`LocalRuleLibraryTest`、`CampaignRuleSupportTest`、
+标准模组的角色、职业、装备与法术场景由独立模组工具运行。应用侧冻结读回和规则绑定的定向入口包括 `BundledCampaignRulesTest`、`LocalRuleLibraryTest`、`CampaignRuleSupportTest`、
 `CampaignRuleContextTest` 与 `CampaignRuleBindingIntegrationTest`。规则、领域后果和恢复由 `Schema2CheckCompositionTest`、
 `CampaignDomainEngineTest`、`CampaignCheckEffectsTest`、`CampaignDomainsCombatIntegrationTest`
 与 `CampaignDomainRecoveryTest` 覆盖相关路径。按测试指南运行有关定向测试，生产代码或资源

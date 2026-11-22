@@ -7,7 +7,7 @@
 “v2”是设计简称，不是所有版本字段都取数字 2。完整 SRD 族
 `dnd5e2014_srd51_se` release `"1"` 的 canonical/archive 目标仍为 `2/2`，状态仍 DRAFT。
 SQLite 是 Web 应用的唯一运行库。标准规则随应用直接加载，自定义组合核验本机原包与接受记录。
-SQLite 完整文件 `RULE_BOUND_CAMPAIGN` format 3 与 MySQL archive dispatcher 分别管理。
+SQLite 工作台保存和打开 `RULE_BOUND_CAMPAIGN` format 3。原 MySQL 存档的保管方式见[备份与恢复](../../backup-and-restore.md)。
 
 ## 模组分层目标
 

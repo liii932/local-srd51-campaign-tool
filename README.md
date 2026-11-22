@@ -138,7 +138,7 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 `target/dnd-tool-se-0.2.1.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
 JUnit 用例，例如启动逻辑用 `mvn '-Dtest=StorageApplicationListenerTest' test`。
 
-规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
+可运行规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
 
 ```sh
 python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.2.1.war \
@@ -146,6 +146,8 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 ```
 
 开发中的模组可单独构建候选 ZIP 并传给同一入口，见[模组场景指南](./rule-packages/srd51-runtime/scenarios/README.md)。独立 MySQL 测试库的启用条件和 WAR 审计见[测试指南](./docs/testing.md)。
+
+离线 DRAFT 语言与工具目录使用 `python3 -B tools/rule-packages/catalog-vector.py --check rule-packages/srd51-complete` 核对正式作者内容。应用读取器与安装测试另用固定夹具。见[独立作者验证](./docs/rules/language-author-package.md#独立验证)。
 
 ## 数据库与部署
 
@@ -249,6 +251,6 @@ tracks semantic drafting and source review separately from implementation.
 
 - 按完整 SRD 5.1 目标做最小领域切片，并准确区分当前行为与目标行为；
 - 不修改已经应用的编号迁移，应新增下一条前向迁移；
-- 模组改动运行对应作者场景，应用改动验证受影响的机制及调用方；
+- 按上方验证入口核对模组内容，应用改动验证受影响的机制及调用方；
 - 生产代码或资源变化时审计生成的 WAR；
 - 不提交构建产物、数据库秘密、Tomcat 外部配置、日志、备份或真实存档。

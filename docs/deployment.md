@@ -5,9 +5,13 @@
 
 ## 1. 构建候选
 
-使用发行制品 `dnd-tool-se-0.2.1.war`。从源码构建时，在仓库根目录按
-[完整验证流程](testing.md#2-必要时的完整验证)生成 `target/dnd-tool-se-0.2.1.war`。
-复用同一代码和配置的有效测试结果时，按测试指南记录选取的范围和制品构建命令。
+使用发行制品 `dnd-tool-se-0.2.1.war`，或在仓库根从源码生成 `target/dnd-tool-se-0.2.1.war`。
+按[测试指南](testing.md)选取受影响的应用测试和模组检查。应用结果可复用时，或本次只改规则包时，
+运行 `mvn -DskipTests package`。旧输出可能影响候选时，在打包命令中加入 `clean`。
+
+交付可运行模组变更时，用候选 WAR 执行受影响的作者场景，核对实际加载的组合和 ZIP 身份。
+应用与模组一并改动时，先完成定向应用验证及候选构建，再用新 WAR 执行这些场景。
+记录各项实际使用的命令、制品和结果。
 
 按 [WAR 审计方法](testing.md#6-war-审计)记录候选字节数、SHA-256 和 ZIP 条目数。核对
 生产描述符、Servlet 和 Filter、SQLite JDBC、结构 JSON、五个规则原包、对应的 `bundled-members.tsv` 身份清单和 Host/玩家

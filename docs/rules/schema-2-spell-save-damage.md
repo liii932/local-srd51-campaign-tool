@@ -94,5 +94,5 @@ B CON 原8加1和 Bless1 恰成功；此后才出现 A 的 `CAST_COMPLETED` Read
 
 [专用授权](../../database/grants/schema2-spell-save-damage.sql)与
 [只读验证](../../database/verify/schema2-spell-save-damage.sql)分别使用。SQL 文件存在不证明
-迁移或 grant 已执行。该采用保持 INTERNAL，完整 Host/base/archive format 2、安装接受、
-真实 MySQL、部署与跨域发布门仍须各自验收；旧 RELEASED 默认和 v1 合同不变。
+迁移或 grant 已执行。这些证据覆盖旧 MySQL INTERNAL 链路，真实 MySQL、安装接受、部署和跨域发布各自验收。
+SQLite 工作台的有限 Burning Hands 接合使用当前运行规则绑定和 format 3。[领域接合表](../design/v2/domain-integration.md)

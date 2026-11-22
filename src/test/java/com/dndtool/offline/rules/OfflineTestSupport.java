@@ -10,13 +10,19 @@ final class OfflineTestSupport {
     static Path privateDirectory(Path parent,String name)throws Exception {
         Path dir=Files.createDirectory(parent.resolve(name));Files.setPosixFilePermissions(dir,PosixFilePermissions.fromString("rwx------"));return dir;
     }
-    static RuleArtifact artifact(Path parent)throws Exception {
-        Path source=Files.createDirectory(parent.resolve("author"));Files.createDirectory(source.resolve("character"));
-        for(String file:List.of("author-package.json","character/languages.json","character/tools.json")) {
-            String input=Files.readString(Path.of("rule-packages/srd51-complete").resolve(file)).replace("\r\n","\n");
-            Files.writeString(source.resolve(file),input);
+    static Path authorDirectory(Path parent) throws Exception {
+        Path fixture = Path.of("src/test/resources/character-catalog-author");
+        Path source = Files.createDirectory(parent.resolve("author"));
+        Files.createDirectory(source.resolve("character"));
+        for (String file : List.of("author-package.json", "character/languages.json", "character/tools.json")) {
+            Files.copy(fixture.resolve(file), source.resolve(file));
         }
-        Files.writeString(source.resolve("package-guide.md"),"Documentation\n");Files.writeString(source.resolve("notice.md"),"License\n");
+        Files.writeString(source.resolve("package-guide.md"), "Documentation\n");
+        Files.writeString(source.resolve("notice.md"), "License\n");
+        return source;
+    }
+    static RuleArtifact artifact(Path parent)throws Exception {
+        Path source = authorDirectory(parent);
         Path output=parent.resolve("artifact");String hash=RuleArtifact.build(source,output);return RuleArtifact.read(output,hash);
     }
     static MaintenanceEvidence evidence(Path parent,Path state,String permission,UUID operation)throws Exception {

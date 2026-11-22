@@ -2,8 +2,7 @@
 
 状态：公共目标合同及独立验收推演。已采用的有限 INTERNAL 怪物动作、来源／镜像、
 共享伤害批次和局部历史恢复以[怪物吐息合同](../../rules/schema-2-monster-breath.md)为准。
-下文更广的空间体积、未接入反应／法术、完整文件 codec、Host 及技术 END／清理责任
-仍须分别实施；设计 fixture 不授予完整怪物、法术、基础模组或 archive format 2 运行资格。
+当前 SQLite Host 已接入有限吐息，战役的完整状态、原骰和待继续动作随 format 3 文件保存。下文更广的空间体积和反应／法术仍须各自接入并验证保存、恢复及清理。现行范围见[领域接合表](domain-integration.md)。
 本文遵循[模组接口基线](module-interface-baseline.md)、[机制接入责任清单](mechanism-integration-checklist.md)、
 [动作继续协议](action-continuation-protocol.md)、[持续效果协议](ongoing-effect-protocol.md)、
 [运行与事务](runtime-and-transactions.md)及[保存与恢复](save-and-recovery.md)。
@@ -479,8 +478,7 @@ consumer 宣称完成。当前文档核对不代替测试、真实 SQL／权限�
 
 ## 17项责任落点与采用判定
 
-本表区分公共目标与[有限 INTERNAL 采用](../../rules/schema-2-monster-breath.md)；后者有真实
-消费者和局部存储仍不代表 Host、完整文件、技术 END／清理或跨域发布门完成。
+本表列出公共目标及[原 MySQL INTERNAL 吐息链路](../../rules/schema-2-monster-breath.md)的证据。SQLite Host 与 format 3 文件的验收使用当前战役入口。
 
 | 项 | 负责者 | 本文合同与独立证据；实施边界 |
 |---|---|---|
@@ -496,10 +494,10 @@ consumer 宣称完成。当前文档核对不代替测试、真实 SQL／权限�
 | 10 幂等/提交 | 结果持久化及故障实现者 | 共用不可变接受结果、准确意图比较和 UNKNOWN 原操作只读查证；新阶段不会重掷原 raw 或重付 release。 |
 | 11 状态/历史/版本 | batch、健康、资源、检定、专注/effect owner | V040 类型化怪物、batch／proof／checks／packets／obligations 与原健康／holder owner 共同保存；没有新增第二份角色 HP 或 holder。 |
 | 12 保存/恢复 | 各owner、codec、恢复协调者 | 内部 Save／restore 核完整图和原骰后直接恢复真实 pending／完成前缀；公共 S0/S1/S2、可移植字节及完整 format 2 仍须各自采用。 |
-| 13 END/清理 | 保存结束、各领域及清理实现者 | 本文的 FINAL、文件发布/DB接受分离、完整引用覆盖和私有目录清理仍为全域目标；局部直接恢复不授予删除资格。 |
+| 13 END/清理 | 保存结束、各领域及清理实现者 | SQLite 战役按[保存与恢复](save-and-recovery.md)完成 FINAL、发布、接受及私有目录清理。新批次类型须证明其全部引用在 END 与重开后仍可核验。 |
 | 14 容量/增长 | 预算、batch/effect及保存owner | 有限场景按准确可达后缀预留，工程场景上限与本节公共 64-target／T 外闭包责任分开；完整文件及物理峰值未由设计预算证明。 |
 | 15 独立验收 | 各实现作者、主审者 | 保留原 12／13-draw 目标推演；有限真实机制另以实际合法来源、骰流和独立数值核验调用、存储、故障与恢复，不引用历史测试计数。 |
-| 16 真实Host/可读结果 | 命令及Host实现者 | INTERNAL typed service 和只读历史提供真实结果；生产页面、Host API、完整文件及发布门仍关闭。 |
+| 16 真实Host/可读结果 | 命令及Host实现者 | SQLite Host 提供有限怪物吐息操作，format 3 保存其批次事实、历史与未决动作。更广的法术和怪物动作须各自接入命令、显示与恢复。 |
 | 17 同步/采用 | 领域维护者、集成者、主审者 | 本文、正式有限怪物合同、入口、采用边界和测试方法同步；局部真实链与公共未采用责任分开，安装／接受、完整文件、Host、跨域发布及外部操作各过自己的门。 |
 
 选定实例确定公共结算接口和独立验收输入；有限 INTERNAL 分支按正式怪物合同执行，
@@ -507,5 +505,4 @@ consumer 宣称完成。当前文档核对不代替测试、真实 SQL／权限�
 再分别判断端到端和发布资格。本专题采用当前模组／动作／持续效果协议；新需求或证据
 要求调整接口时，同步修订相关协议、消费者和验证。局部接入不代表实现全域怪物或法术，
 不放宽作者内容安装资格或激活 archive format 2。
-legacy `dnd5e2014_srd51_se_v1` 继续RELEASED与默认，完整SRD继续DRAFT；设计采用不授权
-迁移、规则安装/接受、数据库业务写入、部署或Git外部检查点。
+SQLite 标准战役使用 WAR 随附四包。原 MySQL 简化规则 `dnd5e2014_srd51_se_v1` 保留其 RELEASED 身份，完整 SRD 规则族仍为 DRAFT。

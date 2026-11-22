@@ -87,8 +87,7 @@
 
 ## 验证与外部检查点
 
-纯文档更新不运行 Maven。实现以相关定向规则/共享 SQLite/完整文件/HTTP/进程故障测试
-及必要 WAR 审计取得证据，见[测试指南](../../testing.md)。当前测试定位包括
+纯文档更新核对文字、链接与格式。模组用作者场景在已有 WAR 上核对结算；应用按变更选择规则机制、共享 SQLite、完整文件、HTTP 或进程故障测试。生产代码或打包资源变化时审计 WAR，见[测试指南](../../testing.md)。当前测试定位包括
 `LocalRuleLibraryTest`、`BundledCampaignRulesTest`、`CampaignRuleSupportTest`、`CampaignRuleContextTest`、`CampaignRuleBindingIntegrationTest`、
 `CampaignDomainEngineTest`、`CampaignCheckEffectsTest`、
 `CampaignDomainRecoveryTest`、`CampaignDomainsIntegrationTest`、

@@ -1,7 +1,7 @@
 # Canonical v2 多职业、ASI 与专长 DRAFT 合同
 
 本合同属于 `dnd5e2014_srd51_se` release `1` 当前 DRAFT、canonical format `2`、archive format `2`
-设计。V015—V018 不发布该身份、不激活 archive format 2，也不改变新战役默认发布版。
+设计。V015—V018 冻结旧 MySQL DRAFT 目录，archive format 2 限内部角色片段。
 
 ## 目录与选择
 
