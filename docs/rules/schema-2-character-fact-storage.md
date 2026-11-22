@@ -117,8 +117,8 @@ SQLite 绑定与恢复见[领域接合](../design/v2/domain-integration.md)。�
 真实业务消费者沿共同事务完成规则预检、随机结果生成、追加、实际读回和历史重算，
 提交未知时隔离并只读查证原操作；其语义和验证见[角色基础合同](schema-2-character-foundations.md)。
 成长/休息规则的状态拷贝保留装备与健康字段，稳定恢复与长休清临时 HP 由唯一健康 owner 协调。
-完整初始化、Host、全部特性、其他持续效果、通用跨角色协同及 archive format 2 继续按
-[采用边界](../design/v2/adoption-boundaries.md)接入，默认 RELEASED 不变。
+完整规则的初始化、全部特性、其他持续效果、通用跨角色协同及 archive format 2 继续按采用条件接入。
+当前 SQLite 工作台使用 format 3 保存已接入的有界状态。[采用边界](../design/v2/adoption-boundaries.md)
 
 定向入口见[镜像与事实存储验证](../testing.md#schema-2-检定装备与健康镜像和事实存储验证)。
 JDBC 代理与静态结构检查不代替真实 MySQL 的 CHECK、生成列、外键、触发器、权限或持久化验收。

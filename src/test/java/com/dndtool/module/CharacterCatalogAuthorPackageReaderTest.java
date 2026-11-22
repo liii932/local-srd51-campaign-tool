@@ -16,7 +16,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CharacterCatalogAuthorPackageReaderTest {
-    private static final Path SOURCE = Path.of("rule-packages/srd51-complete");
+    private static final Path SOURCE = Path.of("src/test/resources/character-catalog-author");
     private static final String MATRIX = """
             abyssal|Abyssal|EXOTIC
             celestial|Celestial|EXOTIC
@@ -40,7 +40,7 @@ class CharacterCatalogAuthorPackageReaderTest {
     private final CharacterCatalogAuthorPackageReader reader = new CharacterCatalogAuthorPackageReader();
 
     @Test
-    void formalSourceMatchesEveryIndependentFieldAndTypedProjection() throws Exception {
+    void fixtureMatchesEveryIndependentFieldAndTypedProjection() throws Exception {
         var result = read(header(), languages());
         assertEquals("PARTITION", result.verificationScope());
         assertEquals(new BuiltinModuleReleaseRegistry.Identity("dnd5e2014_srd51_se", "1"), result.header().identity());
@@ -266,7 +266,7 @@ class CharacterCatalogAuthorPackageReaderTest {
         byte[] paddedRows = Arrays.copyOf(rows, CharacterCatalogAuthorPackageReader.MAX_LANGUAGE_BYTES);
         Arrays.fill(paddedHeader, header.length, paddedHeader.length, (byte) ' ');
         Arrays.fill(paddedRows, rows.length, paddedRows.length, (byte) '\n');
-        byte[] tools = Files.readAllBytes(Path.of("rule-packages/srd51-complete/character/tools.json"));
+        byte[] tools = Files.readAllBytes(SOURCE.resolve("character/tools.json"));
         byte[] paddedTools = Arrays.copyOf(tools, CharacterCatalogAuthorPackageReader.MAX_TOOL_BYTES);
         Arrays.fill(paddedTools, tools.length, paddedTools.length, (byte) ' ');
         assertEquals(CharacterCatalogAuthorPackageReader.MAX_TOTAL_BYTES, paddedHeader.length + paddedRows.length + paddedTools.length);

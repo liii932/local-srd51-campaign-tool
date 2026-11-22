@@ -1,6 +1,6 @@
 # Schema 2 检定、装备与健康基础
 
-本文约束单角色 INTERNAL 基础入口中的真实消费者，沿用[初始授予](schema-2-proficiency-grants.md)、
+本文约束单角色基础规则和旧 MySQL INTERNAL 入口中的真实消费者，沿用[初始授予](schema-2-proficiency-grants.md)、
 [成长与资源](schema-2-character-statistics.md)、[休息](schema-2-character-rest.md)及
 [共同事务](business-write-transactions.md)。准确来源、运行快照、角色状态、命令与实际结果共同构成
 执行依据；纯计算方法或测试向量不授予完整战役、Host、archive format 2 或发布资格。
@@ -164,9 +164,8 @@ DM 裁定与装备规则共同形成实际 advantage/disadvantage。两者皆有
 类型化表、不可变触发器和 RESTRICT 引用。清理完整运行时必须包含装备、健康、检定及骰子子行，
 不能仅清根表。仓储不拥有提交/回滚权限；代理/结构测试不代替真实 MySQL 引擎验收。
 
-`dnd5e2014_srd51_se` 保持 DRAFT；`dnd5e2014_srd51_se_v1` 保持 RELEASED 和新战役默认。
-完整战役初始化、Host 入口和 archive format 2 仍未开放；跨角色、战斗、持续效果、施法和怪物机制
-继续按各自采用门接入。
+旧 MySQL 基础入口仅限 INTERNAL。完整规则 `dnd5e2014_srd51_se` 保持 DRAFT，archive format 2 限内部角色片段。
+当前 SQLite 工作台的有界检定、装备、健康及跨角色机制见[领域接合表](../design/v2/domain-integration.md)。
 
 定向验证见[角色基础验证](../testing.md#schema-2-检定装备与健康验证)；存储结构验证另见
 [镜像与事实存储验证](../testing.md#schema-2-检定装备与健康镜像和事实存储验证)。

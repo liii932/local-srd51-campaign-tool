@@ -77,7 +77,7 @@ V041 增加 `s2_character_arcane_recovery_choice` 的类型化环级/数量子�
 | 责任项 | 实际落点与验证责任 |
 |---|---|
 | 1—3 原文、身份、作者 | 本合同及既有成长/施法作者模型；明确 AUTO 与 BLOCKED，两者不互相转换。 |
-| 4—5 来源、组合、快照 | 既有类型化 feature/Wizard/resource 来源和镜像、准确覆盖链；测试经真实包的类型化来源读回、准备/快照，不仅调用内存函数。非空内容安装资格仍关闭。 |
+| 4—5 来源、组合、快照 | 复用既有类型化 feature/Wizard/resource 来源、镜像和准确覆盖链。测试经真实包的类型化来源读回、准备和快照。独立 MySQL 安装器仍拒绝带内容的模组。 |
 | 6—8 选择、时机、真实消费者 | 本文短休/日界条件与 `Schema2ArcaneRecoveryRules`，由真实 `REST_COMPLETED` 唯一消费。 |
 | 9—11 事务、幂等、所有者 | 共同业务事务和角色 Service/Repository；一次角色版本及完整前后事实，含晚写故障和 UNKNOWN 两种提交结果。 |
 | 12 保存恢复 | 原 MySQL INTERNAL 角色历史及同准确快照的直接恢复；SQLite 完整文件保留选择、位数、使用日及根/子历史，不重新发放收益；不宣称 archive format 2 可用。 |
@@ -91,4 +91,4 @@ V041 增加 `s2_character_arcane_recovery_choice` 的类型化环级/数量子�
 [最小授权](../../database/grants/schema2-arcane-recovery.sql)与
 [只读核验](../../database/verify/schema2-arcane-recovery.sql)；文件存在不表示已经执行。
 完整 SRD、其余恢复能力、多职业/Pact Magic、法术书实物/抄录、魔法物品和完整规则发布门
-仍不由本机制开放。原 MySQL legacy RELEASED 默认及 DRAFT/archive 2 边界保持。
+仍按各自支持门采用。完整规则身份保持 DRAFT，archive format 2 限内部角色片段。

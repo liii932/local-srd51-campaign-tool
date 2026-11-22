@@ -1,7 +1,7 @@
 # Schema 2 来源到运行快照
 
 本合同连接[生产制品](schema-2-rule-artifacts.md)、[来源账本](schema-2-source-ledger.md)
-和运行库中的有限类型化材料。`Schema2SnapshotTransferService` 提供内部材料转存及准确规则绑定
+和旧 MySQL 运行库中的有限类型化材料。`Schema2SnapshotTransferService` 提供内部材料转存及准确规则绑定
 核验，`JdbcSchema2RuntimeSnapshotRepository` 提供不访问来源库的完整读回。
 
 材料范围明确为 `INTERNAL`：当前类型为语言、工具、两类候选集合及其成员，以及种族、亚种、背景、
@@ -144,9 +144,8 @@ CAPTURE/RESTORE、run UUID、snapshot UUID、规范 profile、组合算法、有
 和完整链三种摘要。RESTORE 转存从来源重新解析、组合后逐项比较它，失败时不借运行连接。
 相同最终规则不能替代相同版本、顺序、原包和来源链；不接受替换版本或重新打包的近似材料。
 
-这一绑定只是完整战役恢复的规则部分，不是 archive 2 编解码器。当前没有用空角色、空历史
-或空领域分区代替业务恢复；完整工作集、业务事务、保存/END/清理及 Host 入口继续按
-[运行设计](../design/v2/runtime-and-transactions.md)和[采用边界](../design/v2/adoption-boundaries.md)接入。
+这一绑定只覆盖 MySQL 恢复所需的规则材料。当前 SQLite 工作台使用自己的完整工作集、业务事务和 format 3 生命周期。
+完整规则的 archive format 2 限内部 DRAFT 角色片段。[采用边界](../design/v2/adoption-boundaries.md)
 
 ## 容量与验证
 
@@ -169,9 +168,9 @@ V022—V024 新结构另见[授予与工具核验 SQL](../../database/verify/cha
 新增四类镜像及角色事实使用[角色运行权限](../../database/grants/schema2-character-runtime.sql)与
 [角色事实核验](../../database/verify/schema2-character-runtime.sql)，各自保持 SELECT/INSERT 和独立核验边界。
 
-候选 WAR 包含生产读取、组合、快照和协调类；不包含离线安装类、原包、来源 SQL、测试向量、
-秘密或真实存档。运行迁移、账号授权、隔离 MySQL 验收和部署仍分别执行；本合同不改变默认
-RELEASED v1，不激活 archive 2，也不自动装配第二 JNDI 或游戏运行入口。
+当前 WAR 包含 SQLite 交付原包和身份清单，另包含生产读取、组合、快照和协调类。
+离线安装类、来源 SQL、测试向量、秘密和真实存档均为禁止项。旧 MySQL 的运行迁移、账号授权、
+隔离验收和部署分别执行。[WAR 审计](../testing.md#6-war-审计)
 
 ## 有界战斗规则镜像
 

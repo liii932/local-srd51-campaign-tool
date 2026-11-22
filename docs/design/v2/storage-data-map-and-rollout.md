@@ -17,8 +17,8 @@
 | 业务执行 | `CampaignDomainCommands` 与无连接 `CampaignDomainEngine`，复用现有纯领域规则；自由卡用独立 DM-managed typed 领域 |
 | 共同事务 | `CampaignStorageService` 持根/目录锁、串行接纳，`BEGIN IMMEDIATE` 一次提交全部聚合/关系投影、根子历史、revision 和接受 |
 | 文档/关系存储 | `CampaignDomainRepository` 写 closed typed TEXT 和关系投影，调用方拥有事务；读取逐行核验，不修复坏索引 |
-| 文件 | `CampaignCodec`、`CampaignDomainCodec/Validation` 保存 `RULE_BOUND_CAMPAIGN` format 3，包含全部空间、唯一安置、焦点和各 pending。打开复核本机原包及接受，活动和同版残留使用冻结规则 |
-| 原 MySQL/来源服务 | 原 SQL/迁移/读写/账号职责保留；来源安装接受、内部快照与旧格式入口有独立范围，不成为当前有限 SQLite 调用路径 |
+| 文件 | `CampaignCodec`、`CampaignDomainCodec/Validation` 保存 `RULE_BOUND_CAMPAIGN` format 3，包含全部空间、唯一安置、焦点和各 pending。打开按文件绑定重建准确组合，活动和同版残留使用冻结规则 |
+| 原 MySQL/来源服务 | 原 SQL/迁移/读写/账号职责保留；来源安装、接受和内部快照由离线工具及其合同管理。旧档随匹配的发行物保管 |
 
 ## 当前物理分片与唯一状态 owner
 
@@ -67,7 +67,7 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 | 全部根子历史 | roots 与角色/场景/manual 已记录业务事实 | 连续根、唯一子归属、完整 before/after/原骰；不按 UI 近期列表截断 |
 
 当前文件保存完整冻结材料、解释和来源链。`Material.restore` 从冻结行重建投影并核对准确指纹及
-机制闭包。新打开时再用本机原包重组合，逐项核对文件冻结材料和本机接受。DDL、结构计划与本地
+机制闭包。打开文件时，准确匹配标准绑定的成员使用随附四包，其余绑定使用本机已接受的原包。重建的组合须与冻结材料逐项一致。DDL、结构计划与本地
 执行收据由私有工作库独立保管。
 
 ## 原 MySQL 清单的用途与接合差异
@@ -83,7 +83,7 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 | schema-2 战斗/动作/效果/怪物叶表 | 完整场景 History 聚合及关系投影，同一角色健康/资源 owner；保留全部已完成/未决事实 |
 | v1 检定/成功失败效果/物品/位置/消息 | check-effects 和 manual 对应入口完整预检、有序后果、根历史/共享事务/文件；不能用 note/即时UI结果降级 |
 | 永久业务守卫/内部操作 | 当前独占根锁+BEGIN IMMEDIATE，状态/根/接受一次提交；未知显式恢复核库/全部收据，独立 C0/NOT_COMMITTED 方案已替换 |
-| 旧 format 1/内部 format 2 片段 | 保留原模式职责，不是新有限文件的 reader；无跨版本兼容或自动业务数据转换承诺 |
+| 旧 format 1/内部 format 2 片段 | 按原发行物和离线合同保管。当前 SQLite 工作台仅打开本版 format 3 完整文件 |
 
 ## 按当前合同交付与验收
 

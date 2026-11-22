@@ -2,7 +2,7 @@
 
 本合同属于 `dnd5e2014_srd51_se` release `1`、canonical format `2`、archive format `2`。
 该发布版仍为 `DRAFT`；实现存在不代表它可绑定战役、执行规则或导入存档。只有主要规则领域完成
-整合后的跨领域发布门才能发布该身份并改变新战役默认值。
+整合后的跨领域发布门才能发布该身份。SQLite 当前角色创建的准确模板见[运行合同](../storage-vitality-loop.md#有限-schema-2-规则材料)。
 
 ## 冻结身份
 

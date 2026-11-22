@@ -8,7 +8,7 @@ runtime support.
 本文把[完整覆盖目标](srd-5.1-complete.md)拆到可以审查的机制族。规则基线为本地 SRD 5.1；
 [主题索引](../references/srd-5.1/README.md)和分页文本提供出处，原文存在不证明规则数据、执行器或产品入口存在。
 当前采用边界以[采用边界](../design/v2/adoption-boundaries.md)及下列领域合同为准。
-完整规则身份保持 DRAFT，旧 RELEASED 规则保持默认；本表不授予安装、战役绑定、Host、完整文件或发布资格。
+完整规则身份 `dnd5e2014_srd51_se` 保持 DRAFT。当前有限 SQLite 工作台默认使用随附的标准四包组合，也支持本机已接受的自定义组合，完整文件使用 format 3。[运行合同](../storage-vitality-loop.md)
 
 ## 覆盖记录方法
 
@@ -42,7 +42,7 @@ runtime support.
 
 这些入口用于复核后续矩阵，不是本次运行测试的声明。完整测试选择见[测试指南](../testing.md)。
 
-| 证据组 | 正式合同 | 当前生产入口与最近验证 |
+| 证据组 | 正式合同 | 实现与验证入口 |
 |---|---|---|
 | <a id="catalog"></a>角色目录 | [角色目录](character-catalog-v2.md)、[一级创建](character-creation-v2.md)、[职业特性](class-features-v2.md)、[多职业/ASI/专长](multiclass-asi-feats-v2.md) | [LevelOneCharacterRules](../../src/main/java/com/dndtool/service/LevelOneCharacterRules.java)、[ClassFeatureRules](../../src/main/java/com/dndtool/service/ClassFeatureRules.java)；[LevelOneCharacterRulesTest](../../src/test/java/com/dndtool/service/LevelOneCharacterRulesTest.java)、[ClassFeatureRulesTest](../../src/test/java/com/dndtool/service/ClassFeatureRulesTest.java)。这些入口核验旧 DRAFT 的一级创建与职业特性授予。 |
 | <a id="growth"></a>授予与成长 | [初始授予](schema-2-proficiency-grants.md)、[成长与资源](schema-2-character-statistics.md) | [Schema2InitialProficiencyRules](../../src/main/java/com/dndtool/service/Schema2InitialProficiencyRules.java)、[Schema2GrowthRules](../../src/main/java/com/dndtool/service/Schema2GrowthRules.java)、[Schema2CharacterProgressionRules](../../src/main/java/com/dndtool/service/Schema2CharacterProgressionRules.java)、[Schema2CharacterRuntimeService](../../src/main/java/com/dndtool/service/Schema2CharacterRuntimeService.java)；[Schema2InitialProficiencyRulesTest](../../src/test/java/com/dndtool/service/Schema2InitialProficiencyRulesTest.java)、[Schema2GrowthRulesTest](../../src/test/java/com/dndtool/service/Schema2GrowthRulesTest.java)、[Schema2CharacterAdvancementAndRestServiceTest](../../src/test/java/com/dndtool/service/Schema2CharacterAdvancementAndRestServiceTest.java)。 |
@@ -234,11 +234,11 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 
 | 责任 | 当前实际边界 | 进入完整支持前必须补齐 |
 |---|---|---|
-| 来源、安装、接受、组合与冻结 | 有限作者协议和类型化来源/镜像可测；非空领域与完整 base 的资格仍按采用门拒绝 | 准确完整基础材料、全部机制支持检查、合法组合、安装/接受与业务初始化分别完成；来源事实不等于业务授权。 |
+| 来源、安装、接受、组合与冻结 | SQLite 标准四包与已接受自定义组合有实际冻结链路。旧 MySQL schema 2 安装器仍拒绝所有 base 和带内容的扩展/兼容包。 | 分别完成准确完整基础材料、全部机制支持检查、合法组合、安装和接受以及业务初始化。 |
 | 共同事务、版本、幂等 | [共同事务](business-write-transactions.md)与当前内部 owner 接合 | 每个新机制保持全请求/规则/目标/版本/容量先于 RNG；根事件、子状态、原骰、效果后继和接受结果同事务；UNKNOWN 仅查证原操作。 |
-| 历史、严格读取、直接恢复 | 角色/场景/怪物各自局部恢复；保留原规则绑定，不重新掷骰/收费/触发 | 全域引用图、所有暂停阶段、结束/清理/重新开始、完整文件字段及容量、独立读回与故障回滚；局部 writer/reader 自洽不足。 |
-| Host、规则查询、DM 工作流 | 现有 Host 不能视为完整 schema 2 游戏入口 | 完整角色/遭遇/施法/物品/休息有界 API 与 UI、合法候选查询、准确诊断及真实类型化裁定；受支持入口继续限 loopback 单 DM。 |
-| 发布与 archive format 2 | 完整身份 DRAFT、legacy 默认及 archive 门保持 | [完整目标完成门](srd-5.1-complete.md#6-完成判定)中的跨领域目录/规范字节/摘要、完整文件往返、数据库语义、测试和 WAR 验收分别完成；无单族自动发布。 |
+| 历史、严格读取、直接恢复 | 旧 MySQL 内部角色/场景/怪物保留局部历史。SQLite format 3 恢复当前有限战役、冻结材料及未决动作。 | 扩展到全域引用图及所有暂停阶段，核对结束/清理/重新开始、完整文件字段及容量、独立读回与故障回滚。 |
+| Host、规则查询、DM 工作流 | SQLite 工作台接入[当前有限运行](../storage-vitality-loop.md)，DM 限 loopback，独立玩家入口默认关闭。 | 完整角色/遭遇/施法/物品/休息有界 API 与 UI、合法候选查询、准确诊断及真实类型化裁定。 |
+| 发布与 archive format 2 | 完整规则身份保持 DRAFT，archive format 2 限内部角色片段。 | 分别验收跨领域目录、规范字节、摘要、完整文件往返、数据库语义、测试和 WAR。[完整目标完成门](srd-5.1-complete.md#6-完成判定) |
 
 ## 下一批闭合单元与 owner
 
@@ -254,7 +254,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 角色防御与伤害后反应 | 成长/来源、效果 owner、共享伤害与动作流 | 明确来源与 gate、同一 APPLY/CON cut、失败后有界选择、资源一次消费；Protection from Energy、Cutting Words、Evasion 等分别接入。 |
 | 普通经济/库存后再接魔法物品 | 当前装备实例 owner；经济/同调/使用 owner 尚须建立 | 数量/重量/金钱/容器事务与战斗交互先闭合；同调/充能/物品施法/诅咒分别接休息、授权、效果及恢复。 |
 | 角色休息接场景与环境周期 | 休息规则、探索/战斗唯一时间、健康/效果 owner | 多角色共同时间、存续效果/疾病/饥渴/耗竭的到期与后继闭包；不能取消单角色约束后沿用独立时钟。 |
-| 全域文件与产品入口 | 准备/快照/共同事务、角色与场景仓储、完整文件/Host 尚未采用 | 统一完整基础、全域当前状态/不可变历史/暂停/恢复/清理与 UI/API；完成后再独立进入跨领域发布门。 |
+| 全域文件与产品入口 | 旧 MySQL 有准备、快照、共同事务以及角色和场景仓储。SQLite format 3 与 Host 接入当前有限规则。 | 统一完整基础、全域当前状态、不可变历史、暂停、恢复、清理与 UI/API。完成后再进入跨领域发布门。 |
 
 维护本表时同步更新具体领域合同、[采用边界](../design/v2/adoption-boundaries.md)及必要的
 [任务地图](../agent-context.md)。只替换已有证据支持的当前边界，不把计划、旧测试结果、迁移文件或原文收录写成运行事实。

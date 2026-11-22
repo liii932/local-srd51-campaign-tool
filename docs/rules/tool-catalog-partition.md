@@ -3,7 +3,7 @@
 `character.tool` 为 DRAFT `dnd5e2014_srd51_se` / 字符串 `"1"` 的 37 项工具熟练引用目录。
 它与 18 项语言共享作者包、发布根、安装事实和运行快照身份。这里的完整集合只指本目录，
 不包含装备价格、重量、制作、使用算法或角色选择规则，也不是全部角色领域或 COMPLETE。
-旧 RELEASED v1、默认发布、规范字节和存档格式保持不变。
+本目录沿用完整规则 DRAFT 的分区合同。旧 MySQL 批准摘要与归档映射见[发布身份合同](module-release-identity.md)。
 
 ## 字段与封闭集合
 
@@ -59,18 +59,21 @@ PARTITION 验收通过 `BusinessWriteTransactions.openPartition` 获取调用方
 
 ## 核验与采用门
 
+正式作者内容用[独立作者核对](language-author-package.md#独立验证)。应用链路使用固定作者夹具。
+
 独立手写 `ToolCatalogOracle` 的六字段矩阵与语言矩阵组成期望，
 `tools/rule-packages/catalog-vector.py` 使用独立大端编码生成
 `src/test/resources/module-canonical-v2-language-tools.hex`，不调用生产模型、reader 或 encoder。
 各链路边界逐字段及逐字节比较；该字节向量不是可保存为完整内容摘要的发布证明。
 
+改变应用源到组合快照的仓储或结构时，可选择 `CharacterCatalogChainTest`、`ToolCatalogSchemaTest`，相邻 reader、离线安装和链清单按差量补测。下列 Python 命令独立核对 JDBC 验收工具及其迁移清单：
+
 ```bash
-mvn '-Dtest=CharacterCatalogAuthorPackageReaderTest,ToolAuthorPartitionTest,RuleArtifactTest,SourceInstallationTest,JdbcSourceLanguageRepositoryTest,CharacterCatalogChainTest,ToolCatalogSchemaTest,RuleSchemaMigrationsTest,SchemaMigrationsTest' test
 python3 -B tools/rule-packages/verify-language-jdbc.py
 python3 -B tools/rule-packages/tests/verify-language-jdbc-test.py -v
 ```
 
-代理链路覆盖正式材料、真实安装 SQL 适配、来源读取、运行实际读回与独立字节，逐工具写点
+代理链路覆盖固定作者夹具、真实安装 SQL 适配、来源读取、运行实际读回与独立字节，逐工具写点
 回滚、调用方后续失败、坏字段/跨快照拒绝、来源不可用及多身份隔离。源安装测试覆盖所有
 DML 写点、代次冲突、原接受重放、提交未知、永久历史和预算。SQL 静态检查不能代替引擎约束。
 

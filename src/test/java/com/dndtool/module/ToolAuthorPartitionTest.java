@@ -14,7 +14,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ToolAuthorPartitionTest {
-    private static final Path SOURCE=Path.of("rule-packages/srd51-complete");
+    private static final Path SOURCE=Path.of("src/test/resources/character-catalog-author");
     private CharacterCatalogAuthorPackageReader.Result read(byte[] tools) throws Exception {
         return new CharacterCatalogAuthorPackageReader().read(Files.readAllBytes(SOURCE.resolve("author-package.json")),
                 Files.readAllBytes(SOURCE.resolve("character/languages.json")),tools);
@@ -23,7 +23,7 @@ class ToolAuthorPartitionTest {
     private JsonArray json() throws Exception {return JsonParser.parseString(new String(bytes(),StandardCharsets.UTF_8)).getAsJsonArray();}
     private byte[] bytes(JsonArray json) {return json.toString().getBytes(StandardCharsets.UTF_8);}
 
-    @Test void formalToolsMatchAllIndependentFieldsAndCombinedCanonicalBytes() throws Exception {
+    @Test void fixtureToolsMatchAllIndependentFieldsAndCombinedCanonicalBytes() throws Exception {
         var actual=read(bytes());var expected=ToolCatalogOracle.rows();
         assertEquals(37,actual.tools().tools().size());
         for(int i=0;i<37;i++) {

@@ -2,7 +2,7 @@
 
 语言分区核验连接现有作者读取、离线安装、源库只读适配与运行镜像仓储，检查每个边界是否保留
 准确内容。范围只有 `dnd5e2014_srd51_se` / `1` 的 18 项 `character.language`，不是完整规则
-目录、执行上下文或存档验收。旧 RELEASED v1 仍为默认，完整规则族保持 DRAFT，archive 2
+目录、执行上下文或存档验收。完整规则族保持 DRAFT，archive 2
 发布门不变。
 当前作者包和安装同时含语言与工具；本页的语言专用断言保持 18 项，两个分区共同的字段、
 快照与字节核验由 `CharacterCatalogChainTest` 补充，见[工具熟练目录](tool-catalog-partition.md)。
@@ -13,7 +13,7 @@
 
 ## 独立期望与链路
 
-无数据库测试 `LanguagePartitionEquivalenceTest` 从正式作者文件构建制品，经过生产安装逻辑
+无数据库测试 `LanguagePartitionEquivalenceTest` 从固定作者夹具构建制品，经过生产安装逻辑
 写入事务 JDBC 代理；源只读适配器读取这些实际写入的行，再交给运行仓储写入和回读，最后
 通过指定 run/snapshot 身份对读取分区视图。后续边界不以重新生成的期望行替换上一步的结果。
 
@@ -31,7 +31,7 @@ category 在 page 前。规范键序与显式显示顺序分别检查。
 
 | 输入或故障 | 必须观察的结果 |
 |---|---|
-| 正式作者源经过安装、源读取、镜像写入和分区读取 | 各边界均与独立字段和字节期望相符 |
+| 固定作者夹具经过安装、源读取、镜像写入和分区读取 | 各边界均与独立字段和字节期望相符 |
 | 作者数组或 JDBC 返回行次序改变 | 规范内容不变，显式 `sort_order` 不被数组位置替换 |
 | 合法显示名、说明、来源页或排序改变 | 新内容逐字段保留，规范字节改变，旧基准不能继续通过 |
 | 源与镜像同样丢失说明，或把来源页编码成 TEXT | 即使往返相等，独立字段或字节核验仍失败 |
@@ -50,11 +50,13 @@ category 在 page 前。规范键序与显式显示顺序分别检查。
 
 ## 可重复验证与证据边界
 
+修改应用分区安装、读取和快照链路时，可选择：
+
 ```bash
-mvn '-Dtest=LanguagePartitionEquivalenceTest,CharacterCatalogChainTest,MySqlIntegrationTestSupportTest' test
+mvn '-Dtest=LanguagePartitionEquivalenceTest,CharacterCatalogChainTest' test
 ```
 
-该命令同时重验数据库测试目标保护；各组测试都不连接真实数据库。链路代理记录生产 SQL
+各组测试都不连接真实数据库。连接目标保护按[测试指南](../testing.md#3-mysql-集成测试)验证。链路代理记录生产 SQL
 和参数，并以事务状态模拟提交/回滚。这些结果证明 Java 边界上的字段保留、类型、编码、身份
 与事务调用协议，不证明 MySQL 引擎、驱动、权限、触发器、外键或真实持久化的行为。
 

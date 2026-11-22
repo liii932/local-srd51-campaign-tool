@@ -4,7 +4,8 @@
 `com.dndtool.offline.rules`；这些类由 WAR 打包排除。它只写独立 `dnd_tool_rules`
 中 `dnd5e2014_srd51_se` / 字符串 `"1"` 的 DRAFT 语言与工具熟练目录，profile 为
 `srd51-character-catalog` / `1`。安装 18 项语言与 37 项工具不提供完整内容摘要、COMPLETE、发布批准、
-运行快照或 archive 2 开放资格。运行库、默认 RELEASED v1、旧摘要域及迁移不变。
+运行快照或 archive 2 开放资格。当前 SQLite 工作台的规则库用独立的准确原包和本机接受流程。
+[运行合同](../storage-vitality-loop.md#有限-schema-2-规则材料)
 
 这里提供可执行组件与无 DB 故障测试。真实引擎的权限、触发器、并发、存储耐久、
 网络响应丢失和资源容量仍须在测试连接保护通过后，单独授权隔离实例验收。
@@ -167,10 +168,7 @@ profile key、profile version、分区路径集合和五文件真实盘点。NUL
 永久历史中的 `srd51-language` / `1` 原票据仍可显式 resolve，返回原事实自己的分区集合。
 新安装仅接受角色目录 profile；旧语言 PARTITION 不被改写成新的安装事实或完整运行身份。
 
-```bash
-mvn '-Dtest=RuleArtifactTest,TicketStoreTest,SourceInstallationTest' test
-mvn '-Dtest=RuleArtifactTest,TicketStoreTest,SourceInstallationTest' '-DargLine=-Xmx64m' test
-```
+应用离线工具的制品、票据或安装协调变化，按差量选择 `RuleArtifactTest`、`TicketStoreTest` 或 `SourceInstallationTest`。工程容量场景使用 `-DargLine=-Xmx64m` 运行受影响测试。
 
 固定 hex 向量由独立 Python 大端编码器生成并保存在 test resources；维护工具
 `tools/rule-packages/fingerprint-vector.py` 不调用生产 encoder，普通构建不重写向量。

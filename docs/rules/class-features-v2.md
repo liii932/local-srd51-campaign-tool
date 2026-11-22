@@ -1,8 +1,8 @@
 # Canonical v2 职业、子职业与职业特性合同
 
 本合同属于 `dnd5e2014_srd51_se` release `1` 当前 DRAFT、canonical format `2`、archive format `2`
-设计。该发布版保持 `DRAFT`；目录、规则类、V014 或空运行时表的存在都不发布该身份，不改变
-新战役默认，也不启用 archive format 2。DRAFT 设计可以通过后续前向迁移和协调实现继续演进。
+设计。该发布版保持 `DRAFT`，archive format 2 限内部角色片段。DRAFT 设计可以通过后续前向迁移和协调实现继续演进。
+SQLite 当前接入的有界成长与特性见[领域接合表](../design/v2/domain-integration.md)。
 
 ## 冻结目录属性与状态
 
@@ -84,5 +84,4 @@ V014 本身不实现多职业、ASI、专长、法术状态或完整战斗，也
 `CHARACTER_LEVEL_ADVANCED`、`ADVANCE_CHARACTER_LEVEL` 或已有升级摘要域。V015 通过独立的
 [多职业、ASI 与专长 DRAFT 合同](multiclass-asi-feats-v2.md)完成角色成长选择框架；既有算法标识
 `BLOCKED_ISSUE_8_V1` 仍是 V014 的持久化身份，不因实现推进而重命名或重写。多职业施法及
-Grappler 战斗效果仍阻断。角色领域完成后也不发布 canonical/archive format 2 或切换默认
-发布版；这些动作推迟到主要规则领域完成整合后的跨领域发布门。
+Grappler 战斗效果仍阻断。完整规则身份的发布和 archive format 2 激活由主要规则领域完成整合后的跨领域发布门决定。

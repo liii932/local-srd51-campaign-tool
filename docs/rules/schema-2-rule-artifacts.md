@@ -144,7 +144,7 @@ present。来源包含准确 provider、load_index、真实原包摘要、包内
 仅改变排版、ZIP 压缩/顺序/时间、包展示名、元数据或文件拆分，L/F 不变而 R/K/T 改变。
 移除合法同值操作时 F 可不变，但 L/K/T 改变。验证专用的 `validation-json-1`、
 `local-dnd/schema2-validation/1/` 及现有 RELEASED canonical/archive digest 域保持不变。
-本 profile 不激活 `dnd5e2014_srd51_se`，不改变 RELEASED 默认，也不授予 archive 2 或运行支持。
+生产制品的校验通过后仍须由实际消费者核对内容支持资格。完整规则 `dnd5e2014_srd51_se` 保持 DRAFT，archive format 2 限内部角色片段。当前 SQLite 使用范围见[运行合同](../storage-vitality-loop.md#有限-schema-2-规则材料)。
 
 ## 调用与证据边界
 

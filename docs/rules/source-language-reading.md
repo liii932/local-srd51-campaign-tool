@@ -5,7 +5,8 @@
 `CharacterCatalogPartition`；`load()` 是其语言投影，仍完整验证同次安装的两个分区。
 缺失、未安装、损坏或超出支持范围均失败，不返回部分集合。
 它不产生完整内容摘要、发布批准或运行就绪证明，也不连接 Host、JNDI、启动加载和业务调用方。
-完整规则族保持 DRAFT，旧 RELEASED v1、新战役默认值及既有迁移不变。
+这是 MySQL 来源侧的分区读取器。SQLite 工作台从内置准确原包或本机已接受的原包绑定规则。
+[运行合同](../storage-vitality-loop.md#有限-schema-2-规则材料)
 
 结构依据是[规则源 schema](../rule-source-schema.md)，字段、精确语言集合及纯投影沿用
 [语言作者分区](language-author-package.md)与[工具熟练目录](tool-catalog-partition.md)。读取不依赖作者文件、离线安装类或旧目录三表。
@@ -60,8 +61,10 @@ JDBC 的真实整数值，在转换和使用前检查范围；字符串、浮点
 
 ## 验证
 
+应用读取器及结构诊断改动可选择：
+
 ```bash
-mvn '-Dtest=JdbcSourceLanguageRepositoryTest,CharacterCatalogChainTest,RuleDatabaseSchemaVerifierTest,CharacterCatalogAuthorPackageReaderTest,ToolAuthorPartitionTest,BuiltinModuleReleaseRegistryTest,CampaignArchiveCapabilityBoundaryTest' test
+mvn '-Dtest=JdbcSourceLanguageRepositoryTest,RuleDatabaseSchemaVerifierTest' test
 ```
 
 无数据库测试使用独立手写的 18 项语言与 37 项工具字段矩阵和 JDBC 故障代理，核对固定读取、投影、类型、当前

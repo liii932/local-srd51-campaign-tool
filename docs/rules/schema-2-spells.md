@@ -5,7 +5,8 @@
 `Schema2CombatRuntimeService` 在同一 INTERNAL 场景中执行 Bless、Cure Wounds、Shield、Counterspell、有限 Burning Hands、
 Ready attack／move／spell、固定环境抗魔区域及战外持续效果。规则来自[施法作者合同](schema-2-spell-authoring.md)
 定义的准确组合与镜像，角色资格来自实际成长、装备、学习和准备记录。共同事务、版本及正常可见
-平面方格的前提见[战斗合同](schema-2-combat.md)。这些内部能力不开放完整 base、Host 或 archive format 2。
+平面方格的前提见[战斗合同](schema-2-combat.md)。该服务属于旧 MySQL INTERNAL 链路，SQLite 工作台复用其有限施法及反应规则。
+完整规则身份保持 DRAFT，archive format 2 限内部角色片段。[领域接合表](../design/v2/domain-integration.md)
 
 生命领域 profile 限一级单职业角色：实际取得指定子职业与自动特性后，Bless／Cure Wounds 始终准备。
 Wizard profile 限单职业 1—5 级，法术书初始化实际学习六个一级法术，每次升级实际学习两个当前法术位

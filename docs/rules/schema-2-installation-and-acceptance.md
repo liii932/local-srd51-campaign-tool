@@ -7,6 +7,8 @@
 [来源账本](schema-2-source-ledger.md)。旧 schema 1 PARTITION 流程见
 [角色目录安装](offline-language-installation.md)。
 
+下文的安装资格和接受证据限独立 MySQL 规则源。SQLite 工作台的规则库保管准确原包，按自己的导入、审阅、接受及组合支持门工作。[运行合同](../storage-vitality-loop.md#有限-schema-2-规则材料)
+
 `schema2-*` 独立进程使用 256 MiB JVM 堆预算，以容纳写前/写后完整账本和有界解析临时对象；
 它不是 RSS 上限。进程期限仍为 120 秒，超时先 TERM、5 秒后 KILL。旧 schema 1 命令继续使用
 64 MiB 堆。直接嵌入 Java API 的调用方须保留同等资源和期限边界。
@@ -141,9 +143,7 @@ expected、自动重装或把一次新连接成功当作历史证明。
 
 ## 验证边界
 
-```bash
-mvn '-Dtest=Schema2OperationTicketTest,Schema2SourceInstallationTest,Schema2RulePackageCliTest,JdbcSchema2RuleSourceTest,Schema2SourceLedgerContractTest,TicketStoreTest,SourceInstallationTest' test
-```
+应用改动按票据、安装、CLI 和 JDBC 账本分别选择 `Schema2OperationTicketTest`、`Schema2SourceInstallationTest`、`Schema2RulePackageCliTest`、`JdbcSchema2RuleSourceTest` 或 `Schema2SourceLedgerContractTest`。共享 schema 1 路径改变时补其票据或安装测试。当前运行模组的声明和可见行为按[独立模组入口](../testing.md#模组作者向量与成品行为)验证。
 
 无 DB 测试覆盖真实生产 reader→协调层→JDBC SQL 仓储→实际读回、独立证据和共享票据；另覆盖
 双方能力、审查篡改、准确重导入/同版重包、陈旧计数、每个写点及影响数、提交响应丢失、回滚/

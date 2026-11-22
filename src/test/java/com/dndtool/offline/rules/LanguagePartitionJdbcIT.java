@@ -299,9 +299,7 @@ class LanguagePartitionJdbcIT {
 
     private RuleArtifact artifact(String change) throws Exception {
         Path root = Files.createDirectory(temp.resolve("package-" + UUID.randomUUID()));
-        Path author = Files.createDirectory(root.resolve("author")); Files.createDirectory(author.resolve("character"));
-        for (String file : List.of("author-package.json", "character/languages.json", "character/tools.json", "package-guide.md", "notice.md"))
-            Files.copy(Path.of("rule-packages/srd51-complete").resolve(file), author.resolve(file));
+        Path author = OfflineTestSupport.authorDirectory(root);
         if (!change.isEmpty()) {
             Path file = author.resolve("character/languages.json"); var json = JsonParser.parseString(Files.readString(file)).getAsJsonArray();
             var common = json.get(2).getAsJsonObject();
