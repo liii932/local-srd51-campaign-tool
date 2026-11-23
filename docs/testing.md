@@ -51,7 +51,8 @@ mvn '-Dtest=CampaignCheckEffectsTest' test
 mvn '-Dtest=DatabaseDiagnosticsTest' test
 ```
 
-真实 MySQL 验收按第 3 节独立执行。
+真实 MySQL 验收按第 3 节独立执行。当前离线链路的处置与退役后的发布验证见
+[无 MySQL 采用验收](#mysql-free-acceptance)。
 
 ### Tomcat 测试依赖
 
@@ -174,6 +175,155 @@ mvn '-Dtest=MySqlIntegrationTestSupportTest' test
 6. 对保留的实际 `dnd_tool_se`，Agent 使用 `dnd_tool_se_agent` 做只读盘点或 Harness 比较。迁移、授权和写入由各自的授权检查点处理。
 
 账号/schema 合同及现有运行库的阶段性使用决策见[数据库说明](database.md)。
+
+<a id="mysql-free-acceptance"></a>
+
+## 无 MySQL 采用验收
+
+[MySQL 退役设计](design/v2/mysql-retirement.md)采用后，默认产品构建和验收须在完全没有
+MySQL 的环境完成。当前 Web WAR 已使用 SQLite，但同一 Maven 项目仍解析 `provided` 的
+Connector/J，默认测试也含离线链路的 SQL 合同和代理用例。第 3 节及下文的 JDBC 命令仍描述
+现有实现。下表用于退役实施时核对覆盖转移，本节的启动或场景预检只证明实际执行的环节。
+
+### 测试处置矩阵
+
+| 当前测试责任 | 退役时的处置与验收证据 |
+| --- | --- |
+| 纯规则、声明解释、ZIP 安全和冻结身份，包括 `ProductionRuleArtifactTest`、`Schema2CompositionGoldenTest` 和 `Schema2*RulesTest` 中仍有消费者的用例 | 保留严格解析、Unicode、预算、算法、候选/字段覆盖链、unsupported/DRAFT 拒绝，以及当前摘要和原包身份的独立向量。混合用例拆出纯断言，按当前支持的合同维护期望。 |
+| 规则来源安装、接受和运行快照，包括 `Schema2SourceInstallationTest`、`LanguagePartitionEquivalenceTest`、`Schema2SnapshotTransferServiceTest`、`JdbcSchema2*Snapshot*Test` | 生产规则库和战役绑定由真实 SQLite 的 `LocalRuleLibraryTest`、`CampaignRuleBindingIntegrationTest`、`CampaignRuleBundleIsolationTest` 承接，缺口补在对应 owner。覆盖原包身份、导入与接受分离、缺包/未接受、顺序/覆盖、篡改、故障回滚及提交不明后的原操作查证。旧 PARTITION、双库转存或离线票据的专属断言随相应入口退出默认验收。 |
+| JDBC 角色、检定、装备、休息、场景、战斗、持续效果、怪物和施法服务/仓储，包括 `JdbcSchema2*HistoryTest`、`Schema2CombatRuntimeServiceTest` 和 `Schema2SpellSaveDamageRuntimeServiceTest` | 对齐[已接合领域](design/v2/domain-integration.md#可重复验收索引)，迁到走生产命令、真实 SQLite 事务及读回的 `CampaignDomains*IntegrationTest` 等对应 owner。已有等价用例合并覆盖，保留手算/固定期望、原骰次序、全目标预检、子事实、精确继续点及晚写失败。未支持机制保持失败关闭。 |
+| `BusinessWriteTransactionsTest`、`BusinessWriteGuardSchemaTest`、`MySqlIntegrationIT` 的事务责任 | 将仍适用的并发串行、stale 版本、同键重放/异意图、提交前失败与 UNKNOWN 隔离查证落到 `CampaignCheckEffectsTest`、`CampaignDomainRecoveryTest`、`CampaignStorageLifecycleTest`、`CampaignStorageCrashTest` 等真实 SQLite 用例。观察预检拒绝零 RNG/写入，晚失败后无部分状态、事件、效果、版本或收据，已提交结果可查证且不重放。MySQL 首条 SQL 守卫、DBCP 会话复位和专用连接目标保护随实现移出产品验收。 |
+| SQLite 结构、文件、备份恢复、Host/玩家及安全 | 保留 `StorageSchemaCatalogTest`、`SqliteSchemaTest`、`CampaignFileVectorTest`、`CampaignCodecTest`，以及文件生命周期、原生平台、HTTP 和[玩家测试](#玩家参与原型验证)。保留 format 3 正常往返、旧/坏文件拒绝、退役路由 `404`、会话和存档秘密边界。 |
+| MySQL 两条静态迁移链、schema/授权、诊断、真实 JDBC 验收、format 1 和内部 format 2 旧档/片段及旧 Host 专属语义 | `SchemaMigrationsTest`、`RuleSchemaMigrationsTest`、`DatabaseDiagnosticsTest`、`MySqlIntegrationTestSupportTest`、`LanguagePartitionJdbcIT`、`verify-language-jdbc.py` 及旧存档/Host 专属断言跟随所检验的实现退出默认产品验收。有明确保留范围的旧版维护证据在其隔离入口单独执行。仍有产品意义的独立期望转到现行消费者。 |
+| 与数据库无关的规则作者源和独立向量 | 保留 Python/JDK 成品场景、ZIP 一致性检查、DRAFT `catalog-vector.py` 和 `rule-vectors-test.py` 中作用于保留格式的断言。作者源与手写期望可独立于实现执行；用例通过维持其原有资格边界。 |
+
+### 两个清洁环境
+
+在两个相互独立的环境 A/B，从同一退役候选修订的干净检出开始。分别使用 Linux/WSL 本地
+POSIX 文件系统及原生 Windows 本地固定 NTFS，准备独立 Maven 本地库、Tomcat 实例、运行账号的
+私有 SQLite 根和仓库外证据目录。运行环境只安装相应平台的 JDK、Maven、Tomcat 和实际需要的
+验收工具。记录 MySQL/MariaDB 服务、进程、监听、客户端和 JDBC 驱动的缺席；核对有效的
+Maven 设置、应用环境、JVM classpath、Tomcat `lib`、ROOT Context 及 JNDI，确认无旧库
+配置、凭据、共享驱动或继承的数据。构建时只接入需要的 Maven 制品源，应用运行阶段隔离外部数据库网络。
+各端口在本机串行使用，进程操作和浏览器业务写入只针对获授权的隔离实例及一次性样本。
+
+1. **空依赖库解析及产品打包。** Linux/WSL 在仓库根执行以下命令。Windows 原生 Maven 使用
+   相同目标及选项，将两个 `mktemp` 目录换成由操作者新建的空白本地目录。两个环境各自执行，
+   使用正常产品 POM 和默认构建 profile。依赖树覆盖全部 scope，包括 test 和 provided。
+
+   ```bash
+   acceptance_maven="$(mktemp -d)"
+   acceptance_evidence="$(mktemp -d)"
+   mvn -B -ntp "-Dmaven.repo.local=$acceptance_maven" \
+     '-Dtest=StorageApplicationListenerTest,StorageHttpIntegrationTest,LocalRuleLibraryTest,CampaignRuleBindingIntegrationTest,CampaignCheckEffectsTest,CampaignStorageCrashTest,PlayerHttpIntegrationTest,PlayerProcessRecoveryIntegrationTest' \
+     clean package
+   mvn -B -ntp "-Dmaven.repo.local=$acceptance_maven" dependency:tree \
+     "-DoutputFile=$acceptance_evidence/dependency-tree.txt"
+   ```
+
+   保存两条命令的输出、退出码和 Surefire 结果。核对依赖树、解析日志和新库条目中没有
+   `com.mysql:mysql-connector-j`、`mysql:mysql-connector-java`、MariaDB 等 MySQL 驱动或
+   MySQL 专用产品依赖。当前 POM 在这一项会发现 Connector/J。按 [WAR 审计](#6-war-审计)
+   检查两个候选的必需入口、资源、SQLite JDBC、规则原包和清单。退役候选再检查 `target/classes`
+   及 WAR 无 MySQL 专属驱动、迁移、CLI、仓储、启动/连接配置和遗留入口，纯领域类仍可用。
+   按上表补跑改动涉及的应用测试。所有补跑通过 `-Dmaven.repo.local` 使用本次的独立库，
+   完整 Maven 套件仍按第 2 节选择。
+
+2. **真实 WAR 启动。** 两个环境均按[外部 Tomcat 流程](deployment.md)启动隔离实例，Windows 复用
+   [原生候选工具](#原生-windows-外部-tomcat-候选验收)。移机使用同一份审计过的 WAR，两侧核对其
+   SHA-256。每次启动均保持无旧 JNDI 资源、驱动、凭据和可用 MySQL 连接。每个分支使用独立的
+   一次性 `user.home`，在启动该实例的 JVM 上设置 `-Duser.home=<私有绝对路径>`（直接启动 Java 的候选工具可用
+   `JDK_JAVA_OPTIONS` 临时传入）。Windows `Prepare` 会写入显式根，只在停止的一次性实例上修改其
+   `ROOT.xml` 中的 `DND_STORAGE_ROOT` 参数。逐次停止再更换配置，检查以下启动分支：
+
+   | 配置 | 就绪与本地文件断言 |
+   | --- | --- |
+   | 显式有效私有根 | `node tools/storage/verify-war-http.cjs IDLE` 通过，`instance.lock` 在准确显式根。 |
+   | Context 参数和进程环境变量均未设，`user.home` 指向有效私有目录 | 相同 HTTP 验证通过，`${user.home}/.dndtool/campaigns/instance.lock` 出现在该默认根。 |
+   | Context 显式给相对路径，进程环境和默认根均可用 | 就绪 `503`，`mode=SQLITE`、`ready=false`、`state=UNAVAILABLE`、`code=STORAGE_ROOT_INVALID`，有效备选根不出现受管文件。 |
+   | 两处覆盖均未设，在一次性 `user.home` 预先建立名为 `.dndtool` 的普通文件 | 相同 `503` 和状态，`code=STORAGE_UNAVAILABLE`，保留该文件且未创建活动运行。 |
+
+   失败分支直接读取 `GET /api/host/storage/readiness`，例如运行
+   `curl -i http://127.0.0.1:8080/api/host/storage/readiness`，同时确认响应不披露路径。
+
+3. **真实 WAR 规则和业务。** 按 [SQLite 验收](#sqlite-结构完整文件与运行验收)把浏览器用例直接跑在健康
+   候选实例上，验证规则 PC/NPC、自由卡、装备、检定两分支及后果、健康、旅行及场景时钟、战斗/继续、
+   资源、可用施法和有限怪物（例如吐息共享伤害及充能），记录初始和最终事实。
+   用成品 WAR 运行两份独立规则场景，留存组合顺序、原包摘要和实际用例结果。另核对 ZIP 与作者
+   源的一致性及 DRAFT 作者向量。
+
+   ```bash
+   war=target/dnd-tool-se-0.2.1.war
+   scenarios=rule-packages/srd51-runtime/scenarios
+   python3 rule-packages/srd51-runtime/build-bundles.py --check
+   python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
+   python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/check-variant.json"
+   python3 -B tools/rule-packages/catalog-vector.py --check rule-packages/srd51-complete
+   ```
+
+   自定义规则另从 WAR 外提供一份受支持的准确候选 ZIP。可在仓库外复制随附 `check-variant` 原包的
+   条目，将 `author-package.json` 的 `release_version` 改为 `"11"`，将 `rules.json` 中
+   `vital_effect.dm_damage` 的 `modifier` 改为 `2`，更新包内 `README.md` 后将这些文件打包在 ZIP
+   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@11`
+   原字节及摘要。随附 `check-variant` 仍按 `@10`、固定伤害 `3` 的独立场景验证。自定义组合前三包
+   使用标准包，第四包使用这份外部候选。
+
+   通过工作台的本机规则库执行外部原包上传（`POST /api/host/storage/rule-import`），从随附列表导入
+   前三包。接受前预览应报 `RULE_PACKAGE_NOT_ACCEPTED`。逐包审阅和明确接受（`GET .../rule-review`、
+   `POST .../rule-accept`）后，交换基础包与扩展的顺序应使预览返回 `409`。按正确顺序预览
+   （`POST .../rule-preview`）并创建战役，比对接受记录、预览和运行的实际成员、双摘要和来源链。
+   用真实角色验证运动使用感知、固定伤害为 `2`。用独立隔离根上传坏 ZIP，将固定伤害的 `algorithm`
+   改为 `UNKNOWN_VITAL_EFFECT`，导入预期 `409/RULE_PACKAGE_INVALID` 及 `S2_TYPE`。用错误摘要或
+   错绑冻结投影验证组合拒绝，复用 `CampaignRuleBindingIntegrationTest` 的错绑用例。核对这些拒绝未登记
+   无效材料或建立活动运行。[本机规则库合同](design/v2/local-rule-library.md)
+
+4. **玩家与失败边界。** 先证实默认无玩家监听且 DM 8080 只绑定 loopback，再在独立验收配置按
+   [玩家 HTTPS 流程](deployment.md#可选玩家-https-入口)启用准确地址的 8443。执行
+   [玩家参与验证](#玩家参与原型验证)的批准、设备/席位隔离、受限投影、候选动作、权限撤销、
+   重启后的重连及只读查证，核对旧会话、撤权和未决请求均不能重放写入。记录坏 Host、伪造转发头、
+   CSRF/Origin、对象版本、跨 Connector、公开和旧 MySQL URL 的拒绝。涉及真实设备、证书信任或
+   防火墙时使用已批准的目标，按[设备采用门](design/v2/player-participation.md#验收与采用门)单独留证。
+
+5. **两机完整文件。** 在 A 分别用标准与本机接受的自定义组合建档。对 `RULE_BOUND_CAMPAIGN`
+   format 3 执行保存、END 和下载，保留有原骰、事件/效果及复杂未决继续点的样本，例如
+   `CampaignSpacesIntegrationTest` 中的双场景借机反应，或 `CampaignDomainsCombatIntegrationTest`
+   中已掷骰但待结算的共享吐息。玩家控制、共享及重开重新批准可以使用独立样本。记录 `fileKey`、
+   SHA-256、绑定及事实摘要。向 B 的独立空白实例转移 WAR、导出的 JSON 和必要原包，逐份核对原字节。
+   确认导入只登记、同 `fileKey` 冲突无覆盖。标准无需接受记录可打开。自定义先验缺包与已导入未接受
+   都不激活，再接受准确包并打开。确认错包/损坏/不支持格式拒绝，无部分写入。核对 B 建立新的 run，
+   全部冻结材料与字段链、初始/当前事实、角色/场景/时钟、原骰、根/子历史、资源、未决动作及玩家
+   控制/共享与 A 一致。从准确等待点只执行剩余后缀，再保存并结束。原文件继续保持原字节，旧 run/epoch、
+   请求收据和设备会话无继承，玩家设备须重新批准。
+
+6. **原工作库残留。** 独立于移机测试，各环境在合成活动战役上正常停机和强制中断，分别重启同一
+   实例及原私有根。参照[原生候选的恢复用例](#原生-windows-外部-tomcat-候选验收)运行
+   `browser-recovery-smoke.cjs prepare` / `recover` 及 `prepare-discard` / `discard`。
+   `node tools/storage/verify-war-http.cjs RESIDUAL` 预期就绪
+   `503/STORAGE_RECOVERY_REQUIRED`，显式恢复后为 `ACTIVE`。核对保留原 run、库/journal、最新事实、
+   历史和收据，epoch 更新，旧 epoch 拒绝，未重建、补 seed 或重放。另用代表性的复杂未决夹具执行
+   原库恢复，检查未决后缀、原骰和资源一致。双场景夹具还检查继续一个场景时其他场景保持冻结。
+   另留故障 JUnit 证据，
+   用 `CampaignStorageCrashTest`、`CampaignPreparationTest`、`CampaignStorageLifecycleTest`、
+   `CampaignDomainRecoveryTest` 及受影响领域用例核对初始化/保存中断、晚写失败、响应丢失、
+   提交/回滚结果不明、过期 epoch/revision、同键冲突、坏投影及未知文件保护。分别核对工作库及文件
+   前后像、可见性、历史、版本和收据，区分确证回滚、原意图续作和隔离待查证。
+
+7. **原生文件系统。** 在 Linux/WSL 本地 POSIX 环境核对 owner-only 权限、符号链接拒绝、锁和
+   同卷无覆盖硬链接。在原生 Windows 本地固定 NTFS 运行
+   `mvn '-Dtest=CampaignWindowsFilesystemTest' test`（附上本次的 `-Dmaven.repo.local`），核对 ACL
+   继承、已有宽 ACL、junction/reparse、跨进程锁与退出释放，并执行原生候选进程恢复。各自核对
+   根争锁、坏库、无效根、损坏保存点和发布冲突的拒绝边界。记录实际执行数、平台受限项目和
+   补测结果。进程中断证据只覆盖进程级恢复。[存储配置](configuration.md#sqlite-当前应用存储配置)
+
+记录候选修订、WAR 字节数/摘要/条目数、环境与隔离方式，每个检查项用以下字段单独记录。
+
+| 环境与检查项 | 实际命令或操作及输入身份 | 预期状态或错误 | 实际状态与退出码 | 证据位置 |
+| --- | --- | --- | --- | --- |
+| A 或 B、步骤编号 | 命令或表单步骤、相关候选/文件/原 run 身份 | 数值、就绪状态、拒绝代码或不变量 | 对照结果、适用时的退出码 | 测试报告、诊断、状态对比或文件审计 |
+
+JUnit 记测试数、失败、错误和跳过原因。缺证、跳过或失败的采用门须在对应环境补验。
+证据意外含敏感材料时留在受控目录并在报告中脱敏。测试资料、日志、信任材料和备份均在 Git/WAR 外。
+既有 MySQL 库、历史及数据保管单独按[数据库说明](database.md)处理，清洁环境的验收不对其执行连接或写入。
 
 ## 4. 迁移与规则测试
 

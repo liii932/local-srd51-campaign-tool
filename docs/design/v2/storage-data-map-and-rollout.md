@@ -2,8 +2,8 @@
 
 本页维护当前 SQLite 结构/领域/文件的 owner 映射，以及原 MySQL 能力与真实数据保管的
 核对入口。结构格式见[结构合同](storage-schema-and-planning.md)，事务与完整文件见
-[运行](runtime-and-transactions.md)和[保存](save-and-recovery.md)。当前生产入口、剩余
-差异和本次执行证据统一由[领域接合表](domain-integration.md)记录，不由旧表数量推断。
+[运行](runtime-and-transactions.md)和[保存](save-and-recovery.md)。[领域接合表](domain-integration.md)
+列出当前生产入口、剩余差异和退役候选待验证的断言。
 
 只支持当前应用声明模型，不承诺跨版本工作库升级/存档转换。SQLite 是当前应用的唯一运行库，`DND_STORAGE_ROOT` 只控制其位置。
 代码接合、数据库迁移、真实数据处置、部署和默认切换分别判断。
@@ -18,7 +18,7 @@
 | 共同事务 | `CampaignStorageService` 持根/目录锁、串行接纳，`BEGIN IMMEDIATE` 一次提交全部聚合/关系投影、根子历史、revision 和接受 |
 | 文档/关系存储 | `CampaignDomainRepository` 写 closed typed TEXT 和关系投影，调用方拥有事务；读取逐行核验，不修复坏索引 |
 | 文件 | `CampaignCodec`、`CampaignDomainCodec/Validation` 保存 `RULE_BOUND_CAMPAIGN` format 3，包含全部空间、唯一安置、焦点和各 pending。打开按文件绑定重建准确组合，活动和同版残留使用冻结规则 |
-| 原 MySQL/来源服务 | 原 SQL/迁移/读写/账号职责保留；来源安装、接受和内部快照由离线工具及其合同管理。旧档随匹配的发行物保管 |
+| 原 MySQL/来源服务 | 独立维护原 SQL、批准清单、账号、来源安装与接受和内部快照。旧档随匹配的发行物保管。当前代码和交付边界见[依赖清单](#mysql-dependency-inventory) |
 
 ## 当前物理分片与唯一状态 owner
 
@@ -70,6 +70,33 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 机制闭包。打开文件时，准确匹配标准绑定的成员使用随附四包，其余绑定使用本机已接受的原包。重建的组合须与冻结材料逐项一致。DDL、结构计划与本地
 执行收据由私有工作库独立保管。
 
+<a id="mysql-dependency-inventory"></a>
+
+## MySQL 依赖与保管清单
+
+以下边界以源码装配和打包规则为准。后续拆分顺序、验证与授权见 [MySQL 退役计划](mysql-retirement.md)。
+
+| 范围 | 当前证据 | 后续归属 |
+|---|---|---|
+| 启动、JNDI 与 Host API | `web.xml` 仅注册 `StorageApplicationListener`、SQLite Host/玩家入口、健康探针及安全过滤器。`StorageApplicationListener` 读取 `DND_STORAGE_ROOT`，外部 `ROOT.xml.example` 提供 Context 覆盖示例。战役工作库由 `CampaignStorageService.connect` 直接通过 `jdbc:sqlite:` 连接，规则库账本由 `LocalRuleLibraryLedger.connect` 直接连接。旧 `/host/rules`、`/host/archive`、`/api/host/diagnostics/database` 及原角色、事件、地图、存档 API 已退役，由 `HostHomeServletTest` 和 `verify-war-http.cjs` 断言 `404` | 保留 SQLite 启动、就绪、文件、规则库和玩家边界。旧 JNDI 资源与外置驱动随使用它们的旧部署配置保管 |
+| Maven、JDBC 与 WAR | `pom.xml` 的 `sqlite-jdbc` 随 WAR 交付。Connector/J 当前是 `provided`，Tomcat DBCP 是 `test`。`packagingExcludes` 明确剔除 `offline/**`、运行迁移 V001—V042、`SchemaMigrations`、`RuleDatabaseSchemaVerifier` 及其内类，以及构建期规则清单生成器。来源 SQL 位于 Maven 资源树外。其余旧实现仍参与默认编译，且未被上述规则排除。`DatabaseDiagnostics`、`JdbcSchema2SnapshotControlRepository` 和 `RuleSchemaMigrations` 仍引用已排除的 `SchemaMigrations` | 保留 SQLite 驱动、结构和规则清单生成。在共享边界分清后，将 MySQL 专属实现和依赖从生产编译及制品输入隔离，按候选 WAR 实际条目和类依赖验收 |
+| 原 MySQL 运行与内部镜像 | `DatabaseDiagnostics`、`JdbcModuleCatalogRepository`、旧角色/战役仓储及 `BusinessWriteTransactions` 等仍在当前编译树。`Schema2SnapshotTransferService`、`Schema2InitializationPreparationService`、`Schema2CharacterRuntimeService` 和 `Schema2CombatRuntimeService` 使用 JDBC 来源、快照、准备或历史的事务链，独立于当前 Web 装配。schema 1 `PARTITION` 仓储也仍用于独立 JDBC 核验 | 保管可读原库的现有版本及其配套迁移、工具和配置。新版维护工具有独立需求时另行立项。删除旧实现前核对其实际消费者 |
+| 原 MySQL 来源、迁移与批准 | `RulePackageCli` 从同版 `target/classes` 启动。`rule-package.sh` 的 `build`、`verify` 和 `schema2-verify` 无需驱动，其余安装/接受/查证子命令从 `DND_RULE_INSTALLER_JDBC_JAR` 加入外供 Connector/J。运行 V001—V042 的 `SchemaMigrations` 对应 `schema_meta`，来源 V001—V012 的 `RuleSchemaMigrations` 对应 `rule_schema_meta`。`JdbcSourceLanguageRepository` 和 `JdbcSourceSchema2Repository` 核对准确批准账本和规则材料 | 原 SQL、批准摘要、已应用记录、原包及安装/接受账本随各自库保管。分离可复用的原包验证与 MySQL 安装适配。[维护与账号](../../database.md#mysql-维护与退役边界) |
+| 旧目录与发布身份 | `ModuleReleaseVerifier` 使用 `BuiltinModuleReleaseRegistry` 和旧目录仓储。离线 `RuleArtifact` 的 `CharacterCatalogAuthorPackageReader` 同样使用该注册表验证 DRAFT 身份。`ModuleCanonicalEncoderV2` 复用 V1 的文本编码辅助方法 | 已发行 v1 的身份、canonical 和摘要与对应版本及原库保管。拆分旧目录时同时核对只在离线使用的作者读取、DRAFT 校验和独立目录向量 |
+| 旧存档 | format 1 整档使用匹配的已发行应用。format 2 的 `CampaignArchiveV2*`、`JdbcCampaignArchiveV2*` 和测试仍实现 DRAFT 角色片段校验和内部 JDBC 恢复。当前 SQLite 的 `CampaignCodec` 仅接受本版 `RULE_BOUND_CAMPAIGN` format 3 | 保管真实旧档及对应原制品。format 2 片段的专属实现和测试随独立旧链评估，完整 DRAFT 的发布和存档资格继续受其发布门约束 |
+| 测试与运维工具 | `database/grants/`、`database/verify/`、`database/test/` 和 `verify-language-jdbc.py` 属 MySQL 维护，纯清单校验与显式隔离实例验收是两种入口。`MySqlIntegrationTestSupport` 限定写入测试目标。`tools/storage/` 的 HTTP、规则组合和完整文件验收使用 SQLite | MySQL 专属核验、样例和测试随匹配旧版保管。保留 SQLite 的应用、作者场景、WAR 审计和平台生命周期证据。[定向测试与隔离环境](../../testing.md#3-mysql-集成测试) |
+
+### SQLite 仍使用的领域依赖
+
+| 当前消费者与共享事实 | 拆分时保护的边界 |
+|---|---|
+| `BundledCampaignRules`、`LocalRuleLibrary`、`CampaignRuleSupport` 和 `CampaignDomainData.Material` 使用 `ProductionRuleArtifact`、`Schema2CompositionKernel`、`ProductionSchema2Projection`、`Schema2RulesBinding` 及其规则/条目/来源链类型。`Schema2CompositionKernel` 还使用 `AdvancementValueProfile` 和 `ResourceRecoveryProfile` | 保留与 JDBC 无关的原包读取、规范编码、按顺序组合、冻结材料重建和成员/最终规则/完整链摘要。SQLite 本机接受由 `LocalRuleLibrary` 的独立账本承担 |
+| `CampaignDomainCommands` 调用 `CampaignDomainEngine`，`CampaignDomainValidation` 以该引擎的 `CharacterRecord` 投影角色。原 `Schema2CharacterRuntimeService`、`Schema2CombatRuntimeService` 也持有同一引擎。`CampaignDomainEngine` 调用纯 `Schema2*Rules`，使用 `Schema2CharacterRequest`、`Schema2CombatRequest` 生成和重验 SQLite 角色、场景及因果子事件的请求摘要 | 保留纯引擎、请求和领域规则。保持事件命令、历史邻接、前后状态、原骰、类型化事实、请求摘要及核验。MySQL 专属连接、SQL、事务守卫及操作收据随对应适配器退出产品交付 |
+| `CampaignDomainCodec` 直接登记 `Schema2PreparationIdentity`、`Schema2InitialCharacterPlanService` 的计划、`Schema2InitialProficiencyRules` 的授予、`Schema2CharacterRuntime`、`Schema2CombatState` 和 `Schema2CombatHistory` 等记录。嵌套记录标签取登记前缀和 Java 简名，字段取记录组件名 | 先核对类型、静态引用和 codec 登记，再迁移或提取共享类型。同步保持当前 format 3 的标签、字段、事件与摘要一致。准备身份保留为领域事实，SQLite 的运行身份、epoch 与接受收据由自身控制表管理 |
+| `CampaignDomainEngine`、`CampaignManualCommands` 与 `PlayerGatewayService` 等复用旧服务也在用的 `CharacterNamePolicy` | 保留名称校验的 Unicode、NFC 与控制字符边界 |
+
+后续删除前，从 `web.xml` 启动、SQLite 服务与 codec、规则清单生成器和独立作者场景追踪实际类依赖，覆盖内部类型和反射注册。保留纯领域层、SQLite 调用者和无需 MySQL 的作者验证，逐批分离 MySQL 适配。干净构建后复查 WAR 条目与依赖，并用定向测试核对标准与自定义组合、角色/场景历史、同版恢复及完整文件重开。旧链的保管与真实库处置按[数据库合同](../../database.md#mysql-维护与退役边界)单独核对。
+
 ## 原 MySQL 清单的用途与接合差异
 
 附录仍列原运行 V001—V042、来源 V001—V012 的实际持久表，用于能力/字段审查和保管，
@@ -78,10 +105,10 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 | 原责任 | 当前接合/保管方向 |
 |---|---|
 | 规则目录/语言工具/PARTITION/内部快照 | SQLite 冻结完整组合与链。本机规则库保管准确原包和接受，原 MySQL 来源、迁移和接受服务独立保管 |
-| 原角色自由字段/职业等级/熟练/Manual/普通save/简易遭遇名单/阵营 | 独立 DM-managed typed 领域逐项接合，不能文档排除或伪装成 schema-2 构筑；最终差异/本次证据见接合表 |
+| 原角色自由字段/职业等级/熟练/Manual/普通save/简易遭遇名单/阵营 | 由独立 DM-managed typed 领域逐项接合。当前入口、剩余差异和待验证断言见接合表 |
 | schema-2 角色/资源/装备/健康/书籍/休息叶表 | 原纯规则/完整 typed History 复用到角色聚合，同根/事务/文件，不复制第二条 MySQL 服务事务 |
 | schema-2 战斗/动作/效果/怪物叶表 | 完整场景 History 聚合及关系投影，同一角色健康/资源 owner；保留全部已完成/未决事实 |
-| v1 检定/成功失败效果/物品/位置/消息 | check-effects 和 manual 对应入口完整预检、有序后果、根历史/共享事务/文件；不能用 note/即时UI结果降级 |
+| v1 检定/成功失败效果/物品/位置/消息 | `check-effects` 和 `manual-check` 对已支持的生命、物品及消息后果完整预检，按序与根历史同事务提交，并随完整文件保存。旧 MySQL 直接定位和 `effect.set_entity_position` 的业务写入路径已移除。SQLite 的遭遇内直放与检定分支原子定位见[领域接合表](domain-integration.md#支持边界和设计修订) |
 | 永久业务守卫/内部操作 | 当前独占根锁+BEGIN IMMEDIATE，状态/根/接受一次提交；未知显式恢复核库/全部收据，独立 C0/NOT_COMMITTED 方案已替换 |
 | 旧 format 1/内部 format 2 片段 | 按原发行物和离线合同保管。当前 SQLite 工作台仅打开本版 format 3 完整文件 |
 
@@ -112,9 +139,9 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 本机规则库与运行工作库使用各自的存储和事务。
 
 当前测试入口包括结构/引擎、BundledCampaignRules、CampaignDomainEngine、共享 SQLite
-域/战斗/文件/生命周期、HTTP/安全和进程故障族；manual/check-effects 的精确新增类及
-本次观察结果登记在接合表。类存在不证明通过；来源/旧 MySQL 测试不代替 SQLite 或平台
-锁/刷盘/低磁盘验证。可重复命令见[测试指南](../../testing.md)。
+域/战斗/文件/生命周期、HTTP/安全和进程故障族。领域接合表列出自由卡和检定效果的当前入口、
+剩余差异及待验证断言。退役候选应分别记录 SQLite 应用与平台锁、刷盘、低磁盘的实际验证结果。
+可重复命令见[测试指南](../../testing.md)。
 
 WAR 必含应用结构、严格聚合与领域代码、SQLite JDBC、Host 页面与脚本及 `storage/rules/` 的五份原包。
 其他作者源/来源SQL/离线写入类、真实库/journal/存档、秘密/日志/机器路径仍排除。生产

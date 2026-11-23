@@ -68,7 +68,7 @@ DM 家规，不能称作已实现 Antimagic Field。规则来源及详细限制�
 每命令 SQLite 耐久与 INITIAL/MANUAL/FINAL 已承担当前保存责任；周期 AUTO 与轮换属于
 容量测量后的后续能力，不能成为略过当前领域生命周期的理由。
 
-运行 WAR 只装配 SQLite 战役与玩家接口。既有 MySQL 数据、账号和离线工具的保管见[数据库说明](database.md)。
+运行 WAR 只装配 SQLite 战役与玩家接口。产品目标还要求在没有运行或来源 MySQL 的环境中完成构建、规则选择、业务和恢复。现有构建依赖、各项保留能力及验收批次见[单路线实施计划](design/v2/mysql-retirement.md)。既有 MySQL 数据、账号和离线工具的保管见[数据库说明](database.md)。
 完整规则族 `dnd5e2014_srd51_se` 的 DRAFT、通用来源安装/接受以及 archive format 2 资格
 继续由各自合同限定，不因 SQLite 有限运行入口开放而转为完整发布。
 

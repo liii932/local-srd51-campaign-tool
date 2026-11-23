@@ -57,6 +57,7 @@ SQLite 工作台保存和打开 `RULE_BOUND_CAMPAIGN` format 3。原 MySQL 存�
 | 规则材料、存储与版本 | [规则存储](rule-storage-and-versioning.md) | 战役冻结材料、独立本机规则库、准确绑定与文件模型 |
 | 结构声明与纯计划 | [结构合同](storage-schema-and-planning.md) | 应用 JSON、有限 SQLite 编译、依赖、DDL/seed、首次初始化与既有结构验证 |
 | 数据 owner 与替换 | [数据映射](storage-data-map-and-rollout.md) | 当前物理表/正文/投影映射、原 MySQL 清单及配置/测试/运维边界 |
+| MySQL 退役准备 | [SQLite 单路线实施计划](mysql-retirement.md) | 运行与来源库的依赖、共享类型、保留业务、测试处置、实施批次与无 MySQL 环境的完成条件 |
 | 角色与完整因果历史 | [角色状态与历史](character-state-and-history.md) | 业务和运行身份、状态及因果历史、形态健康、召唤与群组回合 |
 | 局域网玩家参与原型 | [玩家参与](player-participation.md) | 当前 SQLite 成员/控制/共享、有限动作/裁定、独立 HTTPS 边界与重连原型；真实设备信任和剩余交互另验收 |
 | 单写事务与故障恢复 | [运行与事务](runtime-and-transactions.md) | 独占接纳、预检/RNG、共同提交、未知查证、新 epoch、初始化和清理 |

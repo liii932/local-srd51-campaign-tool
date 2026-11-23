@@ -16,6 +16,24 @@
 同版残留恢复保留原 run 与收据，并建立新 epoch。文件过程、耐久和备份见
 [运行合同](storage-vitality-loop.md)和[备份恢复](backup-and-restore.md)。
 
+## MySQL 维护与退役边界
+
+旧 MySQL Web 路由和 JNDI 装配已退役。当前 MySQL 维护以同版源码、编译输出、经批准的
+SQL 和独立凭据为入口。当前仍编译的旧服务、生产 WAR 的精确排除项以及 SQLite 使用的
+共享规则、身份和历史类型见[依赖清单](design/v2/storage-data-map-and-rollout.md#mysql-dependency-inventory)。
+
+| 维护范围 | 当前输入与核验 |
+|---|---|
+| 原运行库 `dnd_tool_se` | 运行迁移 V001—V042 的 SQL 原件、`SchemaMigrations` 批准清单和已应用 `schema_meta`。`DatabaseSchemaVerifier` 用于独立运行库结构检查。JDBC 运行快照、准备事实和内部历史随同版工具及迁移链维护 |
+| 来源库 `dnd_tool_rules` | 来源迁移 V001—V012 的 SQL 原件、`RuleSchemaMigrations` 批准清单和已应用 `rule_schema_meta`。保管原 ZIP、安装/接受事实和相应操作账本。来源审批和接受依照[离线来源合同](rules/schema-2-installation-and-acceptance.md)独立执行 |
+| 权限与验收 | 使用 `database/grants/` 中按职责拆分的权限、`database/verify/` 的对应只读检查和 `database/test/` 的隔离配置。`SchemaMigrationsTest`、`RuleSchemaMigrationsTest` 和无参 `verify-language-jdbc.py` 只核对仓库材料。真实驱动、DDL、账号权限和事务验收走[隔离测试流程](testing.md#3-mysql-集成测试) |
+| 旧文件与可读制品 | 真实 format 1 文件、旧 WAR、对应版本和所需外部配置共同保管。内部 format 2 DRAFT 角色片段随对应旧链处理，发布资格按[格式 2 合同](rules/archive-format-2-character-state.md)判断。SQLite format 3 使用自己的完整文件及本机规则接受账本 |
+
+退役时保管可读原库与原件的现有版本、所需制品和运行说明。后续维护工具有独立需求时另行立项。
+来源清单目前通过 `RuleSchemaMigrations` 调用 `SchemaMigrations.canonicalPayloadSha256`。若另立
+的维护项目需要拆分两条链，先核对这项共享校验对两套原 SQL 的批准摘要。真实数据库及文件的
+发现、备份、恢复、迁移或处置需各自明确目标和授权，依现有备份合同保管。[MySQL 退役计划](design/v2/mysql-retirement.md)
+
 ## 迁移合同
 
 离线维护使用同一版本的源码仓库及其 Maven 编译输出。在仓库根运行 `mvn compile` 后，
@@ -105,7 +123,8 @@ V005 保存成长、资源、休息和类型化条目/前提/修改材料，V006
 [检定、装备与健康作者来源](rules/schema-2-foundation-authoring.md)，V008 保存三类战斗作者定义和原子修改，
 V009/V010 保存法术、施法配置、Wizard 学习名单、固定环境与修改的类型化作者材料；
 V011 增加怪物／动作、复合 stat block／action profile 的十一张类型化材料表，并前向
-接入真实 `SAVING_THROW` 熟练类别及合法属性引用。既有历史保持不可变。
+接入真实 `SAVING_THROW` 熟练类别及合法属性引用。V012 扩展来源法术算法约束并追加批准账本项。
+既有历史保持不可变。
 当前来源 schema 合计 53 张表、159 个触发器。schema 1 和 schema 2 共用原安装锁，各自核对所属历史与计数。
 schema 2 原始制品、独立接受和控制账本绑定 43 张类型化作者材料表。成长定义、稳定等级条目、
 起始/多职业来源槽、子职业、特性、专长、有界熟练集合与休息声明保留原始作者序号和完整引用。

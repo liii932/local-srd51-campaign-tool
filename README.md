@@ -156,6 +156,8 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 
 既有 MySQL 库、账号和迁移账本单独维护。离线规则工具使用对应版本的源码仓库及其 Maven 编译输出 `target/classes`，运行与来源迁移由仓库提供。维护入口见[数据库文档](./docs/database.md#迁移合同)。
 
+当前默认 Maven 构建仍解析 Connector/J。构建与交付移除 MySQL 依赖的批次、保留能力和候选验收见[SQLite 单路线实施计划](./docs/design/v2/mysql-retirement.md)。
+
 ## 安全与数据约束
 
 - Host 入口只接受精确的 `http://127.0.0.1:8080` origin，不信任 `X-Forwarded-*`；

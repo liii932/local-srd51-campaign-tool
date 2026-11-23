@@ -19,6 +19,12 @@
 确认 WAR 无 V001—V042 运行迁移、独立迁移清单加载器和来源账本核验器、退役 MySQL Web 入口、Connector/J、外部
 Tomcat 配置、凭据、密钥、账号专用配置、日志、备份和真实战役数据。
 
+[MySQL 退役设计](design/v2/mysql-retirement.md)采用时，候选须另满足
+[无 MySQL 采用验收](testing.md#mysql-free-acceptance)，包括从空 Maven 本地库构建、
+真实 WAR 启动、双机文件和原工作库恢复。当前 WAR 的 SQLite 启动检查只覆盖运行环节，
+Maven 仍解析离线工具所用的 Connector/J。候选通过两机验收后，正式替换继续依照本页的
+备份、替换、启动及回滚流程；已有 MySQL 数据的保管与处置按[数据库说明](database.md)。
+
 ## 2. 存储前提
 
 确认 Tomcat 的实际运行账号、[私有根和文件系统](configuration.md#sqlite-当前应用存储配置)、

@@ -89,6 +89,7 @@
 | schema、迁移、JDBC、权限、数据库诊断 | [数据库](database.md)；拆分设计仅需要时读 [规则/运行库分离](rule-database-separation.md) | `persistence/SchemaMigrations.java`、相关 `Jdbc*Repository.java`；`SchemaMigrationsTest` / `Jdbc*RepositoryTest`；SQL 在仓库根 `src/main/resources/db/migration/` 与 `database/` |
 | 独立规则库、来源账本、语言结构、来源权限 | [规则来源 schema](rule-source-schema.md)；[数据库](database.md) | `persistence/RuleSchemaMigrations.java`、`persistence/RuleDatabaseSchemaVerifier.java`；`RuleSourceSchemaContractTest`；SQL 在仓库根 `database/rules/migration/`、`database/grants/rule-source-*.sql` 与 `database/verify/rule-source-schema.sql` |
 | 构建、测试、WAR、部署、备份 | [测试](testing.md)；实际部署才读 [部署](deployment.md) / [备份恢复](backup-and-restore.md) | 仓库根 `pom.xml`、`config/`、`tools/`；MySQL 集成测试需独立授权与隔离目标 |
+| MySQL 退役准备与单路线实施 | [批次与关联责任](design/v2/mysql-retirement.md)、[依赖清单](design/v2/storage-data-map-and-rollout.md#mysql-dependency-inventory)、[能力映射](design/v2/domain-integration.md#sqlite-retained-capabilities)、[测试处置与验收](testing.md#mysql-free-acceptance) | 从 `pom.xml`、`CampaignDomainEngine` 和 `CampaignDomainCodec` 追到实际调用者与 WAR 条目；按批次验证默认构建、SQLite 业务和跨环境文件恢复 |
 | MySQL 测试连接目标保护 | [测试](testing.md) §3 | 测试目录 `persistence/MySqlIntegrationTestSupport.java`；`MySqlIntegrationTestSupportTest`，两入口在连接前仅允许专用测试目标 |
 | 新增完整规则领域、覆盖差距、发布门 | [机制覆盖矩阵](rules/srd-5.1-coverage.md)、[完整规则目标](rules/srd-5.1-complete.md)；[架构](architecture.md) | 按机制族核对数据、真实执行和状态/恢复；只提升有实际消费者和证据的准确范围，不为未来领域编造类名 |
 | Agent、skill、项目导航、文档 | [AGENTS.md](../AGENTS.md)、本文 | 先选本文相关入口；本地 `dnd-project-start` 可辅助导航；不预读业务源码 |
