@@ -49,10 +49,7 @@
 规则库与工作库分别提交，具体准入与故障合同见
 [本机规则库](design/v2/local-rule-library.md)和[规则存储](design/v2/rule-storage-and-versioning.md)。
 
-MySQL 维护代码遵循原 `jdbc/DndToolSE`、`dnd_tool_se` 与外键及目录读取合同。
-`Schema2SourceLedger` 和 `JdbcSourceSchema2Repository` 完整读取来源接受及镜像，
-`Schema2SnapshotTransferService` 在来源连接结束后向 MySQL 写入有限快照。这些操作用于独立维护，
-仍按其原有资格与事务边界运行。
+原部署的 JNDI、来源与运行快照、安装/接受记录和工具随匹配版本保管。当前规则来源是本机已接受原包或 WAR 随附的准确标准组合。[保管清单](design/v2/storage-data-map-and-rollout.md#mysql-dependency-inventory)
 
 ## 迁移、保管与验证
 

@@ -9,16 +9,12 @@ import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.service.storage.BundledCampaignRules;
 import com.dndtool.service.storage.CampaignRuleContext;
 import com.dndtool.service.storage.CampaignRuleSupport;
-import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
-import static com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.SECOND_WIND_SQLITE_REQUIRED;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2SecondWindRulesTest {
@@ -81,27 +77,6 @@ class Schema2SecondWindRulesTest {
                 state.hitDicePools(), state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version(),
                 state.resources(), state.rest(), state.equipment(), state.health());
         rejected("S2_COMBAT_FEATURE_UNSUPPORTED", () -> Schema2FeatureSupport.secondWindResource(rules.projection(), mixed));
-    }
-
-    @Test void mysqlExecutionAndRestorationRejectBeforeConnectionOrDice() {
-        var started = start();
-        var versions = started.characters().stream().collect(Collectors.toMap(row -> row.initial().characterId(),
-                row -> row.history().current().version()));
-        var command = Command.action(Kind.SECOND_WIND, actor);
-        var request = new Schema2CombatRequest(UUID.randomUUID(), scene, campaign, rules.binding(),
-                started.history().members(), started.history().current().version(), versions, command);
-        DataSource inaccessible = (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(),
-                new Class<?>[]{DataSource.class}, (proxy, method, arguments) -> fail("Unexpected JDBC call " + method.getName()));
-        var service = new Schema2CombatRuntimeService(inaccessible, sides -> fail("Unexpected d" + sides));
-        assertEquals(SECOND_WIND_SQLITE_REQUIRED, service.execute(request).code());
-        assertEquals(SECOND_WIND_SQLITE_REQUIRED, service.inspect(request).code());
-
-        var used = apply(started, Kind.SECOND_WIND, actor, 10, 1);
-        var histories = used.history().members().stream().map(member -> used.characters().stream()
-                .filter(row -> row.initial().characterId().equals(member.characterId())).findFirst().orElseThrow().history()).toList();
-        var save = new Schema2CombatRuntimeService.Save(used.history(), histories);
-        assertEquals(SECOND_WIND_SQLITE_REQUIRED, service.restore(save).code());
-        assertEquals(SECOND_WIND_SQLITE_REQUIRED, service.inspectRestore(save).code());
     }
 
     private CharacterRecord character(String characterClass) {

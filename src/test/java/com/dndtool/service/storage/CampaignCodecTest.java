@@ -45,6 +45,33 @@ class CampaignCodecTest {
     }
 
     @Test void invalidRuleCharacterHistoryReturnsTheStableFileErrorAfterDigestVerification() {
+        var file = ruleCharacterFile();
+        file.getAsJsonObject("domains").getAsJsonArray("characters").get(0).getAsJsonObject()
+                .getAsJsonObject("history").getAsJsonArray("events").get(0).getAsJsonObject()
+                .getAsJsonObject("after").addProperty("version", "1");
+        resign(file);
+
+        var invalid = assertThrows(StorageException.class, () -> codec.decode(CampaignJson.canonical(file)));
+        assertEquals("INVALID_FILE", invalid.code());
+        assertEquals("Complete facts differ from retained root consequences", invalid.getMessage());
+    }
+
+    @Test void forgedInitialGrantCannotOpenEvenWithAnUpdatedFileDigest() {
+        var file = ruleCharacterFile();
+        var plan = file.getAsJsonObject("domains").getAsJsonArray("characters").get(0).getAsJsonObject()
+                .getAsJsonObject("initial").getAsJsonObject("character");
+        var grants = plan.getAsJsonArray("grants");
+        var fixedGrant = grants.asList().stream().map(JsonElement::getAsJsonObject)
+                .filter(grant -> grant.get("kind").getAsString().endsWith("FIXED")).findFirst().orElseThrow();
+        fixedGrant.addProperty("suppressed", !fixedGrant.get("suppressed").getAsBoolean());
+        resign(file);
+
+        var invalid = assertThrows(StorageException.class, () -> codec.decode(CampaignJson.canonical(file)));
+        assertEquals("INVALID_FILE", invalid.code());
+        assertEquals("Complete facts differ from retained root consequences", invalid.getMessage());
+    }
+
+    private JsonObject ruleCharacterFile() {
         Snapshot empty = CampaignRuleFixtures.snapshot(CampaignLifecycleFixture.CAMPAIGN, "测试");
         JsonObject input = new JsonObject();
         input.addProperty("name", "战士");
@@ -55,15 +82,7 @@ class CampaignCodecTest {
                 UUID.fromString("00000000-0000-4000-8000-000000000005"), "a".repeat(64),
                 sides -> { throw new AssertionError("Character creation does not roll"); });
         var snapshot = new Snapshot(empty.campaignId(), empty.name(), domains);
-        var file = CampaignJson.read(codec.encode(new Document(CampaignLifecycleFixture.FILE, snapshot)));
-        file.getAsJsonObject("domains").getAsJsonArray("characters").get(0).getAsJsonObject()
-                .getAsJsonObject("history").getAsJsonArray("events").get(0).getAsJsonObject()
-                .getAsJsonObject("after").addProperty("version", "1");
-        resign(file);
-
-        var invalid = assertThrows(StorageException.class, () -> codec.decode(CampaignJson.canonical(file)));
-        assertEquals("INVALID_FILE", invalid.code());
-        assertEquals("Complete facts differ from retained root consequences", invalid.getMessage());
+        return CampaignJson.read(codec.encode(new Document(CampaignLifecycleFixture.FILE, snapshot)));
     }
 
     @Test void codePointsNfcAndBusinessIntegerGrammarAreStrict() {

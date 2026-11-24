@@ -4,7 +4,6 @@ import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.module.composition.Schema2CompositionKernel.Schema2Exception;
-import com.dndtool.persistence.JdbcSchema2RuntimeSnapshotRepository;
 import com.dndtool.service.CampaignDomainEngine;
 import com.dndtool.service.Schema2CharacterCheckRules;
 import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
@@ -16,10 +15,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -93,7 +89,7 @@ class CampaignRuleSupportTest {
         assertRejected("STORAGE_RULE_SUPPORT_COMBAT", noAttack);
     }
 
-    @Test void eightMemberLocalCompositionRestoresAndOldJdbcRejectsItBeforeSql() throws Exception {
+    @Test void eightMemberLocalCompositionRestoresInOrder() throws Exception {
         var selected = new ArrayList<>(BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD));
         var common = authorRow(CORE, "rules.json", "rule_key", "language.common");
         for (int index = 1; index <= 4; index++) {
@@ -105,14 +101,6 @@ class CampaignRuleSupportTest {
         var context = Material.of(projection).restore();
         assertEquals(8, context.binding().members().size());
         assertEquals("local_metadata_4", context.binding().members().getLast().moduleKey());
-
-        Connection untouched = (Connection) Proxy.newProxyInstance(Connection.class.getClassLoader(),
-                new Class<?>[]{Connection.class}, (connection, method, args) -> {
-                    throw new AssertionError("Unsupported snapshot touched JDBC: " + method.getName());
-                });
-        var rejected = assertThrows(SQLException.class, () -> new JdbcSchema2RuntimeSnapshotRepository()
-                .store(untouched, Schema2PreparationIdentity.random(), projection));
-        assertEquals("Invalid schema 2 runtime snapshot", rejected.getMessage());
     }
 
     @Test void unownedAutomaticFeatureMustBeDisabledToRemainMetadata() throws Exception {

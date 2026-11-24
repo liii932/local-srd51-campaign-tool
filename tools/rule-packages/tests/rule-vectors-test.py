@@ -1,10 +1,7 @@
-"""Local regression tests for the DRAFT check and application fingerprint vector."""
-import hashlib
-from io import BytesIO
+"""Local regression tests for the DRAFT check."""
 import json
 from pathlib import Path
 import shutil
-import struct
 import subprocess
 import sys
 import tempfile
@@ -12,11 +9,6 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[3]
-
-
-def length_prefixed(stream):
-    length, = struct.unpack('>I', stream.read(4))
-    return stream.read(length)
 
 
 def run_script(script, *arguments):
@@ -70,34 +62,6 @@ class RuleVectorsTest(unittest.TestCase):
         result = run_script(script, '--check', author)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('invalid fields at line 2', result.stderr)
-
-    def test_fingerprint_preserves_raw_crlf_and_encodes_the_nfc_package_name(self):
-        script = self.copy('tools/rule-packages/fingerprint-vector.py')
-        fixture = self.copy('src/test/resources/character-catalog-author')
-        header = fixture / 'author-package.json'
-        declaration = json.loads(header.read_bytes())
-        declaration['package_display_name'] = 'Cafe\u0301'
-        raw_header = (json.dumps(declaration, indent=2) + '\n').replace('\n', '\r\n').encode('utf-8')
-        header.write_bytes(raw_header)
-        result = run_script(script)
-        self.assertEqual(result.returncode, 0, result.stderr)
-
-        vector = fixture.parent / 'source-installation-fingerprint-character-catalog-v1.hex'
-        stream = BytesIO(bytes.fromhex(vector.read_text(encoding='ascii')))
-        length_prefixed(stream)  # Domain marker
-        _, count = struct.unpack('>IH', stream.read(6))
-        fields = {}
-        for _ in range(count):
-            index, _, length = struct.unpack('>HBI', stream.read(7))
-            fields[index] = stream.read(length)
-        self.assertEqual(fields[10], 'Café'.encode('utf-8'))
-
-        files = BytesIO(fields[17])
-        files.read(4)  # Inventory count
-        self.assertEqual(length_prefixed(files), b'author-package.json')
-        self.assertEqual(length_prefixed(files), b'author-header')
-        self.assertEqual(struct.unpack('>Q', files.read(8))[0], len(raw_header))
-        self.assertEqual(length_prefixed(files), hashlib.sha256(raw_header).hexdigest().encode('ascii'))
 
 
 if __name__ == '__main__':

@@ -2,19 +2,13 @@
 
 ## 采用范围
 
-本合同连接 `adventure.monster` 的准确作者／来源／镜像与
-`Schema2CombatRuntimeService`、`Schema2SaveDamageRules` 和 `Schema2MonsterRules` 的 INTERNAL
-怪物动作消费者。唯一可执行怪物动作是
-`SAVE_DAMAGE_BATCH_V1` / `HELL_HOUND_FIRE_BREATH_V1`；普通 Mummy 的火易伤和
-Hell Hound 的火免疫作为真实目标防御消费。怪物能力说明、Bite、Multiattack、Rotting Fist、
-Dreadful Glare 等元数据不取得执行资格，也不能由通用健康输入代替其成本、伤害或后果。
 
-共同事务、角色健康及唯一动作流分别沿用[业务事务](business-write-transactions.md)、
-[角色基础](schema-2-character-foundations.md)、[内部战斗](schema-2-combat.md)和
-[有限施法](schema-2-spells.md)。[多目标公共合同](../design/v2/multi-target-save-damage.md)
-保留更广的目标接口；本文记录已经接入的封闭分支及其适用差异。
-这一 INTERNAL 服务属于旧 MySQL 链路。SQLite 工作台接入有限怪物部署、充能及吐息，并按 format 3 保存战斗。
-完整规则 `dnd5e2014_srd51_se` 仍为 DRAFT，archive format 2 限内部角色片段。[领域接合表](../design/v2/domain-integration.md)
+SQLite 场景通过 `CampaignDomainEngine`、`Schema2MonsterRules` 和 `Schema2SaveDamageRules`
+接入冻结的怪物部署、充能与动作。当前可执行怪物动作限 `SAVE_DAMAGE_BATCH_V1` /
+`HELL_HOUND_FIRE_BREATH_V1`。Mummy 的火易伤和 Hell Hound 的火免疫参与真实目标结算。
+Bite、Multiattack、Rotting Fist 和 Dreadful Glare 保留为元数据。
+[战斗](schema-2-combat.md)与[多目标目标合同](../design/v2/multi-target-save-damage.md)
+分别给出当前动作边界和更广的后续接口。
 
 原文先读本地 SRD：Hell Hound [p.321](../references/srd-5.1/pages/page-321.md)／
 [p.322](../references/srd-5.1/pages/page-322.md)、Mummy [p.333](../references/srd-5.1/pages/page-333.md)、
@@ -101,7 +95,7 @@ HP≤65535。显式 monster save bonus
 不生成 Shield、Counterspell、攻击命中、暴击或 nonlethal 选择。
 完整点格证明为 T 空时接受 `NO_TARGETS`，仍消费一次 action／吐息，但不掷共享骰、不作
 DEX／CON、不创建 packet；不能用空结果掩盖未知规则、缺 reader 或不完整目标。
-INTERNAL 输入／支持错误使用 `S2_BREATH_COMMAND`、`S2_BREATH_AREA`、
+领域输入／支持错误使用 `S2_BREATH_COMMAND`、`S2_BREATH_AREA`、
 `S2_MONSTER_ACTION_UNSUPPORTED`、`S2_MONSTER_RECHARGE_UNAVAILABLE`、
 `S2_MONSTER_SPACE_UNSUPPORTED` 和 `S2_MONSTER_TRAIT_UNSUPPORTED`；版本、当前回合、
 容量、冻结事实与唯一继续点沿既有 `S2_COMBAT_*`／`ACTION_FLOW_*`。公共目标合同的
@@ -174,24 +168,11 @@ Bless、Ready 持能量、独立压制及同名覆盖继续由真实效果 owner
 
 ## 存储、版本与直接恢复
 
-来源 V011 与镜像 V039 保存类型化怪物、动作复合原子及完整覆盖链；运行 V040 保存怪物
-部署、初始／当前／历史状态、action-use、完整目标证明、共享骰、checks、packets 和
-concentration obligations，并扩展准确命令与 flow 类型。既有迁移和持久化标识不改写。
-安装／授权与[只读事实核验](../../database/verify/schema2-monster-breath.sql)是分开的检查点；
-核验只返回完整图的可见结构和异常行，不填补缺失数据或继续 pending。
-`JdbcSchema2MonsterBreathRows` 沿原场景事件／phase 保存并重建这些类型化行：
-
-| V040 物理行 | 责任 |
-|---|---|
-| `s2_combat_monster_deployment`、`s2_combat_breath_input` | 完整 START 部署与封闭吐息意图，不接收客户端结果。 |
-| `s2_combat_monster`、`s2_combat_monster_action` | 前后怪物健康及准确 action-use，关联原场景历史。 |
-| `s2_combat_save_damage_batch`、`s2_combat_breath_candidate`、`s2_combat_breath_target` | 原 release／frame、阶段、完整 roster/membership 和连续 T。 |
-| `s2_combat_breath_die`、`s2_combat_breath_check`、`s2_combat_breath_packet`、`s2_combat_breath_defense`、`s2_combat_breath_concentration` | 原共享骰、save／CON 依据与结果、每目标健康计划／防御来源和 holder 义务；缺少任一被引用节点均拒绝。 |
-| `s2_combat_monster_rest_input`、`s2_combat_monster_rest` | 准确休息意图、开始／到期／完成或中断事实及时间因果引用。 |
+战役冻结怪物定义、动作复合字段和准确来源链。场景保存批次、原骰、完整目标证明与角色引用。
 
 | 事实 | 唯一 owner 与保存／恢复要求 |
 |---|---|
-| 怪物身份与 stat block 来源 | 保存准确 rule/action 身份及同一组合绑定；恢复从原镜像核验，不向最新来源补字段。 |
+| 怪物身份与 stat block 来源 | 保存准确 rule/action 身份及同一组合绑定；恢复从冻结材料核验，不向最新来源补字段。 |
 | 位置、先攻、回合、action/reaction、frame/window | 原场景与唯一 flow；保存当前回合及所有祖先／终结引用，不只留顶层 WAITING 标记。 |
 | 怪物 HP/dead/action-use | `MonsterInstance`；保留原初始及每个前后状态，恢复不回满、不补休息或 recharge。 |
 | 怪物休息 | `MonsterRest` 的准确 key、monster、SHORT／LONG、开始／到期秒、状态及结束操作引用；恢复不重计时间、重发充能或抹去中断事实。 |
@@ -205,21 +186,14 @@ Service 在共同事务内读取准确历史、校验规则与全部版本、预
 事务，之前已经接受的 release/raw/action-use 保留。新根写失败则本命令的全部成本、
 骰审计、版本及事件一起回滚；骰源本身无需倒退。
 
-内部 `Save` 及 `restore` 核对完整业务图、规则和保存骰点后直接写回当前状态及完整历史，
-不调用随机源、不重施法、不复付成本、不重伤害、不 PASS、不恢复效果、不推进时钟。
-PENDING raw 和 after-batch Ready 机会必须由真实生产命令产生后保存，手工拼接 paused
-对象或仅 writer/reader 自洽往返不能充当完整恢复证据。
 
-完整保存/恢复须覆盖的引用闭包包含怪物部署／current/history/action-use → batch/source/action →
-candidate/target/check/shared roll/packet/obligation → flow/window/Ready/effect → 角色因果子事件
-与规则快照，并包含 monster rest／完成操作／时间子事件引用；死亡、源结束或 batch COMPLETE 均不授权删除历史。完整 FINAL 文件、
-发布/接受后的私有运行目录清理、全域恢复映射与容量验收仍按[保存与恢复目标](../design/v2/save-and-recovery.md)
-单独采用，不能把局部仓储恢复写成完整战役存档或授权删除工作集。
+完整文件和同版残留直接恢复现有状态与完整历史，核对部署、伤害批次、各目标、原骰、包、
+flow/window/Ready/effect、角色因果子事件及准确规则。怪物休息引用原时间子事件及完成操作。
+PENDING raw 或伤害后 Ready 保留唯一继续点、已付费用和已完成前缀，恢复不重掷、不重伤害、不重计时间。
 
 ## 独立验证边界
 
-[测试指南](../testing.md#schema-2-有限怪物与多目标豁免伤害验证)按作者／来源／镜像、真实命令、
-共同 cut、事务与恢复分别选择测试。固定 oracle 从本地 SRD 和明确初始状态手算，禁止
+[验收索引](../design/v2/domain-integration.md#可重复验收索引)按作者、共享规则及真实 SQLite 事务选择用例。固定 oracle 从本地 SRD 和明确初始状态手算，禁止
 调用被测 planner、encoder 或 reducer 生成期望。
 
 公共设计原 golden 使用 Protection from Energy 与 Cutting Words，当前未接入这些消费者；
@@ -227,7 +201,7 @@ candidate/target/check/shared roll/packet/obligation → flow/window/Ready/effec
 须用真实 Bless、Ready 持能量、怪物防御、合法来源和完整空间构造同类边界；保存原始
 输入、骰流和独立结果，并从实际仓储读回所有领域，而不是只比较行数或头摘要。
 
-[独立服务 oracle](../../src/test/resources/schema2-monster/breath-runtime-golden.json)使用真实
+[独立规则期望](../../src/test/resources/schema2-monster/breath-runtime-golden.json)使用真实
 一级生命领域角色 A／B：各 HP9、DEX／CON +1、无 DEX／CON 熟练，B 先由真实环境
 效果取得 temp HP5；A 实际施放 Bless 到 A／B，B 实际 Ready 持有 Cure Wounds，
 触发为 H 的怪物动作完成。H、A、B、另一 Hell Hound I、Mummy M 的格坐标为
@@ -250,5 +224,5 @@ candidate/target/check/shared roll/packet/obligation → flow/window/Ready/effec
 自然 1／20、奇数半伤、免疫仍 save、易伤、temp HP 全吸收、零 HP／即死／掉物、
 强制结束先于共同 CON、失败批量结束、after-batch Ready、recharge、pending 直接恢复、
 缺行／孤儿／坏引用拒绝、末尾角色／效果／accepted 写失败回滚及 UNKNOWN 原操作查证。
-JDBC 代理、静态 SQL、测试内容包和局部保存不代替真实 MySQL、安装接受、Host、
-完整文件、技术 END／运行目录清理、部署或跨域发布门。
+`Schema2MonsterBreathRulesTest` 使用该独立期望；`CampaignDomainsCombatIntegrationTest` 与
+`CampaignMonsterSpaceIntegrationTest` 核对实际 SQLite 场景和文件行为。

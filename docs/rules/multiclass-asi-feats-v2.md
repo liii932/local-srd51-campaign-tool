@@ -1,5 +1,7 @@
 # Canonical v2 多职业、ASI 与专长 DRAFT 合同
 
+本页记录历史 DRAFT 目录及其规则语义。当前 SQLite 实现见[领域接合表](../design/v2/domain-integration.md)。历史读写和校验使用[匹配版本](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/multiclass-asi-feats-v2.md)。
+
 本合同属于 `dnd5e2014_srd51_se` release `1` 当前 DRAFT、canonical format `2`、archive format `2`
 设计。V015—V018 冻结旧 MySQL DRAFT 目录，archive format 2 限内部角色片段。
 

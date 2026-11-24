@@ -1,5 +1,7 @@
 # Canonical v2 职业、子职业与职业特性合同
 
+本页记录历史 DRAFT 目录及其规则语义。当前 SQLite 实现见[领域接合表](../design/v2/domain-integration.md)。历史读写和校验使用[匹配版本](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/class-features-v2.md)。
+
 本合同属于 `dnd5e2014_srd51_se` release `1` 当前 DRAFT、canonical format `2`、archive format `2`
 设计。该发布版保持 `DRAFT`，archive format 2 限内部角色片段。DRAFT 设计可以通过后续前向迁移和协调实现继续演进。
 SQLite 当前接入的有界成长与特性见[领域接合表](../design/v2/domain-integration.md)。

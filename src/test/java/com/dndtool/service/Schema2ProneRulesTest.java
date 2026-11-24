@@ -1,24 +1,19 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
-import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.module.composition.Schema2SpellFixtures;
 import com.dndtool.service.Schema2CombatRules.Context;
 import com.dndtool.service.Schema2CombatState.*;
 import com.dndtool.service.storage.CampaignDomainCodec;
-import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.fullAbilities;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.fullPlan;
-import static com.dndtool.persistence.JdbcSchema2CombatRuntimeRepository.DROP_PRONE_SQLITE_REQUIRED;
 import static com.dndtool.service.Schema2CheckTestFixture.*;
 import static com.dndtool.service.Schema2CombatTestFixture.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -351,43 +346,6 @@ class Schema2ProneRulesTest {
         assertEquals(cell(1), actor(mover).position());
         assertEquals(10, actor(mover).movementSpentHalfFeet());
         assertEquals("ACTOR_INACTIVE_OR_NO_MOVEMENT", battle.flows().getLast().movement().stopReason());
-    }
-
-    @Test void mysqlRejectsDropCommandsAndHistoriesBeforeConnecting() {
-        var material = material();
-        var engine = new CampaignDomainEngine();
-        var records = List.of(initialRecord(material, engine, mover), initialRecord(material, engine, opponent));
-        long sceneSecond = 90;
-        var deployments = List.of(new Deployment(mover, cell(0), 0), new Deployment(opponent, cell(1), 1));
-        var opened = engine.executeScene(material, records, null, campaign, combat, sceneSecond, UUID.randomUUID(),
-                Command.openScene(deployments, List.of()), sides -> fail("unexpected d" + sides));
-        var started = engine.executeScene(material, opened.characters(), opened.history(), campaign, combat,
-                sceneSecond, UUID.randomUUID(), Command.reenter(mover, List.of(mover, opponent)), sides -> 10);
-        Command drop = Command.action(Kind.DROP_PRONE, started.history().current().activeActor());
-        var versions = started.characters().stream().collect(Collectors.toMap(record -> record.initial().characterId(),
-                record -> record.history().current().version()));
-        var request = new Schema2CombatRequest(UUID.randomUUID(), combat, campaign, Schema2RulesBinding.from(material),
-                started.history().members(), started.history().current().version(), versions, drop);
-        var source = (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(), new Class<?>[]{DataSource.class},
-                (proxy, method, args) -> fail("unexpected connection method " + method.getName()));
-        var service = new Schema2CombatRuntimeService(source, sides -> fail("unexpected d" + sides));
-        assertEquals(DROP_PRONE_SQLITE_REQUIRED, service.execute(request).code());
-        assertEquals(DROP_PRONE_SQLITE_REQUIRED, service.inspect(request).code());
-
-        var dropped = engine.executeScene(material, started.characters(), started.history(), campaign, combat,
-                sceneSecond + started.elapsedSeconds(), request.operationId(), drop, sides -> fail("unexpected d" + sides));
-        assertEquals(0, dropped.elapsedSeconds());
-        var save = new Schema2CombatRuntimeService.Save(dropped.history(),
-                dropped.characters().stream().map(CampaignDomainEngine.CharacterRecord::history).toList());
-        assertEquals(DROP_PRONE_SQLITE_REQUIRED, service.restore(save).code());
-        assertEquals(DROP_PRONE_SQLITE_REQUIRED, service.inspectRestore(save).code());
-    }
-
-    private CampaignDomainEngine.CharacterRecord initialRecord(ProductionSchema2Projection material,
-            CampaignDomainEngine engine, UUID id) {
-        var initial = fullPlan(material, Schema2PreparationIdentity.random(), campaign, id);
-        var history = engine.initial(material, initial, UUID.randomUUID(), fullAbilities(), INITIAL_CHOICES, UUID.randomUUID());
-        return new CampaignDomainEngine.CharacterRecord("Tester", "PC", initial, history);
     }
 
     private Command readyMove(Position... path) {

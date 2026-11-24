@@ -10,12 +10,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RuleArtifactTest {
     @TempDir Path temp;
-    @Test void completeArtifactHasOnlyPartitionEvidenceAndIndependentFingerprint()throws Exception {
-        var artifact=OfflineTestSupport.artifact(temp);
-        assertEquals(5,artifact.files().size());assertEquals(18,artifact.author().languages().languages().size());
-        byte[] expected=HexFormat.of().parseHex(Files.readString(Path.of("src/test/resources/source-installation-fingerprint-character-catalog-v1.hex")).strip());
-        assertArrayEquals(expected,InstallationFingerprint.encode(artifact,0));
-        assertNotEquals(InstallationFingerprint.digest(artifact,0),InstallationFingerprint.digest(artifact,1));
+    @Test void completeArtifactRetainsOnlyTheTwoDraftPartitions() throws Exception {
+        var artifact = OfflineTestSupport.artifact(temp);
+        assertEquals(5, artifact.files().size());
+        assertEquals("PARTITION", artifact.author().verificationScope());
+        assertEquals(18, artifact.author().languages().languages().size());
+        assertEquals(37, artifact.author().tools().tools().size());
     }
     @Test void rawFileChangeAndExternalHashMismatchFail()throws Exception {
         var a=OfflineTestSupport.artifact(temp);Path directory=temp.resolve("artifact");
@@ -64,6 +64,17 @@ class RuleArtifactTest {
         Files.write(source.resolve("notice.md"),new byte[RuleArtifact.MAX_DOCUMENT+1]);
         assertThrows(Exception.class,()->RuleArtifact.build(source,temp.resolve("too-large")));
     }
+    @Test void unsupportedDirectoryProviderFailsClosed() throws Exception {
+        Path container = temp.resolve("author-source.zip");
+        try (FileSystem zip = FileSystems.newFileSystem(container, Map.of("create", "true"))) {
+            Path root = zip.getPath("/");
+            Path output = temp.resolve("artifact");
+            var failure = assertThrows(java.io.IOException.class, () -> RuleArtifact.build(root, output));
+            assertEquals("Secure directory handles required", failure.getMessage());
+            assertFalse(Files.exists(output));
+        }
+    }
+
     @Test void malformedUtf8DepthStringAndTokenBudgetsFail() {
         assertThrows(Exception.class,()->OfflineJson.parse(new byte[]{(byte)0xc0,(byte)0xaf}));
         for(String bad:List.of("[[[[[[0]]]]]]","\""+"x".repeat(4097)+"\"","["+"0,".repeat(32)+"0]","\"\\ud800\"","\ufeff{}"))

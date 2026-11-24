@@ -1,7 +1,7 @@
 # 工具熟练目录分区
 
 `character.tool` 为 DRAFT `dnd5e2014_srd51_se` / 字符串 `"1"` 的 37 项工具熟练引用目录。
-它与 18 项语言共享作者包、发布根、安装事实和运行快照身份。这里的完整集合只指本目录，
+它与 18 项语言共享作者包和 DRAFT 身份。这里的完整集合只指本目录，
 不包含装备价格、重量、制作、使用算法或角色选择规则，也不是全部角色领域或 COMPLETE。
 本目录沿用完整规则 DRAFT 的分区合同。旧 MySQL 批准摘要与归档映射见[发布身份合同](module-release-identity.md)。
 
@@ -24,67 +24,20 @@
 
 键与分类必须准确配对。正式材料承接既有 V011 目录的英文显示名和短说明，来源页为 70，
 显式排序按 ASCII 键排列。显示文本、合法页码和排序可随受审 DRAFT 修改，并未冻结为唯一值。
-作者文本可正规化到 NFC；存储读取只接受已经规范化的值，不修复坏行。
+作者文本可正规化到 NFC；类型化模型要求已规范化的值。
 
 `ToolPartition` 是不可变类型模型，产生 37 条 `character.tool` 定义及 74 条窄类型属性。
 每项的 `catalog.category` 是 IDENTIFIER，`source.page` 是 INTEGER；没有关系。
 `CharacterCatalogPartition` 汇合语言与工具，通过同一 `ModuleCatalog` 和 canonical-v2
 encoder 产生 55 条定义、110 条属性、零关系。数组位置不替代显式排序，规范顺序按稳定键。
 
-## 安装、来源与运行
-
-来源 V002 在独立规则链追加 `rule_tool` 及分区键约束。主键 `(release_id, tool_key)`，排序
-按发布唯一，外键只引用来源发布根且 RESTRICT。三种内容写入触发器锁根并要求 DRAFT，
-UPDATE 不允许重绑键或发布。已有 V001 和永久语言安装事实保持原样。
-
-新安装的 profile 为 `srd51-character-catalog` / `1`，同一事务保存两领域、根代次、永久事实、
-两项分区与控制行计数，提交前实际读取并比较全部后像。旧语言票据只保留其原事实查证能力。
-完整文件盘点、指纹和失败处理见[离线安装](offline-language-installation.md)。
-
-`JdbcSourceLanguageRepository.loadCatalog()` 在一个只读一致事务中验证两项当前分区及两张
-领域表，返回纯 `CharacterCatalogPartition`。工具查询最多观察第 38 行；缺行、多行、错误
-JDBC 类型或非法字段拒绝整次读取。来源 ID、安装代次及连接能力不进入模型或规范字节。
-
-运行 V020 在 V019 登记/头/语言结构上追加 `runtime_rule_tool`。主键为
-`(snapshot_id, tool_key)`，本地外键 RESTRICT，排序按快照唯一，UPDATE 触发器禁止改写。
-运行表不引用来源表或来源自增 ID。新表初始为空，不升级任何已有快照。
-
-`JdbcRuntimeCharacterCatalogRepository.append/read` 使用调用方提供的运行连接和准确
-run/snapshot UUIDv4 身份对。append 一次写入登记、头、语言和工具，并实际 SELECT 比较完整
-内容；read 只读本地快照，来源断开后仍有效。任何写入、读回或后续业务失败均由调用方回滚
-整笔事务。Repository 不提交、回滚、关闭连接或创建 savepoint。已提交身份不可复用。
-append 拒绝未经[共同业务守卫](business-write-transactions.md)接纳的连接；
-PARTITION 验收通过 `BusinessWriteTransactions.openPartition` 获取调用方 Session。
-头仍是 DRAFT/PARTITION、NULL 内容摘要，不能直接用于游戏运行或存档格式 2。
-
 ## 核验与采用门
 
-正式作者内容用[独立作者核对](language-author-package.md#独立验证)。应用链路使用固定作者夹具。
+正式作者内容用[独立作者核对](language-author-package.md#独立验证)。应用 reader 使用固定夹具。
+独立手写 `ToolCatalogOracle` 的六字段矩阵和语言矩阵分别检查字段；
+`tools/rule-packages/catalog-vector.py` 独立编码并核对规范字节。
+`ToolAuthorPartitionTest` 核对闭合字段、稳定排序、未知值拒绝和固定 canonical-v2 字节。
 
-独立手写 `ToolCatalogOracle` 的六字段矩阵与语言矩阵组成期望，
-`tools/rule-packages/catalog-vector.py` 使用独立大端编码生成
-`src/test/resources/module-canonical-v2-language-tools.hex`，不调用生产模型、reader 或 encoder。
-各链路边界逐字段及逐字节比较；该字节向量不是可保存为完整内容摘要的发布证明。
-
-改变应用源到组合快照的仓储或结构时，可选择 `CharacterCatalogChainTest`、`ToolCatalogSchemaTest`，相邻 reader、离线安装和链清单按差量补测。下列 Python 命令独立核对 JDBC 验收工具及其迁移清单：
-
-```bash
-python3 -B tools/rule-packages/verify-language-jdbc.py
-python3 -B tools/rule-packages/tests/verify-language-jdbc-test.py -v
-```
-
-代理链路覆盖固定作者夹具、真实安装 SQL 适配、来源读取、运行实际读回与独立字节，逐工具写点
-回滚、调用方后续失败、坏字段/跨快照拒绝、来源不可用及多身份隔离。源安装测试覆盖所有
-DML 写点、代次冲突、原接受重放、提交未知、永久历史和预算。SQL 静态检查不能代替引擎约束。
-
-真实验证沿用[隔离 JDBC 入口](language-partition-equivalence.md#隔离-jdbc-入口)，另行授权后
-在可销毁实例原样重放[当前完整运行与来源迁移链](../database.md)，核对实际结构和窄账号，再验证
-双领域安装、读取、约束、禁止权限及回滚。安装分别在语言和工具写入时触发真实 CHECK 拒绝，
-用新连接确认七张来源表完整保留原状态；工具运行镜像另测 NULL、未知键、分类错配、重复
-排序与无父快照外键，失败后登记、头和两个领域均无残留。核验 SQL 和授权模板分别为
-`rule-tool-catalog.sql`、`v020-runtime-tool-snapshot.sql` 与 `runtime-tool-snapshot.sql`。
-未执行时必须保留未验收状态，普通构建不操作数据库或部署。
-
-WAR 包含纯模型与只读/运行适配器。离线维护从同版仓库及其 `target/classes` 读取批准清单和
-运行迁移。离线作者材料、安装类、两条迁移链的 SQL、grants、核验脚本和测试向量均在 WAR 外。其他角色、装备/冒险、战斗/状态、法术、怪物/魔法物品
-的完整链路与跨领域 COMPLETE 门仍需分别实现和验收。
+本分区仅用于 DRAFT 目录校验，不授予游戏执行或存档资格。可玩的工具熟练由战役冻结的
+schema 2 规则提供，见[初始授予](schema-2-proficiency-grants.md)和[领域接合表](../design/v2/domain-integration.md)。
+先前的双库安装和镜像证据随[原版合同](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/tool-catalog-partition.md)保管。

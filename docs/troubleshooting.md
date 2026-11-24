@@ -48,11 +48,9 @@ SQLite 的 `SAVE_PENDING` 应完成准确待保存请求；`COMMIT_UNKNOWN` 或 
 `PLAYER_DEVICE_REAPPROVAL_REQUIRED` 需重新审批。`PLAYER_VIEW_EXPIRED` 要刷新合法候选，
 响应丢失或 `PLAYER_RESULT_UNVERIFIED` 先查证原收据；仍待查证时可关闭原提交，取得已接受或确定未执行的结果。
 
-## 离线 MySQL 集成测试未运行
+## 候选环境出现 MySQL 驱动
 
-需要离线 JDBC 验收时，用 `-Dtest=MySqlIntegrationIT` 显式选择测试，配置获授权的独立测试库、
-启用和确认写入开关，并向运行 Maven 的同一 shell 会话提供口令变量。选中后仍被跳过时，检查
-Surefire 报告中的跳过原因及最终测试计数。命令与目标限制见 [MySQL 集成测试](testing.md#3-mysql-集成测试)。
+检查依赖树及候选 Tomcat 的 home、base 与共享类加载路径。产品构建使用 SQLite JDBC。为候选选择独立干净容器，按[无 MySQL 验收](testing.md#mysql-free-acceptance)复核依赖与就绪结果。
 
 ## WAR 或部署不一致
 

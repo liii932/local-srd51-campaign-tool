@@ -12,7 +12,7 @@ import static com.dndtool.service.storage.CampaignSpaceData.*;
 public final class CampaignSpaceCommands {
     private CampaignSpaceCommands() { }
     public static final Set<String> ACTIONS = Set.of("focus-set", "scene-create", "scene-enter", "scene-leave",
-            "scene-close", "scene-mode", "space-time", "space-move", "space-unplace", "travel", "position", "monster-create");
+            "scene-close", "scene-mode", "scene-place", "space-time", "space-move", "space-unplace", "travel", "position", "monster-create");
     private static final Set<String> ADMIN = Set.of("member-add", "member-update", "control-set", "share-set", "exploration-set", "note", "node-create", "character-create", "manual-create");
     public record Result(CampaignDomainData.State state, UUID subject, UUID combatId) { }
 
@@ -128,6 +128,12 @@ public final class CampaignSpaceCommands {
                 CampaignJson.fields(input, "characterId", "nodeId"); subject = id(input, "characterId"); UUID node = id(input, "nodeId"); requireWorld(before, node); requireCharacter(before, subject);
                 if (position(before, subject) != null) throw new StorageException("SUBJECT_ALREADY_PLACED", "Use an explicit space transfer for a placed subject");
                 state = withSpace(before, before.space(), replace(before.positions(), new Position(subject, current, null, 0, nextPlacementVersion(before, subject))));
+            }
+            case "scene-place" -> {
+                CampaignJson.fields(input, "characterId", "placementVersion", "x", "y");
+                subject = id(input, "characterId");
+                Position placed = adjudicatedPlacement(before, subject, readPlacement(input));
+                state = withSpace(before, before.space(), replace(before.positions(), placed));
             }
             case "travel" -> {
                 CampaignJson.fields(input, "targetNodeId", "minutes", "adjudication", "subjects"); requireWorld(before, current == null ? null : current.id());
@@ -295,6 +301,28 @@ public final class CampaignSpaceCommands {
     }
     private static Position checkedPosition(CampaignDomainData.State state, UUID id, long version) {
         requirePlaced(state, id); Position old = position(state, id); if (old.version() != version) throw new StorageException("STALE_POSITION", "Refresh this subject's placement"); return old;
+    }
+    static ScenePlacement readPlacement(JsonObject input) {
+        return new ScenePlacement(CampaignJson.integer(input, "placementVersion"),
+                CampaignJson.integer(input, "x"), CampaignJson.integer(input, "y"));
+    }
+    static Position adjudicatedPlacement(CampaignDomainData.State state, UUID subject, ScenePlacement request) {
+        requireNoPending(state);
+        Ref focus = state.space().focus().space();
+        if (focus == null || !focus.kind().equals("SCENE"))
+            throw new StorageException("SCENE_FOCUS_REQUIRED", "Focus a scene before placing an admitted character");
+        Scene scene = state.space().scene(focus.id());
+        if (!scene.resolution().equals("DM"))
+            throw new StorageException("RULE_SCENE_OWNER_REQUIRED", "Use the rule scene's spatial actions");
+        if (state.space().monsters().stream().anyMatch(monster -> monster.id().equals(subject)))
+            throw new StorageException("SCENE_PLACEMENT_CHARACTER_REQUIRED", "Direct placement requires a PC or NPC");
+        Position old = checkedPosition(state, subject, request.placementVersion());
+        if (request.x() < 0 || request.y() < 0 || request.x() >= scene.width() || request.y() >= scene.height())
+            throw new StorageException("SCENE_GRID_BOUNDS", "Cell lies outside the scene grid");
+        var cell = new Schema2CombatState.Position((int) request.x(), (int) request.y());
+        if (occupied(state.positions(), old.space(), cell, null))
+            throw new StorageException("SCENE_CELL_OCCUPIED", "Placement requires an empty cell");
+        return new Position(subject, old.space(), cell, old.side(), Math.addExact(old.version(), 1));
     }
     private static void transferable(CampaignDomainData.State state, List<Position> selected) {
         Set<UUID> ids = new HashSet<>(); selected.forEach(p -> ids.add(p.characterId()));

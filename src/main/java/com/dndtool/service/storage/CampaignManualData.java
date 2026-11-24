@@ -24,7 +24,7 @@ public final class CampaignManualData {
                 List.of(new Entry("blank", "空白"), new Entry("commoner", "平民"), new Entry("guard", "守卫"), new Entry("wolf", "狼")),
                 List.of(new ItemTemplate("item.backpack", "背包", "用于携带物品的普通背包"), new ItemTemplate("item.rope_hempen_50ft", "50 英尺麻绳", "普通麻绳"), new ItemTemplate("item.torch", "火把", "普通照明用火把")),
                 List.of("NORMAL", "ADVANTAGE", "DISADVANTAGE"), List.of("MANUAL", "ABILITY", "SKILL", "SAVING_THROW"),
-                List.of("HP", "GRANT_MODULE_ITEM", "GRANT_TEMPORARY_ITEM", "MESSAGE"));
+                List.of("HP", "GRANT_MODULE_ITEM", "GRANT_TEMPORARY_ITEM", "MESSAGE", "POSITION"));
     }
     public record Field(String key, String name, int minimum, int maximum, int defaultValue) { }
     public record Entry(String key, String name) { }

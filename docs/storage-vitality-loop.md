@@ -4,8 +4,8 @@
 
 当前应用模型为 `applicationModel=campaign-spaces-3`、`storageModel=sqlite-campaign-3`。
 所有新战役采用完整领域状态和准确规则组合；简单角色由自由卡承担，不再提供独立 HP
-记录或定额治疗创建模式。旧应用/文件模型明确拒绝，不转换真实数据。当前有限支持范围
-不代表完整 SRD `RELEASED` 或 MySQL 的完整 archive format 2；见[领域接合表](design/v2/domain-integration.md)。
+记录或定额治疗创建模式。旧应用/文件模型明确拒绝，不转换真实数据。完整 SRD 的 DRAFT
+作者目录与本版可运行范围遵守各自资格。[领域接合表](design/v2/domain-integration.md)
 
 ## 战役工作台
 
@@ -13,6 +13,7 @@
 
 - 左栏顶部的“本机规则库”默认收起，展开后可导入、审阅和接受原包。下方的“玩家参与”显示当前连接状态；启用玩家入口并进入战役后，可刷新席位、审批申请、分配角色、设置探索许可与共享、裁定提案，以及查看连接和证书说明。
 - 中栏在未运行战役时提供新建、打开、导入和残留恢复入口。进入战役后，这里显示战役名称、执行焦点、保存与结束按钮，以及八个操作页签。创建和编辑角色、选择行动者与目标均在相应表单内完成。“本战役规则目录”列出当前运行绑定的规则。
+- 在焦点 DM 裁定场景可使用“DM 直接定位”。选择已入场的 PC 或 NPC，填写当前网格的 X、Y 并提交。规则卡检定可在成功和失败后果中各填写一对可选坐标。自由卡检定的有序后果中选择“定位到指定格位”，再选择目标和坐标。
 - 在“自由卡检定”选择执行者，填写检定参数及成功、失败两组有序后果。同一标签页中，刷新页面、保存或连续检定都会保留当前运行的草稿。若所选后果目标离开执行焦点或失去资格，DM 需重新选择目标或删除该行才能提交。结束战役会清空草稿，打开保存文件也会从新的检定表单开始。
 - 右栏每次展示一名规则角色或一张自由卡。用“上一位”和“下一位”浏览，刷新战役状态时保留仍在名单里的当前角色。翻页只改变右栏卡片；中部表单的选择与执行焦点保持原值。
 - 从中栏底边打开“战役记录”，可独立滚动查看当前战役的记录。用关闭按钮或 Esc 收起后，键盘焦点回到入口，表单保持原来的滚动位置。
@@ -79,8 +80,8 @@ DM 仍独占完整文件管理与保存/结束；玩家重连时可查证原收�
 runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 `src/main/resources/storage/rules/`。`BundledCampaignRules` 经
 `ProductionRuleArtifact.read` 验证每个原始 ZIP，再调用
-`ProductionSchema2Projection.compose` 建立生产投影；不从测试 fixture 取得规则，
-不使用来源 MySQL 的安装/接受账本。WAR 随附五个原包和构建时从它们生成的身份清单。应用逐包核对槽位、模组键、发行版本、角色和原始及逻辑摘要。
+`ProductionSchema2Projection.compose` 建立生产投影。WAR 随附五个原包及构建时从它们生成的
+身份清单。应用逐包核对槽位、模组键、发行版本、角色和原始及逻辑摘要。
 标准预设使用下表四个准确成员，自定义路径从本机规则库读取已接受的原包。
 
 | 包 | 角色与直接依赖 |
@@ -159,10 +160,19 @@ Host 与获准玩家入口共用预检；Ready 爬行、OA 暂停及原路径后
 资源、装备、法术书、场景/动作帧、效果、怪物等关系投影；聚合与任一投影不符时拒绝，
 普通指令只写有差异的行，历史按序追加；同一事务仍逐行核验全部投影并登记版本和收据。
 
-`CampaignCheckEffects` 承接成功/失败两条有序效果分支：健康必须引用支持的健康规则，
-简单物品用有界 delta，消息独立记录。两分支完整预检后才掷骰，实际后果及原骰同根提交。
-位置变化通过单独的空间意图提交。`CampaignManualData` / `CampaignManualCommands` 接合独立
-DM-managed 自由卡、职业等级/熟练与 MANUAL/SAVING_THROW。共享安置及场景按[空间合同](design/v2/world-and-scene-spaces.md)管理。
+`CampaignCheckEffects` 的成功和失败分支各选择一名规则角色。健康效果引用受支持的冻结规则，
+已有简单物品使用有界数量变化。分支也可记录消息和一个定位后果，定位作用于该分支目标。
+`CampaignManualCommands` 为自由卡的检定分支执行有序列表，其中定位可与 HP、物品及消息组合，
+目标可为已入场的规则角色或自由卡。
+
+定位使用现有受保护的 DM 命令边界。直接命令 `scene-place` 提交
+`characterId`、`placementVersion`、`x`、`y`。规则卡分支用可选 `position` 对象承载
+`placementVersion`、`x`、`y`，作用于分支原有的 `targetId`。自由卡后果提交
+`kind=POSITION`、`targetId`、`placementVersion`、`x`、`y`，并在 `targets` 中保留
+该目标的卡版本。焦点及其代次来自同一命令的 `focus`，坐标和版本使用规范十进制字符串。
+同一自由卡分支多次移动同一目标时，按有序前缀逐次核对安置版本和占位。每个分支从原状态独立
+预检，全部有效才掷骰，再把选中分支、原骰、位置前后值、版本、根/子历史和收据共同提交。
+[当前空间与定位合同](design/v2/world-and-scene-spaces.md#直接定位与分支定位)
 
 初始化的 DDL、seed、准确规则、战役事实和控制同一事务提交；独立连接完整读回且首份
 检查点接受后才开放游戏命令。每个领域命令先验证完整冻结规则、对象/目标集合、版本、
@@ -170,7 +180,7 @@ DM-managed 自由卡、职业等级/熟练与 MANUAL/SAVING_THROW。共享安置
 幂等结果共同提交或回滚。实例根锁、串行接纳门和一个 `BEGIN IMMEDIATE` 覆盖该次
 接纳及业务提交，不另设独立 C0 或 NOT_COMMITTED 裁定。commit/rollback 未知时禁止
 新写，显式 recover 核验真实库、完整历史和全部接受收据后建立新 epoch；未持久意图
-不自动重试或重播。不会调用另一条 MySQL 服务事务保存其中一部分。
+不自动重试或重播。
 分配首先以原子目录创建发布 `.prepare-<runId>_<inputDigest>_<planDigest>_<inputLength>`
 归属绑定；此阶段只允许空锁及原输入/分配的 `.part`、`.json` 固定槽，不得存在数据库。
 原输入以 runId 为文件身份，完整字节、长度和计划均须匹配目录绑定，分配内容严格核对。
@@ -199,7 +209,7 @@ DM-managed 自由卡、职业等级/熟练与 MANUAL/SAVING_THROW。共享安置
 
 ## 完整文件与直接恢复
 
-文件为 `fileKind=RULE_BOUND_CAMPAIGN`、`formatVersion=3`，不属于 MySQL 存档协议。
+文件为 `fileKind=RULE_BOUND_CAMPAIGN`、`formatVersion=3`。
 根字段为 `applicationModel/campaign/domains/fileKey/fileKind/formatVersion/integrity`。
 领域根历史是唯一历史权威，不再重复存储外层 HP 角色、事件摘要或规则 profile。
 业务整数用规范十进制字符串；完整根 canonical 对象键排序、数组保留业务顺序，使用
@@ -281,6 +291,6 @@ Windows 进程中断和锁释放须由原生 Java/SQLite JDBC 验证，不能用
 不能为隔离验收终止无关服务或改动已有 Tomcat。正式 WAR 与测试 classpath 启动的证据
 分别记录，可重复命令见[测试指南](testing.md#sqlite-结构完整文件与运行验收)。
 
-测试仅使用一次性临时根，不连接 MySQL。人工验收先在页面 END，再停止该隔离进程，
+测试仅使用一次性私有根。人工验收先在页面 END，再停止该隔离进程，
 保管需要的 JSON，最后仅清理明确生成的测试根。真实部署仍只按[部署指南](deployment.md)
 执行停机、完整备份、WAR 审计、可回滚替换和独立授权；代码和测试存在不表示已经部署。

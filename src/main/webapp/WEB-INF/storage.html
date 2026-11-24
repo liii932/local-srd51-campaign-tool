@@ -149,6 +149,10 @@
             <label>生命值效果（可选）<select name="successEffect" data-rules="adventure.vital_effect" data-optional></select></label>
             <label>已有物品记录（可选）<select name="successItem" class="check-branch-item" data-optional></select></label>
             <label>物品数量变化<input name="successDelta" type="number" min="-1000000" max="1000000" value="0" required></label>
+            <div data-check-position hidden>
+              <label>定位到 X（可选）<input name="successX" type="number" min="0"></label>
+              <label>定位到 Y（可选）<input name="successY" type="number" min="0"></label>
+            </div>
             <label>结果消息（可选）<input name="successMessage" maxlength="4096"></label>
           </fieldset>
           <fieldset data-check-branch="failure" hidden disabled><legend>失败时</legend>
@@ -156,6 +160,10 @@
             <label>生命值效果（可选）<select name="failureEffect" data-rules="adventure.vital_effect" data-optional></select></label>
             <label>已有物品记录（可选）<select name="failureItem" class="check-branch-item" data-optional></select></label>
             <label>物品数量变化<input name="failureDelta" type="number" min="-1000000" max="1000000" value="0" required></label>
+            <div data-check-position hidden>
+              <label>定位到 X（可选）<input name="failureX" type="number" min="0"></label>
+              <label>定位到 Y（可选）<input name="failureY" type="number" min="0"></label>
+            </div>
             <label>结果消息（可选）<input name="failureMessage" maxlength="4096"></label>
           </fieldset>
           <button>服务器掷骰检定</button>
@@ -203,6 +211,12 @@
            <label>路径（每行一格，X,Y）<textarea name="path" rows="3" placeholder="1,0" required></textarea></label>
            <label>经过分钟<input name="minutes" type="number" min="0" max="1440" value="0" required></label>
            <label>裁定理由<input name="adjudication" maxlength="160" required></label><button>裁定移动</button>
+         </form>
+         <form id="domain-scene-place" hidden><h3>DM 直接定位</h3>
+           <label>已入场角色<select name="characterId" data-placeholder="请选择角色" required></select></label>
+           <label>目标 X<input name="x" type="number" min="0" required></label>
+           <label>目标 Y<input name="y" type="number" min="0" required></label>
+           <button>放到指定格位</button>
          </form>
         <form id="domain-monster-create"><h3>在焦点节点安置规则怪物</h3>
            <label>名称<input name="name" maxlength="160" required></label><label>怪物规则<select name="monster" data-rules="adventure.monster" required></select></label><button>创建并安置怪物</button>

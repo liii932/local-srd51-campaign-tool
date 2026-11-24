@@ -442,6 +442,31 @@ async function main() {
     const adjudicationScene = await createScene(page, action, '混合裁定场景', 'DM');
     await enterScene(page, action, adjudicationScene, [[manualIds[0], 0, 0, 0], [manualIds[1], 1, 0, 1], [pc.id, 2, 0, 0]]);
     await action('domain', () => form('domain-scene-mode').locator('button').click());
+    const placement = async id => (await currentCampaign()).domain.positions.find(entry => entry.characterId === id);
+    const directForm = form('domain-scene-place'), startingPlacement = await placement(pc.id);
+    await directForm.locator('[name="characterId"]').selectOption(pc.id);
+    await directForm.locator('[name="x"]').fill('4'); await directForm.locator('[name="y"]').fill('0');
+    await action('domain', () => directForm.getByRole('button', {name: '放到指定格位', exact: true}).click());
+    assert.equal(Number((await placement(pc.id)).version), Number(startingPlacement.version) + 1);
+    assert.match(await readHistory(page), /DM 直接定位.*\(2,0\) → \(4,0\)/);
+    await page.locator('[data-pane="actions"]').click();
+    const conditional = form('domain-check');
+    await conditional.locator('[name="characterId"]').selectOption(pc.id);
+    await form('check-with-effects').check();
+    for (const [branch, x, y] of [['success', '3', '1'], ['failure', '4', '2']]) {
+      await conditional.locator(`[name="${branch}Target"]`).selectOption(pc.id);
+      await conditional.locator(`[name="${branch}Effect"]`).selectOption('');
+      await conditional.locator(`[name="${branch}Item"]`).selectOption('');
+      await conditional.locator(`[name="${branch}Delta"]`).fill('0');
+      await conditional.locator(`[name="${branch}Message"]`).fill('');
+      await conditional.locator(`[name="${branch}X"]`).fill(x);
+      await conditional.locator(`[name="${branch}Y"]`).fill(y);
+    }
+    await conditional.locator('[name="difficultyClass"]').fill('0');
+    await action('domain', () => conditional.getByRole('button', {name: '服务器掷骰检定', exact: true}).click());
+    assert.match(await readHistory(page), /检定及后果.*成功.*\(4,0\) → \(3,1\)/);
+    for (const field of ['successX', 'successY', 'failureX', 'failureY'])
+      await conditional.locator(`[name="${field}"]`).fill('');
     await page.locator('[data-pane="manual"]').click();
     assert.equal(await form('manual-success-effects').locator('fieldset').count(), 0, 'A new run must start with no success consequences');
     assert.equal(await form('manual-failure-effects').locator('fieldset').count(), 0, 'A new run must start with no failure consequences');
@@ -459,21 +484,26 @@ async function main() {
       }
     }
     await manualEffect('success', 'HP', {amount: '3'}); await manualEffect('success', 'HP', {amount: '-1'});
+    await manualEffect('success', 'POSITION', {x: '4', y: '1'});
+    await manualEffect('success', 'POSITION', {x: '5', y: '1'});
     await manualEffect('success', 'MESSAGE', {text: '自由行动成功，先恢复后消耗。'});
     await manualEffect('failure', 'HP', {amount: '-1'});
     await action('domain', () => form('manual-check').getByRole('button', { name: '服务器掷骰并应用后果', exact: true }).click());
     await showCharacter(page, 'MANUAL', manualCreated.commandResult.subjectId);
     const freeCard = () => page.locator('#manual-cards .card').filter({hasText: '自由记录员'});
     assert.equal((await freeCard().locator('.hp').textContent()).trim(), '6 / 12');
+    assert.match(await readHistory(page), /定位到 \(4,1\) → 定位到 \(5,1\)/);
     await form('manual-check').locator('[name="checkType"]').selectOption('SAVING_THROW');
     await form('manual-check-source').selectOption(saveRule.key);
     await form('manual-check').locator('[name="rollMode"]').selectOption('ADVANTAGE');
     await form('manual-check').locator('[name="difficultyClass"]').fill('60');
     await manualEffect('failure', 'GRANT_TEMPORARY_ITEM', {name: '应急绷带', description: '自由卡豁免记录', quantity: '2'});
+    await manualEffect('failure', 'POSITION', {x: '5', y: '2'});
     await manualEffect('failure', 'MESSAGE', {text: '豁免失败，使用应急绷带。'});
     await action('domain', () => form('manual-check').getByRole('button', { name: '服务器掷骰并应用后果', exact: true }).click());
     assert.equal((await freeCard().locator('.hp').textContent()).trim(), '5 / 12');
     assert.match(await readHistory(page), /豁免失败，使用应急绷带/);
+    assert.match(await readHistory(page), /\(5,1\) → \(5,2\)/);
     assert.match(await freeCard().innerText(), /应急绷带 × 2/);
     await form('manual-inventory').locator('[name="characterId"]').selectOption({label: '自由记录员'});
     await form('manual-item-source').selectOption('item.torch');
@@ -494,6 +524,7 @@ async function main() {
     await action('domain', () => form('domain-scene-leave').locator('button').click());
     await page.locator('[data-pane="manual"]').click();
     report.checks.push('Free cards edited HP, Dexterity, class level and saving proficiency; MANUAL and saving checks applied ordered outcomes, inventory archive/restore and one shared DM combat grid with rule and free cards');
+    report.checks.push('DM combat used direct positioning and conditional positioning from both check forms; history retained ordered grid changes');
     console.log('Browser phase: free cards, ordered checks and mixed DM combat verified; testing rich battle and files');
     await screenshot('07-free-card-wide.png', 1440, 1050);
     await screenshot('08-free-card-mobile.png', 390, 844);

@@ -15,6 +15,7 @@ import java.util.function.IntUnaryOperator;
 
 import static com.dndtool.service.storage.CampaignDomainData.*;
 import com.dndtool.service.storage.CampaignDomainData.Character;
+import com.dndtool.service.storage.CampaignSpaceData.ScenePlacement;
 
 /** One checked conditional command; both complete branches are admitted before any actual die. */
 public final class CampaignCheckEffects {
@@ -23,7 +24,8 @@ public final class CampaignCheckEffects {
     private CampaignCheckEffects() { }
 
     /** Selecting a temporary-HP effect explicitly chooses REPLACE, before its dice are drawn. */
-    public record Branch(UUID targetId, RuleIdentity healthEffect, UUID itemId, long itemDelta, String message) {
+    public record Branch(UUID targetId, RuleIdentity healthEffect, UUID itemId, long itemDelta, String message,
+                         ScenePlacement position) {
         public Branch {
             uuid(targetId); if (itemId != null) uuid(itemId);
             if (itemDelta < -MAX_QUANTITY || itemDelta > MAX_QUANTITY || (itemId == null) != (itemDelta == 0))
@@ -60,7 +62,7 @@ public final class CampaignCheckEffects {
         public Result { if (state == null || audit == null) throw CampaignJson.bad("Missing conditional result"); uuid(subjectId); }
     }
     private record Plan(Branch branch, Command healthCommand, UUID healthOperation,
-                        Item itemBefore, Item itemAfter) { }
+                        Item itemBefore, Item itemAfter, Position position) { }
     private record Prepared(Input input, UUID checkOperation, Map<UUID, Long> versions, Plan success, Plan failure) { }
 
     /** Input is a plain fixed-field object; command and non-null healthEffect use the typed codec. */
@@ -87,7 +89,9 @@ public final class CampaignCheckEffects {
         List<Item> items = new ArrayList<>(before.items());
         if (chosen.itemAfter() != null) { items.remove(chosen.itemBefore()); items.add(chosen.itemAfter()); }
         items.sort(Comparator.comparing(i -> i.id().toString()));
-        State result = new State(before.material(), characters, before.combats(), before.nodes(), before.positions(),
+        List<Position> positions = chosen.position() == null ? before.positions()
+                : CampaignSpaceCommands.replace(before.positions(), chosen.position());
+        State result = new State(before.material(), characters, before.combats(), before.nodes(), positions,
                 items, before.roots(), before.manual(), before.participation(), before.space());
         var audit = new Audit(input, prepared.versions(), prepared.checkOperation(), chosen.healthOperation(), success,
                 chosen.itemBefore(), chosen.itemAfter(), chosen.branch().message());
@@ -135,7 +139,9 @@ public final class CampaignCheckEffects {
         }
         Command health = branch.healthEffect() == null ? null : healthCommand(material, branch.healthEffect());
         if (health != null) engine.executeSpaceCharacter(material, afterCheck, branch.targetId(), health, healthOperation, sides -> 1);
-        return new Plan(branch, health, healthOperation, oldItem, newItem);
+        Position position = branch.position() == null ? null
+                : CampaignSpaceCommands.adjudicatedPlacement(before, branch.targetId(), branch.position());
+        return new Plan(branch, health, healthOperation, oldItem, newItem, position);
     }
 
     private static Command healthCommand(ProductionSchema2Projection material, RuleIdentity effect) {
@@ -156,13 +162,23 @@ public final class CampaignCheckEffects {
                 CampaignDomainCodec.fromJson(input.get("command"), Command.class), readBranch(CampaignJson.object(input, "success")), readBranch(CampaignJson.object(input, "failure")));
     }
     private static Branch readBranch(JsonObject branch) {
-        CampaignJson.fields(branch, "targetId", "healthEffect", "itemId", "itemDelta", "message");
+        ScenePlacement position = null;
+        if (branch.has("position")) {
+            CampaignJson.fields(branch, "targetId", "healthEffect", "itemId", "itemDelta", "message", "position");
+            if (!branch.get("position").isJsonNull()) {
+                JsonObject placement = CampaignJson.object(branch, "position");
+                CampaignJson.fields(placement, "placementVersion", "x", "y");
+                position = CampaignSpaceCommands.readPlacement(placement);
+            }
+        } else {
+            CampaignJson.fields(branch, "targetId", "healthEffect", "itemId", "itemDelta", "message");
+        }
         String delta = CampaignJson.string(branch, "itemDelta");
         if (!delta.matches("0|-?[1-9][0-9]*")) throw CampaignJson.bad("Expected canonical signed quantity delta");
         final long quantity; try { quantity = Long.parseLong(delta); } catch (NumberFormatException invalid) { throw CampaignJson.bad("Quantity delta overflow"); }
         return new Branch(UUID.fromString(CampaignJson.uuid(CampaignJson.string(branch, "targetId"))),
                 branch.get("healthEffect").isJsonNull() ? null : CampaignDomainCodec.fromJson(branch.get("healthEffect"), RuleIdentity.class),
-                optionalUuid(branch, "itemId"), quantity, CampaignJson.string(branch, "message"));
+                optionalUuid(branch, "itemId"), quantity, CampaignJson.string(branch, "message"), position);
     }
     private static UUID optionalUuid(JsonObject input, String key) { return input.get(key).isJsonNull() ? null : UUID.fromString(CampaignJson.uuid(CampaignJson.string(input, key))); }
     private static Character character(State state, UUID id) {

@@ -1,12 +1,6 @@
 # Schema 2 施法与固定抗魔环境作者来源
 
-本文定义 `adventure.spell`、`character.spellcasting`、`character.wizard_spellcasting`、
-`adventure.environment` 和真实圣徽物件的作者输入、纯组合、
-准确来源与 INTERNAL 运行镜像。沿用[作者基础](schema-2-foundation-authoring.md)、
-[生产制品](schema-2-rule-artifacts.md)、[来源账本](schema-2-source-ledger.md)和
-[战斗作者合同](schema-2-combat-authoring.md)。运行消费者与持久化生命周期见
-[有限施法与持续效果](schema-2-spells.md)。类型登记不改变完整基础包、非空 add-on、
-Host、完整战役、archive format 2 或跨域发布资格。
+本合同约束有限施法及固定环境的类型化作者材料、覆盖和生产投影。初始来源和设备条件按[制品合同](schema-2-rule-artifacts.md)及[检定、装备与健康作者合同](schema-2-foundation-authoring.md)核验。当前消费者见[施法合同](schema-2-spells.md)。
 
 ## 准确身份与法术算法
 
@@ -124,32 +118,12 @@ Shield、Counterspell 分别为一环和三环，出处与机制算法不可自�
 Cure Wounds 的 S 组件要求真实空手；未受训护甲仍禁止施法。物件与手位的状态校验复用
 现有装备消费者，客户端不能用自由布尔值声称材料、空手、准备或剩余法术位已经满足。
 
-## 覆盖、来源与镜像
+## 覆盖、冻结与验证
 
-新类型允许 `set_field` 一次替换目标拥有的完整原子字段，引用一次替换完整身份；
-`set_enabled` 保存启停，只有 `author_note` 可清空。必要引用、属性、算法、出处与必需文本
-均不可清空。同值覆盖也保留 provider、加载序号、原包 SHA、位置、操作和 before/after。
-生产规范格式与五类摘要域不变。
+组合依照作者字段和完整身份核验字段覆盖、前后值及来源链。战役冻结真实法术规则、配置、学习名单
+和环境声明；角色已学、准备、资源和真实作用区域由对应的角色或场景聚合保存。
 
-来源 V010 追加 `rule_schema2_wizard_spellcasting`、`rule_schema2_spellbook_member`、
-`rule_schema2_environment` 和 `rule_schema2_wizard_change`；镜像 V037 对应保存准确配置、
-学习名单和环境规则，并以前向 ALTER 扩展法术、特性与字段链的封闭约束。完整引用使用
-同快照 RESTRICT 外键；来源与运行镜像均独立逐列恢复，不借最新来源补齐。
+`Schema2SpellCompositionTest`、`Schema2WizardCompositionTest` 验证作者材料和投影。
+施法、资源、反应和保存的产品覆盖见[领域接合表](../design/v2/domain-integration.md)。
 
-来源 V009 增加 `rule_schema2_spell`、`rule_schema2_spellcasting` 和
-`rule_schema2_spell_change`。原始作者序号、文本、整数、布尔与七组完整引用分别存列；
-共享 reader 对全部包逐列比较原始 ZIP，包含未选择包，缺失、多余、跨包及任意列差异均拒绝。
-材料只追加，installer 仅获准确列 INSERT，其他来源角色只读。来源仓储不提交或回滚。
-
-运行 V035 增加 `s2_runtime_spell` 与 `s2_runtime_spellcasting`，以前向 ALTER 扩展
-圣徽的装备约束及字段链引用白名单。施法的职业、子职业、特性、资源、两个法术与圣徽
-通过同快照 RESTRICT 外键和语义检查绑定。独立读回从保存的类型化行及完整字段链恢复
-生产投影，不查询最新来源补齐机制字段。V009/V035 不改写既有迁移、RELEASED v1 或
-已发布 digest 合同，也不保存运行施法结果或持续效果实例。
-
-法师与环境的针对性入口为 `Schema2WizardCompositionTest`、`JdbcSchema2WizardSourceTest`、
-`JdbcSchema2WizardSnapshotTest`；
-验证入口还包括 `Schema2SpellCompositionTest`、`JdbcSchema2SpellSourceTest`、
-`JdbcSchema2SpellSnapshotTest` 与 `Schema2SpellSchemaTest`，运行消费者另验证真实初始化、
-共享资源消耗、组件、目标、持续效果及恢复。代理和静态 SQL 测试不证明 MySQL 的触发器、
-权限和外键已经执行；迁移、授权、实际数据库验收与部署仍是独立检查点。
+[旧版来源与镜像](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/schema-2-spell-authoring.md)

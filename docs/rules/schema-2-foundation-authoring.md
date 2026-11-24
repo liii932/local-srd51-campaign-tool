@@ -1,15 +1,6 @@
 # Schema 2 检定、装备与健康作者来源
 
-本合同定义 `adventure.check`、`equipment.item`、`adventure.health` 和
-`adventure.vital_effect` 的严格作者输入、纯组合、生产投影与真实来源存储。
-它扩展[生产制品合同](schema-2-rule-artifacts.md)和[来源账本](schema-2-source-ledger.md)，
-沿用既有准确身份、原始 ZIP、直接依赖、完整字段链和生产摘要域。
-
-这些类型已能解析、组合、从类型化来源读回，并校验原始作者事实。运行 V028—V031 的
-[准确镜像与角色事实存储](schema-2-character-fact-storage.md)已接通完整字段链、封闭记录格式及叶仓储恢复；
-[角色基础消费者](schema-2-character-foundations.md)在同一内部角色链执行真实检定、装备和健康命令，
-沿用既有[成长与资源](schema-2-character-statistics.md)及[标准休息](schema-2-character-rest.md)。
-作者类型中的算法登记本身不授予执行资格，也不扩大安装、Host、完整战役或 archive format 2 资格。
+本合同约束检定、装备、健康和环境效果的严格作者输入、纯组合与生产投影。准确身份、原始 ZIP、直接依赖、完整字段链和生产摘要域见[制品合同](schema-2-rule-artifacts.md)。当前业务消费者见[角色基础合同](schema-2-character-foundations.md)。
 
 ## 身份、文本与出处
 
@@ -114,28 +105,10 @@
 新增字段及每步操作进入各自类型化投影；原始非法算法、数值、引用或清空不能被后包的合法最终值隐藏。
 旧 RELEASED 与不含新类型的既有固定字节合同保持。
 
-## 真实来源与运行采用边界
+## 当前验证与运行
 
-来源 V006 增加 `rule_schema2_check`，检定修改复用已有的类型化成长修改表；
-V007 增加 `rule_schema2_equipment_item`、`rule_schema2_health`、
-`rule_schema2_vital_effect`、`rule_schema2_execution_change`。
-定义和修改按准确原包、版本及原始作者序号保存，文本、整数、布尔和完整引用分别存列，
-不把对象压成 JSON 文本。共享 reader 对全部包逐列比较原 ZIP，包含未选中包；
-缺失、多余、跨包、序号或值不一致均拒绝。负修正及严格清空也参与来源读回校验。
+`Schema2CheckCompositionTest` 和 `Schema2EquipmentHealthCompositionTest` 使用固定作者与覆盖材料。
+当前战役保留完整的生产投影与来源链；实际命令的闭合预检、原骰、状态和恢复用
+`CampaignDomainsIntegrationTest`、`CampaignCheckEffectsTest` 和[存储运行合同](../storage-vitality-loop.md)验证。
 
-RULES 的 V001—V009 合计 38 张表、114 个触发器，其中 schema 2 为三个账本表与 28 张类型化作者材料表；
-加运行 V001—V036，共 45 份迁移源。既有历史不可改写；迁移、授权与真实引擎验收各是独立检查点。
-installer 仅获准确材料列 INSERT，accepter/app/agent 对这些材料只读，仓储不拥有提交或回滚权限。
-
-`Schema2CompositionKernel` 与 `ProductionSchema2Projection` 支持这些类型的纯组合、完整链及
-材料还原；`Schema2SourceLedger`、`JdbcSchema2CharacterSourceRepository` 和
-`JdbcSchema2ExecutionSourceRows` 承担真实来源等价核对。纯材料还原不等于运行快照或角色恢复。
-运行 V028/V030 以类型化表保存这四类规则及完整链，不能丢弃定义后保存不完整快照。
-V029/V031 的[角色事实仓储](schema-2-character-fact-storage.md)保存输入、结果、状态和原骰，
-提供结构校验、追加和直接恢复；实际检定、装备、健康规则与 RuntimeService 命令由
-[角色基础合同](schema-2-character-foundations.md)限定。规则执行和保存历史的语义验证不能由来源或仓储结构校验代替。
-[采用边界](../design/v2/adoption-boundaries.md)中的完整基础包及非空 add-on 的
-封闭安装资格门保持，类型化夹具不证明内容包已经可安装或可运行。
-
-组合、来源及结构验证入口见[测试指南](../testing.md#schema-2-检定装备与健康作者来源验证)。
-代理与静态 SQL 测试不能代替真实 MySQL 的触发器、权限、锁和持久化验收。
+[旧版来源与镜像](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/schema-2-foundation-authoring.md)

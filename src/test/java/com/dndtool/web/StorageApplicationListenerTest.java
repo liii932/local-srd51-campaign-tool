@@ -75,6 +75,14 @@ final class StorageApplicationListenerTest {
         assertFalse(Files.exists(home));
     }
 
+    @Test void missingOverridesAndUnusableHomeFailWithoutStartingTheService() {
+        for (String home : new String[] {null, "", "  ", "relative-home"}) {
+            Fixture fixture = new Fixture(null);
+            new StorageApplicationListener(null, home).contextInitialized(fixture.event());
+            assertProblem(fixture, "STORAGE_ROOT_INVALID");
+        }
+    }
+
     @Test void rootsWithinDeployedAndGitTreesAreRejectedBeforeCreation() throws Exception {
         Fixture expanded = new Fixture(temporary.resolve("webapp/private").toString());
         expanded.deployedRoot = temporary.resolve("webapp").toString();

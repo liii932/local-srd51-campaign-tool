@@ -1,5 +1,7 @@
 # Canonical v2 一级角色创建合同
 
+本页记录历史 DRAFT 目录及其规则语义。当前 SQLite 实现见[领域接合表](../design/v2/domain-integration.md)。历史读写和校验使用[匹配版本](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/character-creation-v2.md)。
+
 本合同属于 `dnd5e2014_srd51_se` release `1`、canonical format `2`、archive format `2`。
 该发布版仍为 `DRAFT`；实现存在不代表它可绑定战役、执行规则或导入存档。只有主要规则领域完成
 整合后的跨领域发布门才能发布该身份。SQLite 当前角色创建的准确模板见[运行合同](../storage-vitality-loop.md#有限-schema-2-规则材料)。

@@ -132,7 +132,7 @@ JSON、离线入口/写入适配器、生成安装载荷和测试夹具不得进
 python3 -B tools/rule-packages/catalog-vector.py --check rule-packages/srd51-complete
 ```
 
-脚本核对作者身份、两个分区声明和每行六字段，将 18 项语言与 37 项工具同[独立作者期望](../../rule-packages/srd51-complete-expected.tsv)逐项比较，再独立编码并核对固定的 DRAFT 规范字节摘要。这个摘要用于验证当前两分区，发布摘要仍由完整领域决定。应用 reader、JDBC 安装和运行资格分别有自己的证据，离线安装按[安装合同](offline-language-installation.md)另验。
+脚本核对作者身份、两个分区声明和每行六字段，将 18 项语言与 37 项工具同[独立作者期望](../../rule-packages/srd51-complete-expected.tsv)逐项比较，再独立编码并核对固定的 DRAFT 规范字节摘要。这个摘要用于验证当前两分区，发布摘要仍由完整领域决定。应用 reader 的固定夹具和字节向量按[测试指南](../testing.md)核对。目录制品的构建和核验见[离线 DRAFT 制品](offline-language-installation.md)。
 
 修改应用 reader 时可选下列定向测试，工程容量场景加 `-DargLine=-Xmx64m`：
 

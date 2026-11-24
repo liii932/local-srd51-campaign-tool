@@ -3,6 +3,7 @@ package com.dndtool.service.storage;
 import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.module.composition.ProductionSchema2Projection.StoredMember;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -16,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,7 +29,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LocalRuleLibraryTest {
     private static final String DM = "local-dm";
-    @TempDir Path storage;
+    private Path storage;
+
+    @BeforeEach void createPrivateStorage(@TempDir Path temporary) throws IOException {
+        storage = temporary.resolve("storage");
+        ManagedCampaignFiles.createDirectory(storage);
+    }
 
     @Test void importAndAcceptanceAreIndependentExactAndReplayTheOriginalReceipt() throws Exception {
         LocalRuleLibrary library = new LocalRuleLibrary(storage);

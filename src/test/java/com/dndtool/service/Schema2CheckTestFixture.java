@@ -1,7 +1,6 @@
 package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
-import com.dndtool.persistence.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.google.gson.*;
@@ -10,9 +9,8 @@ import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.*;
-import static org.junit.jupiter.api.Assertions.*;
 
-/** Original author bytes and real preparation, retained snapshot, initialization and JDBC consumers. */
+/** Fixed author material and prepared character facts for check, health and combat rules. */
 final class Schema2CheckTestFixture {
     static final Schema2PreparationIdentity IDENTITY = new Schema2PreparationIdentity(UUID.fromString("30912233-4455-4677-8899-aabbccddeeff"), UUID.fromString("d0eeddcc-bbaa-4988-8766-554433221100"));
     static final UUID PREPARATION = UUID.fromString("30872103-0345-4abc-8def-0123456789ab");
@@ -41,56 +39,6 @@ final class Schema2CheckTestFixture {
     static final RuleIdentity ZERO_DAMAGE = new RuleIdentity(BASE, "adventure.vital_effect", "vital_effect.zero_damage");
     static final GrowthChoices INITIAL_CHOICES = new GrowthChoices(null, Map.of(), null, Map.of(INITIAL_SKILL_SLOT, List.of(ARCANA)));
 
-    final Schema2SourceReadFixture source;
-    final Schema2RuntimeJdbcFixture runtime = new Schema2RuntimeJdbcFixture();
-    final ProductionSchema2Projection material;
-    final Schema2RulesBinding binding;
-    final Schema2CharacterRuntimeService service;
-    final ArrayDeque<Integer> nextRolls = new ArrayDeque<>();
-    State state;
-    int rolls;
-
-    Schema2CheckTestFixture() throws Exception { this("normal"); }
-    Schema2CheckTestFixture(String mode) throws Exception {
-        var artifacts = Schema2GrantFixtures.artifacts(packages(mode));
-        material = ProductionSchema2Projection.compose(artifacts); binding = Schema2RulesBinding.from(material);
-        source = new Schema2SourceReadFixture(artifacts);
-        var character = new Schema2InitialProficiencyRules.Request(new Schema2InitialProficiencyRules.Sources(
-                new RuleIdentity(BASE, "character.race", "race.human"), null,
-                new RuleIdentity(BASE, "character.background", "background.guard"), CLASS), Map.of());
-        var prepared = new Schema2InitializationPreparationService(source.dataSource()).prepare(
-                new Schema2InitializationPreparationService.Request(PREPARATION, IDENTITY, CAMPAIGN, CHARACTER,
-                        source.selections(), null, character));
-        var accepted = new Schema2SnapshotTransferService(source.dataSource(), runtime.dataSource()).transferPrepared(prepared);
-        assertEquals(Schema2SnapshotTransferService.Status.COMMITTED, accepted.status(), accepted.code());
-        service = new Schema2CharacterRuntimeService(runtime.dataSource(), sides -> {
-            assertTrue(Set.of(4, 6, 8, 10, 12, 20).contains(sides)); rolls++; return nextRolls.isEmpty() ? Math.min(10, sides) : nextRolls.removeFirst();
-        });
-    }
-    void initialize() { commit(new Command("INITIALIZED", null, 0, null, null, null, INITIAL_CHOICES)); }
-    Schema2CharacterRequest request(Command command) {
-        return new Schema2CharacterRequest(UUID.randomUUID(), IDENTITY, CAMPAIGN, CHARACTER,
-                PREPARATION, binding, state == null ? -1 : state.version(), command, state == null ? fullAbilities() : Map.of());
-    }
-    Schema2CharacterRuntimeService.Result execute(Schema2CharacterRequest request) {
-        var result = service.execute(request);
-        if (result.status() == Schema2CharacterRuntimeService.Status.COMMITTED) state = result.event().after();
-        return result;
-    }
-    Schema2CharacterRuntimeService.Result commit(Command command) {
-        var result = execute(request(command)); assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED, result.status(), result.code()); return result;
-    }
-    UUID acquire(RuleIdentity item) {
-        UUID operation = UUID.randomUUID();
-        var command = equipment("ITEM_ACQUIRED", operation, item, "CARRIED");
-        var request = new Schema2CharacterRequest(operation, IDENTITY, CAMPAIGN, CHARACTER, PREPARATION,
-                binding, state.version(), command, Map.of());
-        var result = execute(request); assertEquals(Schema2CharacterRuntimeService.Status.COMMITTED, result.status(), result.code()); return operation;
-    }
-    void prepareTools() {
-        UUID first = acquire(ITEM_TOOL); commit(equipment("ITEM_EQUIPPED", first, null, "MAIN_HAND"));
-        UUID other = acquire(OTHER_ITEM_TOOL); commit(equipment("ITEM_EQUIPPED", other, null, "OFF_HAND"));
-    }
     static State withPreparedTools(State before) {
         var items = List.of(new EquipmentItem(UUID.fromString("11111111-1111-4111-8111-111111111111"), ITEM_TOOL, "MAIN_HAND"),
                 new EquipmentItem(UUID.fromString("22222222-2222-4222-8222-222222222222"), OTHER_ITEM_TOOL, "OFF_HAND"));

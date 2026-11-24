@@ -185,19 +185,11 @@ release 1 的 23 个 canonical format 1 分区及批准摘要仍由[冻结 v1 �
 9. 模型或文件协议变化同步更新代码、身份/格式声明、项目文档和测试，未完成的采用仍明确标为未实现。
 
 完整规则族当前映射为：module key `dnd5e2014_srd51_se`、release version 1、canonical format
-version 2、archive format version 2。V011 和
-[角色目录与 canonical format 2](character-catalog-v2.md) 建立当前角色 DRAFT 投影基线；该身份
-保持 `DRAFT`，直到所有主要规则领域完成整合并通过统一发布门。
-迁移文件存在不构成数据库已经执行或发布成功的证据。
-
-V012 的[一级角色创建合同](character-creation-v2.md)、V013 的
-[升级与生命骰合同](level-advancement-v2.md)与 V014 的
-[职业、子职业与职业特性合同](class-features-v2.md)以及 V015 的
-[多职业、ASI 与专长合同](multiclass-asi-feats-v2.md)只扩充该 DRAFT 身份。多职业施法和专长的
-战斗效果仍明确阻断。这些迁移不会开放 archive format 2。V017 及内部 DRAFT codec 已为当前角色状态建立稳定事件
-闭包、严格写入/读取、预览与原子恢复基础。V018 冻结[多职业施法贡献](multiclass-spell-slots-v2.md)，
-共享法术位的计算、权威状态和升级接合仍待采用。这些旧 MySQL DRAFT 投影仍限内部验证。
-当前 Host 支持的规则、角色和完整文件以 SQLite 领域接合为准。[领域接合表](../design/v2/domain-integration.md)
+version 2、archive format version 2。该身份仍为 `DRAFT`，直到主要领域完成接合并通过统一发布门。
+[角色目录与 canonical format 2](character-catalog-v2.md)记录准确目录身份及规范投影；
+语言和工具分区由[独立作者入口](language-author-package.md#独立验证)验证。
+历史内部片段按[原格式边界](archive-format-2-character-state.md)保管。当前工作台的规则、角色和完整文件以
+[SQLite 领域接合](../design/v2/domain-integration.md)为准。
 
 ## 6. 完成判定
 
@@ -212,7 +204,7 @@ V012 的[一级角色创建合同](character-creation-v2.md)、V013 的
 - Host UI/API 只接受有界输入，Service 重新计算权威候选和结果；
 - Repository 保存完整状态、事件、快照、资源变化、版本和幂等结果；
 - 交付模组的作者声明、组合和可见行为有独立向量及非 Maven 的成品行为证据。
-- 应用机制的正常、边界、畸形冻结数据、过期版本、重复请求和事务失败按影响通过定向测试。深度应用回归按测试指南选择，真实 JDBC 语义按独立授权验收。[测试指南](../testing.md#2-必要时的完整验证)
+- 应用机制的正常、边界、畸形冻结数据、过期版本、重复请求和事务失败按影响通过定向测试。深度应用回归按实际调用者和事务边界选择。[测试指南](../testing.md#2-必要时的完整验证)
 - 当前支持格式的存档导出、严格读取、预览、确认、失败回滚及不支持格式的拒绝已覆盖；
 - 生产资源变化后的 WAR 审计没有秘密、本机路径、日志、备份或真实存档；
 - README 与架构文档准确区分已实现行为和剩余目标，不把设计目标写成发布事实。

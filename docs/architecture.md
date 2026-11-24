@@ -48,6 +48,4 @@ Host 入口固定为 `http://127.0.0.1:8080`，应用检查连接、Host 和请�
 完整文件打开建立新执行身份。故障恢复继续核对原运行及其事务记录。
 见[存储运行合同](storage-vitality-loop.md)和[备份恢复](backup-and-restore.md)。
 
-MySQL 迁移、JDBC 核验和规则源维护属于[独立数据库工具](database.md)。已有数据库和
-存档从生产 WAR 之外保管。发布所需的行为验证、WAR 审计与实际部署见
-[测试指南](testing.md)和[部署指南](deployment.md)。
+运行时由 SQLite 存储服务消费纯领域引擎、规则材料、请求摘要和历史校验。默认 Maven 构建包含 SQLite JDBC；外部 Tomcat 提供 Servlet API。作者 CLI 可在仓库构建输出上离线核验 DRAFT 目录和 schema 2 原包。原 MySQL 的运行与来源适配器、迁移及运维工具随旧版本保管。[数据库说明](database.md) · [候选验证](testing.md) · [部署流程](deployment.md)
