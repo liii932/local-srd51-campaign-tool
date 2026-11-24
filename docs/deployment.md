@@ -15,15 +15,95 @@
 
 按 [WAR 审计方法](testing.md#6-war-审计)记录候选字节数、SHA-256 和 ZIP 条目数。核对
 生产描述符、Servlet 和 Filter、SQLite JDBC、结构 JSON、五个规则原包、对应的 `bundled-members.tsv` 身份清单和 Host/玩家
-静态资源。MySQL 维护使用[对应版本的仓库及编译输出](database.md#迁移合同)。审计源码与资源差量，
-确认 WAR 无 V001—V042 运行迁移、独立迁移清单加载器和来源账本核验器、退役 MySQL Web 入口、Connector/J、外部
-Tomcat 配置、凭据、密钥、账号专用配置、日志、备份和真实战役数据。
+静态资源。逐项核对交付类与源码、实际依赖以及清单，审计退役的运行与来源适配器、SQL、离线工具、MySQL 驱动及旧路由。复核资源和配置差量中的秘密、外部容器配置、日志、备份及私有战役资料。[原数据保管](database.md#迁移合同)
 
-[MySQL 退役设计](design/v2/mysql-retirement.md)采用时，候选须另满足
-[无 MySQL 采用验收](testing.md#mysql-free-acceptance)，包括从空 Maven 本地库构建、
-真实 WAR 启动、双机文件和原工作库恢复。当前 WAR 的 SQLite 启动检查只覆盖运行环节，
-Maven 仍解析离线工具所用的 Connector/J。候选通过两机验收后，正式替换继续依照本页的
-备份、替换、启动及回滚流程；已有 MySQL 数据的保管与处置按[数据库说明](database.md)。
+候选须通过[无 MySQL 采用验收](testing.md#mysql-free-acceptance)，包括空 Maven 库解析、真实 WAR 启动、两个环境间打开完整文件和原工作库恢复。正式替换按本页备份与回滚流程处理，旧库保管见[数据库说明](database.md)。
+
+<a id="isolated-war-candidate"></a>
+
+### 隔离外部 Tomcat 候选
+
+使用全新 Tomcat 10.1 发行包和私有的一次性 base、运行根、证据目录。启动前核对 8080、
+8005 及启用玩家时的 8443 空闲。Windows 使用[原生候选工具](testing.md#原生-windows-外部-tomcat-候选验收)。
+Linux 在环境 A 运行以下准备步骤。变量分别填入干净 Tomcat 解压目录、JDK 目录、审计后 WAR 的
+绝对路径；其余目录均在本地 POSIX 文件系统。以本次测试账号执行，使用该账号的干净启动环境。
+
+```bash
+set -eu
+umask 077
+: "${clean_tomcat_home:?}" "${candidate_java_home:?}" "${candidate_war:?}"
+for candidate_input in "$clean_tomcat_home" "$candidate_java_home" "$candidate_war"; do
+  case "$candidate_input" in /*) ;; *) exit 1 ;; esac
+done
+test -x "$clean_tomcat_home/bin/catalina.sh"
+test -x "$candidate_java_home/bin/java"
+test -f "$candidate_war"
+candidate_dir="$(mktemp -d)"
+candidate_shutdown="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+export CATALINA_HOME="$clean_tomcat_home" JAVA_HOME="$candidate_java_home"
+export CATALINA_BASE="$candidate_dir/base"
+export DND_STORAGE_ROOT="$candidate_dir/storage"
+mkdir -p "$CATALINA_BASE"/{conf/Catalina/localhost,logs,temp,webapps,work,lib}
+mkdir -p "$candidate_dir"/{home,evidence}
+cp "$CATALINA_HOME"/conf/{web.xml,catalina.properties,logging.properties} "$CATALINA_BASE/conf/"
+cp "$candidate_war" "$CATALINA_BASE/webapps/ROOT.war"
+printf '<Context />\n' > "$CATALINA_BASE/conf/context.xml"
+printf '<Context />\n' > "$CATALINA_BASE/conf/Catalina/localhost/ROOT.xml"
+cat > "$CATALINA_BASE/conf/server.xml" <<XML
+<Server port="8005" address="127.0.0.1" shutdown="$candidate_shutdown">
+  <Service name="Catalina">
+    <Connector address="127.0.0.1" port="8080" protocol="HTTP/1.1" connectionTimeout="20000" maxPostSize="16778240" />
+    <Engine name="Catalina" defaultHost="localhost">
+      <Host name="localhost" appBase="webapps" unpackWARs="true" autoDeploy="false" deployOnStartup="true" />
+    </Engine>
+  </Service>
+</Server>
+XML
+unset candidate_shutdown
+export CATALINA_OPTS="-Duser.home=\"$candidate_dir/home\""
+cmp -s "$candidate_war" "$CATALINA_BASE/webapps/ROOT.war"
+sha256sum "$candidate_war" "$CATALINA_BASE/webapps/ROOT.war"
+"$CATALINA_HOME/bin/catalina.sh" run
+```
+
+核对复制前后摘要，再从另一终端检查监听和就绪。正常停机使用同一 home/base 的
+`catalina.sh stop`，待进程和端口退出。做中断验收时，用实际 Java 进程的启动参数、
+PID 和启动时间确认准确 base，再终止该候选进程。Windows 用候选工具的 Status/Stop
+核对进程身份。变动 Context、环境变量和 JVM 参数前停止一次性实例，保留旧运行根及
+已有证据，按[启动分支](testing.md#mysql-free-acceptance)准备新夹具。
+[Tomcat 安装与启动](https://tomcat.apache.org/tomcat-10.1-doc/setup.html)
+
+退役验收记录两侧实际启动命令、类加载来源与连接尝试。JDK 可加 `-Xlog:class+load=info`
+并保留启动标准输出。A 可在前述 `catalina.sh run` 前加
+`strace -ff -e trace=connect -o "$candidate_dir/evidence/connect"`。B 可在隔离虚拟机上
+用获授权的管理员终端运行以下追踪，Tomcat 仍以测试运行账号启动。
+
+```powershell
+netsh trace show status
+netsh trace start provider=Microsoft-Windows-TCPIP provider=Microsoft-Windows-Winsock-AFD report=disabled persistent=no "tracefile=$traceFile"
+# 从另一个终端启动候选，完成就绪检查及本次业务后正常停止。
+netsh trace stop
+netsh trace convert "input=$traceFile" "output=$traceText" dump=XML report=no
+```
+
+为每次追踪选择新证据路径，保持已存在的追踪会话。将 Bash 的 `$closed_port` 或 PowerShell
+的 `$closedPort` 设为已确认未监听的环回端口，执行以下探针。预期连接失败，并在追踪中看见
+连接尝试。A 使用独立 strace 输出前缀，B 在同一 ETW 追踪中按探针 PID 核对。
+
+```bash
+strace -ff -e trace=connect -o "$candidate_dir/evidence/control-connect" \
+  curl --noproxy '*' --connect-timeout 2 "http://127.0.0.1:${closed_port}/"
+```
+
+```powershell
+curl.exe --noproxy '*' --connect-timeout 2 "http://127.0.0.1:${closedPort}/"
+```
+
+按候选 Java PID 和运行时段核对实际事件，排除数据库
+驱动加载及未知目标连接；正常健康探针、候选 HTTPS 和停止命令的环回流量单独标明。
+无法观测启动或连接尝试时保留对应证据缺口。追踪不替代产物、配置及启动调用链检查。
+[Windows 网络追踪](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-trace) ·
+[Winsock 事件与进程对应](https://learn.microsoft.com/en-us/windows/win32/winsock/control-of-winsock-tracing)
 
 ## 2. 存储前提
 
@@ -60,6 +140,15 @@ DM Connector 固定绑定 `127.0.0.1:8080`，shutdown listener 同样限 loopbac
 4. 用实际桌面和移动设备执行[玩家验收矩阵](design/v2/player-participation.md#验收与采用门)。
    核对证书信任、目标地址、两设备授权隔离、权限撤销和重连查证。
 5. 关闭时移除相应应用参数、HTTPS Connector 和防火墙规则，保管运行及完整文件。
+
+隔离 WAR 验收使用 `127.0.0.1:8443`，单独准备空白根和停止状态的候选 base。用 JDK
+`keytool -genkeypair` 生成短期 PKCS12 测试证书，设置 `-ext SAN=ip:127.0.0.1`。将
+示例 Connector 放在该 base 的 `server.xml` 中，与 DM Connector 同属一个 `Service`。
+在候选 Java 上加入 `-Dorg.apache.tomcat.util.digester.PROPERTY_SOURCE=org.apache.tomcat.util.digester.EnvironmentPropertySource`，
+从测试启动环境设置 `DND_PLAYER_BIND_ADDRESS=127.0.0.1`、`DND_PLAYER_ORIGIN=https://127.0.0.1:8443`、
+`DND_PLAYER_KEYSTORE` 和 `DND_PLAYER_KEYSTORE_PASSWORD`。Linux 使用 `CATALINA_OPTS` 补 JVM
+参数，Windows 候选工具从临时 `JDK_JAVA_OPTIONS` 读取。检查实际监听后，按[玩家参与验证](testing.md#玩家参与原型验证)
+使用该测试证书和对应浏览器工具。
 
 ### 自动化部署身份
 

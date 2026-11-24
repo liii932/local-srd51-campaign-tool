@@ -71,28 +71,17 @@ Counterspell 或上述 Shield 资格时，其完成事件才进入此提前发�
 
 ## 类型化保存、恢复与验证
 
-运行迁移 V042 为 cast command/attempt 增加方向，并建立
-`s2_combat_spell_damage_source`。共享 batch 的 action 身份允许完整为空；精确 source 明细
-只能指向同一 phase 的真实 cast/child frame。既有 `s2_combat_breath_*` 表名保留为物理历史，
-其完整 candidate、骰、check、packet、防御和专注明细由共享消费者复用。RULES V012 仅新增
-准确算法接纳，原算法和迁移不改写。
+
+`SaveDamageBatch` 保留真实 cast 来源、方向、准确 frame、完整目标、共享原骰、用到的防御与专注意务。
+命令、角色因果历史和场景事件均保存于同一 SQLite 业务事务。
 
 读取和恢复检查完整原 source、cast/window/frame、INT/PB、目标、原骰、健康/角色因果
 历史、强制余集和接受结果；未知、缺行、多行、孤儿或字段改变均拒绝。声明窗口、原始骰
 暂停、伤害后 Ready 以及施法者死亡后的父继续点均可直接恢复，不重施法、重选资源、
 重掷、隐式 PASS、重伤害或退款。根、子事件、版本和接受结果共同提交或回滚；调用方拥有事务。
 
-`Schema2SpellSaveDamageRuntimeServiceTest` 的手算向量使用真实 Wizard A（INT10、PB2、DC10）、
-生命领域 B（HP9、temp5、DEX/CON +1）、Hell Hound 和 Mummy。B 实际施放 Bless 到 A/B，
-再以 Ready move 等待 A 完成施法；A 的东向锥形包含 B/Hell Hound/Mummy。
-共享三骰 3/4/4 得 11；B 原 DEX7、Bless1 得 9，失败；Hell Hound 的 DEX12/+1
-见本地 [p.322](../references/srd-5.1/pages/page-322.md)，无 DEX 豁免熟练，原1加1得2，失败但免疫；
-Mummy 原2减1得1，失败且易伤。三包实际伤害为 11/0/22，HP 为 3/45/36，B temp 归零。
-B CON 原8加1和 Bless1 恰成功；此后才出现 A 的 `CAST_COMPLETED` Ready 窗口。
-升环、奇数半伤、零 HP/强制结束、反制、失能、旧版本、幂等、坏物理行、事务故障和 UNKNOWN
-另有聚焦向量。测试实现存在不等于本轮已执行或真实 MySQL 已验收。
 
-[专用授权](../../database/grants/schema2-spell-save-damage.sql)与
-[只读验证](../../database/verify/schema2-spell-save-damage.sql)分别使用。SQL 文件存在不证明
-迁移或 grant 已执行。这些证据覆盖旧 MySQL INTERNAL 链路，真实 MySQL、安装接受、部署和跨域发布各自验收。
-SQLite 工作台的有限 Burning Hands 接合使用当前运行规则绑定和 format 3。[领域接合表](../design/v2/domain-integration.md)
+`Schema2SpellSaveDamageCompositionTest` 与 `Schema2SpellSaveDamageRequestDigestTest` 核对
+准确作者声明、组合和请求身份。`CampaignImprovedCriticalIntegrationTest` 中的真实 SQLite 施法分支
+及[领域验收](../design/v2/domain-integration.md#可重复验收索引)覆盖实际 Burning Hands 后果。
+[原实现的独立手算场景](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/schema-2-spell-save-damage.md#类型化保存恢复与验证)供规划额外边界验证时参考。

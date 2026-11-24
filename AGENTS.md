@@ -36,7 +36,7 @@ These instructions apply to automated contributors working in this repository. C
 - [docs/architecture.md](docs/architecture.md): product scope, components, trust and transaction boundaries.
 - [docs/references/srd-5.1/README.md](docs/references/srd-5.1/README.md): local SRD 5.1 source index. For original rule text, search the page-based Markdown and read only relevant pages; check ambiguous text or tables against the [local PDF](docs/references/srd-5.1.pdf). Use the official online source only when the local PDF is missing or damaged, or the task explicitly requires official-source verification; rebuild missing derived text from the local PDF. These references do not replace project implementation contracts or executable rule packages.
 - [docs/rules/srd-5.1.md](docs/rules/srd-5.1.md): frozen keys, algorithms, ranges and canonical encoding for the released MySQL v1 rules. Current SQLite campaign rule bindings are documented in [docs/storage-vitality-loop.md](docs/storage-vitality-loop.md).
-- `src/main/resources/db/migration/`: current runtime schema and seed migration artifacts; reconcile them with actual database history before any external change.
+- [`src/main/resources/storage/campaign-schema.json`](src/main/resources/storage/campaign-schema.json): current SQLite runtime schema and seeds. Match historical database maintenance artifacts to the version that created the data.
 - [docs/database.md](docs/database.md): migration and account responsibilities.
 - [docs/testing.md](docs/testing.md): repeatable verification methods.
 - [docs/deployment.md](docs/deployment.md): build, rollback, deployment and HTTP acceptance.
@@ -71,7 +71,7 @@ Distinguish current behavior from a target design before treating a difference a
 - While a rule release is supported by the current version, its identity, canonical/archive values, algorithms, fields, event/effect types and digests must agree across readers, writers and runtime. Future versions may replace or remove that release and its readers without preserving old saves.
 - Catalogs, runtime models, APIs, canonical/archive projections and tests may evolve cohesively. Reject unsupported old formats clearly; do not silently reinterpret them or add compatibility shims unless the user explicitly requires particular data to survive.
 - SQLite is the supported Web runtime. The separate complete-rule DRAFT state and archive-format gates describe the supported rule boundaries. Change them only with the corresponding supported behavior and verification; do not present a design or partial mechanism as complete runtime support.
-- Preserve `com.dndtool`, Maven coordinates, existing environment-variable contracts and the offline tools’ MySQL identities unless a dedicated migration plan explicitly changes them.
+- Preserve `com.dndtool`, Maven coordinates, supported environment-variable contracts and retained rule identities unless a dedicated migration plan explicitly changes them.
 - Keep database credentials, Connector/J secrets, certificates, Tomcat external configuration, logs, backups and real save data outside Git and WAR.
 
 ## Implementation workflow
@@ -88,7 +88,7 @@ Distinguish current behavior from a target design before treating a difference a
 
 - Write public documentation as current contracts and repeatable procedures. Do not preserve migration timelines, dated acceptance claims, local IP addresses, certificate failures, terminal transcripts or machine-specific paths as project guidance.
 - Replace obsolete descriptions rather than append a version-by-version narrative. Keep historical version details only when needed to explain current supported behavior, an explicitly required compatibility boundary or a database transition procedure; use Git history for superseded designs, implementation attempts and change chronology. Keep current behavior and target design explicit without turning project documentation into a changelog. Editing guidance does not authorize external database changes.
-- Keep community entry files at the repository root. Put durable documentation under `docs/`, verification SQL under `database/verify/`, account grants under `database/grants/`, integration-test setup under `database/test/`, external configuration examples under `config/` and reusable maintenance tools under `tools/`.
+- Keep community entry files at the repository root. Put durable documentation under `docs/`, external configuration examples under `config/` and reusable maintenance tools under `tools/`.
 - Do not move result captures, logs, table dumps, temporary recovery scripts or obsolete planning backups into `legacy`, `archive` or compatibility directories. Extract durable rules first, then delete material with no long-term value.
 - Use conventional root filenames; use lowercase ASCII kebab-case for documentation, scripts, helper SQL and directories; use responsibility-based PascalCase names for Java types. Keep applied Flyway filenames unchanged when retaining their database history.
 - Treat code renames as domain changes: check destination conflicts and atomically update filenames, type names, imports, tests, registrations, reflection strings, configuration and documentation. Do not mechanically remove `Stage` from persisted operation names, digest domains or migration references.

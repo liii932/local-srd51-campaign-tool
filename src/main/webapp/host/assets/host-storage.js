@@ -41,8 +41,12 @@
     RULE_MEMBER_MISMATCH: '本机规则包与所需准确版本不同。',
     DOMAIN_INVALID: '此操作不满足当前规则或状态，请检查角色、装备与待处理行动。',
     STALE_FOCUS: '执行焦点已变化。请同步并重新选择当前行动。',
+    STALE_POSITION: '角色的安置已变化，请同步后重新选择格位。',
     SPACE_FROZEN: '该主体所在的空间已冻结。先切换执行焦点。',
     SUBJECT_UNPLACED: '请先在世界节点安置该主体。',
+    SCENE_FOCUS_REQUIRED: '请先将局部场景设为执行焦点。',
+    RULE_SCENE_OWNER_REQUIRED: '请使用当前规则场景允许的动作。',
+    ACTION_FLOW_BUSY: '请先继续结算当前待处理行动。',
     SCENE_GRID_BOUNDS: '所选格位超出场景范围。',
     SCENE_CELL_OCCUPIED: '所选格位已有主体。',
     SCENE_PATH_INVALID: '路径须使用相邻空格。',
@@ -317,7 +321,16 @@
       branch.hidden = !enabled; branch.disabled = !enabled;
       const select = branch.querySelector('.check-branch-character'), previous = select.value;
       options(select, active.map(character => character.id), personName);
-      if (!active.some(character => character.id === previous) && active.some(character => character.id === executor?.id)) select.value = executor.id;
+      const coordinates = branch.querySelector('[data-check-position]');
+      const hasPosition = Array.from(coordinates.querySelectorAll('input')).some(input => input.value !== '');
+      if (!active.some(character => character.id === previous)) {
+        if (hasPosition) select.value = '';
+        else if (active.some(character => character.id === executor?.id)) select.value = executor.id;
+      }
+      const scene = placementScene();
+      coordinates.hidden = !scene && !hasPosition;
+      setGridLimits(coordinates, scene);
+      for (const input of coordinates.querySelectorAll('input')) input.disabled = coordinates.hidden;
       const items = (domain().items || []).filter(item => item.characterId === select.value);
       options(branch.querySelector('.check-branch-item'), items.map(item => item.id), id => {
         const item = items.find(item => item.id === id); return `${item.name} · 当前 ${item.quantity}`;
@@ -345,6 +358,23 @@
     return null;
   }
   const pendingIn = id => Boolean(battleFor(id)?.flows.some(flow => flow.status === 'ACTIVE'));
+  function placementScene() {
+    const ref = domain()?.space.focus.space;
+    if (ref?.kind !== 'SCENE' || pendingIn(ref.id)) return null;
+    const scene = domain().space.scenes.find(scene => scene.id === ref.id);
+    return scene?.resolution === 'DM' && scene.mode !== 'CLOSED' ? scene : null;
+  }
+  function setGridLimits(parent, scene) {
+    const [x, y] = parent.querySelectorAll('input[type="number"]');
+    x.max = String((scene?.width ?? 201) - 1);
+    y.max = String((scene?.height ?? 201) - 1);
+  }
+  function scenePlacement(id, x, y) {
+    const scene = placementScene(), placement = placeFor(id);
+    if (!scene || placement?.space.id !== scene.id) throw new Error('请选择当前 DM 裁定场景内已入场的角色。');
+    if (![x, y].every(coordinate => /^(0|[1-9][0-9]*)$/.test(coordinate))) throw new Error('请填写有效的目标 X 和 Y。');
+    return {placementVersion: String(placement.version), x, y};
+  }
   const sceneMode = mode => ({EXPLORATION: '探索', COMBAT: '战斗', CLOSED: '已关闭'})[mode];
   function spaceRefs(state) {
     return [...state.nodes.map(node => ({kind: 'WORLD', id: node.id})), ...state.space.scenes.map(scene => ({kind: 'SCENE', id: scene.id}))];
@@ -429,6 +459,11 @@
     move.querySelector('button').disabled = waiting;
     move.elements.minutes.readOnly = scene?.resolution === 'RULES';
     if (move.elements.minutes.readOnly) move.elements.minutes.value = '0';
+    const directPlacement = byId('domain-scene-place'), placement = placementScene();
+    const eligible = placement ? allPeople().filter(character => character.active && inFocus(character.id)) : [];
+    directPlacement.hidden = eligible.length === 0;
+    options(directPlacement.elements.characterId, eligible.map(character => character.id), personName);
+    setGridLimits(directPlacement, placement);
     const position = byId('domain-position');
     const unplaced = allPeople().filter(c => c.active && !placeFor(c.id));
     options(position.elements.characterId, unplaced.map(c => c.id), personName);
@@ -531,6 +566,14 @@
     if (recentHealth) { const result = recentHealth.healthResult; text(card, 'p', `最近健康操作：${recentHealth.before?.hitPoints ?? '—'} → ${recentHealth.after.hitPoints}；掷骰 ${[...(result.dice || []), result.deathD20, result.recoveryD4].filter(value => value !== null && value !== undefined).join('、') || '无'}`); }
     return card;
   }
+  function placementHistory(root) {
+    const prior = new Map(root.space.beforePositions.map(placement => [placement.characterId, placement]));
+    return root.space.afterPositions.flatMap(current => {
+      const previous = prior.get(current.characterId);
+      if (!previous?.grid || !current.grid || (previous.grid.x === current.grid.x && previous.grid.y === current.grid.y)) return [];
+      return [`${personName(current.characterId)} 位置 (${previous.grid.x},${previous.grid.y}) → (${current.grid.x},${current.grid.y})`];
+    });
+  }
   function renderDomain(state) {
     refreshRuleChoices();
     renderSpaces(state);
@@ -546,7 +589,12 @@
         }
         for (const change of audit.items || []) if (change.after) details.push(`${change.after.name} 数量 ${change.before?.quantity || 0} → ${change.after.quantity}`);
         const request = result.request, chosen = result.success ? request.success || request.successEffects : request.failure || request.failureEffects;
-        if (chosen?.length) details.push(`应用顺序：${chosen.map(effect => effect.amount !== undefined ? `生命值 ${effect.amount}` : effect.itemKey || effect.quantity ? '给予物品' : '记录消息').join(' → ')}`);
+        if (chosen?.length) details.push(`应用顺序：${chosen.map(effect => {
+          if (effect.placement) return `定位到 (${effect.placement.x},${effect.placement.y})`;
+          if (effect.amount !== undefined) return `生命值 ${effect.amount}`;
+          return effect.itemKey || effect.quantity ? '给予物品' : '记录消息';
+        }).join(' → ')}`);
+        details.push(...placementHistory(root));
         for (const effect of chosen || []) if (typeof effect.text === 'string' && effect.text) details.push(effect.text);
         text(history, 'li', details.join('；'));
       } else if (root.kind === 'check-effects') {
@@ -558,8 +606,11 @@
           }
         }
         if (audit.itemAfter) details.push(`${audit.itemAfter.name} 数量 ${audit.itemBefore.quantity} → ${audit.itemAfter.quantity}`);
+        details.push(...placementHistory(root));
         if (audit.message) details.push(audit.message);
         text(history, 'li', details.join('；'));
+      } else if (root.kind === 'scene-place') {
+        text(history, 'li', [`${root.sequence}. DM 直接定位`, ...placementHistory(root)].join('；'));
       } else {
         const event = roster().find(character => character.id === root.subjectId)?.history?.events?.find(event => event.operationId === root.operationId);
         const recovery = arcaneRecoveryResult(event);
@@ -744,7 +795,8 @@
     refreshCharacterChoices();
   }
   const tierNames = {NONE: '无', HALF: '半熟练', FULL: '熟练', EXPERTISE: '专精'};
-  const effectNames = {HP: '调整当前生命值', GRANT_MODULE_ITEM: '给予目录物品', GRANT_TEMPORARY_ITEM: '给予临时物品', MESSAGE: '记录结果消息'};
+  const effectNames = {HP: '调整当前生命值', GRANT_MODULE_ITEM: '给予目录物品', GRANT_TEMPORARY_ITEM: '给予临时物品',
+    MESSAGE: '记录结果消息', POSITION: '定位到指定格位'};
   const manualCatalog = () => manualData()?.catalog;
   const manualCheckForm = byId('manual-check');
   const manualCheckDraftKey = 'dnd.manual-check-draft.v1';
@@ -797,6 +849,7 @@
   }
   const eligibleForManualCheck = card => card.active && inFocus(card.id);
   function manualEffectTargets(kind) {
+    if (kind === 'POSITION' && !placementScene()) return [];
     const focus = domain().space.focus.space;
     const rulesScene = focus?.kind === 'SCENE' && domain().space.scenes.find(scene => scene.id === focus.id)?.resolution === 'RULES';
     return (kind === 'HP' || rulesScene ? manualCards() : allPeople()).filter(eligibleForManualCheck);
@@ -921,6 +974,13 @@
         refreshManualEffectTarget(target, kind.value, typeof saved?.targetId === 'string' ? saved.targetId : '', saved?.targetUnavailable === true);
       }
       if (kind.value === 'HP') { const amount = control(body, '生命值变化（负数为伤害）', 'amount', 'number', '1'); amount.min = '-999'; amount.max = '999'; amount.required = true; }
+      if (kind.value === 'POSITION') {
+        for (const axis of ['x', 'y']) {
+          const coordinate = control(body, `目标 ${axis.toUpperCase()}`, axis, 'number');
+          coordinate.min = '0'; coordinate.required = true;
+        }
+        setGridLimits(body, placementScene());
+      }
       if (kind.value === 'GRANT_MODULE_ITEM') { const item = control(body, '目录物品', 'itemKey', 'select'); options(item, meta.items.map(item => item.key), key => meta.items.find(item => item.key === key).name); }
       if (kind.value === 'GRANT_TEMPORARY_ITEM') { control(body, '物品名称', 'name', 'text').required = true; control(body, '物品描述', 'description', 'text'); }
       if (['GRANT_MODULE_ITEM', 'GRANT_TEMPORARY_ITEM'].includes(kind.value)) { const quantity = control(body, '数量', 'quantity', 'number', '1'); quantity.min = '1'; quantity.max = '999'; quantity.required = true; }
@@ -947,14 +1007,16 @@
   }
   function refreshManualEffects() {
     for (const target of manualCheckForm.querySelectorAll('.manual-effect-target')) {
-      const kind = target.closest('.manual-effect').querySelector('[name="kind"]').value;
+      const row = target.closest('.manual-effect'), kind = row.querySelector('[name="kind"]').value;
       refreshManualEffectTarget(target, kind);
+      if (kind === 'POSITION') setGridLimits(row.querySelector('.manual-effect-fields'), placementScene());
     }
   }
   function manualEffectValues(row) {
     const value = name => row.querySelector(`[name="${name}"]`).value;
     const kind = value('kind');
     if (kind === 'HP') return {kind, targetId: value('targetId'), amount: value('amount')};
+    if (kind === 'POSITION') return {kind, targetId: value('targetId'), x: value('x'), y: value('y')};
     if (kind === 'GRANT_MODULE_ITEM') return {kind, targetId: value('targetId'), itemKey: value('itemKey'), quantity: value('quantity')};
     if (kind === 'GRANT_TEMPORARY_ITEM') return {kind, targetId: value('targetId'), name: value('name'), description: value('description'), quantity: value('quantity')};
     if (kind === 'MESSAGE') return {kind, text: value('text')};
@@ -962,12 +1024,19 @@
   }
   function readManualEffects(branch, versions) {
     const effects = Array.from(manualEffectList(branch).children, manualEffectValues);
+    const placementVersions = new Map();
     if (effects.filter(effect => effect.kind === 'MESSAGE').length > 1) throw new Error('每个分支最多设置一条结果消息。');
     for (const effect of effects) {
       if (effect.kind === 'MESSAGE') continue;
       const target = manualEffectTargets(effect.kind).find(card => card.id === effect.targetId);
       if (!target) throw new Error('后果目标已失效，请重新选择。');
       versions.set(target.id, String(target.version));
+      if (effect.kind === 'POSITION') {
+        const placement = scenePlacement(target.id, effect.x, effect.y);
+        const expected = placementVersions.get(target.id) ?? BigInt(placement.placementVersion);
+        effect.placementVersion = String(expected);
+        placementVersions.set(target.id, expected + 1n);
+      }
     }
     return effects;
   }
@@ -1340,8 +1409,11 @@
   function conditionalBranch(prefix, values) {
     const itemId = values[prefix + 'Item'] || null, delta = values[prefix + 'Delta'];
     if (!/^(0|-?[1-9][0-9]*)$/.test(delta) || (itemId === null) !== (delta === '0')) throw new Error(`${prefix === 'success' ? '成功' : '失败'}分支：物品与非零数量变化需要同时选择；没有物品变化时请留空并设为 0。`);
-    return {targetId: values[prefix + 'Target'], healthEffect: typedRule(values[prefix + 'Effect']), itemId, itemDelta: delta,
+    const branch = {targetId: values[prefix + 'Target'], healthEffect: typedRule(values[prefix + 'Effect']), itemId, itemDelta: delta,
       message: values[prefix + 'Message'] || ''};
+    const x = values[prefix + 'X'] || '', y = values[prefix + 'Y'] || '';
+    if (x !== '' || y !== '') branch.position = scenePlacement(branch.targetId, x, y);
+    return branch;
   }
   domainForm('domain-check', (_, values) => values.withEffects === 'on' ? 'check-effects' : 'character-command', (form, values) => {
     const character = selectedCharacter(form);
@@ -1381,6 +1453,8 @@
   domainForm('domain-space-move', 'space-move', (_, values) => {
     return {...values, path: readGridPath(values.path), version: String(placeFor(values.characterId).version)};
   });
+  domainForm('domain-scene-place', 'scene-place', (_, {characterId, x, y}) =>
+    ({characterId, ...scenePlacement(characterId, x, y)}));
   domainForm('domain-item', 'item', (_, values) => ({itemId: values.itemId || null, characterId: values.characterId, name: values.name, quantity: values.quantity}));
   domainForm('domain-note', 'note', (_, values) => ({text: values.text}));
   domainForm('manual-create', 'manual-create', (_, values) => ({name: values.name, kind: values.kind, template: values.template}));

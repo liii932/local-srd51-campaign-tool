@@ -51,7 +51,7 @@ SQLite 工作台保存和打开 `RULE_BOUND_CAMPAIGN` format 3。原 MySQL 存�
 | 几何、区域与安置 | [空间与区域](spatial-and-area-contract.md) | 目标三维体积、视线与完整区域证明、联动移动、生成与强制回归 |
 | 时间、期限与日历 | [时间与日历](time-and-calendar.md) | 目标空间钟、个人经历、自然日与黎明、期限交接及消费去重 |
 | 物件、魔法物品与符文 | [物件与魔法物品](objects-and-magic-items.md) | 实物身份和互动、同调、魔杖充能、符文触发与保存 |
-| 产品、原型与网络范围 | [产品说明](../../product.md)、[架构](../../architecture.md) | SQLite 运行与 MySQL 离线维护、支持范围、loopback 与真实数据责任 |
+| 产品、原型与网络范围 | [产品说明](../../product.md)、[架构](../../architecture.md) | SQLite 运行与原 MySQL 资料保管、支持范围、loopback 与真实数据责任 |
 | 当前领域能力与验收 | [领域接合表](domain-integration.md)、[采用边界](adoption-boundaries.md) | 实际入口、初始/当前/历史覆盖、仍需接合的旧能力与后续门 |
 | 规则身份、作者输入与组合 | [模组接口基线](module-interface-baseline.md) | 严格 schema-2、依赖、字段操作、完整链和有限机制的执行资格 |
 | 规则材料、存储与版本 | [规则存储](rule-storage-and-versioning.md) | 战役冻结材料、独立本机规则库、准确绑定与文件模型 |
@@ -67,7 +67,7 @@ SQLite 工作台保存和打开 `RULE_BOUND_CAMPAIGN` format 3。原 MySQL 存�
 | 动作与效果 | [动作继续](action-continuation-protocol.md)、[持续效果](ongoing-effect-protocol.md) | 检定、动作替代、反应和选择、移动区域、真实抗魔、疾病及持续关系 |
 | 多目标与施法扩展 | [共享伤害](multi-target-save-damage.md)、[施法扩展](spellcasting-extension-contract.md) | 当前有限机制及目标的对象、多目标阶段、魔法物品授权和储存释放 |
 | 规则来源与原文 | [本地 SRD 索引](../../references/srd-5.1/README.md)、[完整规则目标](../../rules/srd-5.1-complete.md)、[覆盖矩阵](../../rules/srd-5.1-coverage.md) | 原文、有限支持、完整 SRD 跨领域发布门 |
-| 原 MySQL 内部作者/来源/快照 | [制品](../../rules/schema-2-rule-artifacts.md)、[安装接受](../../rules/schema-2-installation-and-acceptance.md)、[快照](../../rules/schema-2-runtime-snapshot.md) | 原 MySQL 路线的独立保管、接受和服务门 |
+| 原 MySQL 内部作者/来源/快照 | [制品](../../rules/schema-2-rule-artifacts.md)、[安装接受](../../rules/schema-2-installation-and-acceptance.md)、[快照](../../rules/schema-2-runtime-snapshot.md) | 原数据及对应工具的保管与读取边界 |
 
 ## 未来完整目标与变更规则
 

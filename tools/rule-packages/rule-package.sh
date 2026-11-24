@@ -1,22 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Use the offline tool classes from a reviewed application build of this checkout.
+
 project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 if [[ ! -d "$project_root/target/classes/com/dndtool/offline/rules" ]]; then
-  printf '%s\n' 'Expected reviewed application build outputs under target/classes (including offline rule tools).' >&2
+  printf '%s\n' 'Expected compiled author tooling under target/classes.' >&2
   exit 1
 fi
-if [[ ${1:-} == build || ${1:-} == verify || ${1:-} == schema2-verify ]]; then
-  classpath="$project_root/target/classes"
-else
-  : "${DND_RULE_INSTALLER_JDBC_JAR:?Set the absolute path to the independently supplied Connector/J jar}"
-  [[ "$DND_RULE_INSTALLER_JDBC_JAR" = /* && -f "$DND_RULE_INSTALLER_JDBC_JAR" ]] || exit 1
-  classpath="$project_root/target/classes:$DND_RULE_INSTALLER_JDBC_JAR"
-fi
-# Hard process boundary, including input IO and driver calls; no worker can continue in this JVM.
-# A killed attempt retains its pre-DML pending ticket and needs independent server-side isolation.
 jvm_heap=64m
-if [[ ${1:-} == schema2-* ]]; then
+if [[ ${1:-} == schema2-verify ]]; then
   jvm_heap=256m
 fi
-exec timeout --signal=TERM --kill-after=5s 120s java "-Xmx$jvm_heap" -cp "$classpath" com.dndtool.offline.rules.RulePackageCli "$@"
+exec timeout --signal=TERM --kill-after=5s 120s java "-Xmx$jvm_heap" \
+  -cp "$project_root/target/classes" com.dndtool.offline.rules.RulePackageCli "$@"

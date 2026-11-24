@@ -2,9 +2,7 @@ package com.dndtool.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.dndtool.module.CharacterProficiencyGrant;
 import com.dndtool.service.storage.BundledCampaignRules;
 import com.dndtool.service.storage.CampaignCodec;
 import com.dndtool.service.storage.CampaignData;
@@ -13,43 +11,16 @@ import com.dndtool.service.storage.CampaignJson;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
-/** Protects the internal character projection and the portable file from request and machine data. */
+/** Protects the portable campaign file from request and machine data. */
 final class CampaignArchiveSecretBoundaryTest {
     private static final List<Path> CODEC_SOURCES = List.of(
-            Path.of("src/main/java/com/dndtool/service/CampaignArchiveV2CharacterStateCodec.java"),
-            Path.of("src/main/java/com/dndtool/service/CampaignArchiveV2CharacterStateValidator.java"),
-            Path.of("src/main/java/com/dndtool/service/CampaignArchiveV2DraftPreview.java"),
             Path.of("src/main/java/com/dndtool/service/storage/CampaignCodec.java"),
             Path.of("src/main/java/com/dndtool/service/storage/CampaignDomainCodec.java"));
-
-    @Test
-    void draftCharacterRecordsHaveNoRequestSecretMachineOrDeferredPublicComponents() {
-        Set<String> forbiddenFragments = Set.of(
-                "session", "cookie", "csrf", "password", "credential", "secret",
-                "privatekey", "certificate", "tomcat", "localpath", "database",
-                "jdbc", "public", "player", "owner", "approval", "networkepoch",
-                "hoststateepoch");
-
-        var records = Stream.concat(
-                Stream.<Class<?>>of(CampaignArchiveV2CharacterState.class, CharacterProficiencyGrant.class),
-                Arrays.stream(CampaignArchiveV2CharacterState.class.getDeclaredClasses()).filter(Class::isRecord))
-                .toList();
-        for (Class<?> type : records) {
-            assertTrue(type.isRecord(), type.getName());
-            for (var component : type.getRecordComponents()) {
-                String name = component.getName().toLowerCase(Locale.ROOT);
-                assertFalse(forbiddenFragments.stream().anyMatch(name::contains),
-                        type.getSimpleName() + "." + component.getName());
-            }
-        }
-    }
 
     @Test
     void portableFileProjectsOnlyStableCampaignAndParticipationFields() {

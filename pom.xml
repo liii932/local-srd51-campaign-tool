@@ -42,22 +42,10 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.tomcat</groupId>
-            <artifactId>tomcat-dbcp</artifactId>
-            <version>${tomcat.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.apache.tomcat.embed</groupId>
             <artifactId>tomcat-embed-core</artifactId>
             <version>${tomcat.version}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <version>26.7.0</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -126,58 +114,10 @@
                 <artifactId>maven-war-plugin</artifactId>
                 <version>3.4.0</version>
                 <configuration>
-                    <!-- The matching checkout and target/classes supply the offline maintenance tools. -->
+                    <!-- Standalone author tooling and the build-time generator stay outside the Web artifact. -->
                     <packagingExcludes>
                         WEB-INF/classes/com/dndtool/offline/**,
-                        WEB-INF/classes/com/dndtool/service/storage/BundledRuleManifestGenerator.class,
-                        WEB-INF/classes/com/dndtool/persistence/SchemaMigrations.class,
-                        WEB-INF/classes/com/dndtool/persistence/SchemaMigrations$Definition.class,
-                        WEB-INF/classes/com/dndtool/persistence/SchemaMigrations$Expectation.class,
-                        WEB-INF/classes/com/dndtool/persistence/SchemaMigrations$PackagedSchemaException.class,
-                        WEB-INF/classes/com/dndtool/persistence/RuleDatabaseSchemaVerifier.class,
-                        WEB-INF/classes/com/dndtool/persistence/RuleDatabaseSchemaVerifier$SchemaMismatchException.class,
-                        WEB-INF/classes/db/migration/V001__stage1_schema.sql,
-                        WEB-INF/classes/db/migration/V002__stage2_module_schema.sql,
-                        WEB-INF/classes/db/migration/V003__builtin_module_draft.sql,
-                        WEB-INF/classes/db/migration/V004__release_builtin_module.sql,
-                        WEB-INF/classes/db/migration/V005__stage2_character_event_schema.sql,
-                        WEB-INF/classes/db/migration/V006__stage2_character_field_value_schema.sql,
-                        WEB-INF/classes/db/migration/V007__character_creation_idempotency.sql,
-                        WEB-INF/classes/db/migration/V008__stage2_simple_item_schema.sql,
-                        WEB-INF/classes/db/migration/V009__stage3_check_execution_schema.sql,
-                        WEB-INF/classes/db/migration/V010__stage3_node_encounter_schema.sql,
-                        WEB-INF/classes/db/migration/V011__complete_character_catalog_draft.sql,
-                        WEB-INF/classes/db/migration/V012__level_one_character_creation.sql,
-                        WEB-INF/classes/db/migration/V013__level_advancement_hit_dice.sql,
-                        WEB-INF/classes/db/migration/V014__class_feature_lifecycle.sql,
-                        WEB-INF/classes/db/migration/V015__multiclass_asi_feat_draft.sql,
-                        WEB-INF/classes/db/migration/V016__starting_proficiency_baseline_draft.sql,
-                        WEB-INF/classes/db/migration/V017__character_archive_v2_origin.sql,
-                        WEB-INF/classes/db/migration/V018__multiclass_spell_slot_foundation.sql,
-                        WEB-INF/classes/db/migration/V019__runtime-language-snapshot.sql,
-                        WEB-INF/classes/db/migration/V020__runtime-tool-snapshot.sql,
-                        WEB-INF/classes/db/migration/V021__schema2-runtime-snapshot.sql,
-                        WEB-INF/classes/db/migration/V022__character-proficiency-grants.sql,
-                        WEB-INF/classes/db/migration/V023__schema2-runtime-tools.sql,
-                        WEB-INF/classes/db/migration/V024__schema2-character-grants.sql,
-                        WEB-INF/classes/db/migration/V025__business-write-guard.sql,
-                        WEB-INF/classes/db/migration/V026__schema2-initial-plans.sql,
-                        WEB-INF/classes/db/migration/V027__schema2-character-runtime.sql,
-                        WEB-INF/classes/db/migration/V028__schema2-check-rules.sql,
-                        WEB-INF/classes/db/migration/V029__schema2-character-check-history.sql,
-                        WEB-INF/classes/db/migration/V030__schema2-equipment-health-rules.sql,
-                        WEB-INF/classes/db/migration/V031__schema2-equipment-health-history.sql,
-                        WEB-INF/classes/db/migration/V032__schema2-combat-rules.sql,
-                        WEB-INF/classes/db/migration/V033__schema2-combat-runtime.sql,
-                        WEB-INF/classes/db/migration/V034__schema2-combat-time-ground.sql,
-                        WEB-INF/classes/db/migration/V035__schema2-spell-rules.sql,
-                        WEB-INF/classes/db/migration/V036__schema2-spell-runtime.sql,
-                        WEB-INF/classes/db/migration/V037__schema2-wizard-environment-rules.sql,
-                        WEB-INF/classes/db/migration/V038__schema2-reactions-and-ongoing-scenes.sql,
-                        WEB-INF/classes/db/migration/V039__schema2-monster-rules.sql,
-                        WEB-INF/classes/db/migration/V040__schema2-monster-breath-runtime.sql,
-                        WEB-INF/classes/db/migration/V041__schema2-arcane-recovery.sql,
-                        WEB-INF/classes/db/migration/V042__schema2-spell-save-damage.sql
+                        WEB-INF/classes/com/dndtool/service/storage/BundledRuleManifestGenerator.class
                     </packagingExcludes>
                 </configuration>
             </plugin>

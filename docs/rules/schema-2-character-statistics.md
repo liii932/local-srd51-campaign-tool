@@ -1,16 +1,10 @@
-# Schema 2 内部角色成长、HP、生命骰与职业资源
+# Schema 2 角色成长、HP、生命骰与职业资源
 
-本合同限定旧 MySQL schema 2 的内部成长与资源业务入口及其规则语义。它连接已保留的初始身份／授予计划、类型化
-运行规则、有界成长选择、HP／混合生命骰、职业资源及不可变历史。
-`CHARACTER_ADVANCEMENT` 声明本合同的完整成长能力，`STATISTICS_AND_RESOURCES_ONLY` 仅声明
-原有限统计能力；两者不能互相代称。完整战役初始化、全部职业特性执行仍未开放；真实休息见
-[内部休息合同](schema-2-character-rest.md)。
-当前 SQLite 工作台采用的有界成长、休息及完整文件见[领域接合表](../design/v2/domain-integration.md)。
-完整规则的 archive format 2 限内部 DRAFT 角色片段。
 
-初始授予沿用[初始熟练来源与选择合同](schema-2-proficiency-grants.md)，运行材料沿用
-[schema 2 运行快照](schema-2-runtime-snapshot.md)，写入保护沿用
-[业务写事务](business-write-transactions.md)。内部统计状态不等于已创建完整战役或完整 SRD 角色。
+本合同定义 schema 2 成长、生命骰、HP 和职业资源的作者模型和规则消费。
+`CHARACTER_ADVANCEMENT` 声明完整成长计算，`STATISTICS_AND_RESOURCES_ONLY` 声明有限统计能力。
+当前 SQLite 工作台接入的角色模板和机制见[领域接合表](../design/v2/domain-integration.md)；
+实际休息和恢复见[休息合同](schema-2-character-rest.md)。
 
 ## 类型化作者模型
 
@@ -104,16 +98,15 @@ profile、scope 和 execution 使用已验证文本值；不把复合对象压�
 现有 `set_field`、`set_enabled` 和在本成长领域仅允许清空备注的 `clear_field` 合同，不允许
 `maximum_profile.range` 等嵌套修改。显式同值修改仍保留来源步骤。
 
-来源表和运行表分别保留成长／资源的类型化字段。运行读回重建最终规则及全部字段链，复核
-原始所有者、声明位置、各步骤连续性和完整性后恢复现有 production canonical 字节与摘要。
-已保留快照的本地读回不依赖作者源库；角色历史直接恢复要求该准确快照与初始计划已经存在。
-重新构建规则快照仍遵循来源转存合同，不把成功组合当成安装资格或完整基础模组证明。
 
-## 内部命令与状态
+战役冻结成长与资源的最终字段及完整来源链。读取按准确规则原包及其绑定校验生产字节和摘要；
+同版残留使用战役内冻结材料。组合阶段单独验证声明，业务执行再核对当前角色的资格和状态。
 
-内部命令是封闭的 `INITIALIZED`、`CHARACTER_ADVANCED`、`STATISTICS_ADVANCED`、`RESOURCE_SPENT` 和
+## 领域命令与状态
+
+领域命令为封闭的 `INITIALIZED`、`CHARACTER_ADVANCED`、`STATISTICS_ADVANCED`、`RESOURCE_SPENT` 和
 `RESOURCES_RECOVERED`。各命令只接受其对应字段，不能夹带客户端骰点、资源上限、HP 增量、
-职业特性结果或任意规则字段。它们不通过完整角色创建或普通升级 Host 路由开放。
+职业特性结果或任意规则字段。工作台仅接纳当前保护范围内的角色创建及成长命令。
 [角色事实存储](schema-2-character-fact-storage.md)另支持检定、装备和健康的封闭记录格式；
 成长/休息规则在复制状态时保留装备与健康事实，不生成其他领域的效果；
 同一个 RuntimeService 通过[角色基础消费者](schema-2-character-foundations.md)执行其检定、装备和健康命令。
@@ -185,21 +178,18 @@ HP 最大值的可达范围、六能力集合和完整运行身份也必须成�
 
 ## 事务、幂等与结果查证
 
-`Schema2CharacterRuntimeService.execute` 使用 `BusinessWriteTransactions.openInternal`，
-复核准备操作收据、准确规则绑定、完整历史、预期版本和容量之后再调用服务端骰源。
-活动 legacy 或 PARTITION 状态阻止写入。叶仓储只能使用调用方受保护连接，不能提交或回滚。
 
-SQLite 领域引擎和 JDBC 服务使用同一个 `Schema2CharacterRequest` 校验输入并计算摘要。
+`CampaignDomainEngine` 以 `Schema2CharacterRequest` 复核绑定、初始计划和完整历史。
+事务与收据由 SQLite 工作库负责，在首次 RNG 前检查当前版本和可达事实预算。
+
 摘要使用独立域 `local-dnd/schema2-character-command/1` 后接零字节，按顺序编码
 操作、run、snapshot、campaign、character、准备操作六个 UUID，完整 `Schema2RulesBinding`，
 预期版本、命令 union 字段及按键排序的初始能力。字符串为 UTF-8 字节长前缀，整数按
 `DataOutputStream` 大端编码。摘要不替代完整状态或历史；同一操作的不同请求拒绝，准确
 重放返回原事件，不再次抽骰、消费或写事件。
 
-commit 或 rollback 结果不明时返回 `UNKNOWN`，不返回候选成功事件，并由共同守卫冻结
-后续写入。`inspect` / `inspectRestore` 只读完整已存结果，不访问来源库，不补写、不重试。
-只有保留原未决意图并确认执行连接隔离的服务实例，才能把查无原结果判为 `NOT_COMMITTED`；
-新实例的查无结果仍为 `UNKNOWN`。查证成功不自动解除写入冻结。
+
+提交、回滚和原请求查证按 [SQLite 事务合同](../design/v2/runtime-and-transactions.md)执行。
 
 ## 不可变历史与直接恢复
 
@@ -213,11 +203,7 @@ commit 或 rollback 结果不明时返回 `UNKNOWN`，不返回候选成功事�
 乐观版本由同一个受保护业务事务提交或回滚。成功读回或恢复不授权安装、完整战役文件导入
 或 archive format 2 激活。
 
-引用关系由 V027 明确保存：命令选择子行和前后状态依附角色事件，成长／资源子行依附
-前后状态，事件依附 `s2_character_runtime`，角色根再引用准确初始计划和运行快照。
-这些事实仅追加，外键采用 `RESTRICT`，应用账号不获更新／删除权限；本内部消费者不提供
-隐式清理。后续完整运行的清理协调必须纳入整条引用关系及未决结果，不能先删快照、计划
-或角色根，再遗留历史子行。
+[数据映射](../design/v2/storage-data-map-and-rollout.md)列出角色聚合、资源投影及完整文件的关系。
 
 ## SRD 依据与剩余能力
 

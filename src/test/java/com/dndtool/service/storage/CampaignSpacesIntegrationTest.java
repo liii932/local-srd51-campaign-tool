@@ -48,8 +48,20 @@ class CampaignSpacesIntegrationTest {
             }
             UUID sceneA = scene(service, west, "西侧庭院", "RULES");
             enter(service, sceneA, a1, a2);
+            long placementVersion = CampaignSpaceCommands.position(state(service), a1).version();
+            var direct = object("characterId", a1, "placementVersion", placementVersion, "x", 7, "y", 7);
+            var ruleExploration = service.accessSnapshot();
+            assertEquals("RULE_SCENE_OWNER_REQUIRED", assertThrows(StorageException.class,
+                    () -> send(service, "scene-place", direct)).code());
+            assertEquals(ruleExploration, service.accessSnapshot());
             combat(service, sceneA, Command.reenter(a1, List.of(a1, a2)));
             Position aDestination = openOpportunity(service, sceneA, a1);
+            var rulePending = service.accessSnapshot();
+            int beforeDirect = dice.get();
+            assertEquals("ACTION_FLOW_BUSY", assertThrows(StorageException.class,
+                    () -> send(service, "scene-place", direct)).code());
+            assertEquals(rulePending, service.accessSnapshot());
+            assertEquals(beforeDirect, dice.get());
             var frozenA = sceneHistory(service, sceneA);
             var frozenAClock = state(service).space().clock(Ref.scene(sceneA));
             var aBefore = character(service, a1).history();

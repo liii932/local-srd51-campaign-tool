@@ -17,7 +17,7 @@
 
 | 启动失败类别 | 核对项 |
 | --- | --- |
-| `STORAGE_ROOT_INVALID` | 路径语法、绝对本地目录和仓库/应用树边界 |
+| `STORAGE_ROOT_INVALID` | 所选路径的语法、绝对本地目录和仓库/应用树边界。两处覆盖均未设置时，检查 JVM 的 `user.home` 是否提供有效的绝对路径 |
 | `STORAGE_UNAVAILABLE` | 实际运行身份、权限、可用文件系统及应用资源 |
 | `STORAGE_ROOT_IN_USE` | 私有根已有独占所有者 |
 
@@ -44,9 +44,7 @@ Windows 部署须先用 `DriveInfo.DriveType` 核对根所在盘为本机固定�
 
 `StorageApplicationListener` 装配 `CampaignStorageService`。SQLite 驱动和受审 JSON
 结构声明随 WAR 打包。生产 Tomcat 只需应用运行身份及私有根的访问权限。
-Host 启动不查找旧 `jdbc/DndToolSE`，也无需设置来源 MySQL 凭据。当前默认 Maven
-构建仍解析 `provided` 范围的 Connector/J。移除该构建依赖并验证干净容器启动的条件见
-[SQLite 单路线实施计划](design/v2/mysql-retirement.md)。
+Host 直接使用随 WAR 交付的 SQLite JDBC，构建、外部 Tomcat 和本机规则库均无需 MySQL 驱动、凭据或 JNDI 数据源。
 
 交互启动的 `startup.bat` / `catalina.bat` 从启动进程继承环境，读取
 [setenv 示例](../config/tomcat/setenv.bat.example)中的 JVM 设置。Windows 服务的进程环境、

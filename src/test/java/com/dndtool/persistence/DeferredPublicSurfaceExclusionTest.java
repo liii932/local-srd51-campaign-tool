@@ -37,7 +37,6 @@ final class DeferredPublicSurfaceExclusionTest {
     private static final Pattern FORBIDDEN_PUBLIC_CAMEL = Pattern.compile(
             "\\b(?:isPublic|public[A-Z][A-Za-z0-9]*|publication[A-Z][A-Za-z0-9]*|"
                     + "viewer[A-Z][A-Za-z0-9]*)\\b");
-    private static final Pattern SQL_IDENTIFIER = Pattern.compile("`([a-z0-9_]+)`");
 
     @Test
     void everyServletRouteStaysInsideHealthHostOrTheExactPrivatePlayerSurface() throws Exception {
@@ -87,7 +86,7 @@ final class DeferredPublicSurfaceExclusionTest {
     void productionCodeAndWebResourcesContainNoPublicProjectionIdentifiers()
             throws Exception {
         for (Path root : List.of(
-                Path.of("src/main/java/com/dndtool"), Path.of("src/main/webapp"))) {
+                Path.of("src/main/java/com/dndtool"), Path.of("src/main/webapp"), Path.of("src/main/resources/storage/campaign-schema.json"))) {
             try (Stream<Path> files = Files.walk(root)) {
                 for (Path file : files.filter(Files::isRegularFile)
                         .filter(DeferredPublicSurfaceExclusionTest::isProductionTextFile)
@@ -99,26 +98,10 @@ final class DeferredPublicSurfaceExclusionTest {
         }
     }
 
-    @Test
-    void migrationsContainNoPublicProjectionTablesOrFields() throws Exception {
-        try (Stream<Path> files = Files.list(
-                Path.of("src/main/resources/db/migration"))) {
-            for (Path file : files.filter(path -> path.toString().endsWith(".sql")).toList()) {
-                Matcher identifiers = SQL_IDENTIFIER.matcher(
-                        Files.readString(file, StandardCharsets.UTF_8));
-                while (identifiers.find()) {
-                    String identifier = identifiers.group(1);
-                    assertFalse(FORBIDDEN_PUBLIC_IDENTIFIER.matcher(identifier).find(),
-                            () -> file + ": " + identifier);
-                }
-            }
-        }
-    }
-
     private static boolean isProductionTextFile(Path path) {
         String name = path.getFileName().toString();
         return name.endsWith(".java") || name.endsWith(".jsp")
-                || name.endsWith(".html") || name.endsWith(".js") || name.endsWith(".xml");
+                || name.endsWith(".html") || name.endsWith(".js") || name.endsWith(".xml") || name.endsWith(".json");
     }
 
     private static void assertNoPublicIdentifier(String source, String content) {

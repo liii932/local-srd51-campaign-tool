@@ -1,5 +1,7 @@
 # Canonical v2 升级与生命骰合同
 
+本页记录历史 DRAFT 目录及其规则语义。当前 SQLite 实现见[领域接合表](../design/v2/domain-integration.md)。历史读写和校验使用[匹配版本](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/level-advancement-v2.md)。
+
 本合同属于 `dnd5e2014_srd51_se` release `1`、canonical format `2`、archive format `2`。
 该发布版仍为 `DRAFT`；V013—V018 的代码、目录或表存在不代表数据库已经迁移，也不允许创建战役、
 执行规则或导入格式 2 存档。正式发布及 archive format 2 激活属于主要规则领域整合后的跨领域发布门。

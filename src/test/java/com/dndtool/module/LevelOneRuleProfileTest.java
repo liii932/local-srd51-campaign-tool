@@ -4,10 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class LevelOneRuleProfileTest {
@@ -37,21 +33,5 @@ class LevelOneRuleProfileTest {
                 () -> LevelOneRuleProfile.parse("unknown=value"));
         assertThrows(IllegalArgumentException.class,
                 () -> LevelOneRuleProfile.parse("language=common\u0000"));
-    }
-
-    @Test
-    void everyV012DraftProfileUsesTheFrozenGrammar() throws Exception {
-        String sql = Files.readString(Path.of(
-                "src/main/resources/db/migration/V012__level_one_character_creation.sql"),
-                StandardCharsets.UTF_8);
-        var matcher = Pattern.compile(
-                "\\('character\\.(?:race|subrace|background|class)', '[^']+', '([^']+)'\\)")
-                .matcher(sql);
-        int count = 0;
-        while (matcher.find()) {
-            LevelOneRuleProfile.parse(matcher.group(1));
-            count++;
-        }
-        assertEquals(26, count);
     }
 }

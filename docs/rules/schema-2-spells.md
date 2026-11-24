@@ -2,11 +2,10 @@
 
 ## 采用范围与真实资格
 
-`Schema2CombatRuntimeService` 在同一 INTERNAL 场景中执行 Bless、Cure Wounds、Shield、Counterspell、有限 Burning Hands、
-Ready attack／move／spell、固定环境抗魔区域及战外持续效果。规则来自[施法作者合同](schema-2-spell-authoring.md)
-定义的准确组合与镜像，角色资格来自实际成长、装备、学习和准备记录。共同事务、版本及正常可见
-平面方格的前提见[战斗合同](schema-2-combat.md)。该服务属于旧 MySQL INTERNAL 链路，SQLite 工作台复用其有限施法及反应规则。
-完整规则身份保持 DRAFT，archive format 2 限内部角色片段。[领域接合表](../design/v2/domain-integration.md)
+
+SQLite 场景支持 Bless、Cure Wounds、Shield、Counterspell、有限 Burning Hands、Ready attack／move／spell、
+固定 DM 抗魔区域及战外持续效果。规则来自[冻结施法材料](schema-2-spell-authoring.md)，资格取实际成长、
+装备、学习和准备记录。共同事务和场景边界见[战斗合同](schema-2-combat.md)。
 
 生命领域 profile 限一级单职业角色：实际取得指定子职业与自动特性后，Bless／Cure Wounds 始终准备。
 Wizard profile 限单职业 1—5 级，法术书初始化实际学习六个一级法术，每次升级实际学习两个当前法术位
@@ -95,17 +94,11 @@ Bless 保存唯一 effect key、完整法术身份、施法者、固定目标和
 
 ## 类型化存储与验证
 
-来源 V009/V010、镜像 V035/V037、事实 V036/V038 保存准确作者、学习名单、角色法术书、命令、
-多层 frame/window、原骰、成本、Ready、holder、Shield、区域及全部独立原因。每类子行有精确计数与
-引用，缺行、多行、孤儿、未知类型或独立重建不一致均拒绝。既有迁移保持不变。
 
-V038 在任何持久 DDL 前要求 `s2_combat_runtime` 为空，包括已经 ENDED 的旧事实；旧 INTERNAL
-动作图和请求格式不自动转换。存在真实旧 DRAFT 战斗历史时须另行审查迁移／恢复方案，不删除历史绕过此门。
-
-资源、健康和时间仍为角色历史的因果子事件；根场景操作与全部子结果共用
-[业务事务](business-write-transactions.md)，仓储不得自行提交。`COMBAT_ENVIRONMENT_HEALTH`
-保留真实 effect 输入与骰子。直接恢复保留完整当前状态和历史，不重掷、不重施法、不重复学习或付款；
-`UNKNOWN` 只查证原操作。
+角色聚合保存已学、准备、施法资源及因果历史；场景保存 frame/window、原骰、成本、Ready、holder、
+Shield、区域和各压制原因。`COMBAT_ENVIRONMENT_HEALTH` 保留真实 effect 输入和骰子。
+根和角色子结果共用[业务事务](../design/v2/runtime-and-transactions.md)。
+完整文件和原库恢复保留当前与历史事实，不重掷、重施法、重复学习或再付成本。
 
 规则优先读取本地 SRD：Wizard [p.52](../references/srd-5.1/pages/page-052.md)／
 [p.53](../references/srd-5.1/pages/page-053.md)，Ready [p.93](../references/srd-5.1/pages/page-093.md)／
@@ -114,5 +107,6 @@ V038 在任何持久 DDL 前要求 `s2_combat_runtime` 为空，包括已经 END
 Counterspell [p.131](../references/srd-5.1/pages/page-131.md)，Cure Wounds [p.132](../references/srd-5.1/pages/page-132.md)，
 Shield [p.179](../references/srd-5.1/pages/page-179.md)。固定区域、同强最早优先和内部容量是项目合同。
 
-[定向验证](../testing.md#schema-2-有限施法与持续效果验证)分开覆盖纯规则、实际角色成长、来源／镜像、
-事务、历史与恢复。代理 JDBC 和静态 SQL 不能替代另行授权的真实 MySQL 迁移、权限及并发验收。
+
+当前产品场景及共享规则的[验收入口](../design/v2/domain-integration.md#可重复验收索引)
+覆盖实际角色成长、开始施法、反应／Ready、持续效果、共同事务和完整文件恢复。

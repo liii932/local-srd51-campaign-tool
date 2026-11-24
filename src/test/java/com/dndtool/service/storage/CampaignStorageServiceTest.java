@@ -112,6 +112,49 @@ class CampaignStorageServiceTest {
         }
     }
 
+    @Test void deferredForeignKeyFailureAtCommitBlocksUntilExplicitRecovery() throws Exception {
+        verifyUnknownOutcome("INSERT INTO test_deferred VALUES (zeroblob(16))", false);
+    }
+
+    @Test void rollbackFailureAfterSqliteHasAbortedTheTransactionBlocksUntilExplicitRecovery() throws Exception {
+        verifyUnknownOutcome("SELECT RAISE(ROLLBACK, 'injected late failure')", true);
+    }
+
+    private void verifyUnknownOutcome(String triggerBody, boolean rollbackFailed) throws Exception {
+        String original = id(), rejected = id();
+        try (var host = new CampaignStorageService(root())) {
+            var initial = CampaignRuleFixtures.create(host, "事务查证");
+            var accepted = addCard(host, original, initial.epoch(), 0, "原角色");
+            String run = host.status().runId(), character = cardId(accepted);
+            try (Connection connection = database(run); Statement sql = connection.createStatement()) {
+                sql.execute("CREATE TABLE test_deferred (id BLOB REFERENCES core_command(request_id) DEFERRABLE INITIALLY DEFERRED)");
+                sql.execute("CREATE TRIGGER test_receipt AFTER INSERT ON core_command BEGIN " + triggerBody + "; END");
+            }
+
+            var error = assertThrows(StorageException.class, () ->
+                    setHp(host, rejected, accepted.epoch(), 1, character, 0, 8));
+            assertEquals("COMMIT_UNKNOWN", error.code());
+            assertInstanceOf(SQLException.class, error.getCause());
+            assertEquals(rollbackFailed ? 1 : 0, error.getCause().getSuppressed().length);
+            assertEquals("BLOCKED", host.status().state());
+            assertCode("RUN_BLOCKED", () -> addCard(host, id(), accepted.epoch(), 1, "阻断"));
+
+            try (Connection connection = database(run); Statement sql = connection.createStatement()) {
+                var repository = new CampaignRepository();
+                assertNull(repository.command(connection, rejected));
+                assertNotNull(repository.command(connection, original));
+                assertEquals(1, repository.control(connection).revision());
+                sql.execute("DROP TRIGGER test_receipt");
+                sql.execute("DROP TABLE test_deferred");
+            }
+            var recovered = host.recover(run);
+            assertNotEquals(accepted.epoch(), recovered.epoch());
+            assertEquals(accepted.history(), recovered.history());
+            assertEquals(accepted.domain(), recovered.domain());
+            assertTrue(addCard(host, original, recovered.epoch(), 0, "原角色").lastCommand().replayed());
+        }
+    }
+
     @Test void lostBusinessAcknowledgmentBlocksThenRecoversTheOriginalAcceptedResult() throws Exception {
         AtomicReference<Boundary> fail = new AtomicReference<>(); String request = id();
         try (var host = faultHost(fail)) {

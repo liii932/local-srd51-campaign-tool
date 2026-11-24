@@ -1,35 +1,13 @@
 # Schema 2 角色事实存储
 
-本合同约束检定、装备与健康的类型化运行事实格式、追加读回和直接恢复。
-规则定义与完整字段链沿用[作者来源](schema-2-foundation-authoring.md)及
-[运行快照](schema-2-runtime-snapshot.md)；角色根、成长和休息事实沿用
-[成长与资源](schema-2-character-statistics.md)、[标准休息](schema-2-character-rest.md)及
-[共同业务事务](business-write-transactions.md)。
 
-当前已接通四类规则的准确运行镜像。`Schema2CharacterRuntime` 定义命令、原骰与结果、当前状态
-和不可变历史的类型化 record，`Schema2PreparationIdentity` 保存准确的 run 与 snapshot 身份。
-领域模型负责状态、事件形状、前后邻接与容量预检。`JdbcSchema2CharacterRuntimeRepository`
-把这些事实编码为 SQL 行并追加、读回和直接恢复，在 JDBC 边界将领域历史校验拒绝转换为稳定的
-`SQLException`。叶仓储接收已准备的事实，不抽骰或推导规则效果。
+规则角色的检定、装备与健康由 `Schema2CharacterRuntime` 表达类型化命令、原骰、结果、
+前后状态与完整历史。`Schema2PreparationIdentity` 是角色初始计划及历史引用的稳定领域事实。
+`CampaignDomainEngine` 按战役冻结规则核验历史，SQLite 工作库负责当前运行的控制身份和事务。
+[角色基础](schema-2-character-foundations.md) · [数据映射](../design/v2/storage-data-map-and-rollout.md)
 
-`Schema2CharacterRuntimeService` 在内部 JDBC 路径复用该仓储。`CampaignDomainEngine` 在
-SQLite 路径复用相同领域类型，从经核验的战役规则上下文读取准确材料。两条路径的检定、
-装备和健康语义由[角色基础合同](schema-2-character-foundations.md)及其消费者约束，
-SQLite 绑定与恢复见[领域接合](../design/v2/domain-integration.md)。结构与算术校验仍需与
-实际规则语义校验共同完成。
-
-## 规则镜像与事实的区别
-
-运行 V028/V030 分别保存 `adventure.check`、`equipment.item`、`adventure.health`、
-`adventure.vital_effect` 的完整最终字段、启停和覆盖链，准确读回重建生产字节与摘要。
-运行 V029/V031 则保存角色检定、装备和健康的命令/结果及 before/after，
-不把物品定义当成库存，不把健康算法定义当成角色当前 HP。
-运行 V001—V036 与来源 V001—V009 共 45 份迁移源；来源字段与安装资格门保持。
-
-根身份继续绑定准确 run、snapshot、campaign、character 和 preparation operation。
-一个 run 最多一个角色根，初始事件版本为 0，后续事件恰好递增一次；所有操作 UUID 唯一，
-相邻 before/after 必须相等，当前状态必须等于最后 after。初始化装备为空，健康为规范初始值。
-现有命令的状态拷贝保留新增字段，不借成长或休息合成新装备、检定或健康命令。
+初始化版本为 0，后续每个接受事件恰增一次，操作身份唯一；每个 before 必须等于上一 after，
+当前状态必须匹配最后 after。规则定义存入冻结材料，装备实例、当前 HP 和真实原骰由业务聚合保存。
 
 ## 类型化命令与结果
 
@@ -79,33 +57,13 @@ SQLite 绑定与恢复见[领域接合](../design/v2/domain-integration.md)。�
 资源，仅允许装备及适用的时间字段变化；健康命令保留装备、时间、成长和资源。
 状态结构及邻接检查不替代伤害、治疗、死亡、穿脱或到期恢复的规则语义验证。
 
-## 表、追加与直接恢复
 
-| 表 | 责任 |
-| --- | --- |
-| `s2_character_check` | 每条检定事件恰好一行完整输入、原骰、有效模式及结果；其他事件不得有该行 |
-| `s2_character_event_equipment` | 每个 before/after 的规范装备实例列表；数量与状态头一致，唯一约束保护实例及穿戴/手位 |
-| `s2_character_equipment_command` | 每条装备事件恰好一行完整输入 |
-| `s2_character_event_state` | 原状态标量及 equipment_count、完整健康字段；原有资源、成长、熟练、生命骰子表仍完整保存 |
-| `s2_character_health_event` | 每条健康事件恰好一行完整输入与结果头，明确效果骰数量及可空 d20/d4 |
-| `s2_character_health_die` | 以连续零基索引保存每个效果原骰，数量与健康结果头一致 |
+## 聚合、投影与直接恢复
 
-新表依附准确事件或前后状态，外键使用 RESTRICT，UPDATE/DELETE 触发器拒绝改写。
-应用增量权限仅 SELECT/INSERT；核验和授权分别见
-[角色事实核验](../../database/verify/schema2-character-runtime.sql)与
-[运行权限](../../database/grants/schema2-character-runtime.sql)。完整运行清理必须纳入所有子行，
-当前仓储不提供隐式删除。
-
-`append`、`restore` 要求调用方提供受共同守卫保护的连接；叶仓储不提交、回滚、关闭连接或
-另开写事务。追加先读取现有完整历史，验证 before、全局操作身份和候选完整结构，写后实际
-读回并比较。`restore` 直接写入已有完整事实和原骰，不重放命令、掷骰或再次发放收益；
-已存在角色、身份冲突或不连续历史拒绝，任一失败由事务 owner 回滚整笔候选。
-
-读回独立查询状态、各类命令和原骰；缺行、多余行、重复/断裂索引、孤儿、跨角色与错误类型
-均拒绝，无角色根时也检查全部子表。请求摘要作为调用方提供的准确操作事实保存，
-领域检查摘要格式与历史内操作身份唯一性，仓储检查全局操作身份。`Schema2CharacterRuntimeService`
-的请求指纹绑定全部有界输入、准确规则、
-版本和身份，负责同操作回放、正文冲突拒绝及从保存事件重新核对请求摘要。
+`CampaignDomainRepository` 在调用方事务中保存完整角色聚合及关系核验投影。
+`CampaignDomainCodec` 的闭合记录登记保护字段形状及类型，一次读回严格核对全历史、参照和投影。
+读回失败拒绝继续，不重建遗失的事实。完整文件保留准确冻结材料、完整根子历史和现有业务事实，
+打开只恢复和验证既有原骰、装备和状态。
 
 ## 历史预算与采用边界
 
@@ -114,32 +72,26 @@ SQLite 绑定与恢复见[领域接合](../design/v2/domain-integration.md)。�
 一个结果头加最多 20 个原骰行；已有事件按实际保存的事实数量计数。
 应用在完整命令预检后、首次随机性前检查容量，使用类型化事实即可计算。
 
-真实业务消费者沿共同事务完成规则预检、随机结果生成、追加、实际读回和历史重算，
-提交未知时隔离并只读查证原操作；其语义和验证见[角色基础合同](schema-2-character-foundations.md)。
-成长/休息规则的状态拷贝保留装备与健康字段，稳定恢复与长休清临时 HP 由唯一健康 owner 协调。
-完整规则的初始化、全部特性、其他持续效果、通用跨角色协同及 archive format 2 继续按采用条件接入。
-当前 SQLite 工作台使用 format 3 保存已接入的有界状态。[采用边界](../design/v2/adoption-boundaries.md)
 
-定向入口见[镜像与事实存储验证](../testing.md#schema-2-检定装备与健康镜像和事实存储验证)。
-JDBC 代理与静态结构检查不代替真实 MySQL 的 CHECK、生成列、外键、触发器、权限或持久化验收。
+真实业务消费者按[共同事务](../design/v2/runtime-and-transactions.md)执行预检、结算、追加、实际读回和历史核验。
+只有实际接合的当前模型进入 format 3。验证入口见[领域接合](../design/v2/domain-integration.md#可重复验收索引)。
 
 ## 战斗因果事实与精确时钟
 
-运行 V033/V034 追加 `s2_character_combat_input`：角色事件引用准确 combat、根操作、frame、
+角色事件引用准确 combat、根操作、frame、
 actor、伤害／暴击及秒推进事实。`COMBAT_DAMAGE_APPLIED`、`COMBAT_DEATH_SAVE_RESOLVED`、
 `COMBAT_TIME_ADVANCED` 只由[战斗 owner](schema-2-combat.md)同事务产生，基础请求入口拒绝。
 原始攻击骰由战斗保存；角色健康行保存准确健康规则和实际 HP／死亡结果，双向核验因果引用。
 同一根可按连续子序号先推进角色时间再结算其死亡豁免，各角色版本连续且不重用子操作键。
 
-V036 为[有限施法](schema-2-spells.md)追加 `COMBAT_RESOURCE_SPENT` 与
+[有限施法](schema-2-spells.md)使用 `COMBAT_RESOURCE_SPENT` 与
 `COMBAT_HEALING_APPLIED`，分别保存原角色一级位资源消费及 Cure Wounds 治疗的准确结果。
 二者引用真实战斗根与施法 frame，资源事件不夹带健康结果；自我治疗先扣资源、再写健康，
 两个子事件的角色版本连续。Bless 死亡豁免的一个贡献 d4 随健康结果保存，准确效果来源及
 豁免审计由战斗保存并交叉核验；不把它混成基础健康效果或客户端角色命令。
 
 `RestState` 保存分钟、秒余数、上次长休收益分钟／秒和活动休息；`HealthState` 的稳定期限
-同样保存分钟／秒。V034 对原分钟事实仅在新秒列补零，现有非零秒在成长、检定、装备和
-休息复制中保留。地面装备仍属于原实例，`GROUND` 必须伴随准确战斗身份和 x/y 格坐标；
+同样保存分钟／秒。非零秒在成长、检定、装备和休息复制中保留。地面装备仍属于原实例，`GROUND` 必须伴随准确战斗身份和 x/y 格坐标；
 其他位置禁止这些字段。战斗伤害导致的掉落与 HP 变化写在同一角色事件中。
 
-含战斗子事实的历史须通过完整战斗 Save 一起恢复，不能单独制造没有 owner 的角色事件。
+完整战役恢复同时核对场景及其角色历史，拒绝缺少根归属的角色事件。

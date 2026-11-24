@@ -216,13 +216,34 @@ DM 裁定场景显式切换探索与战斗，支持自由卡和规则角色共�
 当时受影响角色的实际经历。地形数据、分阶段旅行和跨空间持续影响仍须相应机制接入。
 [领域引擎](../../../src/main/java/com/dndtool/service/CampaignDomainEngine.java)
 
+### 直接定位与分支定位
+
+DM 可在执行焦点内的裁定场景直接定位已入场且活动的 PC/NPC。探索及裁定战斗均可使用。
+目标必须是当前二维场景内的空格，可以与原格不相邻。定位保留主体、场景、阵营及现有时钟，
+不推进普通移动或规则动作。当当前场景有待继续动作时，先完成该动作。规则场景中的位置由
+该场景的规则动作流更新，直接定位与分支定位均要求 DM 裁定场景。
+
+两类检定各验证成功与失败分支的目标、安置版本、占位及顺序才取骰。规则卡检定的分支可对
+该分支选定的规则角色执行一次定位，自由卡检定可声明有序定位后果，目标可为当前合格的规则卡或
+自由卡。自由卡两分支分别从同一原状态预检，后续定位读取前一步的占位及安置版本。只执行选中的
+分支。位置、原骰、其他后果、版本、根/子历史和收据属于同一提交。玩家入口通过当前授权候选
+使用空间命令，DM 定位动作只通过 Host。
+
+错误焦点、后台或未安置主体分别按 `STALE_FOCUS`、`SPACE_FROZEN`、`SUBJECT_UNPLACED`
+拒绝。错误安置版本返回 `STALE_POSITION`，越界或占位冲突返回
+`SCENE_GRID_BOUNDS` 或 `SCENE_CELL_OCCUPIED`。无局部场景、规则场景或活动中的待继续
+动作按 `SCENE_FOCUS_REQUIRED`、`RULE_SCENE_OWNER_REQUIRED` 或 `ACTION_FLOW_BUSY` 处理。
+[工作台与请求字段](../../storage-vitality-loop.md)
+
 `RULE_BOUND_CAMPAIGN` format 3 保存所有空间当前事实和完整历史。校验用保留的原请求、
 骰子边数与结果纯核对每个已提交前缀及空间审计。直接装载已核验事实，不消耗实时随机性，
-不执行任何待继续后缀。MySQL INTERNAL 仍使用同场景角色同秒的既有入口。
+不执行任何待继续后缀。
 
 验收入口为 `CampaignSpacesIntegrationTest`、`CampaignSpaceTimeBoundaryTest`、
 `CampaignMonsterSpaceIntegrationTest`、`CampaignDomainsCombatIntegrationTest` 与
 `CampaignDomainRootValidationTest`。空间闭环覆盖两个规则场景各有未决动作、过期焦点零
 RNG 和零写入、FINAL 重开、切回继续原后缀、结束战斗后局部探索和通过锚点离场。
-另按[测试指南](../../testing.md#sqlite-结构完整文件与运行验收)核错锚点、非法格位和路径、
-跨空间影响、事务失败与提交未知。对每次候选按实际执行结果确认范围。
+另用 `CampaignCheckEffectsTest`、`CampaignManualIntegrationTest`、`StorageHttpIntegrationTest`
+和 `tools/storage/browser-smoke.cjs` 验证直接定位、两类分支定位、过期版本、非法未选分支、原收据及
+重开后的格位和因果记录。按[测试指南](../../testing.md#sqlite-结构完整文件与运行验收)核错锚点、
+非法格位和路径、跨空间影响、事务失败与提交未知。对每次候选按实际执行结果确认范围。

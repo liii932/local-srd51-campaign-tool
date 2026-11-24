@@ -23,11 +23,17 @@ public final class CampaignManualCommands {
                         String rollMode,int dc,Map<UUID,Long> targets,List<Effect> success,List<Effect> failure) implements Request {
         public Check { version(characterId,characterVersion);if(checkKind==null||rollMode==null)throw CampaignJson.bad("Missing check kind");targets=Map.copyOf(targets);success=List.copyOf(success);failure=List.copyOf(failure); }
     }
-    public sealed interface Effect permits Hp,GrantModuleItem,GrantTemporaryItem,Message { }
+    public sealed interface Effect permits Hp,GrantModuleItem,GrantTemporaryItem,Message,Place { }
     public record Hp(UUID targetId,int amount) implements Effect { public Hp { uuid(targetId);if(amount<-999||amount>999)throw CampaignJson.bad("HP adjustment outside bounds"); } }
     public record GrantModuleItem(UUID targetId,String itemKey,int quantity) implements Effect { public GrantModuleItem { uuid(targetId);CampaignManualCommands.quantity(quantity);if(itemKey==null)throw CampaignJson.bad("Missing item template"); } }
     public record GrantTemporaryItem(UUID targetId,String name,String description,int quantity) implements Effect { public GrantTemporaryItem { uuid(targetId);CampaignManualCommands.quantity(quantity);text(name,1,80);text(description,0,500); } }
     public record Message(String text) implements Effect { public Message { CampaignManualData.text(text,1,500); } }
+    public record Place(UUID targetId, CampaignSpaceData.ScenePlacement placement) implements Effect {
+        public Place {
+            uuid(targetId);
+            if (placement == null) throw CampaignJson.bad("Missing scene placement");
+        }
+    }
     public record Roll(Check request,List<Integer> dice,int selectedIndex,int modifier,int total,boolean success) { public Roll { dice=List.copyOf(dice); } }
     public record CardChange(ManualCharacter before,ManualCharacter after) { }
     public record ItemChange(Item before,Item after) { }
@@ -125,14 +131,15 @@ public final class CampaignManualCommands {
                 case GrantModuleItem e->{ItemTemplate t=template(e.itemKey());grant(work,target,t.key(),t.name(),t.description(),e.quantity(),branch,i);}
                 case GrantTemporaryItem e->{text(e.name(),1,80);text(e.description(),0,500);grant(work,target,null,e.name(),e.description(),e.quantity(),branch,i);}
                 case Message e->text(e.text(),1,500);
+                case Place e->work.place(e);
             }
-            if(target!=null&&work.cards.containsKey(target))work.touch.add(target);
+            if (!(effect instanceof Place) && target != null && work.cards.containsKey(target)) work.touch.add(target);
         }
     }
     private static void grant(Work work,UUID target,String source,String name,String description,int quantity,String branch,int ordinal){
         quantity(quantity);UUID id=child(work.operation,branch+"-grant",ordinal);if(work.items.containsKey(id)||work.items.size()>=10000)throw CampaignJson.bad("Granted item identity or capacity conflict");work.setItem(new Item(id,target,name,quantity,source,description,true));
     }
-    private static UUID target(Effect effect){return switch(effect){case Hp e->e.targetId();case GrantModuleItem e->e.targetId();case GrantTemporaryItem e->e.targetId();case Message ignored->null;};}
+    private static UUID target(Effect effect){return switch(effect){case Hp e->e.targetId();case GrantModuleItem e->e.targetId();case GrantTemporaryItem e->e.targetId();case Message ignored->null;case Place e->e.targetId();};}
     private static void quantity(int value){if(value<1||value>999)throw CampaignJson.bad("Simple item quantity must be 1–999");}
     private static ItemTemplate template(String key){return catalog().items().stream().filter(i->i.key().equals(key)).findFirst().orElseThrow(()->CampaignJson.bad("Unknown module item template"));}
     private static Card copy(Card c,Map<String,Integer> fields,Map<String,Integer> classes,Map<String,String> skills,Map<String,String> saves){return new Card(c.id(),c.name(),c.kind(),c.active(),fields,classes,skills,saves,c.version());}
@@ -142,7 +149,8 @@ public final class CampaignManualCommands {
         final Map<UUID,Item> items=new TreeMap<>(Comparator.comparing(UUID::toString));
         final Set<UUID> touch=new HashSet<>();
         final List<ItemChange> itemChanges=new ArrayList<>();
-        Work(State before,UUID operation){this.before=before;this.operation=operation;before.manual().characters().forEach(c->cards.put(c.id(),c));before.items().forEach(i->items.put(i.id(),i));}
+        List<Position> positions;
+        Work(State before,UUID operation){this.before=before;this.operation=operation;positions=before.positions();before.manual().characters().forEach(c->cards.put(c.id(),c));before.items().forEach(i->items.put(i.id(),i));}
         boolean owner(UUID id){return cards.containsKey(id)||before.characters().stream().anyMatch(c->c.id().equals(id));}
         void activeOwner(UUID id){uuid(id);if(cards.containsKey(id)){if(!cards.get(id).current().active())throw new StorageException("CHARACTER_INACTIVE","Restore the manual character first");}else if(before.characters().stream().noneMatch(c->c.id().equals(id)&&c.active()))throw CampaignJson.bad("Unknown or inactive effect target");}
         void checkOwner(UUID id) {
@@ -163,11 +171,16 @@ public final class CampaignManualCommands {
         void edit(Card card){ManualCharacter old=cards.get(card.id());cards.put(card.id(),new ManualCharacter(old.initial(),card));touch.add(card.id());}
         boolean placed(UUID id){return CampaignSpaceCommands.position(before,id)!=null;}
         void setItem(Item item){itemChanges.add(new ItemChange(items.get(item.id()),item));items.put(item.id(),item);}
+        void place(Place effect) {
+            State projected = CampaignSpaceCommands.withSpace(before, before.space(), positions);
+            Position destination = CampaignSpaceCommands.adjudicatedPlacement(projected, effect.targetId(), effect.placement());
+            positions = CampaignSpaceCommands.replace(positions, destination);
+        }
         Result finish(Request request,Roll roll){
             for(UUID id:touch){ManualCharacter c=cards.get(id);Card v=c.current();cards.put(id,new ManualCharacter(c.initial(),new Card(v.id(),v.name(),v.kind(),v.active(),v.fields(),v.classes(),v.skills(),v.saves(),v.version()+1)));}
             Map<UUID,ManualCharacter> old=new HashMap<>();before.manual().characters().forEach(c->old.put(c.id(),c));List<CardChange> changes=new ArrayList<>();for(var c:cards.values())if(!c.equals(old.get(c.id())))changes.add(new CardChange(old.get(c.id()),c));
             var manual=new CampaignManualData.State(List.copyOf(cards.values()));
-            State state=new State(before.material(),before.characters(),before.combats(),before.nodes(),before.positions(),List.copyOf(items.values()),before.roots(),manual,before.participation(),before.space());
+            State state=new State(before.material(),before.characters(),before.combats(),before.nodes(),positions,List.copyOf(items.values()),before.roots(),manual,before.participation(),before.space());
             return new Result(state,operation,new Audit(request,changes,itemChanges,roll));
         }
     }
@@ -191,6 +204,10 @@ public final class CampaignManualCommands {
         case "GRANT_MODULE_ITEM"->{fields(o,"kind","targetId","itemKey","quantity");yield new GrantModuleItem(id(o,"targetId"),s(o,"itemKey"),integer(o,"quantity"));}
         case "GRANT_TEMPORARY_ITEM"->{fields(o,"kind","targetId","name","description","quantity");yield new GrantTemporaryItem(id(o,"targetId"),s(o,"name"),s(o,"description"),integer(o,"quantity"));}
         case "MESSAGE"->{fields(o,"kind","text");yield new Message(s(o,"text"));}
+        case "POSITION" -> {
+            fields(o, "kind", "targetId", "placementVersion", "x", "y");
+            yield new Place(id(o, "targetId"), CampaignSpaceCommands.readPlacement(o));
+        }
         default->throw CampaignJson.bad("Unknown manual effect");});}return result;}
     private static void fields(JsonObject o,String...names){CampaignJson.fields(o,names);}
     private static JsonObject object(JsonElement value){if(value==null||!value.isJsonObject())throw CampaignJson.bad("Expected typed manual object");return value.getAsJsonObject();}

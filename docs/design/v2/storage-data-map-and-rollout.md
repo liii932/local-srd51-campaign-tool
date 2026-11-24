@@ -74,33 +74,27 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 
 ## MySQL 依赖与保管清单
 
-以下边界以源码装配和打包规则为准。后续拆分顺序、验证与授权见 [MySQL 退役计划](mysql-retirement.md)。
-
-| 范围 | 当前证据 | 后续归属 |
-|---|---|---|
-| 启动、JNDI 与 Host API | `web.xml` 仅注册 `StorageApplicationListener`、SQLite Host/玩家入口、健康探针及安全过滤器。`StorageApplicationListener` 读取 `DND_STORAGE_ROOT`，外部 `ROOT.xml.example` 提供 Context 覆盖示例。战役工作库由 `CampaignStorageService.connect` 直接通过 `jdbc:sqlite:` 连接，规则库账本由 `LocalRuleLibraryLedger.connect` 直接连接。旧 `/host/rules`、`/host/archive`、`/api/host/diagnostics/database` 及原角色、事件、地图、存档 API 已退役，由 `HostHomeServletTest` 和 `verify-war-http.cjs` 断言 `404` | 保留 SQLite 启动、就绪、文件、规则库和玩家边界。旧 JNDI 资源与外置驱动随使用它们的旧部署配置保管 |
-| Maven、JDBC 与 WAR | `pom.xml` 的 `sqlite-jdbc` 随 WAR 交付。Connector/J 当前是 `provided`，Tomcat DBCP 是 `test`。`packagingExcludes` 明确剔除 `offline/**`、运行迁移 V001—V042、`SchemaMigrations`、`RuleDatabaseSchemaVerifier` 及其内类，以及构建期规则清单生成器。来源 SQL 位于 Maven 资源树外。其余旧实现仍参与默认编译，且未被上述规则排除。`DatabaseDiagnostics`、`JdbcSchema2SnapshotControlRepository` 和 `RuleSchemaMigrations` 仍引用已排除的 `SchemaMigrations` | 保留 SQLite 驱动、结构和规则清单生成。在共享边界分清后，将 MySQL 专属实现和依赖从生产编译及制品输入隔离，按候选 WAR 实际条目和类依赖验收 |
-| 原 MySQL 运行与内部镜像 | `DatabaseDiagnostics`、`JdbcModuleCatalogRepository`、旧角色/战役仓储及 `BusinessWriteTransactions` 等仍在当前编译树。`Schema2SnapshotTransferService`、`Schema2InitializationPreparationService`、`Schema2CharacterRuntimeService` 和 `Schema2CombatRuntimeService` 使用 JDBC 来源、快照、准备或历史的事务链，独立于当前 Web 装配。schema 1 `PARTITION` 仓储也仍用于独立 JDBC 核验 | 保管可读原库的现有版本及其配套迁移、工具和配置。新版维护工具有独立需求时另行立项。删除旧实现前核对其实际消费者 |
-| 原 MySQL 来源、迁移与批准 | `RulePackageCli` 从同版 `target/classes` 启动。`rule-package.sh` 的 `build`、`verify` 和 `schema2-verify` 无需驱动，其余安装/接受/查证子命令从 `DND_RULE_INSTALLER_JDBC_JAR` 加入外供 Connector/J。运行 V001—V042 的 `SchemaMigrations` 对应 `schema_meta`，来源 V001—V012 的 `RuleSchemaMigrations` 对应 `rule_schema_meta`。`JdbcSourceLanguageRepository` 和 `JdbcSourceSchema2Repository` 核对准确批准账本和规则材料 | 原 SQL、批准摘要、已应用记录、原包及安装/接受账本随各自库保管。分离可复用的原包验证与 MySQL 安装适配。[维护与账号](../../database.md#mysql-维护与退役边界) |
-| 旧目录与发布身份 | `ModuleReleaseVerifier` 使用 `BuiltinModuleReleaseRegistry` 和旧目录仓储。离线 `RuleArtifact` 的 `CharacterCatalogAuthorPackageReader` 同样使用该注册表验证 DRAFT 身份。`ModuleCanonicalEncoderV2` 复用 V1 的文本编码辅助方法 | 已发行 v1 的身份、canonical 和摘要与对应版本及原库保管。拆分旧目录时同时核对只在离线使用的作者读取、DRAFT 校验和独立目录向量 |
-| 旧存档 | format 1 整档使用匹配的已发行应用。format 2 的 `CampaignArchiveV2*`、`JdbcCampaignArchiveV2*` 和测试仍实现 DRAFT 角色片段校验和内部 JDBC 恢复。当前 SQLite 的 `CampaignCodec` 仅接受本版 `RULE_BOUND_CAMPAIGN` format 3 | 保管真实旧档及对应原制品。format 2 片段的专属实现和测试随独立旧链评估，完整 DRAFT 的发布和存档资格继续受其发布门约束 |
-| 测试与运维工具 | `database/grants/`、`database/verify/`、`database/test/` 和 `verify-language-jdbc.py` 属 MySQL 维护，纯清单校验与显式隔离实例验收是两种入口。`MySqlIntegrationTestSupport` 限定写入测试目标。`tools/storage/` 的 HTTP、规则组合和完整文件验收使用 SQLite | MySQL 专属核验、样例和测试随匹配旧版保管。保留 SQLite 的应用、作者场景、WAR 审计和平台生命周期证据。[定向测试与隔离环境](../../testing.md#3-mysql-集成测试) |
+| 交付对象 | 责任与入口 |
+|---|---|
+| Web 与默认构建 | `StorageApplicationListener` 从 Context 参数、`DND_STORAGE_ROOT` 或运行身份解析私有根。`CampaignStorageService` 与 `LocalRuleLibraryLedger` 通过 SQLite JDBC 连接；默认 Maven 解析 SQLite 驱动及 HTTP 测试容器。旧 Host 路由返回 404。 |
+| 战役与规则 | SQLite 在私有工作库持有冻结规则、角色与场景事实、投影、根和幂等收据。本机规则库负责原包、审阅与接受。构建生成的规则身份清单和准确原包随 WAR 交付。 |
+| 作者输入 | `RulePackageCli` 的 build、verify 和 schema2-verify 读取本地制品。DRAFT 语言/工具的独立作者向量、严格读取与可玩组合的资格门独立核验。 |
+| 旧运行库与来源库 | JDBC 适配器、迁移/权限脚本、诊断、安装/接受票据及内部快照工具由持有者随匹配旧版保管。两个迁移账本及对应原件、备份、旧文件和最小权限核验见[数据库合同](../../database.md#迁移合同)。 |
 
 ### SQLite 仍使用的领域依赖
 
 | 当前消费者与共享事实 | 拆分时保护的边界 |
 |---|---|
 | `BundledCampaignRules`、`LocalRuleLibrary`、`CampaignRuleSupport` 和 `CampaignDomainData.Material` 使用 `ProductionRuleArtifact`、`Schema2CompositionKernel`、`ProductionSchema2Projection`、`Schema2RulesBinding` 及其规则/条目/来源链类型。`Schema2CompositionKernel` 还使用 `AdvancementValueProfile` 和 `ResourceRecoveryProfile` | 保留与 JDBC 无关的原包读取、规范编码、按顺序组合、冻结材料重建和成员/最终规则/完整链摘要。SQLite 本机接受由 `LocalRuleLibrary` 的独立账本承担 |
-| `CampaignDomainCommands` 调用 `CampaignDomainEngine`，`CampaignDomainValidation` 以该引擎的 `CharacterRecord` 投影角色。原 `Schema2CharacterRuntimeService`、`Schema2CombatRuntimeService` 也持有同一引擎。`CampaignDomainEngine` 调用纯 `Schema2*Rules`，使用 `Schema2CharacterRequest`、`Schema2CombatRequest` 生成和重验 SQLite 角色、场景及因果子事件的请求摘要 | 保留纯引擎、请求和领域规则。保持事件命令、历史邻接、前后状态、原骰、类型化事实、请求摘要及核验。MySQL 专属连接、SQL、事务守卫及操作收据随对应适配器退出产品交付 |
-| `CampaignDomainCodec` 直接登记 `Schema2PreparationIdentity`、`Schema2InitialCharacterPlanService` 的计划、`Schema2InitialProficiencyRules` 的授予、`Schema2CharacterRuntime`、`Schema2CombatState` 和 `Schema2CombatHistory` 等记录。嵌套记录标签取登记前缀和 Java 简名，字段取记录组件名 | 先核对类型、静态引用和 codec 登记，再迁移或提取共享类型。同步保持当前 format 3 的标签、字段、事件与摘要一致。准备身份保留为领域事实，SQLite 的运行身份、epoch 与接受收据由自身控制表管理 |
-| `CampaignDomainEngine`、`CampaignManualCommands` 与 `PlayerGatewayService` 等复用旧服务也在用的 `CharacterNamePolicy` | 保留名称校验的 Unicode、NFC 与控制字符边界 |
+| `CampaignDomainCommands` 和 `CampaignSpaceCommands` 调用 `CampaignDomainEngine`。`CampaignDomainValidation` 将保留事实投影为 `CharacterRecord`，通过领域命令核验历史。引擎使用独立的纯 `Schema2CharacterMaterial`、`Schema2CharacterRequest` 和 `Schema2CombatRequest`，执行 `Schema2*Rules` 并生成和重验请求摘要 | 保留已分离的纯引擎、材料、请求和规则。保持事件命令、历史邻接、前后状态、原骰、类型化事实和请求摘要。MySQL 专属连接、SQL、事务守卫及操作收据随对应适配器退出产品交付 |
+| `CampaignRuleContext.initialPlan` 调用纯 `Schema2InitialCharacterPlanService.prepareMaterial`。独立作者场景入口 `tools/rule-packages/ModuleScenario.java` 也引用 `InitialPlan`。`CampaignDomainCodec` 登记 `initial.Plan`、`initial.InitialPlan`、`preparation-identity`、熟练授予、角色事实和战斗状态/历史记录 | 核对静态调用、独立场景及 codec 的反射登记。类型如需移动，同步当前 format 3 的标签、记录字段、事件与摘要。准备身份继续保留为领域事实，SQLite 的运行身份、epoch 与接受收据由自身控制表管理 |
+| `CampaignDomainEngine`、`CampaignManualCommands` 与 `PlayerGatewayService` 等共用 `CharacterNamePolicy` | 保留名称校验的 Unicode、NFC 与控制字符边界 |
 
-后续删除前，从 `web.xml` 启动、SQLite 服务与 codec、规则清单生成器和独立作者场景追踪实际类依赖，覆盖内部类型和反射注册。保留纯领域层、SQLite 调用者和无需 MySQL 的作者验证，逐批分离 MySQL 适配。干净构建后复查 WAR 条目与依赖，并用定向测试核对标准与自定义组合、角色/场景历史、同版恢复及完整文件重开。旧链的保管与真实库处置按[数据库合同](../../database.md#mysql-维护与退役边界)单独核对。
+制品审计须从源码与构建输出复核领域类型、内部类、codec 登记和独立作者场景的需求。运行验证覆盖标准/自定义组合、历史、同版恢复及完整文件。
 
 ## 原 MySQL 清单的用途与接合差异
 
-附录仍列原运行 V001—V042、来源 V001—V012 的实际持久表，用于能力/字段审查和保管，
-不是新模型要照抄的 259 张表，也不是外部数据库已经安装或迁移的证据。
+原表、迁移清单与校验 SQL 由对应版本保管。按业务事实核对旧数据的读取责任及当前能力，并按实际账本判断已应用的迁移。[数据库保管](../../database.md#迁移合同)
 
 | 原责任 | 当前接合/保管方向 |
 |---|---|
@@ -108,7 +102,7 @@ Java 责任类型，也不要求为每个叶字段保留旧 MySQL 子表。
 | 原角色自由字段/职业等级/熟练/Manual/普通save/简易遭遇名单/阵营 | 由独立 DM-managed typed 领域逐项接合。当前入口、剩余差异和待验证断言见接合表 |
 | schema-2 角色/资源/装备/健康/书籍/休息叶表 | 原纯规则/完整 typed History 复用到角色聚合，同根/事务/文件，不复制第二条 MySQL 服务事务 |
 | schema-2 战斗/动作/效果/怪物叶表 | 完整场景 History 聚合及关系投影，同一角色健康/资源 owner；保留全部已完成/未决事实 |
-| v1 检定/成功失败效果/物品/位置/消息 | `check-effects` 和 `manual-check` 对已支持的生命、物品及消息后果完整预检，按序与根历史同事务提交，并随完整文件保存。旧 MySQL 直接定位和 `effect.set_entity_position` 的业务写入路径已移除。SQLite 的遭遇内直放与检定分支原子定位见[领域接合表](domain-integration.md#支持边界和设计修订) |
+| v1 检定/成功失败效果/物品/位置/消息 | `check-effects` 和 `manual-check` 对已支持的生命、物品、位置及消息后果完整预检，按序与根历史同事务提交，并随完整文件保存。旧 MySQL 直接定位和 `effect.set_entity_position` 的业务写入路径已移除。SQLite 的遭遇内直放与检定分支原子定位见[领域接合表](domain-integration.md#支持边界和设计修订) |
 | 永久业务守卫/内部操作 | 当前独占根锁+BEGIN IMMEDIATE，状态/根/接受一次提交；未知显式恢复核库/全部收据，独立 C0/NOT_COMMITTED 方案已替换 |
 | 旧 format 1/内部 format 2 片段 | 按原发行物和离线合同保管。当前 SQLite 工作台仅打开本版 format 3 完整文件 |
 
@@ -150,64 +144,3 @@ WAR 必含应用结构、严格聚合与领域代码、SQLite JDBC、Host 页面
 默认保管原 MySQL 运行/来源库、准确原包/接受账本和必要可读应用。保留数据库用前向
 迁移，不改已应用摘要；重建/重置、真实导出恢复删除、来源安装接受、Tomcat启停/WAR
 替换和业务写入分别授权。无跨版本兼容只免除格式延续义务，不减少真实数据责任。
-
-## 附录：现行持久表完整清单
-
-表名仅用于核对替换覆盖，不把现有 259 张表固定为目标物理模型。未列建表的迁移仍可能
-修改约束、seed 或现有列，不能因没有新增表就在替换审查中跳过。
-
-### 运行库：206 张
-
-| 建表迁移 | 表名 |
-|---|---|
-| [V001__stage1_schema.sql](../../../src/main/resources/db/migration/V001__stage1_schema.sql) | `schema_meta`, `module_release`, `campaign`, `campaign_module`, `host_operation` |
-| [V002__stage2_module_schema.sql](../../../src/main/resources/db/migration/V002__stage2_module_schema.sql) | `module_rule_constant`, `module_field_definition`, `module_class_definition`, `module_proficiency_tier`, `module_proficiency_bonus_band`, `module_skill_definition`, `module_save_definition`, `module_item_template`, `module_entity_template`, `module_entity_template_value`, `module_entity_template_class_level`, `module_entity_template_proficiency`, `module_check_definition`, `module_roll_mode`, `module_event_template`, `module_effect_definition`, `module_event_check`, `module_event_effect`, `module_effect_parameter`, `module_map_definition`, `module_map_node`, `module_map_connection` |
-| [V005__stage2_character_event_schema.sql](../../../src/main/resources/db/migration/V005__stage2_character_event_schema.sql) | `character_record`, `character_class_level`, `character_skill_proficiency`, `character_save_proficiency`, `game_event`, `field_change` |
-| [V006__stage2_character_field_value_schema.sql](../../../src/main/resources/db/migration/V006__stage2_character_field_value_schema.sql) | `character_field_value` |
-| [V008__stage2_simple_item_schema.sql](../../../src/main/resources/db/migration/V008__stage2_simple_item_schema.sql) | `item_instance` |
-| [V009__stage3_check_execution_schema.sql](../../../src/main/resources/db/migration/V009__stage3_check_execution_schema.sql) | `check_execution`, `dice_roll`, `check_effect`, `check_effect_parameter_value` |
-| [V010__stage3_node_encounter_schema.sql](../../../src/main/resources/db/migration/V010__stage3_node_encounter_schema.sql) | `map_instance`, `party_world_position`, `battle_state`, `battle_participant`, `entity_position` |
-| [V011__complete_character_catalog_draft.sql](../../../src/main/resources/db/migration/V011__complete_character_catalog_draft.sql) | `module_catalog_definition_v2`, `module_catalog_attribute_v2`, `module_catalog_relation_v2` |
-| [V012__level_one_character_creation.sql](../../../src/main/resources/db/migration/V012__level_one_character_creation.sql) | `character_creation_snapshot_v2`, `character_creation_selection_v2`, `character_resource_state_v2` |
-| [V013__level_advancement_hit_dice.sql](../../../src/main/resources/db/migration/V013__level_advancement_hit_dice.sql) | `character_class_level_v2`, `character_level_advancement_v2`, `character_level_resource_change_v2` |
-| [V014__class_feature_lifecycle.sql](../../../src/main/resources/db/migration/V014__class_feature_lifecycle.sql) | `character_subclass_state_v2`, `character_feature_state_v2`, `character_feature_choice_v2`, `character_feature_adjudication_v2`, `character_resource_recovery_v2` |
-| [V015__multiclass_asi_feat_draft.sql](../../../src/main/resources/db/migration/V015__multiclass_asi_feat_draft.sql) | `character_advancement_choice_v2`, `character_ability_score_change_v2`, `character_feat_state_v2`, `character_multiclass_proficiency_v2` |
-| [V019__runtime-language-snapshot.sql](../../../src/main/resources/db/migration/V019__runtime-language-snapshot.sql) | `runtime_run_identity`, `runtime_rule_snapshot`, `runtime_rule_language` |
-| [V020__runtime-tool-snapshot.sql](../../../src/main/resources/db/migration/V020__runtime-tool-snapshot.sql) | `runtime_rule_tool` |
-| [V021__schema2-runtime-snapshot.sql](../../../src/main/resources/db/migration/V021__schema2-runtime-snapshot.sql) | `s2_runtime_identity`, `s2_runtime_snapshot`, `s2_runtime_member`, `s2_runtime_language`, `s2_runtime_language_set`, `s2_runtime_language_entry`, `s2_runtime_field_chain`, `s2_runtime_chain_step`, `s2_runtime_control`, `s2_runtime_operation` |
-| [V022__character-proficiency-grants.sql](../../../src/main/resources/db/migration/V022__character-proficiency-grants.sql) | `character_proficiency_grant_v2` |
-| [V023__schema2-runtime-tools.sql](../../../src/main/resources/db/migration/V023__schema2-runtime-tools.sql) | `s2_runtime_tool`, `s2_runtime_tool_set`, `s2_runtime_tool_entry` |
-| [V024__schema2-character-grants.sql](../../../src/main/resources/db/migration/V024__schema2-character-grants.sql) | `s2_runtime_character_source`, `s2_runtime_proficiency_grant` |
-| [V025__business-write-guard.sql](../../../src/main/resources/db/migration/V025__business-write-guard.sql) | `business_write_guard` |
-| [V026__schema2-initial-plans.sql](../../../src/main/resources/db/migration/V026__schema2-initial-plans.sql) | `s2_initial_plan`, `s2_initial_plan_slot`, `s2_initial_plan_choice`, `s2_initial_plan_grant` |
-| [V027__schema2-character-runtime.sql](../../../src/main/resources/db/migration/V027__schema2-character-runtime.sql) | `s2_runtime_class_progression`, `s2_runtime_resource`, `s2_runtime_subclass`, `s2_runtime_feature`, `s2_runtime_feat`, `s2_runtime_proficiency`, `s2_runtime_proficiency_set`, `s2_runtime_rest`, `s2_runtime_class_level_entry`, `s2_runtime_proficiency_entry`, `s2_runtime_growth_grant`, `s2_runtime_rule_prerequisite`, `s2_runtime_chain_prerequisite`, `s2_character_runtime`, `s2_character_event`, `s2_character_event_state`, `s2_character_event_resource`, `s2_character_event_class`, `s2_character_event_hit_die`, `s2_character_event_subclass`, `s2_character_event_feature`, `s2_character_event_feat`, `s2_character_event_proficiency`, `s2_character_command_ability`, `s2_character_command_proficiency`, `s2_character_command_hit_die` |
-| [V028__schema2-check-rules.sql](../../../src/main/resources/db/migration/V028__schema2-check-rules.sql) | `s2_runtime_check` |
-| [V029__schema2-character-check-history.sql](../../../src/main/resources/db/migration/V029__schema2-character-check-history.sql) | `s2_character_check` |
-| [V030__schema2-equipment-health-rules.sql](../../../src/main/resources/db/migration/V030__schema2-equipment-health-rules.sql) | `s2_runtime_equipment_item`, `s2_runtime_health`, `s2_runtime_vital_effect` |
-| [V031__schema2-equipment-health-history.sql](../../../src/main/resources/db/migration/V031__schema2-equipment-health-history.sql) | `s2_character_event_equipment`, `s2_character_equipment_command`, `s2_character_health_event`, `s2_character_health_die` |
-| [V032__schema2-combat-rules.sql](../../../src/main/resources/db/migration/V032__schema2-combat-rules.sql) | `s2_runtime_combat`, `s2_runtime_weapon_attack`, `s2_runtime_movement` |
-| [V033__schema2-combat-runtime.sql](../../../src/main/resources/db/migration/V033__schema2-combat-runtime.sql) | `s2_combat_runtime`, `s2_combat_member`, `s2_combat_event`, `s2_combat_dependency`, `s2_combat_character_result`, `s2_combat_command_point`, `s2_combat_command_deployment`, `s2_combat_command_tie`, `s2_combat_roll`, `s2_combat_fact`, `s2_combat_state`, `s2_combat_actor`, `s2_combat_initiative`, `s2_combat_flow`, `s2_combat_frame`, `s2_combat_window`, `s2_combat_opportunity`, `s2_combat_opportunity_item`, `s2_combat_movement`, `s2_combat_movement_point`, `s2_combat_attack`, `s2_combat_attack_die`, `s2_character_combat_input` |
-| [V035__schema2-spell-rules.sql](../../../src/main/resources/db/migration/V035__schema2-spell-rules.sql) | `s2_runtime_spell`, `s2_runtime_spellcasting` |
-| [V036__schema2-spell-runtime.sql](../../../src/main/resources/db/migration/V036__schema2-spell-runtime.sql) | `s2_combat_cast_command`, `s2_combat_cast_command_target`, `s2_combat_ongoing_effect`, `s2_combat_ongoing_target`, `s2_combat_cast`, `s2_combat_cast_target`, `s2_combat_cast_die`, `s2_combat_saving_throw` |
-| [V037__schema2-wizard-environment-rules.sql](../../../src/main/resources/db/migration/V037__schema2-wizard-environment-rules.sql) | `s2_runtime_wizard_spellcasting`, `s2_runtime_environment`, `s2_runtime_spellbook_member` |
-| [V038__schema2-reactions-and-ongoing-scenes.sql](../../../src/main/resources/db/migration/V038__schema2-reactions-and-ongoing-scenes.sql) | `s2_character_event_learned_spell`, `s2_character_event_prepared_spell`, `s2_character_spellbook_command`, `s2_character_spellbook_choice`, `s2_combat_ready_input`, `s2_combat_ready_point`, `s2_combat_ready_target`, `s2_combat_zone_command`, `s2_combat_health_command`, `s2_combat_reaction_option`, `s2_combat_window_trigger`, `s2_combat_ready_release`, `s2_combat_ability_check`, `s2_combat_ready`, `s2_combat_trigger`, `s2_combat_shield`, `s2_combat_concentration`, `s2_combat_environment`, `s2_combat_suppression` |
-| [V039__schema2-monster-rules.sql](../../../src/main/resources/db/migration/V039__schema2-monster-rules.sql) | `s2_runtime_monster`, `s2_runtime_monster_action`, `s2_runtime_monster_stat`, `s2_runtime_monster_save`, `s2_runtime_monster_skill`, `s2_runtime_monster_defense`, `s2_runtime_monster_condition`, `s2_runtime_monster_language`, `s2_runtime_monster_trait`, `s2_runtime_monster_action_value` |
-| [V040__schema2-monster-breath-runtime.sql](../../../src/main/resources/db/migration/V040__schema2-monster-breath-runtime.sql) | `s2_combat_monster_deployment`, `s2_combat_breath_input`, `s2_combat_monster`, `s2_combat_monster_action`, `s2_combat_save_damage_batch`, `s2_combat_breath_candidate`, `s2_combat_breath_target`, `s2_combat_breath_die`, `s2_combat_breath_check`, `s2_combat_breath_packet`, `s2_combat_breath_defense`, `s2_combat_breath_concentration`, `s2_combat_monster_rest_input`, `s2_combat_monster_rest` |
-| [V041__schema2-arcane-recovery.sql](../../../src/main/resources/db/migration/V041__schema2-arcane-recovery.sql) | `s2_character_arcane_recovery_choice` |
-| [V042__schema2-spell-save-damage.sql](../../../src/main/resources/db/migration/V042__schema2-spell-save-damage.sql) | `s2_combat_spell_damage_source` |
-
-### 来源库：53 张
-
-| 建表迁移 | 表名 |
-|---|---|
-| [V001__rule-source-schema.sql](../../../database/rules/migration/V001__rule-source-schema.sql) | `rule_schema_meta`, `rule_release`, `rule_language`, `rule_package_installation`, `rule_package_installation_partition`, `rule_installation_control` |
-| [V002__tool-catalog.sql](../../../database/rules/migration/V002__tool-catalog.sql) | `rule_tool` |
-| [V003__schema2-source-ledger.sql](../../../database/rules/migration/V003__schema2-source-ledger.sql) | `rule_schema2_artifact`, `rule_schema2_acceptance`, `rule_schema2_control` |
-| [V004__schema2-character-grant-source.sql](../../../database/rules/migration/V004__schema2-character-grant-source.sql) | `rule_schema2_character_source`, `rule_schema2_proficiency_grant`, `rule_schema2_character_change` |
-| [V005__schema2-advancement-source.sql](../../../database/rules/migration/V005__schema2-advancement-source.sql) | `rule_schema2_class_progression`, `rule_schema2_resource`, `rule_schema2_subclass`, `rule_schema2_feature`, `rule_schema2_feat`, `rule_schema2_proficiency`, `rule_schema2_proficiency_set`, `rule_schema2_class_level`, `rule_schema2_proficiency_member`, `rule_schema2_growth_grant`, `rule_schema2_ability_requirement`, `rule_schema2_rest`, `rule_schema2_advancement_change` |
-| [V006__schema2-check-source.sql](../../../database/rules/migration/V006__schema2-check-source.sql) | `rule_schema2_check` |
-| [V007__schema2-equipment-health-source.sql](../../../database/rules/migration/V007__schema2-equipment-health-source.sql) | `rule_schema2_equipment_item`, `rule_schema2_health`, `rule_schema2_vital_effect`, `rule_schema2_execution_change` |
-| [V008__schema2-combat-source.sql](../../../database/rules/migration/V008__schema2-combat-source.sql) | `rule_schema2_combat`, `rule_schema2_weapon_attack`, `rule_schema2_movement`, `rule_schema2_combat_change` |
-| [V009__schema2-spell-source.sql](../../../database/rules/migration/V009__schema2-spell-source.sql) | `rule_schema2_spell`, `rule_schema2_spellcasting`, `rule_schema2_spell_change` |
-| [V010__schema2-wizard-environment-source.sql](../../../database/rules/migration/V010__schema2-wizard-environment-source.sql) | `rule_schema2_wizard_spellcasting`, `rule_schema2_environment`, `rule_schema2_spellbook_member`, `rule_schema2_wizard_change` |
-| [V011__schema2-monster-source.sql](../../../database/rules/migration/V011__schema2-monster-source.sql) | `rule_schema2_monster`, `rule_schema2_monster_action`, `rule_schema2_monster_change`, `rule_schema2_monster_stat`, `rule_schema2_monster_save`, `rule_schema2_monster_skill`, `rule_schema2_monster_defense`, `rule_schema2_monster_condition`, `rule_schema2_monster_language`, `rule_schema2_monster_trait`, `rule_schema2_monster_action_value` |

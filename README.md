@@ -37,7 +37,7 @@ Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授�
 
 战役默认存放在运行账号的 `${user.home}/.dndtool/campaigns`。通过 `DND_STORAGE_ROOT` 可指定其他私有目录。
 
-来源 MySQL 的作者包安装/接受、内部快照与规则算法测试继续具有各自责任。
+本机规则库负责准确原包和接受账本，作者工具单独校验 DRAFT 目录与规则制品。
 通用外部规则安装、完整 SRD 发布、完整通用 archive format 2 和跨版本存档兼容
 不由此有限应用模型自动完成。当前业务/根/接受在一个 SQLite 事务提交，未知结果显式
 恢复；每命令耐久和 INITIAL/MANUAL/FINAL 承担保存责任，周期 AUTO/轮换仍为后续目标。
@@ -105,7 +105,7 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 | 数据库 | 进程私有 SQLite，随 WAR 交付 JDBC 驱动 |
 | JSON | Gson 2.14 |
 | 构建 | Maven 3.9 |
-| 测试 | JUnit 5、可选独立 MySQL 集成测试 |
+| 测试 | JUnit 5、真实临时 SQLite、独立规则向量与成品场景 |
 
 ## 架构概览
 
@@ -145,7 +145,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
   --case weapon-damage rule-packages/srd51-runtime/scenarios/standard.json
 ```
 
-开发中的模组可单独构建候选 ZIP 并传给同一入口，见[模组场景指南](./rule-packages/srd51-runtime/scenarios/README.md)。独立 MySQL 测试库的启用条件和 WAR 审计见[测试指南](./docs/testing.md)。
+开发中的模组可单独构建候选 ZIP 并传给同一入口，见[模组场景指南](./rule-packages/srd51-runtime/scenarios/README.md)。SQLite 测试、无 MySQL 环境验收和 WAR 审计见[测试指南](./docs/testing.md)。
 
 离线 DRAFT 语言与工具目录使用 `python3 -B tools/rule-packages/catalog-vector.py --check rule-packages/srd51-complete` 核对正式作者内容。应用读取器与安装测试另用固定夹具。见[独立作者验证](./docs/rules/language-author-package.md#独立验证)。
 
@@ -154,9 +154,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 在外部 Tomcat 中将发行 WAR 部署为 `ROOT.war`。WAR 自带 SQLite JDBC，启动无需配置 JNDI 或 MySQL。
 私有存储根、可回滚替换与验收见[部署指南](./docs/deployment.md)。
 
-既有 MySQL 库、账号和迁移账本单独维护。离线规则工具使用对应版本的源码仓库及其 Maven 编译输出 `target/classes`，运行与来源迁移由仓库提供。维护入口见[数据库文档](./docs/database.md#迁移合同)。
-
-当前默认 Maven 构建仍解析 Connector/J。构建与交付移除 MySQL 依赖的批次、保留能力和候选验收见[SQLite 单路线实施计划](./docs/design/v2/mysql-retirement.md)。
+当前应用、默认构建与测试只需要 SQLite。本机规则库保管已接受原包，历史 MySQL 库、账号、迁移账本和工具按匹配版本单独保管。[数据库合同](./docs/database.md#迁移合同) · [候选验收](./docs/testing.md#mysql-free-acceptance)
 
 ## 安全与数据约束
 
@@ -174,16 +172,15 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 ```text
 src/main/java/com/dndtool/
   module/          不可变规则模型、内置目录、规范编码与哈希校验
-  persistence/     JDBC Repository、模式查询与持久化边界
+  persistence/     SQLite 结构、规则账本、战役事实仓储与 Host 状态代次接口
   security/        loopback 主机边界和请求安全过滤器
   service/         业务验证、诊断编排、事务、幂等和存档服务
   web/             SQLite 启动与就绪检查、Servlet、HTTP DTO 与页面支持
-src/main/resources/db/migration/
-                    独立 MySQL 维护与核验使用的 V001—V042 迁移
+src/main/resources/storage/
+                    战役结构声明与内置规则原包
 src/main/webapp/    WAR 的 Host / Player HTML、web.xml、JavaScript 和 CSS
 src/test/           单元、边界、结构和集成测试
 docs/               架构、规则、配置、安全、测试和运维指南
-database/           只读验证、最小授权与独立测试库辅助 SQL
 config/tomcat/      不含秘密的外部 Tomcat 配置示例
 tools/              规则制品与摘要校验、SQLite 隔离启动和验收工具
 ```
@@ -215,25 +212,25 @@ tracks semantic drafting and source review separately from implementation.
 | [架构](./docs/architecture.md) | 产品范围、组件、事务与信任边界 |
 | [规则数据库分离设计](./docs/rule-database-separation.md) | 当前存储、双 schema 职责及 v2 采用边界 |
 | [schema 2 制品与安装接受](./docs/rules/schema-2-installation-and-acceptance.md) | 原始 ZIP、生产摘要、审阅绑定、独立接受和提交查证 |
-| [schema 2 来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md) | 来源只读复核、类型化快照和完整链、原子转存、查证与准确恢复绑定 |
+| [schema 2 来源到运行快照](./docs/rules/schema-2-runtime-snapshot.md) | 历史来源与运行快照保管、当前冻结组合与直接恢复入口 |
 | [schema 2 初始语言／工具授予](./docs/rules/schema-2-proficiency-grants.md) | 真实来源与稳定槽、原子授予字段、跨模组选择和固定快照计划 |
 | [schema 2 检定、装备与健康作者来源](./docs/rules/schema-2-foundation-authoring.md) | 四类类型化定义、字段和引用、负修正、清空、纯组合与真实来源边界 |
 | [schema 2 角色事实存储](./docs/rules/schema-2-character-fact-storage.md) | 准确镜像、检定/装备/健康输入与结果、前后状态、历史预算及仓储直接恢复 |
 | [schema 2 检定、装备与健康基础](./docs/rules/schema-2-character-foundations.md) | 真实检定、装备实例、健康变化、命令幂等、完整局部历史与直接恢复 |
-| [schema 2 战斗作者来源](./docs/rules/schema-2-combat-authoring.md) | 战斗算法、真实近战武器及步行来源、来源 V008 和运行 V032 镜像 |
+| [schema 2 战斗作者来源](./docs/rules/schema-2-combat-authoring.md) | 战斗算法、近战武器及步行的类型化来源 |
 | [schema 2 内部战斗与动作继续](./docs/rules/schema-2-combat.md) | 真实攻击/移动/机会攻击、回合、倒地/掉落、共享秒时钟、完整历史与恢复 |
-| [schema 2 施法作者来源](./docs/rules/schema-2-spell-authoring.md) | 生命领域/法师准确来源、学习名单、固定抗魔环境与 V009/V010、V035/V037 镜像 |
+| [schema 2 施法作者来源](./docs/rules/schema-2-spell-authoring.md) | 生命领域与法师来源、学习名单、固定抗魔环境 |
 | [schema 2 有限施法与持续效果](./docs/rules/schema-2-spells.md) | 真实成本/法术书、Shield/Counterspell/Ready、独立压制、专注/到期及探索转移 |
 | [schema 2 有限怪物与火焰吐息](./docs/rules/schema-2-monster-breath.md) | 类型化怪物/动作、完整点格目标、共享伤害/豁免、充能、专注共同切面与局部恢复 |
-| [共同业务写入与初始化准备](./docs/rules/business-write-transactions.md) | 全部写入口、永久守卫、事务故障隔离及绑定初始计划的原子准备 |
+| [共同业务写入与初始化准备](./docs/rules/business-write-transactions.md) | SQLite 共同事务与历史运行守卫的保管 |
 | [SRD 5.1 本地原文索引](./docs/references/srd-5.1/README.md) | 按主题定位 403 页检索文本，核对本地 PDF 与官方出处 |
 | [完整规则目标](./docs/rules/srd-5.1-complete.md) | SRD 5.1 功能覆盖、自动化边界和兼容要求 |
 | [冻结 v1 规则规范](./docs/rules/srd-5.1.md) | 现有稳定键、算法、范围、规范化和模组关系 |
 | [职业特性 v2](./docs/rules/class-features-v2.md) | 12 职业/子职业特性矩阵、资源恢复与阻断边界 |
 | [多职业共享法术位 v2](./docs/rules/multiclass-spell-slots-v2.md) | DRAFT 施法贡献与共享位采用范围 |
-| [Archive format 2 角色投影](./docs/rules/archive-format-2-character-state.md) | DRAFT 稳定事件闭包、严格 codec 与恢复来源 |
+| [Archive format 2 角色投影](./docs/rules/archive-format-2-character-state.md) | 历史 DRAFT 片段的保管和当前格式接受边界 |
 | [配置](./docs/configuration.md) | SQLite 存储根、Tomcat 运行身份与可选玩家 HTTPS Connector |
-| [数据库](./docs/database.md) | SQLite 工作库与独立 MySQL 迁移、核验及账号职责 |
+| [数据库](./docs/database.md) | SQLite 工作库与原 MySQL 数据保管 |
 | [安全](./docs/security.md) | 请求边界、权威输入、最小权限与秘密处理 |
 | [测试](./docs/testing.md) | 应用定向测试、独立模组场景、集成测试和 WAR 审计 |
 | [公开仓库发布检查清单](./docs/public-release-checklist.md) | 私有迁移仓库公开前的内容审计与 GitHub 设置确认 |

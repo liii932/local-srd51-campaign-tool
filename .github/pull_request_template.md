@@ -4,9 +4,8 @@
 
 ## Preserved contracts
 
-- Applied MySQL migration history and checksums remain unchanged when retaining the database.
 - Describe any effect on SQLite campaign rule bindings, format 3 saves, or the separate complete-SRD DRAFT release gate.
-- For offline MySQL changes, verify the affected released v1 identities, digest domains and archive contract.
+- For changes affecting historical data custody, identify the matching release, original artifacts and required read access.
 - The single-DM entry remains loopback-only; optional player HTTPS access follows the documented security boundary.
 - No secrets, private campaign data, backups, logs or build outputs are included.
 

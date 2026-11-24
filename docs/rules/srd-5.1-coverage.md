@@ -26,7 +26,7 @@ runtime support.
 | 执行 | 有限选择 | 服务生成合法候选，DM 选择目标、选项或顺序，服务重验并执行。 |
 | 执行 | 类型化裁定 | 存在真实命令及有界裁定类型、对象、成本、后果、事件和恢复；标签、备注或任意成功/失败记录不足以证明机制完成。 |
 | 执行 | 未接入／阻断 | 没有闭合消费者，或当前入口明确拒绝；不能经通用伤害、说明文字或任意修正绕过。 |
-| 状态 | 局部闭环 | 当前 INTERNAL 或单发布 DRAFT 切片保存并严格重验其状态、原骰、历史、幂等及直接恢复；不等于完整文件。 |
+| 状态 | 局部闭环 | 当前有限机制保存并严格重验其状态、原骰、历史、幂等及直接恢复，支持范围以实际场景为准。 |
 | 状态 | 未建闭环 | 对该机制的权威事实、因果历史或恢复责任尚未建立。 |
 
 下表“局部”始终受对应合同的起点、容量、对象和场景限制；“未接入”不推断数据库已经执行任何迁移。
@@ -44,13 +44,13 @@ runtime support.
 
 | 证据组 | 正式合同 | 实现与验证入口 |
 |---|---|---|
-| <a id="catalog"></a>角色目录 | [角色目录](character-catalog-v2.md)、[一级创建](character-creation-v2.md)、[职业特性](class-features-v2.md)、[多职业/ASI/专长](multiclass-asi-feats-v2.md) | [LevelOneCharacterRules](../../src/main/java/com/dndtool/service/LevelOneCharacterRules.java)、[ClassFeatureRules](../../src/main/java/com/dndtool/service/ClassFeatureRules.java)；[LevelOneCharacterRulesTest](../../src/test/java/com/dndtool/service/LevelOneCharacterRulesTest.java)、[ClassFeatureRulesTest](../../src/test/java/com/dndtool/service/ClassFeatureRulesTest.java)。这些入口核验旧 DRAFT 的一级创建与职业特性授予。 |
-| <a id="growth"></a>授予与成长 | [初始授予](schema-2-proficiency-grants.md)、[成长与资源](schema-2-character-statistics.md) | [Schema2InitialProficiencyRules](../../src/main/java/com/dndtool/service/Schema2InitialProficiencyRules.java)、[Schema2GrowthRules](../../src/main/java/com/dndtool/service/Schema2GrowthRules.java)、[Schema2CharacterProgressionRules](../../src/main/java/com/dndtool/service/Schema2CharacterProgressionRules.java)、[Schema2CharacterRuntimeService](../../src/main/java/com/dndtool/service/Schema2CharacterRuntimeService.java)；[Schema2InitialProficiencyRulesTest](../../src/test/java/com/dndtool/service/Schema2InitialProficiencyRulesTest.java)、[Schema2GrowthRulesTest](../../src/test/java/com/dndtool/service/Schema2GrowthRulesTest.java)、[Schema2CharacterAdvancementAndRestServiceTest](../../src/test/java/com/dndtool/service/Schema2CharacterAdvancementAndRestServiceTest.java)。 |
-| <a id="foundation"></a>检定/装备/健康 | [作者来源](schema-2-foundation-authoring.md)、[基础消费者](schema-2-character-foundations.md)、[事实存储](schema-2-character-fact-storage.md) | [Schema2CharacterCheckRules](../../src/main/java/com/dndtool/service/Schema2CharacterCheckRules.java)、[Schema2CharacterEquipmentRules](../../src/main/java/com/dndtool/service/Schema2CharacterEquipmentRules.java)、[Schema2CharacterHealthRules](../../src/main/java/com/dndtool/service/Schema2CharacterHealthRules.java)；[Schema2CharacterCheckServiceTest](../../src/test/java/com/dndtool/service/Schema2CharacterCheckServiceTest.java)、[Schema2CharacterEquipmentHealthServiceTest](../../src/test/java/com/dndtool/service/Schema2CharacterEquipmentHealthServiceTest.java)、[JdbcSchema2CharacterRuntimeRepository](../../src/main/java/com/dndtool/persistence/JdbcSchema2CharacterRuntimeRepository.java)。 |
-| <a id="rest"></a>休息/时间 | [标准休息](schema-2-character-rest.md) | [Schema2CharacterRestRules](../../src/main/java/com/dndtool/service/Schema2CharacterRestRules.java)、原角色服务；[Schema2CharacterAdvancementAndRestServiceTest](../../src/test/java/com/dndtool/service/Schema2CharacterAdvancementAndRestServiceTest.java)。场景时间另见战斗和施法组。 |
-| <a id="combat"></a>战斗/动作 | [战斗作者](schema-2-combat-authoring.md)、[内部战斗](schema-2-combat.md)、[动作继续协议](../design/v2/action-continuation-protocol.md) | [Schema2CombatRuntimeService](../../src/main/java/com/dndtool/service/Schema2CombatRuntimeService.java)、[Schema2CombatRules](../../src/main/java/com/dndtool/service/Schema2CombatRules.java)、[Schema2ActionFlowRules](../../src/main/java/com/dndtool/service/Schema2ActionFlowRules.java)、[Schema2CombatTimeRules](../../src/main/java/com/dndtool/service/Schema2CombatTimeRules.java)；[Schema2CombatRuntimeServiceTest](../../src/test/java/com/dndtool/service/Schema2CombatRuntimeServiceTest.java)、[Schema2CombatRulesTest](../../src/test/java/com/dndtool/service/Schema2CombatRulesTest.java)、[JdbcSchema2CombatRuntimeRepository](../../src/main/java/com/dndtool/persistence/JdbcSchema2CombatRuntimeRepository.java)。 |
-| <a id="spells"></a>施法/效果/探索 | [施法作者](schema-2-spell-authoring.md)、[有限施法](schema-2-spells.md)、[施法扩展目标](../design/v2/spellcasting-extension-contract.md)、[持续效果协议](../design/v2/ongoing-effect-protocol.md) | [Schema2SpellRules](../../src/main/java/com/dndtool/service/Schema2SpellRules.java)、[Schema2WizardSpellbookRules](../../src/main/java/com/dndtool/service/Schema2WizardSpellbookRules.java)、[Schema2OngoingEffectRules](../../src/main/java/com/dndtool/service/Schema2OngoingEffectRules.java)、[Schema2ExplorationRules](../../src/main/java/com/dndtool/service/Schema2ExplorationRules.java)、原战斗服务；[Schema2SpellRuntimeServiceTest](../../src/test/java/com/dndtool/service/Schema2SpellRuntimeServiceTest.java)、[Schema2WizardRuntimeServiceTest](../../src/test/java/com/dndtool/service/Schema2WizardRuntimeServiceTest.java)、[Schema2ExplorationRuntimeServiceTest](../../src/test/java/com/dndtool/service/Schema2ExplorationRuntimeServiceTest.java)。 |
-| <a id="monsters"></a>怪物/共享伤害 | [有限怪物](schema-2-monster-breath.md)、[多目标伤害合同](../design/v2/multi-target-save-damage.md) | [Schema2MonsterRules](../../src/main/java/com/dndtool/service/Schema2MonsterRules.java)、[Schema2MonsterRestRules](../../src/main/java/com/dndtool/service/Schema2MonsterRestRules.java)、[Schema2SaveDamageRules](../../src/main/java/com/dndtool/service/Schema2SaveDamageRules.java)、原战斗服务；[Schema2MonsterBreathRulesTest](../../src/test/java/com/dndtool/service/Schema2MonsterBreathRulesTest.java)、[Schema2MonsterBreathRuntimeServiceTest](../../src/test/java/com/dndtool/service/Schema2MonsterBreathRuntimeServiceTest.java)、[JdbcSchema2MonsterBreathRows](../../src/main/java/com/dndtool/persistence/JdbcSchema2MonsterBreathRows.java)。 |
+| <a id="catalog"></a>角色目录 | [角色目录](character-catalog-v2.md)、[一级创建](character-creation-v2.md)、[职业特性](class-features-v2.md)、[多职业/ASI/专长](multiclass-asi-feats-v2.md) | [CharacterCatalogAuthorPackageReaderTest](../../src/test/java/com/dndtool/module/CharacterCatalogAuthorPackageReaderTest.java)、[ToolAuthorPartitionTest](../../src/test/java/com/dndtool/module/ToolAuthorPartitionTest.java)与[独立目录向量](language-author-package.md#独立验证)。 |
+| <a id="growth"></a>授予与成长 | [初始授予](schema-2-proficiency-grants.md)、[成长与资源](schema-2-character-statistics.md) | `Schema2InitialProficiencyRules`、`Schema2GrowthRules`、`Schema2CharacterProgressionRules`；`Schema2InitialProficiencyRulesTest`、`Schema2GrowthRulesTest`、`CampaignDomainsIntegrationTest`。 |
+| <a id="foundation"></a>检定/装备/健康 | [作者来源](schema-2-foundation-authoring.md)、[基础消费者](schema-2-character-foundations.md)、[事实存储](schema-2-character-fact-storage.md) | `Schema2CharacterCheckRules`、`Schema2CharacterEquipmentRules`、`Schema2CharacterHealthRules`；`CampaignCheckEffectsTest`、`CampaignDomainsIntegrationTest`。 |
+| <a id="rest"></a>休息/时间 | [标准休息](schema-2-character-rest.md) | `Schema2CharacterRestRules`；`CampaignArcaneRecoveryIntegrationTest`、`CampaignSecondWindIntegrationTest`。场景时钟见战斗和施法。 |
+| <a id="combat"></a>战斗/动作 | [战斗作者](schema-2-combat-authoring.md)、[战斗](schema-2-combat.md)、[动作继续协议](../design/v2/action-continuation-protocol.md) | `CampaignDomainEngine`、`Schema2CombatRules`、`Schema2ActionFlowRules`、`Schema2CombatTimeRules`；`CampaignDomainsCombatIntegrationTest`、`Schema2CombatRulesTest`。 |
+| <a id="spells"></a>施法/效果/探索 | [施法作者](schema-2-spell-authoring.md)、[有限施法](schema-2-spells.md)、[施法扩展目标](../design/v2/spellcasting-extension-contract.md)、[持续效果协议](../design/v2/ongoing-effect-protocol.md) | `Schema2SpellRules`、`Schema2WizardSpellbookRules`、`Schema2OngoingEffectRules`、`Schema2ExplorationRules`；`Schema2WizardSpellbookRulesTest`、`Schema2ExplorationRulesTest`、`CampaignDomainsCombatIntegrationTest`。 |
+| <a id="monsters"></a>怪物/共享伤害 | [有限怪物](schema-2-monster-breath.md)、[多目标伤害合同](../design/v2/multi-target-save-damage.md) | `Schema2MonsterRules`、`Schema2MonsterRestRules`、`Schema2SaveDamageRules`；`Schema2MonsterBreathRulesTest`、`CampaignMonsterSpaceIntegrationTest`、`CampaignDomainsCombatIntegrationTest`。 |
 
 ## 角色构筑、种族、背景与成长
 
@@ -149,7 +149,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 普通近战 Attack、命中/暴击/伤害（[93—97](../references/srd-5.1/pages/page-093.md)） | 普通手持近战 profile、单击结算；Attack 序列按冻结规则与真实授予为一次或两次；真实属性/熟练/AC、原骰及健康 | 局部闭环；缺非致命击倒、徒手/天然武器及其他属性/多个伤害分量/特性修正；每种新 profile 须完整来源 | [战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md) |
 | 远程/投掷/双持（[93—95](../references/srd-5.1/pages/page-093.md)） | 未接入 | 缺射程与贴身劣势、遮蔽/弹药/投掷、附赠攻击手位和伤害规则；不能循环调用普通 ATTACK 绕过成本 | [战斗](#combat)当前明确边界 |
 | Extra Attack（[25](../references/srd-5.1/pages/page-025.md)） | 单职业战士 5–6 级本人 Attack 两击；两击间移动、反应、换目标和放弃；完整文件保留原骰与序列进度 | 机会攻击和当前 Ready 响应仍为单击；更高等级、其他职业及多职业合并未接入；不代表擒抱轨迹实现 | [有限额外攻击合同](schema-2-extra-attack.md)、[真实链路验证](../testing.md#extra-attack-verification) |
-| Second Wind（[24](../references/srd-5.1/pages/page-024.md)） | 单职业战士 1–6 级真实一级授予，本人回合附赠动作治疗，原骰/资源/HP 同根；标准短长休恢复 | SQLite 完整文件及 Host/有限玩家候选接合；多职业、战斗外和 MySQL INTERNAL 命令未采用，不代表通用附赠动作完成 | [有限回气合同](schema-2-second-wind.md)、[真实链路验证](../testing.md#second-wind-verification) |
+| Second Wind（[24](../references/srd-5.1/pages/page-024.md)） | 单职业战士 1–6 级真实一级授予，本人回合附赠动作治疗，原骰/资源/HP 同根；标准短长休恢复 | SQLite 完整文件及 Host/有限玩家候选接合；多职业或战斗外执行未采用，不代表通用附赠动作完成 | [有限回气合同](schema-2-second-wind.md)、[真实链路验证](../testing.md#second-wind-verification) |
 | Improved Critical（[25](../references/srd-5.1/pages/page-025.md)） | 单职业勇士 3–6 级正常取得，近战普通/OA/Ready 选中 19/20 重击，固定修正不加倍 | 反应暂停及原骰/授予/伤害随完整文件恢复；远程、投掷、多职业和 Superior Critical 未接入 | [有限精通重击合同](schema-2-improved-critical.md)、[真实链路验证](../testing.md#improved-critical-verification) |
 | Dash/Disengage/Dodge（[93](../references/srd-5.1/pages/page-093.md)） | 已接 action 成本及速度/本回合 OA 免除/攻击和 DEX save 贡献 | 局部闭环；新增失能、不可见、速度为零或特殊动作来源须消费真实贡献 | [战斗](#combat)、[怪物](#monsters) |
 | Help（[93](../references/srd-5.1/pages/page-093.md)） | 未接入 | 缺援助对象/任务/五尺敌人资格、下一次适用检定或攻击的单次优势、本人下回合期限及消费事实 | [战斗](#combat)、[检定](#foundation)待接 |
@@ -234,9 +234,9 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 
 | 责任 | 当前实际边界 | 进入完整支持前必须补齐 |
 |---|---|---|
-| 来源、安装、接受、组合与冻结 | SQLite 标准四包与已接受自定义组合有实际冻结链路。旧 MySQL schema 2 安装器仍拒绝所有 base 和带内容的扩展/兼容包。 | 分别完成准确完整基础材料、全部机制支持检查、合法组合、安装和接受以及业务初始化。 |
+| 来源、安装、接受、组合与冻结 | SQLite 标准四包与已接受自定义组合有实际冻结链路。准确原包与接受记录按本机规则库合同维护。 | 分别完成准确完整基础材料、全部机制支持检查、合法组合、安装和接受以及业务初始化。 |
 | 共同事务、版本、幂等 | [共同事务](business-write-transactions.md)与当前内部 owner 接合 | 每个新机制保持全请求/规则/目标/版本/容量先于 RNG；根事件、子状态、原骰、效果后继和接受结果同事务；UNKNOWN 仅查证原操作。 |
-| 历史、严格读取、直接恢复 | 旧 MySQL 内部角色/场景/怪物保留局部历史。SQLite format 3 恢复当前有限战役、冻结材料及未决动作。 | 扩展到全域引用图及所有暂停阶段，核对结束/清理/重新开始、完整文件字段及容量、独立读回与故障回滚。 |
+| 历史、严格读取、直接恢复 | SQLite format 3 恢复当前有限战役、冻结材料、角色／场景／怪物历史及未决动作。 | 扩展到全域引用图及所有暂停阶段，核对结束/清理/重新开始、完整文件字段及容量、独立读回与故障回滚。 |
 | Host、规则查询、DM 工作流 | SQLite 工作台接入[当前有限运行](../storage-vitality-loop.md)，DM 限 loopback，独立玩家入口默认关闭。 | 完整角色/遭遇/施法/物品/休息有界 API 与 UI、合法候选查询、准确诊断及真实类型化裁定。 |
 | 发布与 archive format 2 | 完整规则身份保持 DRAFT，archive format 2 限内部角色片段。 | 分别验收跨领域目录、规范字节、摘要、完整文件往返、数据库语义、测试和 WAR。[完整目标完成门](srd-5.1-complete.md#6-完成判定) |
 
@@ -254,7 +254,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 角色防御与伤害后反应 | 成长/来源、效果 owner、共享伤害与动作流 | 明确来源与 gate、同一 APPLY/CON cut、失败后有界选择、资源一次消费；Protection from Energy、Cutting Words、Evasion 等分别接入。 |
 | 普通经济/库存后再接魔法物品 | 当前装备实例 owner；经济/同调/使用 owner 尚须建立 | 数量/重量/金钱/容器事务与战斗交互先闭合；同调/充能/物品施法/诅咒分别接休息、授权、效果及恢复。 |
 | 角色休息接场景与环境周期 | 休息规则、探索/战斗唯一时间、健康/效果 owner | 多角色共同时间、存续效果/疾病/饥渴/耗竭的到期与后继闭包；不能取消单角色约束后沿用独立时钟。 |
-| 全域文件与产品入口 | 旧 MySQL 有准备、快照、共同事务以及角色和场景仓储。SQLite format 3 与 Host 接入当前有限规则。 | 统一完整基础、全域当前状态、不可变历史、暂停、恢复、清理与 UI/API。完成后再进入跨领域发布门。 |
+| 全域文件与产品入口 | SQLite format 3 与 Host 接入当前有限规则并保存完整战役。 | 统一完整基础、全域当前状态、不可变历史、暂停、恢复、清理与 UI/API。完成后再进入跨领域发布门。 |
 
 维护本表时同步更新具体领域合同、[采用边界](../design/v2/adoption-boundaries.md)及必要的
 [任务地图](../agent-context.md)。只替换已有证据支持的当前边界，不把计划、旧测试结果、迁移文件或原文收录写成运行事实。

@@ -173,7 +173,7 @@ DEX(Acrobatics) 对抗，替代 Attack 动作中的一击。拖带通常使速�
 
 **轨迹。** A 声明 1 环 Bless，B 用 3 环位反制 A，C 用 3 环位反制 B。C 自动成功，
 B 被反制，A 继续产生 Bless；三个真实声明各保留自身动作/反应和位成本，反制链零检定骰。
-保存于最内层后直接恢复准确叶子；错误指向父 A 的继续请求拒绝，不能重新扣 B 的成本。
+在内层反制候选等待时保存，重开恢复准确叶子。指向父 A 的继续请求被拒绝，B 的已付成本保留。
 
 **P 的依据。** [Counterspell 与准备法术](action-continuation-protocol.md#counterspell-与准备法术)
 已经定义真实 cast、`CAST_BEFORE_COMPLETION`、子反应、内层优先、返回父帧及原成本保留。
@@ -182,10 +182,10 @@ B 被反制，A 继续产生 Bless；三个真实声明各保留自身动作/反
 
 **程序。** 当前规定所有参战者彼此可见、无遮挡的网格内，有限法师/3 环位反制链已接入。
 [场景前提](../../rules/schema-2-combat.md) · [资格实现](../../../src/main/java/com/dndtool/service/Schema2SpellRules.java)
-存在[嵌套测试](../../../src/test/java/com/dndtool/service/Schema2ReactionSpellRulesTest.java)和
-[恢复测试](../../../src/test/java/com/dndtool/service/Schema2SpellSaveDamageRuntimeServiceTest.java)源码。
-[`completeCast` 中的局部算式](../../../src/main/java/com/dndtool/service/Schema2ActionFlowRules.java)
-直接取 INT、无额外贡献；不代表高环或通用见证分支具有真实输入链。本轮未运行这些测试。
+[SQLite 恢复用例](../../../src/test/java/com/dndtool/service/storage/CampaignDomainsCombatIntegrationTest.java)
+从正常学习和准备进入三人场景，用生产命令及完整文件核对该轨迹。重开保留已付法术位和原先攻，
+只有当前叶子能继续，内层反制生效后按原父子顺序完成 Bless。[纯规则用例](../../../src/test/java/com/dndtool/service/Schema2ReactionSpellRulesTest.java)
+覆盖同类嵌套对 Shield 的影响。高阶检定和通用见证分支仍需各自输入链。
 
 <a id="v06"></a>
 ### V06：Fireball、Evasion、抗性与专注

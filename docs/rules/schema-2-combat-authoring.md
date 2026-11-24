@@ -1,10 +1,6 @@
 # Schema 2 战斗、近战武器与步行作者来源
 
-本文限定 `adventure.combat`、`equipment.weapon_attack` 与 `character.movement` 的作者输入、
-纯组合、准确来源和 INTERNAL 运行镜像。沿用[作者基础](schema-2-foundation-authoring.md)、
-[生产制品](schema-2-rule-artifacts.md)、[来源账本](schema-2-source-ledger.md)及
-[动作继续协议](../design/v2/action-continuation-protocol.md)。类型和算法的登记不授予完整基础包、
-非空 add-on、完整战役、Host、archive format 2 或发布资格。
+本合同约束战斗、近战武器攻击和步行的严格作者输入、纯组合与战役冻结。沿用[制品合同](schema-2-rule-artifacts.md)及[检定、装备与健康作者合同](schema-2-foundation-authoring.md)。
 
 ## 共同字段与身份
 
@@ -65,23 +61,12 @@ owner 启用。实际角色必须按其冻结种族和亚种族找到唯一适�
 速度是定义，已走距离、剩余 movement、位置和路径是业务事实。护甲力量不足的速度减值沿
 真实装备派生；本定义不提供飞行、游泳、攀爬或自由移动模式，也不创建第二份 movement pool。
 
-## 覆盖、来源与运行镜像
+## 覆盖、冻结与验证
 
-`set_field` 仅替换目标类型拥有的完整原子字段；完整引用一次替换，`set_enabled` 保存启停。
-这三个类型只有 `author_note` 可 `clear_field`。所有算法、数值、引用、伤害类型和必需文本均不可清空。
-同值覆盖也保留 provider、加载序号、原包 SHA、位置、before/after 和操作身份。
+受支持的覆盖继续按制品合同保留完整原子、完整引用、原包和位置。战役工作库冻结最终规则及
+完整链，战斗命令、准备与焦点、装备和角色健康事实由各自业务聚合拥有。
 
-来源 V008 增加 `rule_schema2_combat`、`rule_schema2_weapon_attack`、`rule_schema2_movement` 和
-`rule_schema2_combat_change`。作者序号、文本、整数和完整引用逐列保存；原 ZIP 中全部包，包括
-未选择包，均由共享 reader 独立核对。缺失、多余、跨包和任何列不一致都拒绝。材料只追加，
-installer 只获准确列 INSERT，其他来源角色只读；仓储不拥有提交和回滚权限。
+`Schema2CombatCompositionTest` 使用独立固定字节材料，当前场景执行见
+[战斗合同](schema-2-combat.md)和 `CampaignDomainsCombatIntegrationTest`。
 
-运行 V032 增加三个对应 `s2_runtime_*` 类型化表，并前向扩展既有字段链目标白名单。
-快照保留完整定义、原始和覆盖字段链、准确成员身份以及既有五类生产摘要；生产编码和摘要域不变。
-独立读回使用保存的类型化行重建完整投影，不依赖最新来源。武器和步行引用通过同快照 RESTRICT
-外键与语义检查共同绑定，不能保存只有规则头、缺失机制字段的快照。
-
-验证入口为 `Schema2CombatCompositionTest`、`JdbcSchema2CombatSourceTest`、
-`JdbcSchema2CombatSnapshotTest` 与 `Schema2CombatSchemaTest`；固定独立向量位于
-`src/test/resources/schema2-combat/`。逐列篡改、漏行/多行、非法原始链和写入失败均应拒绝或整体回滚。
-代理和结构测试不证明真实 MySQL 的触发器、权限和外键已执行；迁移、授权与部署各自需要独立检查点。
+[旧版来源与镜像](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/schema-2-combat-authoring.md)

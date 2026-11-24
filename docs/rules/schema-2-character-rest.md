@@ -1,10 +1,8 @@
-# Schema 2 内部休息、时间与治疗
+# Schema 2 休息、时间与治疗
 
-本合同连接[角色成长与资源](schema-2-character-statistics.md)中的真实角色状态和
-[共同业务事务](business-write-transactions.md)。支持范围是准确运行快照下的单角色
-INTERNAL 运行：标准短休、逐次生命骰选择、标准长休、职业资源恢复和对应时间历史。
-此 INTERNAL 服务属于旧 MySQL 链路。SQLite 工作台复用有限休息语义并按战役规则绑定保存 format 3。
-[领域接合表](../design/v2/domain-integration.md)
+
+本合同定义工作台在准确战役规则下执行的标准短休、逐次生命骰、标准长休和职业资源恢复。
+时间、健康和资源与角色[成长状态](schema-2-character-statistics.md)共用事实，按战役完整文件保存。
 
 ## 模组声明与执行责任
 
@@ -112,17 +110,13 @@ SQLite 的[战士回气](schema-2-second-wind.md)消费既有一次/短休资源
 时沿本合同恢复。开始休息、时长不足、放弃尝试或单纯推进回合均不恢复，
 普通资源命令也不能代付或补回已接入的回气能力。
 
+
 ## 历史、恢复与验证边界
 
-状态、活动段、生命骰选择、保存骰点、资源、长休收益时间和幂等结果共同提交或回滚。
-提交未知沿用共同隔离、永久写阻断和原操作只读查证。历史保存全部前后事实，直接恢复
-只验证并写入既有事实，不再次推进时间、掷骰、治疗、恢复资源或重发升级收益。
+活动段、生命骰选择、原骰、资源、长休收益时间和接受收据共同提交或回滚。
+同版残留和完整文件保留前后事实，恢复不再次推进时钟、掷骰、治疗或恢复资源。
+执行前检查命令资格及历史容量，提交未知按[事务合同](../design/v2/runtime-and-transactions.md)查证。
 
-执行前检查每类集合容量、128 个事件上限和 32768 个历史子行上限。恢复要求原准确运行
-快照、初始计划和规则绑定已经存在。当前局部恢复不等于完整战役文件或多角色时间恢复；
-其最终生命周期接合仍遵循[保存与恢复](../design/v2/save-and-recovery.md)。
-
-定向验证入口为 `Schema2CharacterAdvancementAndRestServiceTest`、
-`Schema2CharacterRuntimeServiceTest`、`JdbcSchema2CharacterRuntimeRepositoryTest` 及
-schema 2 成长、来源和快照测试。JDBC 夹具与静态 SQL 检查不代替真实 MySQL 的触发器、
-权限、锁及连接池验收。
+`CampaignArcaneRecoveryIntegrationTest`、`CampaignSecondWindIntegrationTest` 核对真实休息、
+资源和保存恢复；共享规则由 `Schema2ArcaneRecoveryRulesTest` 等验证。角色累计时间和场景钟
+见[空间合同](../design/v2/world-and-scene-spaces.md)。

@@ -16,6 +16,11 @@ public final class CampaignSpaceData {
     public record Focus(Ref space, long generation) {
         public Focus { if (generation < 0) throw CampaignJson.bad("Invalid focus generation"); }
     }
+    public record ScenePlacement(long placementVersion, long x, long y) {
+        public ScenePlacement {
+            if (placementVersion < 0) throw CampaignJson.bad("Invalid expected placement version");
+        }
+    }
     public record Scene(UUID id, String name, UUID nodeId, int width, int height,
                         String resolution, String mode, long version) {
         public Scene {

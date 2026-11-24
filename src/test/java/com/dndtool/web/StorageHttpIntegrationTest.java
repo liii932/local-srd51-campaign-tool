@@ -3,6 +3,7 @@ package com.dndtool.web;
 import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.dndtool.service.storage.BundledCampaignRules;
 import com.dndtool.service.storage.BundledRuleTestProcess;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -575,6 +576,118 @@ class StorageHttpIntegrationTest {
             var card = entry.getAsJsonObject().getAsJsonObject("current"); if (card.get("name").getAsString().equals(name)) return card;
         }
         throw new AssertionError("Missing manual card: " + name);
+    }
+    @Test void dmPlacesEnteredCharactersAndAppliesConditionalPlacementInOneHttpCommand() throws Exception {
+        try (StorageLoopLauncher ignored = StorageLoopLauncher.start(temporary.resolve("placement-store"))) {
+            refresh();
+            fieldsCommand("create", fields("name", "场景定位"));
+            fieldsCommand("domain", domainFields("character-create", object("name", "战士", "kind", "PC",
+                    "classKey", ruleKey("character.class", "fighter"), "backgroundKey", ruleKey("character.background", "acolyte"))));
+            String fighter = domainState().getAsJsonArray("characters").get(0).getAsJsonObject().get("id").getAsString();
+            fieldsCommand("domain", domainFields("manual-create", object("name", "守卫", "kind", "NPC", "template", "guard")));
+            String guard = manualCardByName("守卫").get("id").getAsString();
+            fieldsCommand("domain", domainFields("node-create", object("name", "大厅")));
+            String node = domainState().getAsJsonArray("nodes").get(0).getAsJsonObject().get("id").getAsString();
+            focus("WORLD", node);
+            for (String id : List.of(fighter, guard))
+                fieldsCommand("domain", domainFields("position", object("characterId", id, "nodeId", node)));
+            fieldsCommand("domain", domainFields("scene-create", object("name", "大厅交手", "nodeId", node,
+                    "width", "4", "height", "4", "resolution", "DM")));
+            String scene = spaces().getAsJsonArray("scenes").get(0).getAsJsonObject().get("id").getAsString();
+            var participants = new JsonArray();
+            participants.add(object("id", fighter, "version", placementVersion(fighter), "x", "0", "y", "0", "side", "0"));
+            participants.add(object("id", guard, "version", placementVersion(guard), "x", "1", "y", "0", "side", "1"));
+            var entry = object("sceneId", scene);
+            entry.add("subjects", participants);
+            fieldsCommand("domain", domainFields("scene-enter", entry));
+            fieldsCommand("domain", domainFields("scene-mode", object("mode", "COMBAT")));
+
+            String priorVersion = placementVersion(fighter);
+            var direct = object("characterId", fighter, "placementVersion", priorVersion, "x", "3", "y", "3");
+            fieldsCommand("domain", domainFields("scene-place", direct));
+            assertGrid(fighter, 3, 3, Long.parseLong(priorVersion) + 1);
+            assertEquals(0, clockSecond(scene));
+            var directRoot = domainState().getAsJsonArray("roots").asList().getLast().getAsJsonObject();
+            assertEquals("scene-place", directRoot.get("kind").getAsString());
+            assertTrue(directRoot.getAsJsonArray("rolls").isEmpty());
+            assertOpaqueError(command("domain", domainFields("scene-place", direct)), 409, "STALE_POSITION");
+            direct.addProperty("placementVersion", placementVersion(fighter));
+            direct.addProperty("x", "4");
+            assertOpaqueError(command("domain", domainFields("scene-place", direct)), 409, "SCENE_GRID_BOUNDS");
+
+            fieldsCommand("domain", domainFields("item", object("itemId", null, "characterId", fighter, "name", "火把", "quantity", "3")));
+            String item = domainState().getAsJsonArray("items").get(0).getAsJsonObject().get("id").getAsString();
+            String ruleVersion = domainState().getAsJsonArray("characters").get(0).getAsJsonObject().get("version").getAsString();
+            var checkRule = ruleRecord("adventure.check", "");
+            var check = new Command("CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null,
+                    new CheckInput(new RuleIdentity(checkRule.get("moduleKey").getAsString(), checkRule.get("type").getAsString(), checkRule.get("key").getAsString()),
+                            "ABILITY", "ability.strength", null, 0, false, false, "先检定，再按已声明的分支调整。"));
+            var rule = object("characterId", fighter, "characterVersion", ruleVersion);
+            rule.add("command", CampaignDomainCodec.toJson(check));
+            var success = checkBranch(fighter, item, "1", "取得火把并定位");
+            success.add("position", object("placementVersion", placementVersion(fighter), "x", "2", "y", "2"));
+            var failure = checkBranch(fighter, item, "-1", "失败分支");
+            failure.add("position", object("placementVersion", placementVersion(fighter), "x", "1", "y", "0"));
+            rule.add("success", success); rule.add("failure", failure);
+            var beforeCheck = campaign();
+            assertOpaqueError(command("domain", domainFields("check-effects", rule)), 409, "SCENE_CELL_OCCUPIED");
+            refresh();
+            assertEquals(beforeCheck, campaign());
+            failure.getAsJsonObject("position").addProperty("y", "1");
+            fieldsCommand("domain", domainFields("check-effects", rule));
+            assertGrid(fighter, 2, 2, Long.parseLong(priorVersion) + 2);
+            assertEquals(4, domainState().getAsJsonArray("items").get(0).getAsJsonObject().get("quantity").getAsInt());
+            var ruleRoot = domainState().getAsJsonArray("roots").asList().getLast().getAsJsonObject();
+            assertEquals(1, ruleRoot.getAsJsonArray("rolls").size());
+            assertEquals(1, ruleRoot.getAsJsonArray("characterOperations").size());
+
+            String guardPlacement = placementVersion(guard);
+            int guardHp = manualCardByName("守卫").getAsJsonObject("fields").get("hp.current").getAsInt();
+            var manual = manualPayload(guard, object("checkKind", "MANUAL", "key", null, "manualName", "自由检定",
+                    "manualModifier", "-99", "rollMode", "NORMAL", "dc", "0"));
+            var targets = new JsonArray();
+            targets.add(object("characterId", guard, "version", manual.get("characterVersion").getAsString()));
+            manual.add("targets", targets);
+            manual.add("success", new JsonArray());
+            var effects = new JsonArray();
+            effects.add(object("kind", "POSITION", "targetId", guard, "placementVersion", guardPlacement, "x", "0", "y", "3"));
+            effects.add(object("kind", "HP", "targetId", guard, "amount", "-1"));
+            effects.add(object("kind", "POSITION", "targetId", guard, "placementVersion", Long.parseLong(guardPlacement) + 1, "x", "1", "y", "3"));
+            manual.add("failure", effects);
+            var fields = domainFields("manual-check", manual);
+            String requestId = UUID.randomUUID().toString();
+            var headers = commandHeaders(epoch(), revision(), requestId, StorageRequestDigest.sha256("domain", epoch(), revision(), fields));
+            assertEquals(200, postRaw("/api/host/storage/domain", encode(fields), headers).statusCode());
+            refresh();
+            var committed = campaign();
+            assertEquals(200, postRaw("/api/host/storage/domain", encode(fields), headers).statusCode());
+            refresh();
+            assertEquals(committed, campaign());
+            assertGrid(guard, 1, 3, Long.parseLong(guardPlacement) + 2);
+            assertEquals(guardHp - 1, manualCardByName("守卫").getAsJsonObject("fields").get("hp.current").getAsInt());
+            var manualRoot = domainState().getAsJsonArray("roots").asList().getLast().getAsJsonObject();
+            assertEquals(requestId, manualRoot.get("operationId").getAsString());
+            assertEquals(1, manualRoot.getAsJsonArray("rolls").size());
+            assertFalse(JsonParser.parseString(manualRoot.get("after").getAsString()).getAsJsonObject().getAsJsonObject("result").get("success").getAsBoolean());
+            assertEquals(0, clockSecond(scene));
+
+            var expected = domainState();
+            fieldsCommand("save", Map.of());
+            var ended = command("end", Map.of());
+            assertEquals(200, ended.statusCode(), ended.body());
+            refresh();
+            fieldsCommand("open", fields("fileKey", json(ended).get("savedFile").getAsString()));
+            assertEquals(expected, domainState());
+            fieldsCommand("end", Map.of());
+        }
+    }
+    private JsonObject domainState() { return campaign().getAsJsonObject("domain"); }
+    private void assertGrid(String id, int x, int y, long version) {
+        var position = domainState().getAsJsonArray("positions").asList().stream().map(JsonElement::getAsJsonObject)
+                .filter(entry -> entry.get("characterId").getAsString().equals(id)).findFirst().orElseThrow();
+        assertEquals(x, position.getAsJsonObject("grid").get("x").getAsInt());
+        assertEquals(y, position.getAsJsonObject("grid").get("y").getAsInt());
+        assertEquals(version, position.get("version").getAsLong());
     }
     private JsonObject manualPayload(String id, JsonObject extra) {
         JsonObject card = null;

@@ -2,11 +2,11 @@
 
 ## 范围与责任
 
-`Schema2CombatRuntimeService` 是有限 INTERNAL 战斗消费者。它通过真实准备、来源快照和角色历史，
-接纳先攻、回合、普通近战攻击、步行、疾走、撤离、闪避、起身及机会攻击；
-[施法与持续效果](schema-2-spells.md)沿同一 owner 接纳 Bless、Cure Wounds、Shield、Counterspell、Ready、独立抗魔环境和探索场景。
-[有限怪物合同](schema-2-monster-breath.md)另接入准确部署、怪物回合、充能及火焰吐息批次，
-复用原角色健康与唯一动作流，不开放其他怪物动作。
+
+`CampaignDomainEngine` 通过冻结规则和有规则事实的场景成员接纳先攻、回合、近战攻击、步行、疾走、
+撤离、闪避、起身与机会攻击。同一根处理[有限施法与持续效果](schema-2-spells.md)和
+[有限怪物部署、充能与吐息](schema-2-monster-breath.md)，复用角色健康与唯一动作流。
+
 规则数据来自[战斗作者合同](schema-2-combat-authoring.md)，动作流遵守
 [动作继续协议](../design/v2/action-continuation-protocol.md)。
 
@@ -14,10 +14,9 @@
 攻击、反应、移动和健康后果；模组提供明确的战斗算法、武器攻击参数和角色速度。
 不存在动态脚本、任意效果参数袋或模组自定义执行阶段。
 
-一个战斗引用同一 campaign 的真实准备角色，并可按[有限怪物合同](schema-2-monster-breath.md)
-部署准确怪物；角色保留自己的 run、snapshot、
-preparation 绑定，冻结规则绑定必须完全一致，开始时角色时钟的分钟和秒必须相同。
-这扩展的是 INTERNAL 多角色战斗接合，不能把独立准备记录称为已完成的整战役初始化。
+
+场景按照实际安置选择同一战役的角色和怪物。名册及规则依赖按事件当时的快照核验；
+后台空间保留自己的时钟与未决事实。
 
 战斗唯一拥有位置、先攻顺序、回合、动作／反应可用性、移动预算、倒地、攻击序列和动作流。
 HP、临时 HP、死亡记录、装备实例、法术位资源及时间仍在原角色状态中。一次战斗命令产生的全部角色子事件
@@ -29,7 +28,7 @@ HP、临时 HP、死亡记录、装备实例、法术位资源及时间仍在原
 全部成员版本和封闭命令。客户端不能指定先攻结果、命中、AC、伤害、反应余额、移动额度、
 骰子、死亡结果或推进后的版本。同分顺序由有限的完整角色排列裁定，只作用于相同先攻总值。
 
-SQLite 场景与 INTERNAL JDBC 战斗使用同一个 `Schema2CombatRequest` 校验成员和版本。
+`Schema2CombatRequest` 绑定准确成员和版本。
 执行与历史复验均按 `local-dnd/schema2-combat-command/3` 的字节布局计算请求摘要。
 
 支持的场景是所有人已警觉、彼此可见、无遮挡的平坦五尺方格，角色占一个格子，阵营固定。
@@ -50,7 +49,7 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 | `START` | 服务器掷先攻 DEX 检定，应用不熟练护甲造成的劣势，保留全部原骰；按总值及同分裁定排序，开始第一个真实回合。 |
 | `BEGIN_ATTACK` | 消费本回合 action 一次，创建有限攻击序列；普通额度为一次，冻结规则与实际已取得的[战士 Extra Attack](schema-2-extra-attack.md)可派生为两次。客户端不能指定额度。 |
 | `ATTACK` | 从实际手持实例、冻结 profile、角色属性、熟练和目标 AC 派生攻击；自然 1 失手、自然 20 重击，真实取得的[精通重击](schema-2-improved-critical.md)可使选中 19 也重击。命中才掷伤害，真正更新目标角色。 |
-| `SECOND_WIND` | SQLite 有限回气：已实际取得的单职业战士在本人回合用附赠动作恢复 `1d10＋战士等级` HP，扣一次准确职业资源。普通动作、反应、移动和攻击序列保持；MySQL INTERNAL 明确拒绝。 |
+| `SECOND_WIND` | SQLite 有限回气：已实际取得的单职业战士在本人回合用附赠动作恢复 `1d10＋战士等级` HP，扣一次准确职业资源。普通动作、反应、移动和攻击序列保持。 |
 | `FORFEIT_ATTACKS` | 明确放弃当前序列剩余额度并关闭序列，不退还 action。 |
 | `DASH` / `DISENGAGE` / `DODGE` | 消费 action，分别增加速度等额移动、免除本人本回合机会攻击、建立真实闪避贡献。 |
 | `MOVE` | 接受完整有限路径，按实际走过的段消费移动；倒地时每尺花两尺移动，有机会攻击时在离开触及之前提交暂停。 |
@@ -116,47 +115,30 @@ SQLite 的[一级回气](schema-2-second-wind.md)在无未决流时同根完成�
 
 GET、超时、重启和恢复都不隐式 PASS。旧请求只返回其不可变接受事实；继续新阶段必须
 取得当前身份和版本。OPEN/CLOSED 窗口阻断无关新根及主动结束专注；反应子施法只从当前准确机会进入。
-战斗或探索场景存续期间，原角色服务的普通装备、健康、成长、休息等写命令
+战斗或探索场景存续期间，角色的普通装备、健康、成长、休息等写命令
 在幂等查证之后、首 RNG 之前被阻断，不能绕过回合和动作流。
+
 
 ## 事务、存储、预算与恢复
 
-`Schema2CombatState` 定义战斗状态、命令和结算，`Schema2CombatHistory` 定义成员、依赖版本、
-事件和历史，并负责结构、邻接和容量校验。SQLite 的有限战役场景也使用这些领域类型，
-通过战役规则上下文读取冻结材料。`CampaignDomainEngine` 依据焦点场景的当前安置选取依赖，
-显式传入 `sceneSecond` 结算法术期限和怪物休息。同场景角色共同增加本次实际耗时，各自
-累计经历值可以不同。后台场景及其时钟、动作流和角色状态保留原值。MySQL INTERNAL 的
-单场景入口继续要求真实准备角色同秒，并使用该共同角色时钟。
-[领域接合](../design/v2/domain-integration.md) · [空间合同](../design/v2/world-and-scene-spaces.md)
+`Schema2CombatState` 定义命令、结算和前后状态，`Schema2CombatHistory` 定义成员、依赖版本
+及连续事件。`CampaignDomainEngine` 按焦点安置选择依赖，显式传入 `sceneSecond` 结算法术期限和怪物休息。
+同场景角色增加实际耗时，各自累计经历值可以不同。[空间合同](../design/v2/world-and-scene-spaces.md)
 
-JDBC 写入使用[共同业务事务](business-write-transactions.md)。`JdbcSchema2CombatRuntimeRepository`
-在调用方提供的连接上编码、读写及核对物理行，将领域结构错误转换为稳定的 `SQLException`。
-运行 V033/V034 保存类型化成员、输入、版本闭包、原骰、结果、状态前后值、帧、窗口、
-机会、移动、攻击及角色子事件引用。V032 保存冻结战斗规则镜像。
-数据没有任意 JSON 状态袋。角色子事件包括伤害、回合死亡豁免与六秒时间推进，引用准确的
-战斗操作和领域事实；其幂等键按根操作、角色和子序号稳定产生。
-运行 V035/V037 保存[施法作者](schema-2-spell-authoring.md)的准确镜像，V036/V038 保存类型化施法命令/目标、
-CAST 帧与结果、持续实例/目标、贡献骰、豁免及精确子行数，并前向修正战斗帧状态 CHECK。
-`COMBAT_RESOURCE_SPENT` 与 `COMBAT_HEALING_APPLIED` 是引用真实施法帧的角色因果子事件；
-自我治疗先消费资源再应用健康，角色版本连续，叶仓储不拥有提交权。Ready、Shield、专注 holder、
-区域与每个独立原因均为类型化事实；`COMBAT_ENVIRONMENT_HEALTH` 保留冻结健康输入与真实结果。
+场景聚合保存完整成员、状态、版本闭包、成本、原骰、动作流、帧和窗口。
+角色因果子事件保留其健康、时间、治疗及资源唯一归属，按根操作、角色和子序号获得稳定身份。
+自我治疗先付资源再写健康；角色版本连续。持有、压制、Ready 和环境效果保留准确来源和结果。
 
 新根与继续在首 RNG 前验证完整来源、全部目标与候选、当前及可达后果、版本、幂等和
 容量。START 还为最多 128 个事件可经过的轮次与最长稳定恢复期限预留 253 分钟的时钟上界余量；
 只在开始时检查，不在已接受后继重复扣除这份余量。每场景最多 128 个命令事件、16 个成员、128 个 flow、65,536 个历史子行；路径最多
 64 格。协议图上限仍适用，具体预算可能更早拒绝新根。预留包含所有必需的窗口决定、父继续、
 状态快照、角色子事件、回合事实到期及来源结束／场景关闭的额度，不截断候选，也不把超界自动解释为 PASS。
-`Schema2CombatHistory` 直接对类型化历史和前后快照计数并预留必需后继。JDBC 编码逐事件核对
-实际行数与领域计数，保证同一预算覆盖物理投影。
 
-`read` 返回战斗及完整成员角色历史；读取重新核对原准备、规则、全部依赖版本、保存的骰子
-与角色因果引用，不调用 RNG。`restore(Save)` 在相同准确准备快照下直接恢复全部类型化事实，
-保存 OPEN／CLOSED 窗口、路径位置、已消费成本、原骰和角色结果。任何冲突、缺行、多行、
-错误引用或不一致结果均拒绝。包含战斗子事件的角色不能单独恢复成没有其 owner 的孤儿。
-
-提交响应丢失时返回 `UNKNOWN`，共同写门保持冻结；`inspect` / `inspectRestore` 只查证原操作，
-不得盲目重试。这个内部恢复接口不是 archive format 2，也不开放 Host 路由、完整 base 安装、
-完整战役生命周期或发布。采用边界见[状态矩阵](../design/v2/adoption-boundaries.md)。
+`Schema2CombatHistory` 对类型化历史和完整前后快照计数并预留必需后继。
+完整文件和同版残留保留所有 OPEN／CLOSED 窗口、路径位置、已付成本、原骰和角色结果。
+恢复核对规则、依赖版本及全部因果引用，保留唯一继续点。提交不明时按
+[运行与事务](../design/v2/runtime-and-transactions.md)查证原操作。
 
 ## 原文与验证
 
@@ -167,7 +149,7 @@ CAST 帧与结果、持续实例/目标、贡献骰、豁免及精确子行数�
 倒地与失去意识 [p.359](../references/srd-5.1/pages/page-359.md)。
 字段、范围、稳定错误与事务合同仍由项目定义。
 
-`Schema2CombatRulesTest` 验证规则与继续，`Schema2CombatTimeRulesTest` 验证精确时钟，
-`Schema2CombatRuntimeServiceTest` 经过真实准备／快照／角色／战斗仓储，验证完整闭环、幂等、
-随机性前拒绝、原子故障和直接恢复；来源、镜像、事实仓储及 schema 测试分别验证各自边界。
-JDBC 代理与静态 SQL 检查不代替真实 MySQL 约束、触发器、权限或部署验收。
+
+`Schema2CombatRulesTest` 验证计算与继续，`Schema2CombatTimeRulesTest` 核对精确时钟。
+`CampaignDomainsCombatIntegrationTest`、`CampaignProneIntegrationTest` 和同一
+[战斗验收索引](../design/v2/domain-integration.md#可重复验收索引)中的用例核对真实 SQLite 执行、保存和恢复。
