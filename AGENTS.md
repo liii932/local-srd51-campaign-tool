@@ -22,10 +22,10 @@ These instructions apply to automated contributors working in this repository. C
 
 ## Agent collaboration
 
-- The main agent plans the work, delegates execution to subagents, integrates their results and performs the final review. It chooses cohesive task boundaries, the number of subagents and serial or parallel execution according to dependencies, write boundaries and actual need; do not prescribe a fixed count, paired agents or the smallest possible fragments.
+- The main agent plans the work and integrates the results. Delegate tasks according to their dependencies and which files they change.
 - By default, create subagents with explicit `model="gpt-6.2-sol"` and `reasoning_effort="xhigh"`. Keep the main session's model and reasoning settings. If delegation or the specified capability is unavailable, report the limitation without substituting a model or claiming that delegation occurred.
 - Give each subagent sufficient scope, inputs, protected contracts, allowed paths, acceptance criteria and known user changes. Avoid concurrent writes to the same files. Subagents stay within their assignment and check their own work before returning actual changes, verification evidence and remaining issues.
-- The main agent personally reviews the actual diff, relevant contracts and verification evidence. Return defects to the author for correction and review the revised result until it passes. Author self-checks remain required; an additional non-author or cross-agent review is not a prerequisite for the main agent's review or completion.
+- The main agent reviews the final diff, relevant contracts and verification results. Authors correct and recheck their changes. The main agent reviews changes to `AGENTS.md` directly, without a separate subagent review.
 - Follow the user's later task-specific directions. Delegation does not expand Git/GitHub, database, deployment, browser-write or other external-action authorization.
 
 ## Sources of truth
@@ -118,8 +118,11 @@ Distinguish current behavior from a target design before treating a difference a
 - Treat fetching, pushing, opening or updating a pull request, creating Issues or Milestones, merging and deleting remote branches as separate external checkpoints. Perform only the checkpoints the user has authorized.
 - Prefer one descriptive branch and one cohesive pull request for a bounded migration. Automated contributor branches use the `codex/` prefix unless the user specifies another name.
 - Before pushing, fetch the intended remote, confirm the base branch has not advanced unexpectedly, verify the working tree is clean and push only the named branch. Never use `--all`, `--mirror` or force push as a shortcut, and never publish backup/original refs.
-- A pull request description must state scope, preserved contracts, tests actually observed, WAR audit when applicable and database/deployment actions explicitly not performed. “No conflicts” is not evidence that tests or review passed.
-- Review the final GitHub diff and required checks before merging. After merge, fetch with pruning and fast-forward the local base branch; delete only the exact merged feature branch. For a squash merge, verify tree or patch equivalence before removing a branch whose commit is not an ancestor of the base.
+- In the PR description, summarize the change, preserved contracts, observed test results, applicable WAR audit, and whether any database or deployment actions were performed.
+- Review the final GitHub diff and verify that all required checks have passed before merging.
+- Use the current GitHub account. Under the [normal PR rules](CONTRIBUTING.md), once `liii932` approves the current revision and all other requirements pass, any collaborator with write access can merge into `main`.
+- If already signed in as `liii932` and the owner requests a merge into `main`, use the account's PR-only bypass when approval is the only blocker. Run `gh pr merge` with `--admin --match-head-commit <reviewed-sha>`.
+- After merging, fetch with pruning and fast-forward the local base branch. When cleaning up, delete only the merged feature branch. For a squash merge, verify tree or patch equivalence before deleting the branch.
 
 ## Completion report
 
