@@ -171,6 +171,10 @@ summary { color: var(--accent); cursor: pointer; }
 #domain-space-occupants { margin-top: 12px; }
 .space-subject label, .deployment label:first-child { display: flex; align-items: center; gap: 8px; }
 .space-subject input[type=checkbox], .deployment input[type=checkbox] { flex: none; width: auto; margin: 0; }
+.group-check-participant { display: flex; align-items: center; flex-wrap: wrap; column-gap: 12px; }
+.group-check-participant label { min-width: 0; overflow-wrap: anywhere; }
+.group-check-participant label:last-child { margin-left: auto; }
+#group-check-result p { overflow-wrap: anywhere; }
 .campaign-log-entry { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 20px; border-top: 3px solid var(--border); background: var(--sidebar); }
 .campaign-log-entry p { margin: 0; color: var(--muted); font-size: .86rem; }
 #campaign-log-toggle, #campaign-log-close { color: var(--accent); background: var(--sidebar); border-color: var(--border); font-size: .86rem; }

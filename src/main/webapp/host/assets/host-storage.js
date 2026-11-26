@@ -44,6 +44,9 @@
     STALE_POSITION: '角色的安置已变化，请同步后重新选择格位。',
     SPACE_FROZEN: '该主体所在的空间已冻结。先切换执行焦点。',
     SUBJECT_UNPLACED: '请先在世界节点安置该主体。',
+    GROUP_CHECK_WORLD_REQUIRED: '请将团队属性检定所在的世界节点设为执行焦点。',
+    GROUP_CHECK_DUPLICATE_PARTICIPANT: '团队属性检定中每名角色只能选择一次。',
+    GROUP_CHECK_RULE_UNSUPPORTED: '请选择当前战役的检定规则。',
     SCENE_FOCUS_REQUIRED: '请先将局部场景设为执行焦点。',
     RULE_SCENE_OWNER_REQUIRED: '请使用当前规则场景允许的动作。',
     ACTION_FLOW_BUSY: '请先继续结算当前待处理行动。',
@@ -138,6 +141,7 @@
     let manualCheckDraft = null;
     if (scope !== workspaceScope) {
       manualCheckDraft = resetManualCheck(workspaceScope === undefined ? scope : null);
+      byId('domain-group-check').reset();
       workspaceScope = scope;
       characterBrowserKey = null;
       characterBrowserIndex = 0;
@@ -249,6 +253,7 @@
     refreshCreationSubraces();
     refreshCharacterChoices();
     refreshCheckAbility();
+    refreshCheckAbility(byId('domain-group-check'));
   }
   function refreshCreationSubraces() {
     const {raceKey, subraceKey} = byId('domain-create').elements;
@@ -258,8 +263,8 @@
     subraceKey.disabled = choices.length === 0;
     subraceKey.parentElement.hidden = subraceKey.disabled;
   }
-  function refreshCheckAbility() {
-    const form = byId('domain-check');
+  function refreshCheckAbility(form = byId('domain-check')) {
+    const group = form.id === 'domain-group-check';
     const kind = form.elements.kind.value;
     const skill = kind === 'SKILL', tool = kind === 'TOOL';
     const entries = catalog().filter(rule => rule.enabled && rule.executable
@@ -268,6 +273,7 @@
     options(proficiency, entries.map(ruleValue), value => ruleFromValue(value).name);
     proficiency.disabled = !skill && !tool;
     proficiency.required = skill || tool;
+    if (group) proficiency.closest('label').hidden = !skill;
     const ability = form.elements.ability;
     const selectedSkill = skill ? ruleFromValue(proficiency.value) : null;
     const mayChoose = selectedSkill && ruleFromValue(form.elements.rule.value)?.allowAlternateSkillAbility === true;
@@ -275,10 +281,10 @@
     if (skill && (!mayChoose || selection !== ability.dataset.skillSelection)) ability.value = selectedSkill?.abilityKey || '';
     ability.dataset.skillSelection = selection;
     ability.disabled = skill && !mayChoose;
-    const hint = byId('check-skill-default');
+    const hint = byId(group ? 'group-check-skill-default' : 'check-skill-default');
     hint.hidden = !mayChoose;
     hint.textContent = mayChoose ? `该技能的默认属性为${abilityName(selectedSkill.abilityKey)}。` : '';
-    refreshCheckSubject();
+    if (!group) refreshCheckSubject();
   }
   function refreshCheckSubject() {
     const form = byId('domain-check');
@@ -583,6 +589,64 @@
     const adjustment = passive ? `，优劣势调整 ${result.passiveAdjustment}` : '';
     return `${checkName(input)}${subject} · ${base}，属性修正 ${result.abilityModifier}，${proficiency}${adjustment}，共 ${result.total}（DC ${input.difficultyClass}，${result.success ? '成功' : '失败'}）`;
   }
+  function renderGroupCheckForm(state) {
+    const form = byId('domain-group-check'), parent = byId('group-check-participants');
+    const focus = state.space.focus.space, world = focus?.kind === 'WORLD';
+    const eligible = world ? roster().filter(character => character.active && inFocus(character.id)
+      && Number(character.hitPoints) > 0 && !character.state.rest?.active) : [];
+    const scope = `${workspaceScope}/${state.space.focus.generation}`;
+    const previous = parent.dataset.scope === scope ? new Map(Array.from(parent.querySelectorAll('[data-character]'), row => [row.dataset.character, {
+      joined: row.querySelector('input').checked, mode: row.querySelector('select').value
+    }])) : new Map();
+    parent.dataset.scope = scope;
+    parent.replaceChildren();
+    byId('group-check-location').textContent = world ? `世界节点 · ${spaceName(focus)}` : '请先将执行焦点设为世界节点。';
+    if (world && eligible.length < 2) text(parent, 'p', '此节点至少需要两名可行动的规则角色。');
+    const submit = form.querySelector('button');
+    const updateSubmit = () => {
+      const count = parent.querySelectorAll('input:checked').length;
+      submit.disabled = count < 2 || count > 16;
+    };
+    for (const character of eligible) {
+      const row = document.createElement('div');
+      row.className = 'space-subject group-check-participant';
+      row.dataset.character = character.id;
+      const old = previous.get(character.id);
+      const join = control(row, character.name, 'join', 'checkbox');
+      join.checked = old?.joined ?? false;
+      const label = text(row, 'label', '裁定');
+      const mode = document.createElement('select');
+      mode.setAttribute('aria-label', `${character.name}的掷骰裁定`);
+      options(mode, ['NORMAL', 'ADVANTAGE', 'DISADVANTAGE', 'BOTH'], value =>
+        ({NORMAL: '正常', ADVANTAGE: '优势', DISADVANTAGE: '劣势', BOTH: '优势与劣势'})[value]);
+      mode.value = old?.mode ?? 'NORMAL';
+      mode.disabled = !join.checked;
+      join.addEventListener('change', () => { mode.disabled = !join.checked; updateSubmit(); });
+      label.append(mode);
+      parent.append(row);
+    }
+    updateSubmit();
+    const result = byId('group-check-result');
+    result.replaceChildren();
+    const latest = world && state.roots.findLast(root => root.kind === 'group-check' && root.subjectId === focus.id);
+    if (latest) renderGroupCheckResult(result, latest);
+  }
+  function renderGroupCheckResult(parent, root, showSequence = false) {
+    const audit = JSON.parse(root.after);
+    const participants = audit.participants.map(participant => {
+      const character = roster().find(character => character.id === participant.characterId);
+      const event = character.history.events.find(event => event.operationId === participant.checkOperationId);
+      return {character, event, result: event.checkResult};
+    });
+    const input = participants[0].event.command.checkInput;
+    text(parent, 'p', `${showSequence ? root.sequence + '. ' : ''}团队属性检定 · ${checkName(input)}（DC ${input.difficultyClass}）· ${audit.success ? '成功' : '失败'}`);
+    text(parent, 'p', `${audit.successCount} / ${participants.length} 人成功，至少需要 ${audit.requiredSuccessCount} 人（${audit.successNumerator}/${audit.successDenominator}）。`);
+    if (audit.message) text(parent, 'p', audit.message);
+    table(parent, ['角色', 'd20 原骰', '选用', '总值', '结果'], participants.map(({character, result}) => [
+      character.name, [result.firstD20, result.secondD20].filter(die => die != null).join(' / '), result.selectedD20,
+      result.total, result.success ? '成功' : '失败'
+    ]));
+  }
   function renderRuleCharacter(character) {
     const card = document.createElement('article'); card.className = 'card character-card'; const current = character.state;
     text(card, 'strong', `${character.name} · ${character.kind === 'NPC' ? 'NPC' : '角色'}${character.active ? '' : ' · 离队'}`);
@@ -623,6 +687,7 @@
     refreshRuleChoices();
     renderSpaces(state);
     renderCharacterBrowser();
+    renderGroupCheckForm(state);
     const history = byId('storage-history'); history.replaceChildren();
     for (const root of state.roots || []) {
       if (root.kind === 'manual-check') {
@@ -642,6 +707,8 @@
         details.push(...placementHistory(root));
         for (const effect of chosen || []) if (typeof effect.text === 'string' && effect.text) details.push(effect.text);
         text(history, 'li', details.join('；'));
+      } else if (root.kind === 'group-check') {
+        renderGroupCheckResult(text(history, 'li', ''), root, true);
       } else if (root.kind === 'check-effects') {
         const audit = JSON.parse(root.after);
         const executor = roster().find(character => character.id === root.subjectId);
@@ -1479,6 +1546,19 @@
     if (values.withEffects === 'on') { input.success = conditionalBranch('success', values); input.failure = conditionalBranch('failure', values); }
     return input;
   });
+  domainForm('domain-group-check', 'group-check', (form, values) => {
+    const participants = Array.from(byId('group-check-participants').querySelectorAll('[data-character]'))
+      .filter(row => row.querySelector('input:checked')).map(row => {
+        const character = roster().find(character => character.id === row.dataset.character);
+        const mode = row.querySelector('select').value;
+        return {characterId: character.id, characterVersion: String(character.version),
+          advantage: mode === 'ADVANTAGE' || mode === 'BOTH', disadvantage: mode === 'DISADVANTAGE' || mode === 'BOTH'};
+      });
+    if (participants.length < 2 || participants.length > 16) throw new Error('请选择 2–16 名参与角色。');
+    return {rule: typedRule(values.rule), kind: values.kind, abilityKey: form.elements.ability.value,
+      proficiency: values.kind === 'SKILL' ? typedRule(values.proficiency) : null, difficultyClass: values.difficultyClass,
+      adjudication: values.adjudication, participants, successMessage: values.successMessage, failureMessage: values.failureMessage};
+  });
   characterForm('domain-health', (_, values) => ({...baseCharacter(values.kind), healthInput: {type: 'character.HealthInput', rule: typedRule(values.rule),
     effect: values.kind === 'HEALTH_EFFECT_RESOLVED' ? typedRule(values.effect) : null, temporaryChoice: values.kind === 'HEALTH_EFFECT_RESOLVED' ? values.temporaryChoice || null : null, adjudication: values.adjudication}}));
   characterForm('domain-spellbook', (form, values, character) => ({...baseCharacter(values.kind), spellbookInput: {type: 'character.SpellbookInput', castingRule: typedRule(values.castingRule),
@@ -1632,9 +1712,11 @@
     byId('check-submit').textContent = event.target.value === 'PASSIVE_CHECK_RESOLVED' ? '结算被动检定' : '服务器掷骰检定';
   });
   byId('domain-rest').elements.kind.addEventListener('change', refreshArcaneRecovery);
-  byId('domain-check').elements.kind.addEventListener('change', refreshCheckAbility);
-  byId('domain-check').elements.proficiency.addEventListener('change', refreshCheckAbility);
-  byId('domain-check').elements.rule.addEventListener('change', refreshCheckAbility);
+  for (const id of ['domain-check', 'domain-group-check']) {
+    const form = byId(id);
+    for (const name of ['kind', 'proficiency', 'rule'])
+      form.elements[name].addEventListener('change', () => refreshCheckAbility(form));
+  }
   byId('domain-check').elements.ability.addEventListener('change', refreshCheckSubject);
   for (const select of document.querySelectorAll('.check-branch-character')) select.addEventListener('change', refreshCheckBranches);
   for (const select of document.querySelectorAll('.world-item-choice')) select.addEventListener('change', event => {

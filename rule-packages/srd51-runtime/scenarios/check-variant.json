@@ -1,8 +1,8 @@
 {
   "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-check-variant"],
-  "members": ["srd51_runtime@11", "srd51_characters@11", "srd51_magic@11", "dm_runtime_house_rules@22"],
+  "members": ["srd51_runtime@12", "srd51_characters@12", "srd51_magic@12", "dm_runtime_house_rules@24"],
   "driver": "BundledSrd51Scenarios",
-  "cases": ["initial-character", "skill-check", "alternate-skill-enabled", "passive-check-variant", "fixed-damage", "stonecunning-variant"],
+  "cases": ["initial-character", "skill-check", "alternate-skill-enabled", "passive-check-variant", "group-check-variant", "fixed-damage", "stonecunning-variant"],
   "character": {
     "characterClass": "fighter",
     "background": "custom_artisan",

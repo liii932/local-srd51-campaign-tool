@@ -74,6 +74,10 @@ final class Schema2CheckTestFixture {
             check.addProperty("allow_alternate_skill_ability", alternate);
             check.addProperty("passive_base_score", alternate ? 12 : 10);
             check.addProperty("passive_advantage_adjustment", alternate ? 3 : 5);
+            var threshold = new JsonObject();
+            threshold.addProperty("numerator", 1);
+            threshold.addProperty("denominator", 2);
+            check.add("group_success_threshold", threshold);
             definitions.add(check);
         }
         var tool = definition(TOOL, 70); tool.addProperty("category", "ARTISAN"); definitions.add(tool);

@@ -170,6 +170,20 @@
           </fieldset>
           <button id="check-submit">服务器掷骰检定</button>
         </form>
+        <form id="domain-group-check"><h3>团队属性检定</h3>
+          <p id="group-check-location"></p>
+          <label>检定规则<select name="rule" data-rules="adventure.check" required></select></label>
+          <label>检定类型<select name="kind"><option value="ABILITY">属性检定</option><option value="SKILL">技能检定</option></select></label>
+          <label>技能<select name="proficiency"></select></label>
+          <label>检定属性<select name="ability" class="ability-choice" required></select><small id="group-check-skill-default" hidden></small></label>
+          <label>DC<input name="difficultyClass" type="number" min="0" max="30" value="10" required></label>
+          <label>裁定说明<input name="adjudication" value="DM 裁定团队属性检定" maxlength="160" required></label>
+          <fieldset><legend>参与角色（2–16 人）</legend><div id="group-check-participants"></div></fieldset>
+          <label>成功消息（可选）<input name="successMessage"></label>
+          <label>失败消息（可选）<input name="failureMessage"></label>
+          <button>结算团队检定</button>
+          <div id="group-check-result" aria-live="polite"></div>
+        </form>
       </div></section>
       <section data-panel="magic" hidden><div class="columns">
         <form id="domain-health"><h3>健康与定额效果</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>健康规则<select name="rule" data-rules="adventure.health" required></select></label><label>操作<select name="kind"><option value="HEALTH_EFFECT_RESOLVED">应用健康效果</option><option value="DEATH_SAVE_RESOLVED">死亡豁免</option></select></label><label>效果<select name="effect" data-rules="adventure.vital_effect" required></select></label><label>临时生命值冲突<select name="temporaryChoice"><option value="">无冲突</option><option value="REPLACE">使用新值</option><option value="KEEP">保留旧值</option></select></label><label>裁定说明<input name="adjudication" value="DM 健康裁定" required maxlength="160"></label><button>应用健康操作</button></form>

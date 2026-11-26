@@ -13,6 +13,10 @@
     "allow_alternate_skill_ability": false,
     "passive_base_score": 10,
     "passive_advantage_adjustment": 5,
+    "group_success_threshold": {
+      "numerator": 1,
+      "denominator": 2
+    },
     "author_note": "Original rule"
   }
 ]

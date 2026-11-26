@@ -90,5 +90,19 @@
     },
     "field": "passive_advantage_adjustment",
     "value": 3
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "group_success_threshold",
+    "value": {
+      "numerator": 2,
+      "denominator": 3
+    }
   }
 ]

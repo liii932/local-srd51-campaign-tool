@@ -36,6 +36,10 @@
 
 幅度同时用于优势加分和劣势减分。两者相抵时调整为零。幅度取零时仍保留有效优劣势事实。
 
+### 团队成功比例
+
+`adventure.check` 的必填字段 `group_success_threshold` 是含 `numerator` 和 `denominator` 两个整数的对象。分数须为最简正分数，且 `1 ≤ numerator ≤ denominator ≤ 10`。标准角色包声明 `{"numerator":1,"denominator":2}`，检定变体通过一个 `set_field` 将整个对象改为 `{"numerator":2,"denominator":3}`。声明、覆盖链和最终值随战役冻结。人数、DC、个人骰点和团队结果由各自的玩法输入或服务器结算产生。[团队属性检定](schema-2-character-foundations.md#团队属性检定)
+
 ### 健康与组合边界
 
 健康类型没有其他领域字段。一个最终组合分别至多包含一个启用的检定定义和一个启用的

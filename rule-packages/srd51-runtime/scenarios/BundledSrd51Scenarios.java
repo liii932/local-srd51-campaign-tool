@@ -17,7 +17,18 @@ import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2SpellRules;
 import com.dndtool.service.Schema2WizardSpellbookRules;
+import com.dndtool.service.storage.CampaignData;
+import com.dndtool.service.storage.CampaignDomainCodec;
+import com.dndtool.service.storage.CampaignDomainCommands;
+import com.dndtool.service.storage.CampaignDomainData;
+import com.dndtool.service.storage.CampaignGroupCheck;
+import com.dndtool.service.storage.CampaignJson;
 import com.dndtool.service.storage.CampaignRuleContext;
+import com.dndtool.service.storage.CampaignSpaceCommands;
+import com.dndtool.service.storage.CampaignSpaceData;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +59,8 @@ public final class BundledSrd51Scenarios {
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
                 scenario("alternate-skill-enabled", BundledSrd51Scenarios::verifyAlternateSkillEnabled),
+                scenario("group-check", checks -> checks.verifyGroupCheck(1, 2, 2, true)),
+                scenario("group-check-variant", checks -> checks.verifyGroupCheck(2, 3, 3, false)),
                 scenario("passive-check", checks -> checks.verifyPassiveChecks(10, 5)),
                 scenario("passive-check-variant", checks -> checks.verifyPassiveChecks(12, 3)),
                 scenario("stonecunning", BundledSrd51Scenarios::verifyStonecunning),
@@ -206,6 +219,105 @@ public final class BundledSrd51Scenarios {
         assertEquals(rules.checkRule(), check.identity());
         assertEquals(allowed, check.definition().allowAlternateSkillAbility());
         verifyCheckField(check.identity(), Field.ALLOW_ALTERNATE_SKILL_ABILITY, new BooleanValue(false), new BooleanValue(allowed));
+    }
+
+    private void verifyGroupCheck(int numerator, int denominator, int required, boolean expectedSuccess) {
+        var check = (FinalCheck) find("adventure.check", "check.srd2014");
+        verifyCheckField(check.identity(), Field.GROUP_SUCCESS_THRESHOLD, new GroupSuccessThreshold(1, 2),
+                new GroupSuccessThreshold(numerator, denominator));
+
+        var campaign = new GroupCheckParty(rules);
+        var node = new JsonObject();
+        node.addProperty("name", "Swamp");
+        UUID swamp = campaign.apply("node-create", node).subjectId();
+        var focus = new JsonObject();
+        focus.add("target", CampaignSpaceCommands.refJson(CampaignSpaceData.Ref.world(swamp)));
+        campaign.apply("focus-set", focus);
+        for (String name : List.of("Ash", "Brook", "Clay", "Dale", "Elm")) {
+            var fighter = new JsonObject();
+            fighter.addProperty("name", name);
+            fighter.addProperty("kind", "PC");
+            fighter.addProperty("classKey", "fighter");
+            fighter.addProperty("backgroundKey", "acolyte");
+            UUID id = campaign.apply("character-create", fighter).subjectId();
+            var position = new JsonObject();
+            position.addProperty("characterId", id.toString());
+            position.addProperty("nodeId", swamp.toString());
+            campaign.apply("position", position);
+        }
+
+        var request = new JsonObject();
+        request.add("rule", CampaignDomainCodec.toJson(rules.checkRule()));
+        request.addProperty("kind", "SKILL");
+        request.addProperty("abilityKey", "ability.wisdom");
+        request.add("proficiency", CampaignDomainCodec.toJson(rules.rule("character.proficiency", "proficiency.skill.perception")));
+        request.addProperty("difficultyClass", "14");
+        request.addProperty("adjudication", "The party looks for a dry crossing.");
+        request.addProperty("successMessage", "The party finds a crossing.");
+        request.addProperty("failureMessage", "The party must turn back.");
+        // One member reaches the DC exactly. Four adventurers split evenly, then the fifth joins them.
+        checkGroupRolls(campaign, request, List.of(14, 11, 9, 6), List.of(true, true, false, false),
+                numerator, denominator, required, expectedSuccess);
+        checkGroupRolls(campaign, request, List.of(14, 11, 9, 6, 18), List.of(true, true, false, false, true),
+                numerator, denominator, expectedSuccess ? 3 : 4, expectedSuccess);
+    }
+
+    private static void checkGroupRolls(GroupCheckParty campaign, JsonObject request, List<Integer> rolls,
+            List<Boolean> individualSuccess, int numerator, int denominator, int required, boolean expectedSuccess) {
+        var party = campaign.state.characters().subList(0, rolls.size());
+        var participants = new JsonArray();
+        for (var character : party.reversed()) {
+            var participant = new JsonObject();
+            participant.addProperty("characterId", character.id().toString());
+            participant.addProperty("characterVersion", Long.toString(character.history().current().version()));
+            participant.addProperty("advantage", false);
+            participant.addProperty("disadvantage", false);
+            participants.add(participant);
+        }
+        request.add("participants", participants);
+        campaign.dice.addAll(rolls);
+        var root = campaign.apply("group-check", request);
+        assertTrue(campaign.dice.isEmpty());
+        assertEquals(rolls, root.rolls().stream().map(CampaignSpaceData.Die::value).toList());
+        var audit = CampaignDomainCodec.fromJson(JsonParser.parseString(root.after()), CampaignGroupCheck.Audit.class);
+        expectNumber(numerator, audit.successNumerator());
+        expectNumber(denominator, audit.successDenominator());
+        expectNumber(required, audit.requiredSuccessCount());
+        expectNumber((int) individualSuccess.stream().filter(Boolean::booleanValue).count(), audit.successCount());
+        assertEquals(expectedSuccess, audit.success());
+        assertEquals(expectedSuccess ? "The party finds a crossing." : "The party must turn back.", audit.message());
+        expectNumber(rolls.size(), audit.participants().size());
+        for (int i = 0; i < rolls.size(); i++) {
+            var member = campaign.state.characters().get(i);
+            var event = member.history().events().getLast();
+            assertEquals(member.id(), audit.participants().get(i).characterId());
+            assertEquals(event.operationId(), audit.participants().get(i).checkOperationId());
+            assertEquals(rolls.get(i), event.checkResult().firstD20());
+            expectNumber(rolls.get(i) + 3, event.checkResult().total());
+            assertEquals(individualSuccess.get(i), event.checkResult().success());
+        }
+    }
+
+    private static final class GroupCheckParty {
+        private final String campaignId = UUID.randomUUID().toString();
+        private final CampaignDomainCommands commands = new CampaignDomainCommands();
+        private final ArrayDeque<Integer> dice = new ArrayDeque<>();
+        private CampaignDomainData.State state;
+
+        GroupCheckParty(CampaignRuleContext rules) {
+            state = CampaignDomainData.State.initial(rules.projection());
+        }
+
+        CampaignDomainData.Root apply(String action, JsonObject input) {
+            input.add("focus", CampaignSpaceCommands.focusPayload(state));
+            var snapshot = new CampaignData.Snapshot(campaignId, "Crossing", state);
+            state = commands.apply(snapshot, action, input, UUID.randomUUID(),
+                    CampaignJson.digest("AUTHOR-SCENARIO", CampaignJson.canonical(input)), sides -> {
+                        expectNumber(20, sides);
+                        return dice.removeFirst();
+                    });
+            return state.roots().getLast();
+        }
     }
 
     private void verifyPassiveChecks(int baseScore, int modeAdjustment) {

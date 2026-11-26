@@ -22,7 +22,7 @@ verify_character_package() {
 verify_character_package "$candidates/srd51-characters.zip" --case weapon-damage
 ```
 
-核对 `MODULE srd51_characters@11` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
+核对 `MODULE srd51_characters@12` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
 
 多项装备声明同时改动时，在同一个命令中重复 `--case`。这些用例共用一次解包、驱动编译、引擎 JVM 启动和规则组合。每项自行准备角色、场景和骰流，按传入的次序执行。省略 `--case` 时按清单次序执行全部用例。任何失败都使整批退出非零。输出分别给出准备、组合与通过用例的耗时，可用 shell 的 `time` 测整条命令。
 
@@ -150,8 +150,8 @@ with ZipFile(directory / "dm-runtime-house-rules.zip") as source, ZipFile(direct
         data = source.read(member)
         if member.filename == "author-package.json":
             manifest = json.loads(data)
-            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["11"]})
-            manifest["compatible_combinations"][0]["srd51_characters"] = "11"
+            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["12"]})
+            manifest["compatible_combinations"][0]["srd51_characters"] = "12"
             manifest["files"].append({"kind": "changes", "path": "changes.json"})
             data = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
         target.writestr(member, data)
@@ -229,6 +229,17 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case passive-check-variant "$scenarios/check-variant.json"
+```
+
+## 验证团队属性检定
+
+标准和家规使用四名角色、同一 DC、同一组原骰，恰好两人成功。标准包要求两人，变体要求三人。第五人加入后，三人成功仍通过标准门槛，家规需四人。场景分别核对成员原骰、个人成败、冻结字段来源、团队成败和选中的叙事。
+
+```bash
+war=target/dnd-tool-se-0.2.1.war
+scenarios=rule-packages/srd51-runtime/scenarios
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case group-check "$scenarios/standard.json"
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case group-check-variant "$scenarios/check-variant.json"
 ```
 
 ## 选择和新增场景

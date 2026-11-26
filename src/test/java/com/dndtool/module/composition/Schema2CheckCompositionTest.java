@@ -3,6 +3,7 @@ package com.dndtool.module.composition;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import java.math.BigDecimal;
 import java.util.*;
@@ -12,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2CheckCompositionTest {
     private static final String ALTERNATE_ABILITY = "allow_alternate_skill_ability";
+    private static final String GROUP_THRESHOLD = "group_success_threshold";
 
     @Test void fixedAuthorFilesProduceTypedCheckAndAllOriginalOverrideFacts() {
         var material = Schema2CheckFixtures.projection();
@@ -24,7 +26,14 @@ class Schema2CheckCompositionTest {
         assertTrue(check.definition().allowAlternateSkillAbility());
         assertEquals(12, check.definition().passiveBaseScore());
         assertEquals(3, check.definition().passiveAdvantageAdjustment());
-        assertEquals(9, material.projection().chains().size());
+        assertEquals(2, check.definition().groupSuccessNumerator());
+        assertEquals(3, check.definition().groupSuccessDenominator());
+        assertEquals(10, material.projection().chains().size());
+        var groupThreshold = groupThresholdChain(material);
+        assertEquals(List.of(new GroupSuccessThreshold(1, 2), new GroupSuccessThreshold(2, 3)),
+                groupThreshold.steps().stream().map(step -> step.after().value()).toList());
+        assertEquals(List.of("checks_base", "checks_extension"), groupThreshold.steps().stream()
+                .map(step -> step.provider().moduleKey()).toList());
         assertPassiveChain(material, Field.PASSIVE_BASE_SCORE, 10, 12);
         assertPassiveChain(material, Field.PASSIVE_ADVANTAGE_ADJUSTMENT, 5, 3);
         var alternate = material.projection().chains().stream()
@@ -98,7 +107,8 @@ class Schema2CheckCompositionTest {
         var definition = check.definition();
         var forged = new FinalCheck(new CheckDefinition(definition.identity(), definition.displayName(),
                 definition.description(), definition.sourcePage(), definition.algorithm(), false,
-                definition.passiveBaseScore(), definition.passiveAdvantageAdjustment(), definition.authorNote()), check.enabled());
+                definition.passiveBaseScore(), definition.passiveAdvantageAdjustment(),
+                definition.groupSuccessThreshold(), definition.authorNote()), check.enabled());
         assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
                 material.members(), List.of(forged), material.projection().entries(), material.projection().chains()));
 
@@ -147,6 +157,119 @@ class Schema2CheckCompositionTest {
             assertEquals("S2_FIELD_NOT_CLEARABLE", assertThrows(Schema2Exception.class,
                     () -> Schema2GrantFixtures.artifacts(cleared)).diagnostic().code());
         }
+    }
+
+    @Test void groupSuccessThresholdIsRequiredAndCanOnlyBeOverriddenAsOneBoundedFraction() {
+        var missing = Schema2CheckFixtures.packages();
+        Schema2GrantFixtures.edit(missing, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).remove(GROUP_THRESHOLD));
+        assertEquals("S2_SHAPE", assertThrows(Schema2Exception.class,
+                () -> Schema2GrantFixtures.artifacts(missing)).diagnostic().code());
+
+        for (String invalid : List.of("null", "[]", "{}", "{\"denominator\":2}",
+                "{\"numerator\":1,\"denominator\":2,\"extra\":0}", "{\"numerator\":0,\"denominator\":2}",
+                "{\"numerator\":1,\"denominator\":0}", "{\"numerator\":3,\"denominator\":2}",
+                "{\"numerator\":1,\"denominator\":11}", "{\"numerator\":1.0,\"denominator\":2}",
+                "{\"numerator\":1,\"denominator\":\"2\"}", "{\"numerator\":2,\"denominator\":4}",
+                "{\"numerator\":10,\"denominator\":10}")) {
+            var original = Schema2CheckFixtures.packages();
+            Schema2GrantFixtures.edit(original, 0, "rules.json", root ->
+                    Schema2GrantFixtures.row(root, 0).add(GROUP_THRESHOLD, JsonParser.parseString(invalid)));
+            assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(original), invalid);
+
+            var changed = Schema2CheckFixtures.packages();
+            Schema2GrantFixtures.edit(changed, 1, "changes.json", root ->
+                    override(root, GROUP_THRESHOLD).add("value", JsonParser.parseString(invalid)));
+            assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(changed), invalid);
+        }
+
+        var cleared = Schema2CheckFixtures.packages();
+        Schema2GrantFixtures.edit(cleared, 1, "changes.json", root -> {
+            var row = override(root, GROUP_THRESHOLD);
+            row.addProperty("op", "clear_field");
+            row.remove("value");
+        });
+        assertEquals("S2_FIELD_NOT_CLEARABLE", assertThrows(Schema2Exception.class,
+                () -> Schema2GrantFixtures.artifacts(cleared)).diagnostic().code());
+
+        var partial = Schema2CheckFixtures.packages();
+        Schema2GrantFixtures.edit(partial, 1, "changes.json", root -> {
+            var row = override(root, GROUP_THRESHOLD);
+            row.addProperty("field", GROUP_THRESHOLD + ".numerator");
+            row.addProperty("value", 2);
+        });
+        assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(partial));
+
+        var packages = Schema2CheckFixtures.packages();
+        Schema2GrantFixtures.edit(packages, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0)
+                .add(GROUP_THRESHOLD, JsonParser.parseString("{\"numerator\":1,\"denominator\":1}")));
+        Schema2GrantFixtures.edit(packages, 1, "changes.json", root -> override(root, GROUP_THRESHOLD)
+                .add("value", JsonParser.parseString("{\"numerator\":9,\"denominator\":10}")));
+        var changed = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(packages));
+        assertEquals(List.of(new GroupSuccessThreshold(1, 1), new GroupSuccessThreshold(9, 10)),
+                groupThresholdChain(changed).steps().stream().map(step -> step.after().value()).toList());
+        assertNotEquals(Schema2CheckFixtures.projection().finalRulesSha256(), changed.finalRulesSha256());
+    }
+
+    @Test void storedGroupThresholdMustMatchTheCompleteValidChain() {
+        var material = Schema2CheckFixtures.projection();
+        var check = assertInstanceOf(FinalCheck.class, material.projection().rules().getFirst());
+        var definition = check.definition();
+        var forged = new FinalCheck(new CheckDefinition(definition.identity(), definition.displayName(),
+                definition.description(), definition.sourcePage(), definition.algorithm(),
+                definition.allowAlternateSkillAbility(), definition.passiveBaseScore(),
+                definition.passiveAdvantageAdjustment(), new GroupSuccessThreshold(1, 2), definition.authorNote()), true);
+        assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                material.members(), List.of(forged), material.projection().entries(), material.projection().chains()));
+
+        var threshold = groupThresholdChain(material);
+        var original = threshold.steps().getFirst();
+        var changed = threshold.steps().getLast();
+        var invalid = new FieldState(StateKind.PRESENT, new GroupSuccessThreshold(3, 2));
+        var altered = new FieldChain(threshold.target(), threshold.field(), List.of(
+                new ChainStep(original.op(), original.before(), invalid, original.provider(),
+                        original.loadIndex(), original.authorLocation(), original.origin()),
+                new ChainStep(changed.op(), invalid, changed.after(), changed.provider(),
+                        changed.loadIndex(), changed.authorLocation(), changed.origin())));
+        var chains = material.projection().chains().stream().map(chain -> chain.equals(threshold) ? altered : chain).toList();
+        assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                material.members(), material.projection().rules(), material.projection().entries(), chains));
+    }
+
+    @Test void validFinalRatioCannotMaskUnreducedIntermediateOverride() {
+        var packages = Schema2CheckFixtures.packages();
+        packages.add(new LinkedHashMap<>(packages.getLast()));
+        Schema2GrantFixtures.edit(packages, 2, HEADER_PATH, root -> root.getAsJsonObject()
+                .addProperty("module_key", "checks_final"));
+        Schema2GrantFixtures.edit(packages, 2, "changes.json", root -> {
+            var change = override(root, GROUP_THRESHOLD).deepCopy();
+            change.add("value", JsonParser.parseString("{\"numerator\":9,\"denominator\":10}"));
+            root.getAsJsonArray().asList().clear();
+            root.getAsJsonArray().add(change);
+        });
+        var material = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(packages));
+        var restored = ProductionSchema2Projection.restore(material.members(), material.projection().rules(),
+                material.projection().entries(), material.projection().chains());
+        assertEquals(material.chainSha256(), restored.chainSha256());
+
+        var threshold = groupThresholdChain(material);
+        assertEquals(3, threshold.steps().size());
+        var original = threshold.steps().getFirst();
+        var middle = threshold.steps().get(1);
+        var last = threshold.steps().getLast();
+        var unreduced = new FieldState(StateKind.PRESENT, new GroupSuccessThreshold(2, 4));
+        var altered = new FieldChain(threshold.target(), threshold.field(), List.of(original,
+                new ChainStep(middle.op(), middle.before(), unreduced, middle.provider(), middle.loadIndex(),
+                        middle.authorLocation(), middle.origin()),
+                new ChainStep(last.op(), unreduced, last.after(), last.provider(), last.loadIndex(),
+                        last.authorLocation(), last.origin())));
+        var chains = material.projection().chains().stream().map(chain -> chain.equals(threshold) ? altered : chain).toList();
+        assertEquals("S2_TYPE", assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                material.members(), material.projection().rules(), material.projection().entries(), chains)).diagnostic().code());
+    }
+
+    private static FieldChain groupThresholdChain(ProductionSchema2Projection material) {
+        return material.projection().chains().stream()
+                .filter(chain -> chain.field() == Field.GROUP_SUCCESS_THRESHOLD).findFirst().orElseThrow();
     }
 
     @Test void validFinalPassiveScoreCannotMaskOutOfRangeOriginalStoredValue() {
