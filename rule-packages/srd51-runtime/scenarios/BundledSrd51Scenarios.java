@@ -48,6 +48,8 @@ public final class BundledSrd51Scenarios {
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
                 scenario("alternate-skill-enabled", BundledSrd51Scenarios::verifyAlternateSkillEnabled),
+                scenario("passive-check", checks -> checks.verifyPassiveChecks(10, 5)),
+                scenario("passive-check-variant", checks -> checks.verifyPassiveChecks(12, 3)),
                 scenario("stonecunning", BundledSrd51Scenarios::verifyStonecunning),
                 scenario("stonecunning-variant", BundledSrd51Scenarios::verifyStonecunningVariant),
                 scenario("fighter-extra-attack", BundledSrd51Scenarios::verifyFighterExtraAttack),
@@ -203,20 +205,80 @@ public final class BundledSrd51Scenarios {
         var check = (FinalCheck) find("adventure.check", "check.srd2014");
         assertEquals(rules.checkRule(), check.identity());
         assertEquals(allowed, check.definition().allowAlternateSkillAbility());
+        verifyCheckField(check.identity(), Field.ALLOW_ALTERNATE_SKILL_ABILITY, new BooleanValue(false), new BooleanValue(allowed));
+    }
+
+    private void verifyPassiveChecks(int baseScore, int modeAdjustment) {
+        var check = (FinalCheck) find("adventure.check", "check.srd2014");
+        assertEquals(rules.checkRule(), check.identity());
+        expectNumber(baseScore, check.definition().passiveBaseScore());
+        expectNumber(modeAdjustment, check.definition().passiveAdvantageAdjustment());
+        verifyCheckField(check.identity(), Field.PASSIVE_BASE_SCORE, new IntegerValue(10), new IntegerValue(baseScore));
+        verifyCheckField(check.identity(), Field.PASSIVE_ADVANTAGE_ADJUSTMENT, new IntegerValue(5), new IntegerValue(modeAdjustment));
+
+        var plan = initialPlan("fighter");
+        State fighter = new Schema2CharacterProgressionRules().initial(rules.projection(), plan, UUID.randomUUID(),
+                rules.initialAbilities("fighter"), rules.initialChoices("fighter"));
+        verifyPassiveResult(plan, fighter, false, false, baseScore, 0);
+        verifyPassiveResult(plan, fighter, true, false, baseScore, modeAdjustment);
+        verifyPassiveResult(plan, fighter, false, true, baseScore, -modeAdjustment);
+        verifyPassiveResult(plan, fighter, true, true, baseScore, 0);
+
+        var checks = new Schema2CharacterCheckRules();
+        var rolled = checks.prepare(rules.projection(), plan, fighter, perceptionCheck("CHECK_RESOLVED", true, false));
+        var result = checks.resolve(rolled, 4, 11);
+        assertEquals(4, result.firstD20());
+        assertEquals(11, result.secondD20());
+        assertEquals(11, result.selectedD20());
+        assertEquals(null, result.passiveBaseScore());
+        assertEquals(null, result.passiveAdjustment());
+        expectNumber(14, result.total());
+        assertTrue(result.success());
+    }
+
+    private void verifyPassiveResult(InitialPlan plan, State fighter, boolean advantage, boolean disadvantage,
+            int baseScore, int adjustment) {
+        var checks = new Schema2CharacterCheckRules();
+        var command = perceptionCheck("PASSIVE_CHECK_RESOLVED", advantage, disadvantage);
+        var prepared = checks.prepare(rules.projection(), plan, fighter, command);
+        var result = checks.resolvePassive(prepared);
+        assertEquals(null, result.firstD20());
+        assertEquals(null, result.secondD20());
+        assertEquals(null, result.selectedD20());
+        assertEquals(baseScore, result.passiveBaseScore());
+        assertEquals(adjustment, result.passiveAdjustment());
+        assertEquals(advantage, result.effectiveAdvantage());
+        assertEquals(disadvantage, result.effectiveDisadvantage());
+        expectNumber(1, result.abilityModifier());
+        expectNumber(2, result.proficiencyBonus());
+        int score = baseScore + 1 + 2 + adjustment;
+        expectNumber(score, result.total());
+        assertEquals(score >= 14, result.success());
+    }
+
+    private Command perceptionCheck(String kind, boolean advantage, boolean disadvantage) {
+        var input = new CheckInput(rules.checkRule(), "SKILL", "ability.wisdom",
+                rules.rule("character.proficiency", "proficiency.skill.perception"), 14, advantage, disadvantage,
+                "The DM checks whether the fighter notices a hidden creature.");
+        return new Command(kind, null, 0, null, null, null, GrowthChoices.EMPTY, null, input);
+    }
+
+    private void verifyCheckField(RuleIdentity rule, Field field, FieldValue original, FieldValue finalValue) {
         var chain = rules.projection().projection().chains().stream()
-                .filter(row -> row.target().equals(check.identity()) && row.field() == Field.ALLOW_ALTERNATE_SKILL_ABILITY)
+                .filter(row -> row.target().equals(rule) && row.field() == field)
                 .findFirst().orElseThrow();
-        expectNumber(allowed ? 2 : 1, chain.steps().size());
+        boolean overridden = !original.equals(finalValue);
+        expectNumber(overridden ? 2 : 1, chain.steps().size());
         var declaration = chain.steps().getFirst();
         assertEquals("declared", declaration.origin());
         assertEquals("srd51_characters", declaration.provider().moduleKey());
-        assertEquals(new FieldState(StateKind.PRESENT, new BooleanValue(false)), declaration.after());
-        if (allowed) {
+        assertEquals(new FieldState(StateKind.PRESENT, original), declaration.after());
+        if (overridden) {
             var override = chain.steps().getLast();
             assertEquals("set_field", override.op());
             assertEquals("dm_runtime_house_rules", override.provider().moduleKey());
             assertEquals(declaration.after(), override.before());
-            assertEquals(new FieldState(StateKind.PRESENT, new BooleanValue(true)), override.after());
+            assertEquals(new FieldState(StateKind.PRESENT, finalValue), override.after());
         }
     }
 

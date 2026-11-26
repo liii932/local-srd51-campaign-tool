@@ -70,7 +70,10 @@ final class Schema2CheckTestFixture {
         if (!mode.equals("missing")) {
             JsonObject check = definition(CHECK, 77);
             check.addProperty("algorithm", Schema2CharacterCheckRules.ALGORITHM);
-            check.addProperty("allow_alternate_skill_ability", mode.equals("alternate-skill-ability"));
+            boolean alternate = mode.equals("alternate-skill-ability");
+            check.addProperty("allow_alternate_skill_ability", alternate);
+            check.addProperty("passive_base_score", alternate ? 12 : 10);
+            check.addProperty("passive_advantage_adjustment", alternate ? 3 : 5);
             definitions.add(check);
         }
         var tool = definition(TOOL, 70); tool.addProperty("category", "ARTISAN"); definitions.add(tool);

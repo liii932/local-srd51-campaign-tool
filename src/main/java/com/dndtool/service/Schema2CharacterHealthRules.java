@@ -197,8 +197,9 @@ public final class Schema2CharacterHealthRules {
         if (before == null) return;
         validateState(before);
         if (before.health().dead()) throw invalid("S2_HEALTH_DEAD");
-        if (before.hitPoints() == 0 && Set.of("CHECK_RESOLVED", "ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED",
-                "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "REST_STARTED").contains(command.kind()))
+        if (before.hitPoints() == 0 && (Schema2CharacterRuntime.checkKind(command.kind())
+                || Set.of("ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED",
+                    "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "REST_STARTED").contains(command.kind())))
             throw invalid("S2_HEALTH_UNCONSCIOUS");
         if (before.hitPoints() == 0 && !before.health().stable() && command.kind().equals("TIME_ADVANCED"))
             throw invalid("S2_HEALTH_DEATH_SAVE_PENDING");

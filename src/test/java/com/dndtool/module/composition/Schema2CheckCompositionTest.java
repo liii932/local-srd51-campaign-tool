@@ -1,7 +1,10 @@
 package com.dndtool.module.composition;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -19,7 +22,11 @@ class Schema2CheckCompositionTest {
         assertEquals(77, check.definition().sourcePage());
         assertEquals("SRD_2014_ABILITY_CHECK_V1", check.definition().algorithm()); assertNull(check.definition().authorNote());
         assertTrue(check.definition().allowAlternateSkillAbility());
-        assertEquals(7, material.projection().chains().size());
+        assertEquals(12, check.definition().passiveBaseScore());
+        assertEquals(3, check.definition().passiveAdvantageAdjustment());
+        assertEquals(9, material.projection().chains().size());
+        assertPassiveChain(material, Field.PASSIVE_BASE_SCORE, 10, 12);
+        assertPassiveChain(material, Field.PASSIVE_ADVANTAGE_ADJUSTMENT, 5, 3);
         var alternate = material.projection().chains().stream()
                 .filter(c -> c.field() == Field.ALLOW_ALTERNATE_SKILL_ABILITY).findFirst().orElseThrow();
         assertEquals(List.of(false, true), alternate.steps().stream()
@@ -70,16 +77,14 @@ class Schema2CheckCompositionTest {
 
             var override = Schema2CheckFixtures.packages();
             Schema2GrantFixtures.edit(override, 1, "changes.json", root -> {
-                var row = root.getAsJsonArray().asList().getLast().getAsJsonObject();
-                assertEquals(ALTERNATE_ABILITY, row.get("field").getAsString());
-                row.add("value", invalid);
+                override(root, ALTERNATE_ABILITY).add("value", invalid);
             });
             assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(override));
         }
 
         var cleared = Schema2CheckFixtures.packages();
         Schema2GrantFixtures.edit(cleared, 1, "changes.json", root -> {
-            var row = root.getAsJsonArray().asList().getLast().getAsJsonObject();
+            var row = override(root, ALTERNATE_ABILITY);
             row.addProperty("op", "clear_field");
             row.remove("value");
         });
@@ -92,7 +97,8 @@ class Schema2CheckCompositionTest {
         var check = assertInstanceOf(FinalCheck.class, material.projection().rules().getFirst());
         var definition = check.definition();
         var forged = new FinalCheck(new CheckDefinition(definition.identity(), definition.displayName(),
-                definition.description(), definition.sourcePage(), definition.algorithm(), false, definition.authorNote()), check.enabled());
+                definition.description(), definition.sourcePage(), definition.algorithm(), false,
+                definition.passiveBaseScore(), definition.passiveAdvantageAdjustment(), definition.authorNote()), check.enabled());
         assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
                 material.members(), List.of(forged), material.projection().entries(), material.projection().chains()));
 
@@ -100,6 +106,76 @@ class Schema2CheckCompositionTest {
                 .filter(c -> c.field() != Field.ALLOW_ALTERNATE_SKILL_ABILITY).toList();
         assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
                 material.members(), material.projection().rules(), material.projection().entries(), incomplete));
+    }
+
+    @Test void passiveParametersRequireExactBoundedIntegersInBothDefinitionsAndOverrides() {
+        var limits = Map.of(Field.PASSIVE_BASE_SCORE, List.of(1, 20),
+                Field.PASSIVE_ADVANTAGE_ADJUSTMENT, List.of(0, 10));
+        for (var entry : limits.entrySet()) {
+            String field = entry.getKey().key();
+            int min = entry.getValue().getFirst(), max = entry.getValue().getLast();
+            for (int bound : entry.getValue()) {
+                var files = Schema2CheckFixtures.packages();
+                Schema2GrantFixtures.edit(files, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).addProperty(field, bound));
+                Schema2GrantFixtures.edit(files, 1, "changes.json", root -> override(root, field).addProperty("value", bound));
+                var material = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+                assertPassiveChain(material, entry.getKey(), bound, bound);
+            }
+
+            var missing = Schema2CheckFixtures.packages();
+            Schema2GrantFixtures.edit(missing, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).remove(field));
+            assertEquals("S2_SHAPE", assertThrows(Schema2Exception.class,
+                    () -> Schema2GrantFixtures.artifacts(missing)).diagnostic().code());
+
+            for (var invalid : List.of(new JsonPrimitive(min - 1), new JsonPrimitive(max + 1), new JsonPrimitive("10"),
+                    new JsonPrimitive(true), new JsonPrimitive(10.0), new JsonPrimitive(new BigDecimal("1E+1")), JsonNull.INSTANCE)) {
+                var original = Schema2CheckFixtures.packages();
+                Schema2GrantFixtures.edit(original, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).add(field, invalid));
+                assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(original));
+
+                var changed = Schema2CheckFixtures.packages();
+                Schema2GrantFixtures.edit(changed, 1, "changes.json", root -> override(root, field).add("value", invalid));
+                assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(changed));
+            }
+
+            var cleared = Schema2CheckFixtures.packages();
+            Schema2GrantFixtures.edit(cleared, 1, "changes.json", root -> {
+                var row = override(root, field);
+                row.addProperty("op", "clear_field");
+                row.remove("value");
+            });
+            assertEquals("S2_FIELD_NOT_CLEARABLE", assertThrows(Schema2Exception.class,
+                    () -> Schema2GrantFixtures.artifacts(cleared)).diagnostic().code());
+        }
+    }
+
+    @Test void validFinalPassiveScoreCannotMaskOutOfRangeOriginalStoredValue() {
+        var material = Schema2CheckFixtures.projection();
+        var invalid = new FieldState(StateKind.PRESENT, new IntegerValue(0));
+        var chains = material.projection().chains().stream().map(chain -> {
+            if (chain.field() != Field.PASSIVE_BASE_SCORE) return chain;
+            var original = chain.steps().getFirst();
+            var changed = chain.steps().getLast();
+            return new FieldChain(chain.target(), chain.field(), List.of(
+                    new ChainStep(original.op(), original.before(), invalid, original.provider(),
+                            original.loadIndex(), original.authorLocation(), original.origin()),
+                    new ChainStep(changed.op(), invalid, changed.after(), changed.provider(),
+                            changed.loadIndex(), changed.authorLocation(), changed.origin())));
+        }).toList();
+        assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                material.members(), material.projection().rules(), material.projection().entries(), chains));
+    }
+
+    private static JsonObject override(JsonElement root, String field) {
+        return root.getAsJsonArray().asList().stream().map(JsonElement::getAsJsonObject)
+                .filter(row -> row.has("field") && row.get("field").getAsString().equals(field))
+                .findFirst().orElseThrow();
+    }
+
+    private static void assertPassiveChain(ProductionSchema2Projection material, Field field, int original, int overridden) {
+        var chain = material.projection().chains().stream().filter(c -> c.field() == field).findFirst().orElseThrow();
+        assertEquals(List.of(original, overridden), chain.steps().stream().map(step -> ((IntegerValue) step.after().value()).value()).toList());
+        assertEquals(List.of("checks_base", "checks_extension"), chain.steps().stream().map(step -> step.provider().moduleKey()).toList());
     }
 
     @Test void atMostOneEnabledRuleAndDirectOriginalOwnerDependencyRemainRequired() {

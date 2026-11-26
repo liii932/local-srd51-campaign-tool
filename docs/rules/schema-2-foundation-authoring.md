@@ -25,6 +25,19 @@
 
 检定定义必需 JSON 布尔字段 `allow_alternate_skill_ability`。标准包取 false，按技能声明的默认属性检定。随附变体通过 `set_field` 改为 true，允许 DM 为单次技能检定选用六属性之一。字段必须提供，拒绝 null、字符串、数字和 `clear_field`。技能的 `ability_key` 仍指定界面预选属性。[运行合同](schema-2-character-foundations.md#技能搭配不同属性)
 
+### 被动检定参数
+
+`adventure.check` 还须声明下列两个精确 JSON 整数。范围含两端，扩展包可用 `set_field` 独立覆盖。缺字段、越界、非整数或 `clear_field` 均拒绝。冻结材料保留原值和每次覆盖的来源。[规则出处](../references/srd-5.1/pages/page-078.md) · [结算合同](schema-2-character-foundations.md#被动检定)
+
+| 字段 | 标准包 | 随附检定变体 | 作者范围 |
+| --- | ---: | ---: | ---: |
+| `passive_base_score` | 10 | 12 | 1–20 |
+| `passive_advantage_adjustment` | 5 | 3 | 0–10 |
+
+幅度同时用于优势加分和劣势减分。两者相抵时调整为零。幅度取零时仍保留有效优劣势事实。
+
+### 健康与组合边界
+
 健康类型没有其他领域字段。一个最终组合分别至多包含一个启用的检定定义和一个启用的
 健康定义。零个启用定义可作为有限材料组合，但不能据此获得相应业务执行资格。
 

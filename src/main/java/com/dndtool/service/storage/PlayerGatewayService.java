@@ -388,7 +388,7 @@ public final class PlayerGatewayService {
                     if(!proposal.memberId.equals(access.snapshot().domains().participation().controller(proposal.characterId)))throw denied(409,"PLAYER_PROPOSAL_EXPIRED");
                     requireMember(access,proposal.memberId);
                     var character=access.snapshot().domains().characters().stream().filter(c->c.id().equals(proposal.characterId)&&c.active()&&c.kind().equals("PC")).findFirst().orElseThrow(()->denied(409,"PLAYER_ADJUDICATION_UNSUPPORTED"));
-                    var command=new Schema2CharacterRuntime.Command("CHECK_RESOLVED",null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,
+                    var command=new Schema2CharacterRuntime.Command(Schema2CharacterRuntime.ROLLED_CHECK,null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,
                             new Schema2CharacterRuntime.CheckInput(access.snapshot().domains().material().restore().checkRule(),"ABILITY",ability,null,dc,false,false,reason));
                     JsonObject check=new JsonObject();check.addProperty("characterId",proposal.characterId.toString());check.addProperty("characterVersion",Long.toString(character.history().current().version()));check.add("command",CampaignDomainCodec.toJson(command));
                     for(String branch:List.of("success","failure")) {

@@ -86,13 +86,13 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 
 | 包 | 角色与直接依赖 |
 |---|---|
-| `srd51_runtime@10` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
-| `srd51_characters@10` | extension，直接依赖 `srd51_runtime@10`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
-| `srd51_magic@10` | extension，直接依赖前两包 |
-| `dm_runtime_house_rules@19` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@10` |
-| `dm_runtime_house_rules@20` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@10` 与 `srd51_characters@10` |
+| `srd51_runtime@11` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
+| `srd51_characters@11` | extension，直接依赖 `srd51_runtime@11`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
+| `srd51_magic@11` | extension，直接依赖前两包 |
+| `dm_runtime_house_rules@21` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@11` |
+| `dm_runtime_house_rules@22` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@11` 与 `srd51_characters@11` |
 
-标准组合选择家规 @19，变体选择 @20。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
+标准组合选择家规 @21，变体选择 @22。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
 同一变体把石工知识从双倍熟练改为三倍、固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
 一个专属包缺失或与清单不符时，依赖它的内置组合返回 `BUNDLED_RULES_UNAVAILABLE`。三个共享包中任一损坏会影响两组。
@@ -112,6 +112,8 @@ Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级�
 人类来源。具有有效矮人创建模板的组合可通过 `raceKey: "dwarf"` 选择矮人。模板选取石匠工具，
 侍僧背景另选精灵语和侏儒语；创建时按本战役目录重验这些选择并保存准确种族来源与授予。
 在矮人模板下，可选 `subraceKey: "subrace.hill_dwarf"`。请求同时提供对应的 `raceKey`。省略亚种时使用普通种族模板。服务器核对父种族和启用的亚种来源，完整保存选取的身份。山丘矮人的[强韧贡献](rules/schema-2-character-statistics.md#山丘矮人强韧)由战役冻结材料供建卡、升级和重开共用。
+在 DM 工作台打开“检定”，把结算方式设为“被动检定”，可直接读取属性、技能或工具的被动分数，或预设成功与失败后果。标准组合基础分为 10、优势或劣势调整幅度为 5，随附变体分别为 12、3。角色卡和战役记录显示实际分数、DC 与成败。保存、结束并打开同一文件后，可以继续使用同一组合执行新的被动或掷骰检定。[规则与示例](rules/schema-2-character-foundations.md#被动检定)
+
 在 DM 工作台选择技能检定后，标准包固定使用默认属性。随附变体允许 DM 另选检定属性。例如选体质（运动）后，直接检定与带后果检定都按体质修正结算，完整文件保留实际组合。
 选择智力（历史）时，可把题材设为“辨认石工作品来历”。[石工知识](rules/schema-2-character-foundations.md#石工知识)从建卡种族及冻结材料派生。结果随完整文件保存，重开后可继续普通历史或石工检定。
 标准包矮人的基础步速为 25 尺，重甲策略为 `IGNORE`。家规可分别覆盖[步速、策略、通用减速量和装备门槛](rules/schema-2-combat-authoring.md#步行来源)。重甲的护甲等级、隐匿劣势与
@@ -176,7 +178,7 @@ Host 与获准玩家入口共用预检；Ready 爬行、OA 暂停及原路径后
 `kind=POSITION`、`targetId`、`placementVersion`、`x`、`y`，并在 `targets` 中保留
 该目标的卡版本。焦点及其代次来自同一命令的 `focus`，坐标和版本使用规范十进制字符串。
 同一自由卡分支多次移动同一目标时，按有序前缀逐次核对安置版本和占位。每个分支从原状态独立
-预检，全部有效才掷骰，再把选中分支、原骰、位置前后值、版本、根/子历史和收据共同提交。
+预检，全部有效才结算，再把选中分支、检定结果、实际掷出的骰、位置前后值、版本、根/子历史和收据共同提交。
 [当前空间与定位合同](design/v2/world-and-scene-spaces.md#直接定位与分支定位)
 
 初始化的 DDL、seed、准确规则、战役事实和控制同一事务提交；独立连接完整读回且首份

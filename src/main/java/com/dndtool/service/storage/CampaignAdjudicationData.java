@@ -3,6 +3,8 @@ package com.dndtool.service.storage;
 import java.text.Normalizer;
 import java.util.UUID;
 
+import static com.dndtool.service.Schema2CharacterRuntime.ROLLED_CHECK;
+
 /** Durable DM decisions, distinct from unaccepted player communication proposals. */
 public final class CampaignAdjudicationData {
     private CampaignAdjudicationData() { }
@@ -12,7 +14,9 @@ public final class CampaignAdjudicationData {
             if (proposalId == null || memberId == null || adjudicationType == null || check == null) throw CampaignJson.bad("Incomplete adjudication decision");
             CampaignJson.uuid(proposalId.toString()); CampaignJson.uuid(memberId.toString()); text(proposalText, 2000); text(reason, 500);
             var input = check.command().checkInput();
-            if (adjudicationType != Type.ABILITY_CHECK || input == null || !"ABILITY".equals(input.kind()) || !reason.equals(input.adjudication())) throw CampaignJson.bad("Unsupported adjudication type or reason binding");
+            if (adjudicationType != Type.ABILITY_CHECK || !ROLLED_CHECK.equals(check.command().kind())
+                    || input == null || !"ABILITY".equals(input.kind()) || !reason.equals(input.adjudication()))
+                throw CampaignJson.bad("Unsupported adjudication type or reason binding");
         }
     }
     public record Audit(Decision decision, CampaignCheckEffects.Audit result) {

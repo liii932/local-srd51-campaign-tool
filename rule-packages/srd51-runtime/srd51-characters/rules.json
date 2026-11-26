@@ -489,10 +489,12 @@
       "rule_key": "check.srd2014"
     },
     "display_name": "Ability checks",
-    "description": "Server-owned ordinary ability, skill and equipped-tool checks.",
+    "description": "Server-owned rolled and passive ability, skill and equipped-tool checks.",
     "source_page": 77,
     "algorithm": "SRD_2014_ABILITY_CHECK_V1",
-    "allow_alternate_skill_ability": false
+    "allow_alternate_skill_ability": false,
+    "passive_base_score": 10,
+    "passive_advantage_adjustment": 5
   },
   {
     "identity": {

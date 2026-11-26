@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_HISTORY;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.*;
 import static com.dndtool.service.Schema2CheckTestFixture.*;
+import static com.dndtool.service.Schema2CharacterRuntime.PASSIVE_CHECK;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2CharacterCheckRulesTest {
@@ -86,6 +87,45 @@ class Schema2CharacterCheckRulesTest {
         assertTrue(cancelled.effectiveAdvantage());
         assertTrue(cancelled.effectiveDisadvantage());
         assertFalse(dexterityAthletics.checkInput().disadvantage());
+        var passiveStealth = rules.resolvePassive(rules.prepare(enabled, proficientArmor, passive(dexterityStealth)));
+        assertEquals(new CheckResult(null, null, null, 1, 0, 10, true, false, true, 2, null, 12, -3), passiveStealth);
+        var passiveCancelled = rules.resolvePassive(rules.prepare(enabled, untrainedShield, passive(dexterityAthletics)));
+        assertEquals(new CheckResult(null, null, null, 1, 2, 15, true, true, true, 2, null, 12, 0), passiveCancelled);
+    }
+
+    @Test void passiveScoreAppliesFrozenBaseAndSignedAdjustmentWithoutRolling() {
+        var enabled = alternateSkillMaterial();
+        var state = alternateSkillState(enabled);
+        for (boolean advantage : List.of(false, true)) for (boolean disadvantage : List.of(false, true)) {
+            int direction = (advantage ? 1 : 0) - (disadvantage ? 1 : 0);
+            var ordinary = check("SKILL", "ability.strength", ATHLETICS, 14, advantage, disadvantage);
+            assertPassive(material, initial, passive(ordinary), 10, direction * 5, 2, 2);
+            var alternate = check("SKILL", "ability.constitution", ATHLETICS, 14, advantage, disadvantage);
+            assertPassive(enabled, state, passive(alternate), 12, direction * 3, 1, 2);
+        }
+        assertPassive(material, initial, passive(check("TOOL", "ability.wisdom", TOOL, 11, false, false)), 10, 0, -1, 2);
+        assertPassive(material, initial, passive(check("ABILITY", "ability.wisdom", null, 11, false, false)), 10, 0, -1, 0);
+        assertThrows(IllegalArgumentException.class, () -> rules.resolvePassive(
+                rules.prepare(material, initial, check("ABILITY", "ability.strength", null, 14, false, false))));
+        assertThrows(IllegalArgumentException.class, () -> rules.prepare(material, initial,
+                passive(check("SKILL", "ability.constitution", ATHLETICS, 14, false, false))));
+    }
+
+    private void assertPassive(ProductionSchema2Projection material, State state, Command command, int base, int adjustment,
+            int modifier, int proficiency) {
+        var prepared = rules.prepare(material, state, command);
+        assertFalse(prepared.secondDieRequired());
+        assertThrows(IllegalArgumentException.class, () -> rules.resolve(prepared, 10, null));
+        int total = base + adjustment + modifier + proficiency;
+        var input = command.checkInput();
+        var result = new CheckResult(null, null, null, modifier, proficiency, total, total >= input.difficultyClass(),
+                input.advantage(), input.disadvantage(), 2, null, base, adjustment);
+        assertEquals(result, rules.resolvePassive(prepared));
+        assertEquals(prepared.capacityState(), rules.verify(material, state, command, result));
+    }
+
+    private static Command passive(Command active) {
+        return new Command(PASSIVE_CHECK, null, 0, null, null, null, GrowthChoices.EMPTY, null, active.checkInput());
     }
 
     private static ProductionSchema2Projection alternateSkillMaterial() {
@@ -180,6 +220,9 @@ class Schema2CharacterCheckRulesTest {
         assertFalse(before.current().proficiencies().stream().anyMatch(fact -> fact.target().equals(STONECUNNING_HISTORY)));
         var command = check(new CheckInput(context.checkRule(), "SKILL", "ability.intelligence", STONECUNNING_HISTORY,
                 13, false, false, "Identify the origin.", CheckInput.STONEWORK_ORIGIN));
+        var passive = rules.resolvePassive(rules.prepare(projection, plan, before.current(), passive(command)));
+        assertEquals(new CheckResult(null, null, null, -1, 4, 13, true, false, false, 2,
+                context.rule("character.stonecunning", "stonecunning.dwarf"), 10, 0), passive);
         var applied = engine.executeCharacter(projection, plan, before, command, UUID.randomUUID(), sides -> {
             assertEquals(20, sides);
             return 10;

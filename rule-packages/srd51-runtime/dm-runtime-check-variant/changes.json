@@ -68,5 +68,27 @@
     },
     "field": "allow_alternate_skill_ability",
     "value": true
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "passive_base_score",
+    "value": 12
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "passive_advantage_adjustment",
+    "value": 3
   }
 ]

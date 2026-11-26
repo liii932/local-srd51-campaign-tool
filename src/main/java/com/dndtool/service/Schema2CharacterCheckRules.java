@@ -6,6 +6,8 @@ import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
+import static com.dndtool.service.Schema2CharacterRuntime.PASSIVE_CHECK;
+import static com.dndtool.service.Schema2CharacterRuntime.checkKind;
 
 /** SRD ability, skill and tool checks in the closed INTERNAL run. */
 public final class Schema2CharacterCheckRules {
@@ -20,9 +22,11 @@ public final class Schema2CharacterCheckRules {
         private final int abilityModifier, proficiencyBonus;
         private final RuleIdentity stonecunningRule;
         private final boolean effectiveAdvantage, effectiveDisadvantage;
+        private final Integer passiveBaseScore, passiveAdjustment;
         private final State capacityState;
         private PreparedCheck(CheckInput input, int abilityModifier, int proficiencyBonus, RuleIdentity stonecunningRule,
-                State capacityState, boolean effectiveAdvantage, boolean effectiveDisadvantage) {
+                State capacityState, boolean effectiveAdvantage, boolean effectiveDisadvantage,
+                Integer passiveBaseScore, Integer passiveAdjustment) {
             this.input = input;
             this.abilityModifier = abilityModifier;
             this.proficiencyBonus = proficiencyBonus;
@@ -30,8 +34,11 @@ public final class Schema2CharacterCheckRules {
             this.capacityState = capacityState;
             this.effectiveAdvantage = effectiveAdvantage;
             this.effectiveDisadvantage = effectiveDisadvantage;
+            this.passiveBaseScore = passiveBaseScore;
+            this.passiveAdjustment = passiveAdjustment;
         }
-        public boolean secondDieRequired() { return effectiveAdvantage != effectiveDisadvantage; }
+        public boolean isPassive() { return passiveBaseScore != null; }
+        public boolean secondDieRequired() { return !isPassive() && effectiveAdvantage != effectiveDisadvantage; }
         public State capacityState() { return capacityState; }
     }
 
@@ -41,7 +48,7 @@ public final class Schema2CharacterCheckRules {
 
     public PreparedCheck prepare(ProductionSchema2Projection material, InitialPlan initial, State before, Command command) {
         growth.validateState(material, before); rests.validateState(material, before);
-        if (!"CHECK_RESOLVED".equals(command.kind()) || command.checkInput() == null
+        if (!checkKind(command.kind()) || command.checkInput() == null
                 || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
             throw invalid("S2_CHECK_COMMAND");
         if (before.rest().active() != null) throw invalid("S2_CHECK_REST_ACTIVE");
@@ -86,8 +93,12 @@ public final class Schema2CharacterCheckRules {
         boolean physical = dexterity || input.abilityKey().equals("ability.strength");
         boolean disadvantage = input.disadvantage() || physical && derived.physicalCheckDisadvantage()
                 || dexterity && input.kind().equals("SKILL") && derived.stealthSkills().contains(input.proficiency());
+        boolean passive = PASSIVE_CHECK.equals(command.kind());
+        int adjustment = (input.advantage() ? definition.passiveAdvantageAdjustment() : 0)
+                - (disadvantage ? definition.passiveAdvantageAdjustment() : 0);
         return new PreparedCheck(input, modifier, proficiency, stonecunning == null ? null : stonecunning.identity(),
-                withNextVersion(before), input.advantage(), disadvantage);
+                withNextVersion(before), input.advantage(), disadvantage,
+                passive ? definition.passiveBaseScore() : null, passive ? adjustment : null);
     }
 
     private static StonecunningDefinition stonecunning(ProductionSchema2Projection material, InitialPlan initial, State before) {
@@ -110,7 +121,7 @@ public final class Schema2CharacterCheckRules {
 
     /** No random source is reachable here; also used to verify retained results during recovery. */
     public CheckResult resolve(PreparedCheck prepared, int firstD20, Integer secondD20) {
-        if (prepared == null || firstD20 < 1 || firstD20 > 20
+        if (prepared == null || prepared.isPassive() || firstD20 < 1 || firstD20 > 20
                 || prepared.secondDieRequired() != (secondD20 != null)
                 || secondD20 != null && (secondD20 < 1 || secondD20 > 20)) throw invalid("S2_CHECK_RANDOM_RESULT");
         int selected = secondD20 == null ? firstD20 : prepared.effectiveAdvantage
@@ -121,13 +132,25 @@ public final class Schema2CharacterCheckRules {
                 prepared.capacityState.proficiencyBonus(), prepared.stonecunningRule);
     }
 
+    public CheckResult resolvePassive(PreparedCheck prepared) {
+        if (prepared == null || !prepared.isPassive()) throw invalid("S2_CHECK_RANDOM_RESULT");
+        int total = prepared.passiveBaseScore + prepared.abilityModifier + prepared.proficiencyBonus + prepared.passiveAdjustment;
+        return new CheckResult(null, null, null, prepared.abilityModifier, prepared.proficiencyBonus, total,
+                total >= prepared.input.difficultyClass(), prepared.effectiveAdvantage, prepared.effectiveDisadvantage,
+                prepared.capacityState.proficiencyBonus(), prepared.stonecunningRule, prepared.passiveBaseScore, prepared.passiveAdjustment);
+    }
+
     public State verify(ProductionSchema2Projection material, State before, Command command, CheckResult result) {
         return verify(material, null, before, command, result);
     }
 
     public State verify(ProductionSchema2Projection material, InitialPlan initial, State before, Command command, CheckResult result) {
         PreparedCheck prepared = prepare(material, initial, before, command);
-        if (result == null || !resolve(prepared, result.firstD20(), result.secondD20()).equals(result))
+        if (result == null || prepared.isPassive() != (result.passiveBaseScore() != null))
+            throw invalid("S2_CHECK_RESULT_CORRUPT");
+        CheckResult expected = prepared.isPassive() ? resolvePassive(prepared)
+                : resolve(prepared, result.firstD20(), result.secondD20());
+        if (!expected.equals(result))
             throw invalid("S2_CHECK_RESULT_CORRUPT");
         return prepared.capacityState();
     }
