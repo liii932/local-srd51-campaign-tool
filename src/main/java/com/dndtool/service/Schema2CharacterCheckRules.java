@@ -2,11 +2,12 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
-/** Ordinary SRD ability, default-ability skill and tool checks in the closed INTERNAL run. */
+/** SRD ability, default-ability skill and tool checks in the closed INTERNAL run. */
 public final class Schema2CharacterCheckRules {
     public static final String ALGORITHM = "SRD_2014_ABILITY_CHECK_V1";
     private final Schema2CharacterProgressionRules growth = new Schema2CharacterProgressionRules();
@@ -17,19 +18,28 @@ public final class Schema2CharacterCheckRules {
     public static final class PreparedCheck {
         private final CheckInput input;
         private final int abilityModifier, proficiencyBonus;
+        private final RuleIdentity stonecunningRule;
         private final boolean effectiveAdvantage, effectiveDisadvantage;
         private final State capacityState;
-        private PreparedCheck(CheckInput input, int abilityModifier, int proficiencyBonus, State capacityState,
-                boolean effectiveAdvantage, boolean effectiveDisadvantage) {
-            this.input = input; this.abilityModifier = abilityModifier;
-            this.proficiencyBonus = proficiencyBonus; this.capacityState = capacityState;
-            this.effectiveAdvantage = effectiveAdvantage; this.effectiveDisadvantage = effectiveDisadvantage;
+        private PreparedCheck(CheckInput input, int abilityModifier, int proficiencyBonus, RuleIdentity stonecunningRule,
+                State capacityState, boolean effectiveAdvantage, boolean effectiveDisadvantage) {
+            this.input = input;
+            this.abilityModifier = abilityModifier;
+            this.proficiencyBonus = proficiencyBonus;
+            this.stonecunningRule = stonecunningRule;
+            this.capacityState = capacityState;
+            this.effectiveAdvantage = effectiveAdvantage;
+            this.effectiveDisadvantage = effectiveDisadvantage;
         }
         public boolean secondDieRequired() { return effectiveAdvantage != effectiveDisadvantage; }
         public State capacityState() { return capacityState; }
     }
 
     public PreparedCheck prepare(ProductionSchema2Projection material, State before, Command command) {
+        return prepare(material, null, before, command);
+    }
+
+    public PreparedCheck prepare(ProductionSchema2Projection material, InitialPlan initial, State before, Command command) {
         growth.validateState(material, before); rests.validateState(material, before);
         if (!"CHECK_RESOLVED".equals(command.kind()) || command.checkInput() == null
                 || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
@@ -65,14 +75,33 @@ public final class Schema2CharacterCheckRules {
             if (!equipment.hasPreparedTool(material, before, input.proficiency())) throw invalid("S2_CHECK_TOOL_UNAVAILABLE");
         }
         int modifier = Math.floorDiv(before.abilities().get(input.abilityKey()) - 10, 2);
-        // Multiple genuine grant sources remain history facts; a target contributes PB once.
-        int proficiency = input.proficiency() != null && before.proficiencies().stream()
-                .anyMatch(fact -> fact.target().equals(input.proficiency())) ? before.proficiencyBonus() : 0;
+        var stonecunning = input.subject().equals(CheckInput.STONEWORK_ORIGIN) ? stonecunning(material, initial, before) : null;
+        int proficiency = stonecunning == null ? Schema2CharacterRuntime.ordinaryCheckProficiency(before, input)
+                : before.proficiencyBonus() * stonecunning.proficiencyMultiplier();
         var derived = equipment.derive(material, before);
         boolean physical = input.abilityKey().equals("ability.strength") || input.abilityKey().equals("ability.dexterity");
         boolean disadvantage = input.disadvantage() || physical && derived.physicalCheckDisadvantage()
                 || input.kind().equals("SKILL") && derived.stealthSkills().contains(input.proficiency());
-        return new PreparedCheck(input, modifier, proficiency, withNextVersion(before), input.advantage(), disadvantage);
+        return new PreparedCheck(input, modifier, proficiency, stonecunning == null ? null : stonecunning.identity(),
+                withNextVersion(before), input.advantage(), disadvantage);
+    }
+
+    private static StonecunningDefinition stonecunning(ProductionSchema2Projection material, InitialPlan initial, State before) {
+        if (initial == null || !initial.campaignId().equals(before.campaignId()) || !initial.characterId().equals(before.characterId())
+                || !initial.character().identity().equals(before.identity())
+                || !initial.character().sources().characterClass().equals(before.characterClass()))
+            throw invalid("S2_CHECK_INITIAL_BINDING");
+        Schema2CharacterProgressionRules.verifyInitialPlan(material, initial);
+        var enabled = material.projection().rules().stream().filter(FinalStonecunning.class::isInstance)
+                .map(FinalStonecunning.class::cast).filter(FinalStonecunning::enabled).toList();
+        if (enabled.isEmpty()) return null;
+        if (enabled.size() != 1) throw invalid("S2_CHECK_STONECUNNING_RULE");
+        var definition = enabled.getFirst().definition();
+        if (!STONECUNNING_ALGORITHM.equals(definition.algorithm()) || !STONECUNNING_DWARF.equals(definition.owner())
+                || !STONECUNNING_HISTORY.equals(definition.skill()) || definition.proficiencyMultiplier() < STONECUNNING_MIN_MULTIPLIER
+                || definition.proficiencyMultiplier() > STONECUNNING_MAX_MULTIPLIER)
+            throw invalid("S2_CHECK_STONECUNNING_RULE");
+        return definition.owner().equals(initial.character().sources().race()) ? definition : null;
     }
 
     /** No random source is reachable here; also used to verify retained results during recovery. */
@@ -84,11 +113,16 @@ public final class Schema2CharacterCheckRules {
                 ? Math.max(firstD20, secondD20) : Math.min(firstD20, secondD20);
         int total = selected + prepared.abilityModifier + prepared.proficiencyBonus;
         return new CheckResult(firstD20, secondD20, selected, prepared.abilityModifier, prepared.proficiencyBonus,
-                total, total >= prepared.input.difficultyClass(), prepared.effectiveAdvantage, prepared.effectiveDisadvantage);
+                total, total >= prepared.input.difficultyClass(), prepared.effectiveAdvantage, prepared.effectiveDisadvantage,
+                prepared.capacityState.proficiencyBonus(), prepared.stonecunningRule);
     }
 
     public State verify(ProductionSchema2Projection material, State before, Command command, CheckResult result) {
-        PreparedCheck prepared = prepare(material, before, command);
+        return verify(material, null, before, command, result);
+    }
+
+    public State verify(ProductionSchema2Projection material, InitialPlan initial, State before, Command command, CheckResult result) {
+        PreparedCheck prepared = prepare(material, initial, before, command);
         if (result == null || !resolve(prepared, result.firstD20(), result.secondD20()).equals(result))
             throw invalid("S2_CHECK_RESULT_CORRUPT");
         return prepared.capacityState();

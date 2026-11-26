@@ -1,6 +1,6 @@
 {
   "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules"],
-  "members": ["srd51_runtime@8", "srd51_characters@8", "srd51_magic@8", "dm_runtime_house_rules@15"],
+  "members": ["srd51_runtime@9", "srd51_characters@9", "srd51_magic@9", "dm_runtime_house_rules@17"],
   "driver": "BundledSrd51Scenarios",
   "cases": [
     "initial-character",
@@ -9,6 +9,7 @@
     "class-templates",
     "fighter-growth",
     "hill-dwarf-toughness",
+    "stonecunning",
     "fighter-extra-attack",
     "cleric-growth-limit",
     "wizard-spellbook",

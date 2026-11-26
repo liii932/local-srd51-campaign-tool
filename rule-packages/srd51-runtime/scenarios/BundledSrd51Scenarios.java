@@ -1,6 +1,8 @@
+import com.dndtool.service.Schema2CharacterCheckRules;
 import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CharacterHealthRules;
 import com.dndtool.service.Schema2CharacterProgressionRules;
+import com.dndtool.service.Schema2CharacterRuntime.CheckInput;
 import com.dndtool.service.Schema2CharacterRuntime.Command;
 import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
 import com.dndtool.service.Schema2CharacterRuntime.FeatureState;
@@ -44,6 +46,8 @@ public final class BundledSrd51Scenarios {
                 scenario("fighter-growth", BundledSrd51Scenarios::verifyFighterGrowth),
                 scenario("hill-dwarf-toughness", BundledSrd51Scenarios::verifyHillDwarfToughness),
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
+                scenario("stonecunning", BundledSrd51Scenarios::verifyStonecunning),
+                scenario("stonecunning-variant", BundledSrd51Scenarios::verifyStonecunningVariant),
                 scenario("fighter-extra-attack", BundledSrd51Scenarios::verifyFighterExtraAttack),
                 scenario("cleric-growth-limit", BundledSrd51Scenarios::verifyClericGrowthLimit),
                 scenario("wizard-spellbook", BundledSrd51Scenarios::verifyWizardSpellbook),
@@ -173,6 +177,67 @@ public final class BundledSrd51Scenarios {
         expectNumber(maximum, state.maximumHitPoints());
         expectNumber(maximum - missing, state.hitPoints());
         assertEquals(ARRAY, state.abilities());
+    }
+
+    private void verifyStonecunning() {
+        var trait = (FinalStonecunning) find("character.stonecunning", "stonecunning.dwarf");
+        var history = rules.rule("character.proficiency", "proficiency.skill.history");
+        assertEquals(rules.rule("character.race", "race.dwarf"), trait.definition().owner());
+        assertEquals(history, trait.definition().skill());
+        expectNumber(3, trait.definition().sourcePage());
+        expectNumber(2, trait.definition().proficiencyMultiplier());
+
+        var dwarf = stonecunningPlan("fighter", "dwarf", null);
+        State fighter = initial(dwarf, "fighter");
+        assertTrue(fighter.proficiencies().stream().noneMatch(grant -> grant.target().equals(history)));
+        verifyStoneworkCheck(dwarf, fighter, CheckInput.STONEWORK_ORIGIN, 4, trait.identity());
+        verifyStoneworkCheck(dwarf, fighter, CheckInput.GENERAL, 0, null);
+
+        var hillDwarf = stonecunningPlan("cleric", "dwarf", "subrace.hill_dwarf");
+        State cleric = initial(hillDwarf, "cleric");
+        assertTrue(cleric.proficiencies().stream().anyMatch(grant -> grant.target().equals(history)));
+        verifyStoneworkCheck(hillDwarf, cleric, CheckInput.STONEWORK_ORIGIN, 4, trait.identity());
+        verifyStoneworkCheck(hillDwarf, cleric, CheckInput.GENERAL, 2, null);
+
+        var human = stonecunningPlan("cleric", "human", null);
+        verifyStoneworkCheck(human, initial(human, "cleric"), CheckInput.STONEWORK_ORIGIN, 2, null);
+    }
+
+    private void verifyStonecunningVariant() {
+        var trait = (FinalStonecunning) find("character.stonecunning", "stonecunning.dwarf");
+        expectNumber(3, trait.definition().proficiencyMultiplier());
+        var chain = rules.projection().projection().chains().stream()
+                .filter(row -> row.target().equals(trait.identity()) && row.field() == Field.PROFICIENCY_MULTIPLIER)
+                .findFirst().orElseThrow();
+        assertEquals("dm_runtime_house_rules", chain.steps().getLast().provider().moduleKey());
+
+        var dwarf = stonecunningPlan("fighter", "dwarf", "subrace.hill_dwarf");
+        var growth = new Schema2CharacterProgressionRules();
+        State fifth = advanceFighter(growth, dwarf, fighterAtLevelFour(growth, dwarf), 5, GrowthChoices.EMPTY);
+        expectNumber(3, fifth.proficiencyBonus());
+        verifyStoneworkCheck(dwarf, fifth, CheckInput.STONEWORK_ORIGIN, 9, trait.identity());
+        verifyStoneworkCheck(dwarf, fifth, CheckInput.GENERAL, 0, null);
+    }
+
+    private InitialPlan stonecunningPlan(String characterClass, String race, String subrace) {
+        return rules.initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(),
+                characterClass, "custom_artisan", race, subrace);
+    }
+
+    private void verifyStoneworkCheck(InitialPlan plan, State state, String subject, int bonus, RuleIdentity source) {
+        var checks = new Schema2CharacterCheckRules();
+        var input = new CheckInput(rules.checkRule(), "SKILL", "ability.intelligence",
+                rules.rule("character.proficiency", "proficiency.skill.history"), 15, false, false,
+                "The DM specifies the subject of the History check.", subject);
+        var command = new Command("CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null, input);
+        var result = checks.resolve(checks.prepare(rules.projection(), plan, state, command), 10, null);
+        expectNumber(10, result.firstD20());
+        expectNumber(1, result.abilityModifier());
+        expectNumber(state.proficiencyBonus(), result.baseProficiencyBonus());
+        expectNumber(bonus, result.proficiencyBonus());
+        expectNumber(11 + bonus, result.total());
+        assertEquals(11 + bonus >= 15, result.success());
+        assertEquals(source, result.stonecunningRule());
     }
 
     private void verifyFighterExtraAttack() {

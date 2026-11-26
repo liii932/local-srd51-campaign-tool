@@ -44,6 +44,8 @@ mvn '-Dtest=CampaignCheckEffectsTest' test
 
 验证 SQLite Web 入口时，由 `HostHomeServletTest` 核对首页和退役 URL，由 `StorageHttpIntegrationTest` 核对就绪、文件下载、规则绑定及拒绝写入后的状态。
 
+石工知识的独立作者场景对照标准双倍、家规三倍和普通历史检定。应用侧用 `CampaignStonecunningIntegrationTest` 核验实际角色、检定后果、重试及完整文件重开。[运行场景](../rule-packages/srd51-runtime/scenarios/README.md#验证矮人石工知识)
+
 ### Tomcat 测试依赖
 
 `pom.xml` 的 `tomcat.version` 管理测试范围的 `tomcat-embed-core`。
@@ -242,10 +244,10 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    ```
 
    自定义规则另从 WAR 外提供一份受支持的准确候选 ZIP。可在仓库外复制随附 `check-variant` 原包的
-   条目，将 `author-package.json` 的 `release_version` 改为 `"17"`，将 `rules.json` 中
+   条目，将 `author-package.json` 的 `release_version` 改为 `"19"`，将 `rules.json` 中
    `vital_effect.dm_damage` 的 `modifier` 改为 `2`，更新包内 `README.md` 后将这些文件打包在 ZIP
-   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@17`
-   原字节及摘要。随附 `check-variant` 按 `@16`、固定伤害 `3` 的独立场景验证。自定义组合前三包
+   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@19`
+   原字节及摘要。随附 `check-variant` 按 `@18`、固定伤害 `3` 的独立场景验证。自定义组合前三包
    使用标准包，第四包使用这份外部候选。
 
    通过工作台的本机规则库执行外部原包上传（`POST /api/host/storage/rule-import`），从随附列表导入

@@ -5,6 +5,10 @@ import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import java.text.Normalizer;
 import java.util.*;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_HISTORY;
+import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_MAX_MULTIPLIER;
+import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_MIN_MULTIPLIER;
+
 /** Typed character state, commands and immutable execution history. */
 public final class Schema2CharacterRuntime {
     private Schema2CharacterRuntime() { }
@@ -181,7 +185,14 @@ public final class Schema2CharacterRuntime {
         }
     }
     public record CheckInput(RuleIdentity rule, String kind, String abilityKey, RuleIdentity proficiency,
-            int difficultyClass, boolean advantage, boolean disadvantage, String adjudication) {
+            int difficultyClass, boolean advantage, boolean disadvantage, String adjudication, String subject) {
+        public static final String GENERAL = "GENERAL", STONEWORK_ORIGIN = "STONEWORK_ORIGIN";
+
+        public CheckInput(RuleIdentity rule, String kind, String abilityKey, RuleIdentity proficiency,
+                int difficultyClass, boolean advantage, boolean disadvantage, String adjudication) {
+            this(rule, kind, abilityKey, proficiency, difficultyClass, advantage, disadvantage, adjudication, GENERAL);
+        }
+
         public CheckInput {
             boolean valid = validRule(rule, "adventure.check") && kind != null && abilityKey != null && ABILITIES.contains(abilityKey)
                     && difficultyClass >= 0 && difficultyClass <= 30 && validAdjudication(adjudication);
@@ -191,18 +202,35 @@ public final class Schema2CharacterRuntime {
                 case "TOOL" -> validRule(proficiency, "character.tool") && validPrefix(proficiency.ruleKey(), "tool");
                 default -> false;
             };
-            if (!valid) throw new IllegalArgumentException("S2_CHARACTER_CHECK_INPUT");
+            if (!valid || !(GENERAL.equals(subject) || STONEWORK_ORIGIN.equals(subject) && kind.equals("SKILL")
+                    && abilityKey.equals("ability.intelligence") && STONECUNNING_HISTORY.equals(proficiency)))
+                throw new IllegalArgumentException("S2_CHARACTER_CHECK_INPUT");
         }
     }
+
     public record CheckResult(int firstD20, Integer secondD20, int selectedD20, int abilityModifier,
-            int proficiencyBonus, int total, boolean success, boolean effectiveAdvantage, boolean effectiveDisadvantage) {
+            int proficiencyBonus, int total, boolean success, boolean effectiveAdvantage, boolean effectiveDisadvantage,
+            int baseProficiencyBonus, RuleIdentity stonecunningRule) {
         public CheckResult {
             if (firstD20 < 1 || firstD20 > 20 || secondD20 != null && (secondD20 < 1 || secondD20 > 20)
                     || selectedD20 < 1 || selectedD20 > 20 || abilityModifier < -5 || abilityModifier > 10
-                    || proficiencyBonus < 0 || proficiencyBonus > 6 || total != selectedD20 + abilityModifier + proficiencyBonus)
+                    || baseProficiencyBonus < 2 || baseProficiencyBonus > 6 || total != selectedD20 + abilityModifier + proficiencyBonus)
+                throw new IllegalArgumentException("S2_CHARACTER_CHECK_RESULT");
+            boolean validProficiency = stonecunningRule == null ? proficiencyBonus == 0 || proficiencyBonus == baseProficiencyBonus
+                    : validRule(stonecunningRule, "character.stonecunning")
+                        && proficiencyBonus >= baseProficiencyBonus * STONECUNNING_MIN_MULTIPLIER
+                        && proficiencyBonus <= baseProficiencyBonus * STONECUNNING_MAX_MULTIPLIER
+                        && proficiencyBonus % baseProficiencyBonus == 0;
+            if (!validProficiency)
                 throw new IllegalArgumentException("S2_CHARACTER_CHECK_RESULT");
         }
     }
+
+    static int ordinaryCheckProficiency(State state, CheckInput input) {
+        return input.proficiency() != null && state.proficiencies().stream()
+                .anyMatch(fact -> fact.target().equals(input.proficiency())) ? state.proficiencyBonus() : 0;
+    }
+
     public record EquipmentInput(UUID itemId, RuleIdentity item, String location, String adjudication) {
         public EquipmentInput {
             if (!validUuid(itemId) || item != null && !validRule(item, "equipment.item") || location != null && !EQUIPMENT_LOCATIONS.contains(location) || !validAdjudication(adjudication))
@@ -437,9 +465,10 @@ public final class Schema2CharacterRuntime {
                 require((result.effectiveAdvantage() != result.effectiveDisadvantage()) == (result.secondD20() != null));
                 int selected = result.secondD20() == null ? result.firstD20() : result.effectiveAdvantage()
                         ? Math.max(result.firstD20(), result.secondD20()) : Math.min(result.firstD20(), result.secondD20());
-                int proficiency = input.proficiency() != null && before.proficiencies().stream().anyMatch(value -> value.target().equals(input.proficiency())) ? before.proficiencyBonus() : 0;
+                require(result.stonecunningRule() == null ? result.proficiencyBonus() == ordinaryCheckProficiency(before, input)
+                        : input.subject().equals(CheckInput.STONEWORK_ORIGIN));
                 require(result.selectedD20() == selected && result.abilityModifier() == Math.floorDiv(before.abilities().get(input.abilityKey()) - 10, 2)
-                        && result.proficiencyBonus() == proficiency && result.success() == (result.total() >= input.difficultyClass()));
+                        && result.baseProficiencyBonus() == before.proficiencyBonus() && result.success() == (result.total() >= input.difficultyClass()));
             } else if (restKind(event.kind())) {
                 require(before.abilities().equals(after.abilities()) && before.level() == after.level() && before.classes().equals(after.classes()) && before.subclasses().equals(after.subclasses()) && before.features().equals(after.features()) && before.feats().equals(after.feats()) && before.proficiencies().equals(after.proficiencies()));
                 require(event.kind().equals("HIT_DIE_SPENT") ? event.hitDieRoll() != null && event.hitDieRoll() >= 1 && event.hitDieRoll() <= command.restInput().hitDieSides() : event.hitDieRoll() == null);

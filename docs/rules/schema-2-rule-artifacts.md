@@ -10,9 +10,9 @@
 字段覆盖与最终候选检查均由同一个严格读取和组合内核完成。
 
 [成长与资源](schema-2-character-statistics.md)另定义其有限类型，
-[检定、装备与健康作者来源](schema-2-foundation-authoring.md)另定义 `adventure.check`、
+[检定、装备与健康作者来源](schema-2-foundation-authoring.md)另定义 `adventure.check`、`character.stonecunning`、
 `equipment.item`、`adventure.health`、`adventure.vital_effect` 的字段、条件引用及严格清空。
-这四类定义已接通作者、纯组合、真实来源和[准确镜像/事实存储](schema-2-character-fact-storage.md)；
+这些定义已接通作者、纯组合、真实来源和[准确镜像/事实存储](schema-2-character-fact-storage.md)；
 运行命令与历史语义由[角色基础消费者](schema-2-character-foundations.md)验证。
 [步行与重甲作者合同](schema-2-combat-authoring.md#步行来源)规定 `character.movement` 与 `equipment.armor_movement` 的字段、唯一性和装备门槛的应用方式。
 作者/来源、材料还原、仓储恢复与业务验证各有职责，不能从单独一层推断完整执行资格。

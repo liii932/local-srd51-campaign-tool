@@ -22,13 +22,30 @@ verify_character_package() {
 verify_character_package "$candidates/srd51-characters.zip" --case weapon-damage
 ```
 
-核对 `MODULE srd51_characters@8` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
+核对 `MODULE srd51_characters@9` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
 
 多项装备声明同时改动时，在同一个命令中重复 `--case`。这些用例共用一次解包、驱动编译、引擎 JVM 启动和规则组合。每项自行准备角色、场景和骰流，按传入的次序执行。省略 `--case` 时按清单次序执行全部用例。任何失败都使整批退出非零。输出分别给出准备、组合与通过用例的耗时，可用 shell 的 `time` 测整条命令。
 
 ```bash
 verify_character_package "$candidates/srd51-characters.zip" \
   --case weapon-damage --case plate-armor --case equipment-profiles
+```
+
+## 验证矮人石工知识
+
+标准组合验证石工来历检定的双倍熟练贡献。第四成员换为检定变体后，相同题材按三倍熟练结算。通过 `--module` 指定外部候选，核对输出的实际加载路径与成员身份。
+
+```bash
+war=target/dnd-tool-se-0.2.1.war
+scenarios=rule-packages/srd51-runtime/scenarios
+candidates="$(mktemp -d)"
+python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" srd51-characters dm-runtime-check-variant
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
+  --module @srd51-runtime --module "$candidates/srd51-characters.zip" --module @srd51-magic --module @dm-runtime-house-rules \
+  --case stonecunning "$scenarios/standard.json"
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
+  --module @srd51-runtime --module "$candidates/srd51-characters.zip" --module @srd51-magic --module "$candidates/dm-runtime-check-variant.zip" \
+  --case stonecunning-variant "$scenarios/check-variant.json"
 ```
 
 ## 验证矮人的重甲移动例外
@@ -133,8 +150,8 @@ with ZipFile(directory / "dm-runtime-house-rules.zip") as source, ZipFile(direct
         data = source.read(member)
         if member.filename == "author-package.json":
             manifest = json.loads(data)
-            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["8"]})
-            manifest["compatible_combinations"][0]["srd51_characters"] = "8"
+            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["9"]})
+            manifest["compatible_combinations"][0]["srd51_characters"] = "9"
             manifest["files"].append({"kind": "changes", "path": "changes.json"})
             data = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
         target.writestr(member, data)
@@ -192,6 +209,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 | 清单 | 可选择的行为 |
 |---|---|
 | [standard.json](standard.json)、[check-variant.json](check-variant.json) | `initial-character` 验证初始 HP、语言与工具；`skill-check` 验证检定属性、熟练、成败与错误属性拒绝；`fixed-damage` 验证固定伤害和剩余 HP。 |
+| 矮人石工知识 | `stonecunning` 验证标准包的双倍熟练及普通历史对照；`stonecunning-variant` 验证五级矮人的三倍熟练贡献 +9。 |
 | 标准组合的角色与装备 | `fighter-growth`、`fighter-extra-attack` 实际升级以验证授予等级。`hill-dwarf-toughness` 验证一级 HP 和后续两种升级方式。`cleric-growth-limit` 验证牧师的升级上限。`plate-armor` 使用一级战士穿甲后派生 AC。`dwarf-heavy-armor-speed` 对照穿板甲的矮人与人类实际移动。`weapon-damage` 使用真实持用、攻击与健康结算，固定普通命中及两颗伤害骰，验证应用量和目标 HP。 |
 | 标准组合的其他声明 | `class-templates`、`wizard-spellbook`、`wizard-evocation`、`burning-hands`（施法预检）、`equipment-profiles`、`monster-breath-profile`、`rule-origins`。 |
 

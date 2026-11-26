@@ -1015,5 +1015,30 @@
     "first_level_bonus": 1,
     "per_additional_level_bonus": 1,
     "algorithm": "SRD_2014_SUBRACE_HIT_POINTS_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.stonecunning",
+      "rule_key": "stonecunning.dwarf"
+    },
+    "display_name": "Stonecunning",
+    "description": "When a qualifying Intelligence (History) check concerns the origin of stonework, the dwarf is considered proficient and adds the declared multiple of their proficiency bonus instead of their normal proficiency bonus.",
+    "source_page": 3,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.race",
+      "rule_key": "race.dwarf"
+    },
+    "skill": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.history"
+    },
+    "proficiency_multiplier": 2,
+    "algorithm": "SRD_2014_DWARF_STONECUNNING_V1"
   }
 ]
