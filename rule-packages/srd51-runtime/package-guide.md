@@ -19,13 +19,13 @@ application that supports the saved mechanisms.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `11` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
-| `srd51_characters` version `11` | extension | `srd51_runtime=11` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled and passive checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `11` | extension | `srd51_runtime=11`, `srd51_characters=11` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `21` | extension | `srd51_runtime=11` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `12` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
+| `srd51_characters` version `12` | extension | `srd51_runtime=12` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive and group checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `12` | extension | `srd51_runtime=12`, `srd51_characters=12` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `23` | extension | `srd51_runtime=12` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `22` as its
+first three members and selects `dm_runtime_house_rules` version `24` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -82,6 +82,15 @@ definition supplies two required integer fields. The standard
 Add the usual modifiers to the base. Add the adjustment for advantage or
 subtract it for disadvantage, and use zero when both apply. A passive check
 uses no d20. The bundled check variant uses base 12 and adjustment 3.
+
+A group check (SRD p. 79) resolves one individual check per participant.
+The group succeeds when the number of successes multiplied by the denominator
+is at least the participant count multiplied by the numerator. The required
+`group_success_threshold` field is a complete object with integer
+`numerator` and `denominator` values in lowest terms and requires
+`1 <= numerator <= denominator <= 10`. Standard rules require at least half
+of participants to succeed. The bundled check variant requires at least two
+thirds. Authors override the whole threshold in one `set_field` operation.
 
 Dwarf and Hill Dwarf can apply Stonecunning when the DM identifies a supported
 Intelligence (History) check about the origin of stonework. The standard

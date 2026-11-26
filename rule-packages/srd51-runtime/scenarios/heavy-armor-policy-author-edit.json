@@ -1,5 +1,5 @@
 {
-  "members": ["srd51_runtime@11", "srd51_characters@11", "srd51_magic@11", "dm_runtime_house_rules@21"],
+  "members": ["srd51_runtime@12", "srd51_characters@12", "srd51_magic@12", "dm_runtime_house_rules@23"],
   "driver": "BundledSrd51Scenarios",
   "cases": ["heavy-armor-policy-author-edit"]
 }

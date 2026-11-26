@@ -24,14 +24,14 @@ public final class CampaignRuleContext {
     static final List<String> INITIAL_BACKGROUNDS = List.of("acolyte", "custom_artisan");
     private final ProductionSchema2Projection projection;
     private final Schema2RulesBinding binding;
-    private final RuleIdentity checkRule;
+    private final CheckDefinition checkDefinition;
     record CreationAncestry(RuleIdentity race, RuleIdentity subrace) { }
     private final List<CreationAncestry> creationAncestries;
 
-    CampaignRuleContext(ProductionSchema2Projection projection, RuleIdentity checkRule) {
+    CampaignRuleContext(ProductionSchema2Projection projection, CheckDefinition checkDefinition) {
         this.projection = projection;
         this.binding = Schema2RulesBinding.from(projection);
-        this.checkRule = checkRule;
+        this.checkDefinition = checkDefinition;
         var ancestries = new ArrayList<CreationAncestry>();
         ancestries.add(new CreationAncestry(rule("character.race", "race.human"), null));
         var dwarf = optionalSource("character.race", "race.dwarf");
@@ -48,7 +48,8 @@ public final class CampaignRuleContext {
     public String interpretation() { return INTERPRETATION; }
     public Schema2RulesBinding binding() { return binding; }
     public ProductionSchema2Projection projection() { return projection; }
-    public RuleIdentity checkRule() { return checkRule; }
+    public RuleIdentity checkRule() { return checkDefinition.identity(); }
+    CheckDefinition checkDefinition() { return checkDefinition; }
     List<CreationAncestry> creationAncestries() { return creationAncestries; }
 
     private CharacterSourceDefinition optionalSource(String type, String key) {

@@ -489,12 +489,16 @@
       "rule_key": "check.srd2014"
     },
     "display_name": "Ability checks",
-    "description": "Server-owned rolled and passive ability, skill and equipped-tool checks.",
+    "description": "Server-owned rolled, passive and group checks with a frozen group success threshold.",
     "source_page": 77,
     "algorithm": "SRD_2014_ABILITY_CHECK_V1",
     "allow_alternate_skill_ability": false,
     "passive_base_score": 10,
-    "passive_advantage_adjustment": 5
+    "passive_advantage_adjustment": 5,
+    "group_success_threshold": {
+      "numerator": 1,
+      "denominator": 2
+    }
   },
   {
     "identity": {

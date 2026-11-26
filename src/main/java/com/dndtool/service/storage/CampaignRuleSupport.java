@@ -39,7 +39,7 @@ public final class CampaignRuleSupport {
         required(rules, FinalRest.class, "REST");
         CampaignRuleContext context;
         try {
-            context = new CampaignRuleContext(projection, check.identity());
+            context = new CampaignRuleContext(projection, check.definition());
             Schema2CombatRules.validateFrozenSupport(projection);
             for (var ancestry : context.creationAncestries())
                 Schema2CharacterEquipmentRules.validateWalkingSpeed(projection, ancestry.race(), ancestry.subrace());
