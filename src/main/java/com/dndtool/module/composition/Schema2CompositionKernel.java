@@ -32,6 +32,12 @@ public final class Schema2CompositionKernel {
     public static final String WALKING_SPEED_ALGORITHM = "SRD_2014_WALKING_SPEED_V1";
     public static final String HEAVY_ARMOR_MOVEMENT_ALGORITHM = "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1";
     public static final String SUBRACE_HIT_POINTS_ALGORITHM = "SRD_2014_SUBRACE_HIT_POINTS_V1";
+    public static final String STONECUNNING_ALGORITHM = "SRD_2014_DWARF_STONECUNNING_V1";
+    public static final int STONECUNNING_MIN_MULTIPLIER = 1, STONECUNNING_MAX_MULTIPLIER = 3;
+    public static final RuleIdentity STONECUNNING_DWARF = new RuleIdentity("srd51_runtime", "character.race", "race.dwarf");
+    public static final RuleIdentity STONECUNNING_HISTORY = new RuleIdentity("srd51_runtime", "character.proficiency",
+            "proficiency.skill.history");
+    private static final String STONECUNNING_TYPE = "character.stonecunning";
     private static final int MAX_SUBRACE_HIT_POINT_BONUS = 5;
     public static final int MAX_PACKAGES = 8;
     private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
@@ -62,6 +68,7 @@ public final class Schema2CompositionKernel {
         ABILITY_KEY("ability_key"), PROFICIENCY("proficiency"), GROWTH_GRANT("growth_grant"), ALGORITHM("algorithm"), KIND("kind"), ARMOR_CLASS("armor_class"), STRENGTH_MINIMUM("strength_minimum"),
         STEALTH_DISADVANTAGE("stealth_disadvantage"), HANDS("hands"), STEALTH_SKILL("stealth_skill"),
         FIRST_LEVEL_BONUS("first_level_bonus"), PER_ADDITIONAL_LEVEL_BONUS("per_additional_level_bonus"),
+        SKILL("skill"), PROFICIENCY_MULTIPLIER("proficiency_multiplier"),
         DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"),
         HEAVY_ARMOR_SPEED_POLICY("heavy_armor_speed_policy"), HEAVY_ARMOR_SPEED_PENALTY_FEET("heavy_armor_speed_penalty_feet"), REQUIRED_SUBCLASS("required_subclass"), REQUIRED_FEATURE("required_feature"), SLOT_RESOURCE("slot_resource"), BLESS("bless"), CURE_WOUNDS("cure_wounds"), MATERIAL_ITEM("material_item"), RANK2_SLOT_RESOURCE("rank2_slot_resource"), RANK3_SLOT_RESOURCE("rank3_slot_resource"), SPELL("spell"), ENABLED("enabled");
         private final String key;
@@ -98,7 +105,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, ArmorMovementDefinition, SubraceHitPointsDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, ArmorMovementDefinition, SubraceHitPointsDefinition, StonecunningDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -175,6 +182,9 @@ public final class Schema2CompositionKernel {
             int heavyArmorSpeedPenaltyFeet, String algorithm, String authorNote) implements Definition { }
     public record SubraceHitPointsDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             RuleIdentity owner, int firstLevelBonus, int perAdditionalLevelBonus,
+            String algorithm, String authorNote) implements Definition { }
+    public record StonecunningDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity owner, RuleIdentity skill, int proficiencyMultiplier,
             String algorithm, String authorNote) implements Definition { }
     public record SpellDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             String algorithm, String authorNote) implements Definition { }
@@ -291,7 +301,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalArmorMovement, FinalSubraceHitPoints, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalArmorMovement, FinalSubraceHitPoints, FinalStonecunning, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -361,6 +371,9 @@ public final class Schema2CompositionKernel {
     }
 
     public record FinalSubraceHitPoints(SubraceHitPointsDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalStonecunning(StonecunningDefinition definition, boolean enabled) implements FinalRule {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalSpell(SpellDefinition definition, boolean enabled) implements FinalRule {
@@ -659,6 +672,11 @@ public final class Schema2CompositionKernel {
                         var owner = originalObjectAt(hitPoints.owner(), chains, declarations.get(declaration.getKey()), source);
                         validateSubraceHitPointsOwner(owner, true, source);
                     }
+                    if (original instanceof StonecunningDefinition stonecunning) {
+                        int index = declarations.get(declaration.getKey());
+                        validateStonecunningReferences(originalObjectAt(stonecunning.owner(), chains, index, source),
+                                originalObjectAt(stonecunning.skill(), chains, index, source), true, source);
+                    }
                     if (original instanceof SpellcastingDefinition casting) {
                         Map<Identity,MutableObject> originalReferences=new HashMap<>(); int declarationIndex=declarations.get(declaration.getKey());
                         for (RuleIdentity target : spellcastingReferences(casting).values()) {
@@ -833,6 +851,12 @@ public final class Schema2CompositionKernel {
                     Location ownerLocation = row.location.child("owner");
                     checkReference(pack, hitPoints.owner(), "character.subrace", objects, ownerLocation);
                     validateSubraceHitPointsOwner(objects.get(hitPoints.owner()), true, ownerLocation);
+                }
+                if (row.value instanceof StonecunningDefinition stonecunning) {
+                    checkReference(pack, stonecunning.owner(), "character.race", objects, row.location.child("owner"));
+                    checkReference(pack, stonecunning.skill(), "character.proficiency", objects, row.location.child("skill"));
+                    validateStonecunningReferences(objects.get(stonecunning.owner()), objects.get(stonecunning.skill()),
+                            true, row.location);
                 }
                 if (row.value instanceof SpellcastingDefinition casting) {
                     for (var reference : spellcastingReferences(casting).entrySet())
@@ -1286,7 +1310,7 @@ public final class Schema2CompositionKernel {
     }
 
     private static boolean executionType(String type) {
-        return Set.of("equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
+        return Set.of("equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
     }
     private static Definition executionDefinition(Object input, RuleIdentity identity, Location source) {
         Set<String> required = new HashSet<>(Set.of("identity", "display_name", "description", "source_page", "algorithm"));
@@ -1302,6 +1326,8 @@ public final class Schema2CompositionKernel {
             required.add("heavy_armor_speed_penalty_feet");
         } else if (identity.ruleType().equals("character.subrace_hit_points")) {
             required.addAll(Set.of("owner", "first_level_bonus", "per_additional_level_bonus"));
+        } else if (identity.ruleType().equals(STONECUNNING_TYPE)) {
+            required.addAll(Set.of("owner", "skill", "proficiency_multiplier"));
         } else if (identity.ruleType().equals("character.spellcasting")) {
             required.addAll(Set.of("owner_class", "required_subclass", "required_feature", "slot_resource", "bless", "cure_wounds", "material_item", "ability_key"));
         } else if (identity.ruleType().equals("character.wizard_spellcasting")) {
@@ -1355,6 +1381,11 @@ public final class Schema2CompositionKernel {
                 integer(row.get("first_level_bonus"), 0, MAX_SUBRACE_HIT_POINT_BONUS, source.child("first_level_bonus")),
                 integer(row.get("per_additional_level_bonus"), 0, MAX_SUBRACE_HIT_POINT_BONUS, source.child("per_additional_level_bonus")),
                 algorithm, note);
+        if (identity.ruleType().equals(STONECUNNING_TYPE)) return new StonecunningDefinition(identity, name, description, page,
+                stonecunningReference(row.get("owner"), STONECUNNING_DWARF, source.child("owner")),
+                stonecunningReference(row.get("skill"), STONECUNNING_HISTORY, source.child("skill")),
+                integer(row.get("proficiency_multiplier"), STONECUNNING_MIN_MULTIPLIER, STONECUNNING_MAX_MULTIPLIER,
+                        source.child("proficiency_multiplier")), algorithm, note);
         if (identity.ruleType().equals("equipment.weapon_attack")) return new WeaponAttackDefinition(identity,name,description,page,
                 typedReference(row.get("item"), "equipment.item", source.child("item")),
                 enumValue(WeaponAbilityPolicy.class,row.get("ability_policy"),source.child("ability_policy")),
@@ -1655,8 +1686,12 @@ public final class Schema2CompositionKernel {
             case SOURCE_PAGE -> new IntegerValue(sourcePage(((RuleIdentity) target).ruleType(), value, source.child("value")));
             case MINIMUM_ENABLED_MEMBERS -> new IntegerValue(integer(value, 1, 128, source.child("value")));
             case LANGUAGE, TOOL, PARENT_RACE, OWNER_CLASS, PROFICIENCY, STEALTH_SKILL, ITEM, REQUIRED_SUBCLASS, REQUIRED_FEATURE, SLOT_RESOURCE, RANK2_SLOT_RESOURCE, RANK3_SLOT_RESOURCE, BLESS, CURE_WOUNDS, MATERIAL_ITEM, SPELL -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
+            case SKILL -> new IdentityValue(stonecunningReference(value, STONECUNNING_HISTORY, source.child("value")));
             case OWNER -> {
-                String ownerType = switch (((RuleIdentity) target).ruleType()) {
+                String type = ((RuleIdentity) target).ruleType();
+                if (type.equals(STONECUNNING_TYPE))
+                    yield new IdentityValue(stonecunningReference(value, STONECUNNING_DWARF, source.child("value")));
+                String ownerType = switch (type) {
                     case "character.movement" -> "character.race|character.subrace";
                     case "character.subrace_hit_points" -> "character.subrace";
                     default -> "character.class|character.subclass";
@@ -1670,6 +1705,8 @@ public final class Schema2CompositionKernel {
             case HEAVY_ARMOR_SPEED_PENALTY_FEET -> new IntegerValue(movementDistance(value, 0, source.child("value")));
             case FIRST_LEVEL_BONUS, PER_ADDITIONAL_LEVEL_BONUS ->
                     new IntegerValue(integer(value, 0, MAX_SUBRACE_HIT_POINT_BONUS, source.child("value")));
+            case PROFICIENCY_MULTIPLIER -> new IntegerValue(integer(value, STONECUNNING_MIN_MULTIPLIER,
+                    STONECUNNING_MAX_MULTIPLIER, source.child("value")));
             case HIT_DIE_SIDES -> new IntegerValue(hitDieSides(value, source.child("value")));
             case SUPPORTED_MAXIMUM_LEVEL -> new IntegerValue(integer(value, 1, 20, source.child("value")));
             case PROFICIENCY_BONUS_PROFILE, MAXIMUM_PROFILE, RECOVERY_PROFILE -> new TextValue(profile(field, value, source.child("value")));
@@ -1733,7 +1770,7 @@ public final class Schema2CompositionKernel {
         String type = string(row.get("rule_type"), source.child("rule_type"));
         if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
                 "character.class_progression", "character.resource", "character.subclass", "character.feature",
-                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
         String prefix = switch (type) {
@@ -1751,6 +1788,7 @@ public final class Schema2CompositionKernel {
             case "equipment.weapon_attack" -> "weapon_attack";
             case "character.movement" -> "movement";
             case "character.subrace_hit_points" -> "subrace_hit_points";
+            case STONECUNNING_TYPE -> "stonecunning";
             case "character.spellcasting", "character.wizard_spellcasting" -> "spellcasting";
             case "adventure.environment" -> "environment";
             case "adventure.monster" -> "monster";
@@ -1773,6 +1811,7 @@ public final class Schema2CompositionKernel {
             case "equipment.item", "equipment.weapon_attack" -> integer(input, 62, 73, source);
             case "equipment.armor_movement" -> integer(input, 63, 63, source);
             case "character.subrace_hit_points" -> integer(input, 4, 4, source);
+            case STONECUNNING_TYPE -> integer(input, 3, 3, source);
             case "adventure.combat" -> integer(input, 90, 95, source);
             case "adventure.spell" -> integer(input, 114, 187, source);
             case "character.wizard_spellcasting" -> integer(input, 52, 53, source);
@@ -1800,6 +1839,7 @@ public final class Schema2CompositionKernel {
             case "equipment.weapon_attack" -> "SRD_2014_MELEE_WEAPON_ATTACK_V1";
             case "character.movement" -> WALKING_SPEED_ALGORITHM;
             case "character.subrace_hit_points" -> SUBRACE_HIT_POINTS_ALGORITHM;
+            case STONECUNNING_TYPE -> STONECUNNING_ALGORITHM;
             case "character.spellcasting" -> "LIFE_DOMAIN_LEVEL1_V1";
             case "character.wizard_spellcasting" -> "SRD_2014_WIZARD_PREPARED_V1";
             case "adventure.environment" -> "DM_ANTIMAGIC_ZONE_V1";
@@ -1845,7 +1885,7 @@ public final class Schema2CompositionKernel {
             case SLOT_RESOURCE, RANK2_SLOT_RESOURCE, RANK3_SLOT_RESOURCE -> "character.resource";
             case BLESS, CURE_WOUNDS, SPELL -> "adventure.spell";
             case PROFICIENCY -> "character.proficiency|character.tool";
-            case STEALTH_SKILL -> "character.proficiency";
+            case STEALTH_SKILL, SKILL -> "character.proficiency";
             default -> throw new IllegalArgumentException("Field is not a catalog reference");
         };
     }
@@ -1856,7 +1896,7 @@ public final class Schema2CompositionKernel {
 
     private static boolean tracedCharacterType(String type) {
         return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
-                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -2110,6 +2150,22 @@ public final class Schema2CompositionKernel {
             throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Subrace hit points require an available subrace owner", source);
     }
 
+    private static RuleIdentity stonecunningReference(Object input, RuleIdentity expected, Location source) {
+        RuleIdentity reference = typedReference(input, expected.ruleType(), source);
+        if (!expected.equals(reference))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Stonecunning requires the exact Dwarf and History identities", source);
+        return reference;
+    }
+
+    private static void validateStonecunningReferences(MutableObject owner, MutableObject skill, boolean profileEnabled,
+            Location source) {
+        if (owner == null || skill == null || (profileEnabled && (!enabled(owner) || !enabled(skill))))
+            throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Stonecunning requires available Dwarf and History sources", source);
+        if (profileEnabled && (!"SKILL".equals(textField(skill.fields, Field.CATEGORY))
+                || !"ability.intelligence".equals(textField(skill.fields, Field.ABILITY_KEY))))
+            throw fail("S2_TYPE", Stage.FINAL, "Stonecunning requires an Intelligence (History) skill", source);
+    }
+
     private record SpellMetadata(int level,int page,boolean wizard) { }
     private static final Map<String,SpellMetadata> SPELL_METADATA=Map.ofEntries(
             Map.entry("SRD_2014_BLESS_V1",new SpellMetadata(1,122,false)),
@@ -2265,7 +2321,7 @@ public final class Schema2CompositionKernel {
         int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
         boolean extraAttackEnabled = false, improvedCriticalEnabled = false, secondWindEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
-        boolean armorMovementEnabled = false;
+        boolean armorMovementEnabled = false, stonecunningEnabled = false;
         Set<RuleIdentity> subraceHitPointOwners = new HashSet<>();
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
@@ -2293,6 +2349,17 @@ public final class Schema2CompositionKernel {
                     if (hitPoints.enabled() && !subraceHitPointOwners.add(owner))
                         throw fail("S2_SUBRACE_HIT_POINTS_AMBIGUOUS", Stage.FINAL,
                                 "A subrace has multiple enabled hit point profiles", object.source);
+                }
+                if (checked instanceof FinalStonecunning stonecunning) {
+                    var definition = stonecunning.definition();
+                    validateStonecunningReferences(objects.get(definition.owner()), objects.get(definition.skill()),
+                            stonecunning.enabled(), object.source);
+                    if (stonecunning.enabled()) {
+                        if (stonecunningEnabled)
+                            throw fail("S2_STONECUNNING_AMBIGUOUS", Stage.FINAL, "Only one Stonecunning rule may be enabled",
+                                    object.source);
+                        stonecunningEnabled = true;
+                    }
                 }
                 if (checked instanceof FinalArmorMovement && checked.enabled()) {
                     if (armorMovementEnabled)
@@ -2475,6 +2542,8 @@ public final class Schema2CompositionKernel {
                 Field.HEAVY_ARMOR_SPEED_PENALTY_FEET, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("character.subrace_hit_points")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
                 Field.OWNER, Field.FIRST_LEVEL_BONUS, Field.PER_ADDITIONAL_LEVEL_BONUS, Field.ALGORITHM, Field.AUTHOR_NOTE);
+        if (type.equals(STONECUNNING_TYPE)) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.OWNER, Field.SKILL, Field.PROFICIENCY_MULTIPLIER, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("equipment.item")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.ARMOR_CLASS, Field.STRENGTH_MINIMUM, Field.STEALTH_DISADVANTAGE, Field.HANDS, Field.PROFICIENCY, Field.STEALTH_SKILL, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.vital_effect")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.DICE_COUNT, Field.DICE_SIDES, Field.MODIFIER, Field.DAMAGE_TYPE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.rest") || type.equals("adventure.check") || type.equals("adventure.health") || type.equals("adventure.combat")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
@@ -2572,6 +2641,7 @@ public final class Schema2CompositionKernel {
             if (definition instanceof MovementDefinition value) return new FinalMovement(value, enabled);
             if (definition instanceof ArmorMovementDefinition value) return new FinalArmorMovement(value, enabled);
             if (definition instanceof SubraceHitPointsDefinition value) return new FinalSubraceHitPoints(value, enabled);
+            if (definition instanceof StonecunningDefinition value) return new FinalStonecunning(value, enabled);
             if (definition instanceof SpellDefinition value) return new FinalSpell(value, enabled);
             if (definition instanceof SpellcastingDefinition value) return new FinalSpellcasting(value, enabled);
             if (definition instanceof WizardSpellcastingDefinition value) return new FinalWizardSpellcasting(value, enabled);
@@ -2748,6 +2818,13 @@ public final class Schema2CompositionKernel {
             result.put("first_level_bonus", hitPoints.firstLevelBonus());
             result.put("per_additional_level_bonus", hitPoints.perAdditionalLevelBonus());
             result.put("algorithm", hitPoints.algorithm());
+        } else if (value instanceof StonecunningDefinition stonecunning) {
+            result.put("description", stonecunning.description());
+            result.put("source_page", stonecunning.sourcePage());
+            result.put("owner", stonecunning.owner() == null ? null : identityJson(stonecunning.owner()));
+            result.put("skill", stonecunning.skill() == null ? null : identityJson(stonecunning.skill()));
+            result.put("proficiency_multiplier", stonecunning.proficiencyMultiplier());
+            result.put("algorithm", stonecunning.algorithm());
         } else if (value instanceof HealthDefinition health) {
             result.put("description", health.description()); result.put("source_page", health.sourcePage()); result.put("algorithm", health.algorithm());
         } else if (value instanceof VitalEffectDefinition effect) {
@@ -2790,7 +2867,7 @@ public final class Schema2CompositionKernel {
         return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
     }
     private static boolean newAdvancementType(String type) {
-        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),

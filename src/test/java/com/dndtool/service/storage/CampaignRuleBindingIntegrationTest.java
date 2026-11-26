@@ -109,7 +109,7 @@ class CampaignRuleBindingIntegrationTest {
             var ordinaryBinding = assertBinding(service, ordinary, STR, HOUSE_RELEASE, "language.dwarvish", 6);
             var ordinaryRequest = id();
             submit(service, ordinaryRequest, input(service, ordinary, STR, 14));
-            assertResult(service, ordinary, ordinaryRequest, new CheckResult(10, null, 10, 2, 2, 14, true, false, false),
+            assertResult(service, ordinary, ordinaryRequest, new CheckResult(10, null, 10, 2, 2, 14, true, false, false, 2, null),
                     DAMAGE, 6, 6, 6, 5, "成功");
             var ordinaryView = service.current();
             String ordinaryFile = end(service);
@@ -131,11 +131,11 @@ class CampaignRuleBindingIntegrationTest {
 
             var failedCheck = id();
             submit(service, failedCheck, input(service, variant, WIS, 14));
-            assertResult(service, variant, failedCheck, new CheckResult(10, null, 10, 1, 2, 13, false, false, false),
+            assertResult(service, variant, failedCheck, new CheckResult(10, null, 10, 1, 2, 13, false, false, false, 2, null),
                     HEALING, 5, 0, 12, 2, "失败");
             var successfulCheck = id();
             submit(service, successfulCheck, input(service, variant, WIS, 13));
-            assertResult(service, variant, successfulCheck, new CheckResult(10, null, 10, 1, 2, 13, true, false, false),
+            assertResult(service, variant, successfulCheck, new CheckResult(10, null, 10, 1, 2, 13, true, false, false, 2, null),
                     DAMAGE, 3, 3, 9, 4, "成功");
             var variantView = service.current();
             String variantFile = end(service);
@@ -191,7 +191,7 @@ class CampaignRuleBindingIntegrationTest {
             assertNotEquals(epoch, restored.epoch());
             assertEquals(revision + 1, restored.revision());
             assertBinding(service, scenario, WIS, VARIANT_RELEASE, "language.gnomish", 3);
-            assertResult(service, scenario, request, new CheckResult(10, null, 10, 1, 2, 13, true, false, false),
+            assertResult(service, scenario, request, new CheckResult(10, null, 10, 1, 2, 13, true, false, false, 2, null),
                     DAMAGE, 3, 3, 9, 5, "成功");
             assertCode("STALE_EPOCH", () -> service.domainCommand(request, epoch, revision, "check-effects", intent));
             var replayed = service.domainCommand(request, restored.epoch(), revision, "check-effects", intent);
@@ -240,7 +240,7 @@ class CampaignRuleBindingIntegrationTest {
             service.create("外部组合", members); scenario = populate(service);
             Files.move(source.resolve("rule-library"), source.resolve("retained-library"));
             submit(service, request, input(service, scenario, WIS, 13));
-            assertResult(service, scenario, request, new CheckResult(10, null, 10, 1, 2, 13, true, false, false),
+            assertResult(service, scenario, request, new CheckResult(10, null, 10, 1, 2, 13, true, false, false, 2, null),
                     DAMAGE, 2, 2, 10, 5, "成功");
             accepted = service.current(); run = service.status().runId();
             service.save(id(), accepted.epoch(), accepted.revision());

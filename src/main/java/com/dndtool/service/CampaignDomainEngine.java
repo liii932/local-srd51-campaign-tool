@@ -142,7 +142,7 @@ public final class CampaignDomainEngine {
             var resolution = health.resolve(prepared, drawn, deathD20, recoveryD4);
             healthResult = resolution.result(); after = resolution.state();
         } else if (request.command().kind().equals("CHECK_RESOLVED")) {
-            var prepared = checks.prepare(material.projection(), before, request.command());
+            var prepared = checks.prepare(material.projection(), material.initial(), before, request.command());
             checkCapacity(history, prepared.capacityState(), request.command());
             int firstD20 = dice.applyAsInt(20);
             Integer secondD20 = prepared.secondDieRequired() ? dice.applyAsInt(20) : null;
@@ -330,7 +330,7 @@ public final class CampaignDomainEngine {
         if (healthResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
         if (command.kind().equals("CHECK_RESOLVED")) {
             if (roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-            return checks.verify(material.projection(), before, command, checkResult);
+            return checks.verify(material.projection(), material.initial(), before, command, checkResult);
         }
         if (checkResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
         if (Schema2WizardSpellbookRules.handles(command)) {

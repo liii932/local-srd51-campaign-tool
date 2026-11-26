@@ -17,8 +17,8 @@
 
 | 事实类型 | 保存内容与形状 |
 | --- | --- |
-| `CHECK_RESOLVED` / `CheckInput` | 完整 `adventure.check` 身份、`ABILITY/SKILL/TOOL`、六属性之一、适用的完整熟练身份、DC 0—30、原始优势/劣势布尔裁定及说明；ABILITY 不携带熟练，SKILL 仅 `character.proficiency`，TOOL 仅 `character.tool` |
-| `CheckResult` | 第一个 d20、可空第二个 d20、选中骰、属性修正、熟练贡献、总值、成败，以及独立保存的 `effectiveAdvantage/effectiveDisadvantage`；不能覆盖原输入的裁定 |
+| `CHECK_RESOLVED` / `CheckInput` | 完整 `adventure.check` 身份、`ABILITY/SKILL/TOOL`、六属性之一、适用的完整熟练身份、题材 `subject`（`GENERAL` 或 `STONEWORK_ORIGIN`）、DC 0—30、原始优势/劣势布尔裁定及说明；ABILITY 不携带熟练，SKILL 仅 `character.proficiency`，TOOL 仅 `character.tool` |
+| `CheckResult` | 第一个 d20、可空第二个 d20、选中骰、属性修正、基础熟练加值 `baseProficiencyBonus`、实际熟练贡献 `proficiencyBonus`、可空的石工知识来源 `stonecunningRule`、总值、成败，以及独立保存的 `effectiveAdvantage/effectiveDisadvantage`；不能覆盖原输入的裁定 |
 | `ITEM_ACQUIRED` / `EquipmentInput` | UUIDv4 实例、完整 `equipment.item` 身份、`CARRIED` 及说明；实例 UUID 等于本次操作 UUID，历史不能重复取得同一实例身份 |
 | `ITEM_EQUIPPED` | 实例、`WORN/MAIN_HAND/OFF_HAND/BOTH_HANDS` 之一及说明；输入不再次指定物品定义 |
 | `ITEM_REMOVED`、`ITEM_UNEQUIPPED` | 实例及说明；物品定义与目标位置输入均为空 |
@@ -28,9 +28,7 @@
 
 检定结果按保存的有效模式验证：优势/劣势皆有或皆无时只有一个 d20，仅有其中之一时两个骰
 取高或低；每个 d20 为 1—20。总值等于选中骰加属性/熟练贡献，成败等于 `total >= DC`。
-属性贡献核对 before 中的六属性，熟练按完整目标身份匹配且只加一次；这些算术/结构校验
-不独立证明技能默认属性、实际工具持有或装备产生的有效模式；`Schema2CharacterCheckRules`
-结合 `Schema2CharacterEquipmentRules` 从准确镜像及 before 状态重新验证这些事实。
+属性贡献和基础熟练加值取自检定前角色状态。普通熟练按完整目标身份匹配。石工知识只允许在智力（历史）的石工来历题材使用，实际贡献取当时基础值乘以冻结倍率。题材进入请求摘要。历史读回时，`Schema2CharacterCheckRules` 用当时的初始计划、规则组合、角色状态和原骰核验来源、数值、有效模式与成败。
 
 检定事件不能夹带生命骰结果；只有检定事件保存 `checkResult`。
 基础健康效果结果不得携带死亡 d20 或恢复 d4，基础死亡豁免结果不得携带效果骰；

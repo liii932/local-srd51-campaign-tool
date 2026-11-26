@@ -46,5 +46,16 @@
     },
     "field": "description",
     "value": "A DM-authored artisan background variant with Gnomish and smith’s tools. Background skill and narrative feature choices are outside this bounded initial-source consumer."
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.stonecunning",
+      "rule_key": "stonecunning.dwarf"
+    },
+    "field": "proficiency_multiplier",
+    "value": 3
   }
 ]

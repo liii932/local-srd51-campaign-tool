@@ -118,7 +118,7 @@ public final class Schema2CharacterProgressionRules {
                 capacity.subclasses(), capacity.features(), capacity.feats(), capacity.proficiencies(), capacity.version(), capacity.resources(), capacity.rest(), capacity.equipment(), capacity.health(), capacity.spellbook()));
     }
 
-    private static void verifyInitialPlan(ProductionSchema2Projection material, InitialPlan plan) {
+    static void verifyInitialPlan(ProductionSchema2Projection material, InitialPlan plan) {
         var character = plan.character();
         character.binding().verify(material);
         var rebuilt = new Schema2InitialProficiencyRules().prepare(material,

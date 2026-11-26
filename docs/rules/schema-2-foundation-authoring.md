@@ -18,6 +18,7 @@
 | 类型 | 键前缀 | 唯一允许的算法 | `source_page` |
 | --- | --- | --- | --- |
 | `adventure.check` | `check.*` | `SRD_2014_ABILITY_CHECK_V1` | 整数 77 |
+| `character.stonecunning` | `stonecunning.*` | `SRD_2014_DWARF_STONECUNNING_V1` | 整数 3 |
 | `equipment.item` | `item.*` | `SRD_2014_EQUIPMENT_V1` | 整数 62—73 |
 | `adventure.health` | `health.*` | `SRD_2014_HEALTH_V1` | 整数 98 |
 | `adventure.vital_effect` | `vital_effect.*` | `DIRECT_VITAL_EFFECT_V1` | 整数 96—99 |
@@ -36,6 +37,12 @@
 [零 HP 与临时 HP p.98](../references/srd-5.1/pages/page-098.md)、
 [临时 HP 期限 p.99](../references/srd-5.1/pages/page-099.md)。
 页码记录声明所依据的原文，不能代替机制支持或实际执行证据。
+
+## 石工知识
+
+标准角色包的 `stonecunning.dwarf` 使用两个完整引用。`owner` 指向 `srd51_runtime / character.race / race.dwarf`，`skill` 指向 `srd51_runtime / character.proficiency / proficiency.skill.history`，后者须为默认属性是智力的技能。外包引用要求直接依赖。组合至多启用一条适用于矮人的石工知识规则。
+
+`proficiency_multiplier` 为 1–3 的精确整数。标准包取 2，随附检定变体通过 `set_field` 改为 3。取 1 时仍授予本次熟练；停用使用 `set_enabled`。冻结组合保留身份、来源和倍率覆盖链。[运行合同](schema-2-character-foundations.md#石工知识)
 
 ## 装备字段与完整引用
 

@@ -269,6 +269,12 @@
     proficiency.required = skill || tool;
     if (skill) form.elements.ability.value = ruleFromValue(proficiency.value)?.abilityKey || '';
     form.elements.ability.disabled = skill;
+    const history = skill && proficiency.value === 'srd51_runtime/character.proficiency/proficiency.skill.history'
+      && form.elements.ability.value === 'ability.intelligence';
+    const subject = form.elements.subject;
+    subject.disabled = !history;
+    subject.parentElement.hidden = !history;
+    if (!history) subject.value = 'GENERAL';
   }
   function refreshCharacterChoices() {
     for (const form of document.querySelectorAll('#storage-domain form')) {
@@ -571,7 +577,14 @@
     const recentRecovery = character.history?.events?.findLast(event => Object.keys(event.command?.restInput?.recoveredSpellSlots || {}).length);
     if (recentRecovery) text(card, 'p', `最近${arcaneRecoveryResult(recentRecovery)}`);
     const recentCheck = character.history?.events?.findLast(event => event.checkResult);
-    if (recentCheck) { const result = recentCheck.checkResult; text(card, 'p', `最近检定：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + 熟练 ${result.proficiencyBonus} = ${result.total}，${result.success ? '成功' : '失败'}`); }
+    if (recentCheck) {
+      const result = recentCheck.checkResult;
+      const subject = recentCheck.command.checkInput.subject === 'STONEWORK_ORIGIN' ? '（辨认石工作品来历）' : '';
+      const proficiency = result.stonecunningRule
+        ? `石工知识 ${result.baseProficiencyBonus} × ${result.proficiencyBonus / result.baseProficiencyBonus}`
+        : `熟练 ${result.proficiencyBonus}`;
+      text(card, 'p', `最近检定${subject}：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + ${proficiency} = ${result.total}，${result.success ? '成功' : '失败'}`);
+    }
     const recentHealth = character.history?.events?.findLast(event => event.healthResult);
     if (recentHealth) { const result = recentHealth.healthResult; text(card, 'p', `最近健康操作：${recentHealth.before?.hitPoints ?? '—'} → ${recentHealth.after.hitPoints}；掷骰 ${[...(result.dice || []), result.deathD20, result.recoveryD4].filter(value => value !== null && value !== undefined).join('、') || '无'}`); }
     return card;
@@ -1435,7 +1448,8 @@
       checkInput: {type: 'character.CheckInput', rule: typedRule(values.rule), kind: values.kind,
         abilityKey: values.kind === 'SKILL' ? ruleFromValue(values.proficiency).abilityKey : values.ability,
         proficiency: values.kind === 'ABILITY' ? null : typedRule(values.proficiency), difficultyClass: values.difficultyClass,
-        advantage: values.advantage === 'on', disadvantage: values.disadvantage === 'on', adjudication: values.adjudication}}};
+        advantage: values.advantage === 'on', disadvantage: values.disadvantage === 'on', adjudication: values.adjudication,
+        subject: values.subject || 'GENERAL'}}};
     if (values.withEffects === 'on') { input.success = conditionalBranch('success', values); input.failure = conditionalBranch('failure', values); }
     return input;
   });

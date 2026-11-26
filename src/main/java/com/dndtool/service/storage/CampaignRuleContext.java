@@ -272,6 +272,7 @@ public final class CampaignRuleContext {
             case MovementDefinition d -> d.description();
             case ArmorMovementDefinition d -> d.description();
             case SubraceHitPointsDefinition d -> d.description();
+            case StonecunningDefinition d -> d.description();
             case SpellDefinition d -> d.description();
             case SpellcastingDefinition d -> d.description();
             case WizardSpellcastingDefinition d -> d.description();

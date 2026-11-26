@@ -2,9 +2,11 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.storage.CampaignRuleFixtures;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_HISTORY;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.*;
 import static com.dndtool.service.Schema2CheckTestFixture.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -19,9 +21,9 @@ class Schema2CharacterCheckRulesTest {
         assertEquals(2, initial.proficiencies().stream().filter(value -> value.target().equals(ATHLETICS)).count());
         assertEquals(2, initial.proficiencies().stream().filter(value -> value.target().equals(TOOL)).count());
         var skill = rules.prepare(material, initial, check("SKILL", "ability.strength", ATHLETICS, 14, false, false));
-        assertEquals(new CheckResult(10, null, 10, 2, 2, 14, true, false, false), rules.resolve(skill, 10, null));
+        assertEquals(new CheckResult(10, null, 10, 2, 2, 14, true, false, false, 2, null), rules.resolve(skill, 10, null));
         var tool = rules.prepare(material, initial, check("TOOL", "ability.wisdom", TOOL, 11, false, false));
-        assertEquals(new CheckResult(10, null, 10, -1, 2, 11, true, false, false), rules.resolve(tool, 10, null));
+        assertEquals(new CheckResult(10, null, 10, -1, 2, 11, true, false, false, 2, null), rules.resolve(tool, 10, null));
         assertEquals(initial.version() + 1, tool.capacityState().version());
         assertEquals(initial.resources(), tool.capacityState().resources());
         assertEquals(initial.proficiencies(), tool.capacityState().proficiencies());
@@ -60,7 +62,7 @@ class Schema2CharacterCheckRulesTest {
             assertThrows(IllegalArgumentException.class, () -> rules.resolve(prepared, 10, roll));
         }
         assertThrows(IllegalArgumentException.class, () -> rules.verify(material, initial,
-                check("ABILITY", "ability.strength", null, 10, true, false), new CheckResult(3, 18, 18, 2, 0, 20, false, true, false)));
+                check("ABILITY", "ability.strength", null, 10, true, false), new CheckResult(3, 18, 18, 2, 0, 20, false, true, false, 2, null)));
     }
 
     @Test void boundedInputRejectsControlsBadUnicodeNonNfcAndForeignCommandFields() {
@@ -82,5 +84,59 @@ class Schema2CharacterCheckRulesTest {
         var error = assertThrows(IllegalArgumentException.class,
                 () -> rules.prepare(statistics, state, check("ABILITY", "ability.strength", null, 10, false, false)));
         assertEquals("S2_CHECK_GROWTH_SCOPE", error.getMessage());
+    }
+
+    @Test void stoneworkSubjectRequiresTheExactHistoryIdentityAndChangesTheRequestDigest() {
+        String intelligence = "ability.intelligence";
+        var lookalike = new Schema2CompositionKernel.RuleIdentity(EXT, STONECUNNING_HISTORY.ruleType(), STONECUNNING_HISTORY.ruleKey());
+        for (var skill : List.of(ARCANA, lookalike))
+            assertThrows(IllegalArgumentException.class, () -> new CheckInput(CHECK, "SKILL", intelligence, skill,
+                    10, false, false, "Identify the origin.", CheckInput.STONEWORK_ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> new CheckInput(CHECK, "SKILL", "ability.wisdom", STONECUNNING_HISTORY,
+                10, false, false, "Identify the origin.", CheckInput.STONEWORK_ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> new CheckInput(CHECK, "ABILITY", intelligence, null,
+                10, false, false, "Identify the origin.", CheckInput.STONEWORK_ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> new CheckInput(CHECK, "SKILL", intelligence, STONECUNNING_HISTORY,
+                10, false, false, "Identify the origin.", "UNKNOWN"));
+        var ordinary = check(new CheckInput(CHECK, "SKILL", intelligence, STONECUNNING_HISTORY,
+                10, false, false, "Identify the origin.", CheckInput.GENERAL));
+        var stonework = check(new CheckInput(CHECK, "SKILL", intelligence, STONECUNNING_HISTORY,
+                10, false, false, "Identify the origin.", CheckInput.STONEWORK_ORIGIN));
+        UUID operation = UUID.randomUUID();
+        var binding = Schema2RulesBinding.from(material);
+        var normalRequest = new Schema2CharacterRequest(operation, IDENTITY, CAMPAIGN, CHARACTER, PREPARATION,
+                binding, initial.version(), ordinary, Map.of());
+        var stoneworkRequest = new Schema2CharacterRequest(operation, IDENTITY, CAMPAIGN, CHARACTER, PREPARATION,
+                binding, initial.version(), stonework, Map.of());
+        assertNotEquals(normalRequest.digest(), stoneworkRequest.digest());
+    }
+
+    @Test void historyReplaysStonecunningFromTheFrozenPlanAndRejectsForgedContribution() {
+        var context = CampaignRuleFixtures.rules();
+        var projection = context.projection();
+        var plan = context.initialPlan(CAMPAIGN, CHARACTER, IDENTITY, "fighter", "custom_artisan", "dwarf", "hill_dwarf");
+        var engine = new CampaignDomainEngine();
+        var before = engine.initial(projection, plan, PREPARATION, context.initialAbilities("fighter"),
+                context.initialChoices("fighter"), UUID.randomUUID());
+        assertFalse(before.current().proficiencies().stream().anyMatch(fact -> fact.target().equals(STONECUNNING_HISTORY)));
+        var command = check(new CheckInput(context.checkRule(), "SKILL", "ability.intelligence", STONECUNNING_HISTORY,
+                13, false, false, "Identify the origin.", CheckInput.STONEWORK_ORIGIN));
+        var applied = engine.executeCharacter(projection, plan, before, command, UUID.randomUUID(), sides -> {
+            assertEquals(20, sides);
+            return 10;
+        });
+        var event = applied.events().getLast();
+        var rule = context.rule("character.stonecunning", "stonecunning.dwarf");
+        assertEquals(new CheckResult(10, null, 10, -1, 4, 13, true, false, false, 2, rule), event.checkResult());
+        assertEquals(before.current().proficiencies(), applied.current().proficiencies());
+        assertDoesNotThrow(() -> engine.validateCharacter(projection, plan, applied));
+
+        var forgedResult = new CheckResult(10, null, 10, -1, 6, 15, true, false, false, 2, rule);
+        var forgedEvent = new Event(event.operationId(), event.requestDigest(), event.command(), event.hitDieRoll(),
+                event.before(), event.after(), forgedResult);
+        var forgedHistory = new History(applied.current(), List.of(before.events().getFirst(), forgedEvent));
+        assertDoesNotThrow(() -> Schema2CharacterRuntime.validate(forgedHistory));
+        var error = assertThrows(IllegalArgumentException.class, () -> engine.validateCharacter(projection, plan, forgedHistory));
+        assertEquals("S2_CHARACTER_HISTORY_CORRUPT", error.getMessage());
     }
 }

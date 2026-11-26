@@ -84,6 +84,7 @@ public record Schema2CharacterRequest(UUID operationId, Schema2PreparationIdenti
                 rule(out, check.rule()); text(out, check.kind()); text(out, check.abilityKey());
                 nullableRule(out, check.proficiency()); out.writeInt(check.difficultyClass());
                 out.writeBoolean(check.advantage()); out.writeBoolean(check.disadvantage()); text(out, check.adjudication());
+                text(out, check.subject());
             }
             EquipmentInput item = command.equipmentInput();
             if (item != null) {
