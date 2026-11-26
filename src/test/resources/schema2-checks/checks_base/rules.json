@@ -11,6 +11,8 @@
     "source_page": 77,
     "algorithm": "SRD_2014_ABILITY_CHECK_V1",
     "allow_alternate_skill_ability": false,
+    "passive_base_score": 10,
+    "passive_advantage_adjustment": 5,
     "author_note": "Original rule"
   }
 ]

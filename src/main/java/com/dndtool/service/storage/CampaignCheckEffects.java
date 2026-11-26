@@ -3,6 +3,7 @@ package com.dndtool.service.storage;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
 import com.dndtool.service.CampaignDomainEngine;
+import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CharacterRuntime.Command;
 import com.dndtool.service.Schema2CharacterRuntime.Event;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
@@ -38,7 +39,7 @@ public final class CampaignCheckEffects {
     public record Input(UUID characterId, long characterVersion, Command command, Branch success, Branch failure) {
         public Input {
             uuid(characterId);
-            if (characterVersion < 0 || command == null || !command.kind().equals("CHECK_RESOLVED")
+            if (characterVersion < 0 || command == null || !Schema2CharacterRuntime.checkKind(command.kind())
                     || success == null || failure == null) throw CampaignJson.bad("Expected one typed check and two explicit branches");
         }
     }

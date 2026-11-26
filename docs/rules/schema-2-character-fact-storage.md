@@ -1,7 +1,7 @@
 # Schema 2 角色事实存储
 
 
-规则角色的检定、装备与健康由 `Schema2CharacterRuntime` 表达类型化命令、原骰、结果、
+规则角色的检定、装备与健康由 `Schema2CharacterRuntime` 表达类型化命令、适用的原骰、结果、
 前后状态与完整历史。`Schema2PreparationIdentity` 是角色初始计划及历史引用的稳定领域事实。
 `CampaignDomainEngine` 按战役冻结规则核验历史，SQLite 工作库负责当前运行的控制身份和事务。
 [角色基础](schema-2-character-foundations.md) · [数据映射](../design/v2/storage-data-map-and-rollout.md)
@@ -17,8 +17,8 @@
 
 | 事实类型 | 保存内容与形状 |
 | --- | --- |
-| `CHECK_RESOLVED` / `CheckInput` | 完整 `adventure.check` 身份、`ABILITY/SKILL/TOOL`、六属性之一、适用的完整熟练身份、题材 `subject`（`GENERAL` 或 `STONEWORK_ORIGIN`）、DC 0—30、原始优势/劣势布尔裁定及说明；ABILITY 不携带熟练，SKILL 仅 `character.proficiency`，TOOL 仅 `character.tool` |
-| `CheckResult` | 第一个 d20、可空第二个 d20、选中骰、属性修正、基础熟练加值 `baseProficiencyBonus`、实际熟练贡献 `proficiencyBonus`、可空的石工知识来源 `stonecunningRule`、总值、成败，以及独立保存的 `effectiveAdvantage/effectiveDisadvantage`；不能覆盖原输入的裁定 |
+| `CHECK_RESOLVED` 或 `PASSIVE_CHECK_RESOLVED` / `CheckInput` | 完整 `adventure.check` 身份、`ABILITY/SKILL/TOOL`、六属性之一、适用的完整熟练身份、题材 `subject`（`GENERAL` 或 `STONEWORK_ORIGIN`）、DC 0—30、原始优势/劣势布尔裁定及说明；ABILITY 不携带熟练，SKILL 仅 `character.proficiency`，TOOL 仅 `character.tool` |
+| `CheckResult` | 依命令保存原骰及选中骰，或被动基础分与有符号调整。两者共用属性修正、基础熟练加值 `baseProficiencyBonus`、实际熟练贡献 `proficiencyBonus`、可空的石工知识来源 `stonecunningRule`、总值、成败，以及独立保存的 `effectiveAdvantage/effectiveDisadvantage`；不能覆盖原输入的裁定 |
 | `ITEM_ACQUIRED` / `EquipmentInput` | UUIDv4 实例、完整 `equipment.item` 身份、`CARRIED` 及说明；实例 UUID 等于本次操作 UUID，历史不能重复取得同一实例身份 |
 | `ITEM_EQUIPPED` | 实例、`WORN/MAIN_HAND/OFF_HAND/BOTH_HANDS` 之一及说明；输入不再次指定物品定义 |
 | `ITEM_REMOVED`、`ITEM_UNEQUIPPED` | 实例及说明；物品定义与目标位置输入均为空 |
@@ -26,9 +26,11 @@
 | `DEATH_SAVE_RESOLVED` | 完整健康规则及说明；效果身份和临时 HP 选择均为空 |
 | `HealthResult` | 有序效果骰列表、可空死亡 d20、可空稳定恢复 d4、非负 `rolledAmount/appliedAmount`；效果骰最多 20 个且每个 1—12，死亡骰 1—20，恢复骰 1—4 |
 
-检定结果按保存的有效模式验证：优势/劣势皆有或皆无时只有一个 d20，仅有其中之一时两个骰
+掷骰检定的 `passiveBaseScore/passiveAdjustment` 均为空，原骰按保存的有效模式验证：优势/劣势皆有或皆无时只有一个 d20，仅有其中之一时两个骰
 取高或低；每个 d20 为 1—20。总值等于选中骰加属性/熟练贡献，成败等于 `total >= DC`。
-检定命令保留实际属性和完整技能身份，两者进入请求摘要。重演时先依据冻结检定开关核验组合，再按检定前的角色状态求实际属性修正和基础熟练加值。普通熟练按完整目标身份匹配。石工知识只允许在智力（历史）的石工来历题材使用，实际贡献取当时基础值乘以冻结倍率。题材进入请求摘要。历史读回时，`Schema2CharacterCheckRules` 用当时的初始计划、规则组合、角色状态和原骰核验来源、数值、有效模式与成败。
+被动检定的 `firstD20/secondD20/selectedD20` 均为空。`passiveBaseScore` 为冻结基础分，`passiveAdjustment` 为按有效优劣势得出的有符号调整（含 0）。总值为两者加属性修正和实际熟练贡献。根事件仅收集真正掷出的骰，选中分支的健康效果独立保留其骰值。
+
+命令种类、实际属性和完整技能身份进入请求摘要。以同一幂等键改变结算方式会产生冲突。重演时先依据冻结检定开关核验组合，再按检定前的角色状态求实际属性修正和基础熟练加值。普通熟练按完整目标身份匹配。石工知识只允许在智力（历史）的石工来历题材使用，实际贡献取当时基础值乘以冻结倍率。题材进入请求摘要。历史读回时，`Schema2CharacterCheckRules` 用当时的初始计划、规则组合和角色状态核验来源与有效模式。掷骰结果与保存的原骰核对，被动结果与冻结参数核对，均重新核验数值与成败。
 
 检定事件不能夹带生命骰结果；只有检定事件保存 `checkResult`。
 基础健康效果结果不得携带死亡 d20 或恢复 d4，基础死亡豁免结果不得携带效果骰；

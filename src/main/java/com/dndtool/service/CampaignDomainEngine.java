@@ -141,12 +141,16 @@ public final class CampaignDomainEngine {
             Integer recoveryD4 = prepared.needsRecoveryD4(deathD20) ? dice.applyAsInt(4) : null;
             var resolution = health.resolve(prepared, drawn, deathD20, recoveryD4);
             healthResult = resolution.result(); after = resolution.state();
-        } else if (request.command().kind().equals("CHECK_RESOLVED")) {
+        } else if (Schema2CharacterRuntime.checkKind(request.command().kind())) {
             var prepared = checks.prepare(material.projection(), material.initial(), before, request.command());
             checkCapacity(history, prepared.capacityState(), request.command());
-            int firstD20 = dice.applyAsInt(20);
-            Integer secondD20 = prepared.secondDieRequired() ? dice.applyAsInt(20) : null;
-            checkResult = checks.resolve(prepared, firstD20, secondD20);
+            if (prepared.isPassive()) {
+                checkResult = checks.resolvePassive(prepared);
+            } else {
+                int firstD20 = dice.applyAsInt(20);
+                Integer secondD20 = prepared.secondDieRequired() ? dice.applyAsInt(20) : null;
+                checkResult = checks.resolve(prepared, firstD20, secondD20);
+            }
             after = prepared.capacityState();
         } else if (isAdvancement(request.command())) {
             var prepared = prepareAdvance(material, before, request.command());
@@ -328,7 +332,7 @@ public final class CampaignDomainEngine {
             return health.verify(material.projection(), before, command, healthResult);
         }
         if (healthResult != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
-        if (command.kind().equals("CHECK_RESOLVED")) {
+        if (Schema2CharacterRuntime.checkKind(command.kind())) {
             if (roll != null) throw rejected("S2_CHARACTER_HISTORY_CORRUPT");
             return checks.verify(material.projection(), material.initial(), before, command, checkResult);
         }

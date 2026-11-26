@@ -172,7 +172,13 @@ class CampaignParticipationIntegrationTest {
             branch.add("healthEffect", JsonNull.INSTANCE); branch.add("itemId", JsonNull.INSTANCE); check.add(side, branch);
         }
         JsonObject decision = object("proposalId", uuid(), "memberId", player.toString(), "proposalText", "我想攀上墙头", "reason", "固定检定。", "type", "ABILITY_CHECK"); decision.add("check", check);
-        var before = f.snapshot; JsonObject wrong = decision.deepCopy(); wrong.addProperty("memberId", other.toString()); int[] draws = {0};
+        var before = f.snapshot;
+        var passive = decision.deepCopy();
+        passive.getAsJsonObject("check").getAsJsonObject("command").addProperty("kind", Schema2CharacterRuntime.PASSIVE_CHECK);
+        assertEquals("INVALID_FILE", assertThrows(StorageException.class, () -> new CampaignDomainCommands().apply(before,
+                "adjudicated-check", CampaignSpaceFixtures.focused(before.domains(), passive), UUID.randomUUID(), "0".repeat(64),
+                sides -> { throw new AssertionError("Passive proposal must be rejected before execution"); })).code());
+        JsonObject wrong = decision.deepCopy(); wrong.addProperty("memberId", other.toString()); int[] draws = {0};
         assertEquals("ADJUDICATION_CONTROL", assertThrows(StorageException.class, () -> new CampaignDomainCommands().apply(before, "adjudicated-check", CampaignSpaceFixtures.focused(before.domains(), wrong), UUID.randomUUID(), "0".repeat(64), sides -> { draws[0]++; return 10; })).code()); assertEquals(0, draws[0]);
         f.apply("adjudicated-check", decision); var root = f.snapshot.domains().roots().getLast();
         assertEquals(Actor.dm(pc, player), root.actor());

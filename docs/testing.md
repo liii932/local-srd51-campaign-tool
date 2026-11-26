@@ -46,6 +46,11 @@ mvn '-Dtest=CampaignCheckEffectsTest' test
 
 技能搭配不同属性使用 `CampaignSkillAbilityIntegrationTest` 和独立作者场景。标准组合运行 `--case alternate-skill-disabled`，变体运行 `--case alternate-skill-enabled`，并在两者运行 `--case skill-check` 核对各自的运动默认属性。
 
+被动检定用 `Schema2CheckCompositionTest` 核对参数与覆盖链，用 `CampaignPassiveCheckIntegrationTest`
+核对直接检定、两分支预检、仅选中后果取骰、回滚、同请求重试及保存、END、重开后的事实重验。
+使用同一份兼容 WAR 分别运行标准组合的 `--case passive-check` 和检定变体的 `--case passive-check-variant`，
+对照 10/5、12/3 的冻结参数、优劣势及主动检定原骰。[运行场景](../rule-packages/srd51-runtime/scenarios/README.md#验证被动检定)
+
 石工知识的独立作者场景对照标准双倍、家规三倍和普通历史检定。应用侧用 `CampaignStonecunningIntegrationTest` 核验实际角色、检定后果、重试及完整文件重开。[运行场景](../rule-packages/srd51-runtime/scenarios/README.md#验证矮人石工知识)
 
 ### Tomcat 测试依赖
@@ -246,10 +251,10 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    ```
 
    自定义规则另从 WAR 外提供一份受支持的准确候选 ZIP。可在仓库外复制随附 `check-variant` 原包的
-   条目，将 `author-package.json` 的 `release_version` 改为 `"21"`，将 `rules.json` 中
+   条目，将 `author-package.json` 的 `release_version` 改为 `"23"`，将 `rules.json` 中
    `vital_effect.dm_damage` 的 `modifier` 改为 `2`，更新包内 `README.md` 后将这些文件打包在 ZIP
-   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@21`
-   原字节及摘要。随附 `check-variant` 按 `@20`、固定伤害 `3` 的独立场景验证。自定义组合前三包
+   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@23`
+   原字节及摘要。随附 `check-variant` 按 `@22`、固定伤害 `3` 的独立场景验证。自定义组合前三包
    使用标准包，第四包使用这份外部候选。
 
    通过工作台的本机规则库执行外部原包上传（`POST /api/host/storage/rule-import`），从随附列表导入

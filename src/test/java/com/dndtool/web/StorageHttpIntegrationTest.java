@@ -678,6 +678,39 @@ class StorageHttpIntegrationTest {
             refresh();
             fieldsCommand("open", fields("fileKey", json(ended).get("savedFile").getAsString()));
             assertEquals(expected, domainState());
+
+            var reopenedFighter = domainState().getAsJsonArray("characters").get(0).getAsJsonObject();
+            var passiveCheck = new Command("PASSIVE_CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null,
+                    new CheckInput(check.checkInput().rule(), "ABILITY", "ability.strength", null, 8, false, true,
+                            "按被动力量检定决定是否守住位置。"));
+            var passiveRequest = object("characterId", fighter, "characterVersion", reopenedFighter.get("version").getAsString());
+            passiveRequest.add("command", CampaignDomainCodec.toJson(passiveCheck));
+            String reopenedPlacement = placementVersion(fighter);
+            var passiveSuccess = checkBranch(fighter, item, "2", "守住位置");
+            passiveSuccess.add("position", object("placementVersion", reopenedPlacement, "x", "0", "y", "2"));
+            var passiveFailure = checkBranch(fighter, item, "-1", "失去火把并后退");
+            passiveFailure.add("position", object("placementVersion", reopenedPlacement, "x", "3", "y", "1"));
+            passiveRequest.add("success", passiveSuccess);
+            passiveRequest.add("failure", passiveFailure);
+            fieldsCommand("domain", domainFields("check-effects", passiveRequest));
+
+            var passiveRoot = domainState().getAsJsonArray("roots").asList().getLast().getAsJsonObject();
+            assertEquals("check-effects", passiveRoot.get("kind").getAsString());
+            assertTrue(passiveRoot.getAsJsonArray("rolls").isEmpty());
+            var passiveAudit = JsonParser.parseString(passiveRoot.get("after").getAsString()).getAsJsonObject();
+            assertFalse(passiveAudit.get("success").getAsBoolean());
+            assertEquals("失去火把并后退", passiveAudit.get("message").getAsString());
+            var passiveEvent = domainState().getAsJsonArray("characters").get(0).getAsJsonObject().getAsJsonObject("history")
+                    .getAsJsonArray("events").asList().getLast().getAsJsonObject();
+            assertEquals(passiveAudit.get("checkOperationId").getAsString(), passiveEvent.get("operationId").getAsString());
+            var score = passiveEvent.getAsJsonObject("checkResult");
+            for (String field : List.of("firstD20", "secondD20", "selectedD20")) assertTrue(score.get(field).isJsonNull(), field);
+            assertEquals(10, score.get("passiveBaseScore").getAsInt());
+            assertEquals(-5, score.get("passiveAdjustment").getAsInt());
+            assertEquals(7, score.get("total").getAsInt());
+            assertGrid(fighter, 3, 1, Long.parseLong(reopenedPlacement) + 1);
+            assertEquals(3, domainState().getAsJsonArray("items").get(0).getAsJsonObject().get("quantity").getAsInt());
+            assertEquals(0, clockSecond(scene));
             fieldsCommand("end", Map.of());
         }
     }

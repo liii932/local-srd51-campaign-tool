@@ -572,6 +572,17 @@
     const ability = abilityName(input.abilityKey);
     return input.proficiency ? `${ability}（${ruleName(input.proficiency)}）` : ability;
   }
+  function describeCheckResult(event) {
+    const result = event.checkResult, input = event.command.checkInput;
+    const subject = input.subject === 'STONEWORK_ORIGIN' ? '（辨认石工作品来历）' : '';
+    const proficiency = result.stonecunningRule
+      ? `石工知识 ${result.baseProficiencyBonus} × ${result.proficiencyBonus / result.baseProficiencyBonus}`
+      : `熟练 ${result.proficiencyBonus}`;
+    const passive = event.command.kind === 'PASSIVE_CHECK_RESOLVED';
+    const base = passive ? `被动基础分 ${result.passiveBaseScore}` : `d20 ${result.selectedD20}`;
+    const adjustment = passive ? `，优劣势调整 ${result.passiveAdjustment}` : '';
+    return `${checkName(input)}${subject} · ${base}，属性修正 ${result.abilityModifier}，${proficiency}${adjustment}，共 ${result.total}（DC ${input.difficultyClass}，${result.success ? '成功' : '失败'}）`;
+  }
   function renderRuleCharacter(character) {
     const card = document.createElement('article'); card.className = 'card character-card'; const current = character.state;
     text(card, 'strong', `${character.name} · ${character.kind === 'NPC' ? 'NPC' : '角色'}${character.active ? '' : ' · 离队'}`);
@@ -595,15 +606,7 @@
     const recentRecovery = character.history?.events?.findLast(event => Object.keys(event.command?.restInput?.recoveredSpellSlots || {}).length);
     if (recentRecovery) text(card, 'p', `最近${arcaneRecoveryResult(recentRecovery)}`);
     const recentCheck = character.history?.events?.findLast(event => event.checkResult);
-    if (recentCheck) {
-      const result = recentCheck.checkResult;
-      const input = recentCheck.command.checkInput;
-      const subject = input.subject === 'STONEWORK_ORIGIN' ? '（辨认石工作品来历）' : '';
-      const proficiency = result.stonecunningRule
-        ? `石工知识 ${result.baseProficiencyBonus} × ${result.proficiencyBonus / result.baseProficiencyBonus}`
-        : `熟练 ${result.proficiencyBonus}`;
-      text(card, 'p', `最近检定 · ${checkName(input)}${subject}：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + ${proficiency} = ${result.total}，${result.success ? '成功' : '失败'}`);
-    }
+    if (recentCheck) text(card, 'p', `最近检定 · ${describeCheckResult(recentCheck)}`);
     const recentHealth = character.history?.events?.findLast(event => event.healthResult);
     if (recentHealth) { const result = recentHealth.healthResult; text(card, 'p', `最近健康操作：${recentHealth.before?.hitPoints ?? '—'} → ${recentHealth.after.hitPoints}；掷骰 ${[...(result.dice || []), result.deathD20, result.recoveryD4].filter(value => value !== null && value !== undefined).join('、') || '无'}`); }
     return card;
@@ -640,7 +643,10 @@
         for (const effect of chosen || []) if (typeof effect.text === 'string' && effect.text) details.push(effect.text);
         text(history, 'li', details.join('；'));
       } else if (root.kind === 'check-effects') {
-        const audit = JSON.parse(root.after), details = [`${root.sequence}. 检定及后果 · ${personName(root.subjectId)} · ${checkName(audit.input.command.checkInput)} · ${audit.success ? '成功' : '失败'}`];
+        const audit = JSON.parse(root.after);
+        const executor = roster().find(character => character.id === root.subjectId);
+        const check = executor.history.events.find(event => event.operationId === audit.checkOperationId);
+        const details = [`${root.sequence}. 检定及后果 · ${executor.name} · ${describeCheckResult(check)}`];
         if (audit.healthOperationId) {
           for (const character of roster()) {
             const event = character.history.events.find(event => event.operationId === audit.healthOperationId);
@@ -656,8 +662,8 @@
       } else {
         const event = roster().find(character => character.id === root.subjectId)?.history?.events?.find(event => event.operationId === root.operationId);
         const recovery = arcaneRecoveryResult(event);
-        const check = event?.command?.checkInput;
-        text(history, 'li', `${root.sequence}. ${operationName(root.kind)}${allPeople().some(character => character.id === root.subjectId) ? ` · ${personName(root.subjectId)}` : ''}${root.kind === 'note' ? ` · ${root.after}` : ''}${check ? ` · ${checkName(check)}` : ''}${recovery ? ` · ${recovery}` : ''}`);
+        const check = event?.checkResult ? describeCheckResult(event) : '';
+        text(history, 'li', `${root.sequence}. ${operationName(root.kind)}${allPeople().some(character => character.id === root.subjectId) ? ` · ${personName(root.subjectId)}` : ''}${root.kind === 'note' ? ` · ${root.after}` : ''}${check ? ` · ${check}` : ''}${recovery ? ` · ${recovery}` : ''}`);
       }
     }
     const world = byId('domain-world-summary'); world.replaceChildren();
@@ -686,7 +692,7 @@
       'space-time': '推进空间时间', 'space-move': '裁定局部移动', 'space-unplace': '撤除安置', 'travel': '沿世界路线转移',
       'monster-create': '创建并安置怪物',
       CHARACTER_CREATED: '创建角色', CHARACTER_PROFILE: '调整角色资料', CHARACTER_ADVANCED: '角色升级',
-      CHECK_RESOLVED: '检定', HEALTH_EFFECT_RESOLVED: '健康效果', ITEM_ACQUIRED: '取得装备', ITEM_EQUIPPED: '装备物品',
+      CHECK_RESOLVED: '掷骰检定', PASSIVE_CHECK_RESOLVED: '被动检定', HEALTH_EFFECT_RESOLVED: '健康效果', ITEM_ACQUIRED: '取得装备', ITEM_EQUIPPED: '装备物品',
       NOTE: '便笺', NODE_CREATED: '建立地点', NODE_LINKED: '连接地点', POSITION: '调整位置', ITEM: '物品记录', COMBAT: '战斗行动'})[kind] || kind;
   }
   const battleFor = id => domain()?.combats?.find(history => history.current.combatId === id)?.current;
@@ -1464,7 +1470,7 @@
   domainForm('domain-check', (_, values) => values.withEffects === 'on' ? 'check-effects' : 'character-command', (form, values) => {
     const character = selectedCharacter(form);
     if (!character) throw new Error('请先创建或选择检定角色。');
-    const input = {characterId: character.id, characterVersion: String(character.version), command: {...baseCharacter('CHECK_RESOLVED'),
+    const input = {characterId: character.id, characterVersion: String(character.version), command: {...baseCharacter(values.resolution),
       checkInput: {type: 'character.CheckInput', rule: typedRule(values.rule), kind: values.kind,
         abilityKey: form.elements.ability.value,
         proficiency: values.kind === 'ABILITY' ? null : typedRule(values.proficiency), difficultyClass: values.difficultyClass,
@@ -1622,6 +1628,9 @@
   for (const select of document.querySelectorAll('.domain-character,.combat-actor-choice,.monster-choice'))
     select.addEventListener('change', select === combatActor ? refreshCombatForm : refreshCharacterChoices);
   byId('check-with-effects').addEventListener('change', refreshCheckBranches);
+  byId('domain-check').elements.resolution.addEventListener('change', event => {
+    byId('check-submit').textContent = event.target.value === 'PASSIVE_CHECK_RESOLVED' ? '结算被动检定' : '服务器掷骰检定';
+  });
   byId('domain-rest').elements.kind.addEventListener('change', refreshArcaneRecovery);
   byId('domain-check').elements.kind.addEventListener('change', refreshCheckAbility);
   byId('domain-check').elements.proficiency.addEventListener('change', refreshCheckAbility);

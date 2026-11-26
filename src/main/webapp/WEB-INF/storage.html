@@ -142,9 +142,10 @@
         <form id="domain-equipment"><h3>装备管理</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>操作<select name="kind"><option value="ITEM_ACQUIRED">取得物品</option><option value="ITEM_EQUIPPED">装备物品</option><option value="ITEM_UNEQUIPPED">卸下物品</option><option value="ITEM_REMOVED">移除物品</option></select></label><label>物品规则<select name="item" data-rules="equipment.item" required></select></label><label>已有物品<select name="itemId" class="equipment-choice" data-optional></select></label><label>位置<select name="location"><option value="MAIN_HAND">主手</option><option value="OFF_HAND">副手</option><option value="BOTH_HANDS">双手</option><option value="WORN">穿戴</option></select></label><label>裁定说明<input name="adjudication" value="DM 操作" required maxlength="160"></label><button>应用装备操作</button></form>
         <form id="domain-check"><h3>检定</h3>
           <label>角色<select name="characterId" class="domain-character" required></select></label><label>检定规则<select name="rule" data-rules="adventure.check" required></select></label><label>检定类型<select name="kind"><option value="ABILITY">属性检定</option><option value="SKILL">技能检定</option><option value="TOOL">工具检定</option></select></label><label>技能 / 工具<select name="proficiency" data-rules="character.proficiency,character.tool" data-optional></select></label><label>检定属性<select name="ability" class="ability-choice" required></select><small id="check-skill-default" hidden></small></label><label>DC<input name="difficultyClass" type="number" min="0" max="30" value="10" required></label><label><input name="advantage" type="checkbox"> 优势</label><label><input name="disadvantage" type="checkbox"> 劣势</label><label>裁定说明<input name="adjudication" value="DM 裁定检定" required maxlength="160"></label>
+          <label>结算方式<select name="resolution"><option value="CHECK_RESOLVED">掷骰检定</option><option value="PASSIVE_CHECK_RESOLVED">被动检定（不掷检定骰）</option></select></label>
           <label hidden>历史检定题材<select name="subject" disabled><option value="GENERAL">一般历史</option><option value="STONEWORK_ORIGIN">辨认石工作品来历</option></select></label>
           <label><input name="withEffects" id="check-with-effects" type="checkbox"> 预先声明成功与失败的后果</label>
-          <p id="check-branches-note" hidden>两个分支都会在掷骰前检查；只应用实际结果对应的分支。临时生命值效果使用新值。</p>
+          <p id="check-branches-note" hidden>结算前会检查两个分支，只应用实际结果对应的分支。临时生命值效果使用新值。</p>
           <fieldset data-check-branch="success" hidden disabled><legend>成功时</legend>
             <label>后果目标<select name="successTarget" class="check-branch-character" required></select></label>
             <label>生命值效果（可选）<select name="successEffect" data-rules="adventure.vital_effect" data-optional></select></label>
@@ -167,7 +168,7 @@
             </div>
             <label>结果消息（可选）<input name="failureMessage" maxlength="4096"></label>
           </fieldset>
-          <button>服务器掷骰检定</button>
+          <button id="check-submit">服务器掷骰检定</button>
         </form>
       </div></section>
       <section data-panel="magic" hidden><div class="columns">

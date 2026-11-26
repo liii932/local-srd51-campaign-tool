@@ -19,14 +19,16 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class Schema2CharacterRequestDigestTest {
-    @Test void skillCheckRetainsItsCanonicalCommandDigest() {
-        // Python struct.pack and hashlib produced this 1093-byte vector, confirmed against the
-        // pre-extraction candidate. The v1 domain ends in NUL, UUIDs are text, the two binding
-        // members keep their order, and version is a big-endian long. String lengths count UTF-8
-        // bytes, including the check's adjudication. The SKILL payload follows the empty growth
-        // and rest fields without an extra presence byte, and an empty initial-abilities map ends it.
+    @Test void rolledAndPassiveSkillChecksHaveCanonicalCommandDigests() {
+        // Independently encoded with Python struct.pack and hashlib. The v1 domain ends in NUL,
+        // UUIDs are text, the two binding members keep their order, and version is a big-endian long.
+        // UTF-8 byte lengths frame strings including the adjudication. After the empty growth and
+        // rest fields, the SKILL payload ends in its length-prefixed GENERAL subject and an empty
+        // initial-abilities map follows. Only the command kind differs across the 1104 and 1112 byte vectors.
         var request = skillCheck(id(1), 257);
-        assertEquals("fc73f35355f2949961f83f530b06b8c4e5bf8b704ebea75a36dec536f8d59a11", request.digest());
+        assertEquals("90213b1a1ca20dfcf7448910993338bfaddcb9e0e39bcac2a0c3dfab1c3e23e6", request.digest());
+        assertEquals("c9b195deba9cf5466e0d354b2451e30446bb6a94fe91a59b48fa90310747ffcd",
+                skillCheck(id(1), 257, Schema2CharacterRuntime.PASSIVE_CHECK).digest());
         assertNotEquals(request.digest(), skillCheck(id(1), 258).digest());
     }
 
@@ -38,6 +40,10 @@ class Schema2CharacterRequestDigestTest {
     }
 
     private static Schema2CharacterRequest skillCheck(UUID operation, long version) {
+        return skillCheck(operation, version, Schema2CharacterRuntime.ROLLED_CHECK);
+    }
+
+    private static Schema2CharacterRequest skillCheck(UUID operation, long version, String kind) {
         var binding = new Schema2RulesBinding(ProductionSchema2Projection.CANONICAL_PROFILE,
                 ProductionSchema2Projection.COMPOSITION_ALGORITHM,
                 List.of(new StoredMember("base", "1", Role.BASE, "1".repeat(64), "2".repeat(64)),
@@ -45,7 +51,7 @@ class Schema2CharacterRequestDigestTest {
                 "3".repeat(64), "4".repeat(64), "5".repeat(64));
         var check = new CheckInput(new RuleIdentity("base", "adventure.check", "check.srd2014"), "SKILL", "ability.strength",
                 new RuleIdentity("base", "character.proficiency", "proficiency.skill.athletics"), 17, true, false, "攀越石墙");
-        var command = new Command("CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null, check);
+        var command = new Command(kind, null, 0, null, null, null, GrowthChoices.EMPTY, null, check);
         return new Schema2CharacterRequest(operation, new Schema2PreparationIdentity(id(2), id(3)), id(4), id(5), id(6),
                 binding, version, command, Map.of());
     }

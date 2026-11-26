@@ -5,6 +5,9 @@ import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import java.text.Normalizer;
 import java.util.*;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.MAX_PASSIVE_ADVANTAGE_ADJUSTMENT;
+import static com.dndtool.module.composition.Schema2CompositionKernel.MAX_PASSIVE_BASE_SCORE;
+import static com.dndtool.module.composition.Schema2CompositionKernel.MIN_PASSIVE_BASE_SCORE;
 import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_HISTORY;
 import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_MAX_MULTIPLIER;
 import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_MIN_MULTIPLIER;
@@ -15,7 +18,8 @@ public final class Schema2CharacterRuntime {
 
     public static final int MAX_EVENTS = 128, MAX_RESOURCES = 32;
     public static final List<String> ABILITIES = List.of("ability.strength", "ability.dexterity", "ability.constitution", "ability.intelligence", "ability.wisdom", "ability.charisma");
-    private static final Set<String> KINDS = Set.of("INITIALIZED", "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED", "CHECK_RESOLVED", "ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED", "HEALTH_EFFECT_RESOLVED", "DEATH_SAVE_RESOLVED", "COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED", "COMBAT_RESOURCE_SPENT", "COMBAT_HEALING_APPLIED", "COMBAT_ENVIRONMENT_HEALTH", "SPELLBOOK_INITIALIZED", "SPELLBOOK_ADVANCED", "SPELLBOOK_PREPARED");
+    public static final String ROLLED_CHECK = "CHECK_RESOLVED", PASSIVE_CHECK = "PASSIVE_CHECK_RESOLVED";
+    private static final Set<String> KINDS = Set.of("INITIALIZED", "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED", ROLLED_CHECK, PASSIVE_CHECK, "ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED", "HEALTH_EFFECT_RESOLVED", "DEATH_SAVE_RESOLVED", "COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED", "COMBAT_RESOURCE_SPENT", "COMBAT_HEALING_APPLIED", "COMBAT_ENVIRONMENT_HEALTH", "SPELLBOOK_INITIALIZED", "SPELLBOOK_ADVANCED", "SPELLBOOK_PREPARED");
     private static final Comparator<RuleIdentity> RULE_ORDER = Comparator.comparing(RuleIdentity::moduleKey).thenComparing(RuleIdentity::ruleType).thenComparing(RuleIdentity::ruleKey);
     public static final Comparator<EntryIdentity> SLOT_ORDER = Comparator.comparing(EntryIdentity::rule, RULE_ORDER)
             .thenComparing(EntryIdentity::collectionKey).thenComparing(EntryIdentity::moduleKey).thenComparing(EntryIdentity::entryKey);
@@ -208,13 +212,34 @@ public final class Schema2CharacterRuntime {
         }
     }
 
-    public record CheckResult(int firstD20, Integer secondD20, int selectedD20, int abilityModifier,
+    public record CheckResult(Integer firstD20, Integer secondD20, Integer selectedD20, int abilityModifier,
             int proficiencyBonus, int total, boolean success, boolean effectiveAdvantage, boolean effectiveDisadvantage,
-            int baseProficiencyBonus, RuleIdentity stonecunningRule) {
+            int baseProficiencyBonus, RuleIdentity stonecunningRule, Integer passiveBaseScore, Integer passiveAdjustment) {
+        public CheckResult(int firstD20, Integer secondD20, int selectedD20, int abilityModifier,
+                int proficiencyBonus, int total, boolean success, boolean effectiveAdvantage, boolean effectiveDisadvantage,
+                int baseProficiencyBonus, RuleIdentity stonecunningRule) {
+            this(firstD20, secondD20, selectedD20, abilityModifier, proficiencyBonus, total, success, effectiveAdvantage,
+                    effectiveDisadvantage, baseProficiencyBonus, stonecunningRule, null, null);
+        }
+
         public CheckResult {
-            if (firstD20 < 1 || firstD20 > 20 || secondD20 != null && (secondD20 < 1 || secondD20 > 20)
-                    || selectedD20 < 1 || selectedD20 > 20 || abilityModifier < -5 || abilityModifier > 10
-                    || baseProficiencyBonus < 2 || baseProficiencyBonus > 6 || total != selectedD20 + abilityModifier + proficiencyBonus)
+            if (abilityModifier < -5 || abilityModifier > 10 || baseProficiencyBonus < 2 || baseProficiencyBonus > 6)
+                throw new IllegalArgumentException("S2_CHARACTER_CHECK_RESULT");
+            boolean validScore;
+            if (passiveBaseScore != null) {
+                int advantageDirection = (effectiveAdvantage ? 1 : 0) - (effectiveDisadvantage ? 1 : 0);
+                validScore = firstD20 == null && secondD20 == null && selectedD20 == null
+                        && passiveBaseScore >= MIN_PASSIVE_BASE_SCORE && passiveBaseScore <= MAX_PASSIVE_BASE_SCORE
+                        && passiveAdjustment != null
+                        && passiveAdjustment >= Math.min(0, advantageDirection * MAX_PASSIVE_ADVANTAGE_ADJUSTMENT)
+                        && passiveAdjustment <= Math.max(0, advantageDirection * MAX_PASSIVE_ADVANTAGE_ADJUSTMENT)
+                        && total == passiveBaseScore + passiveAdjustment + abilityModifier + proficiencyBonus;
+            } else {
+                validScore = passiveAdjustment == null && validD20(firstD20) && validD20(selectedD20)
+                        && (secondD20 == null || validD20(secondD20))
+                        && total == selectedD20 + abilityModifier + proficiencyBonus;
+            }
+            if (!validScore)
                 throw new IllegalArgumentException("S2_CHARACTER_CHECK_RESULT");
             boolean validProficiency = stonecunningRule == null ? proficiencyBonus == 0 || proficiencyBonus == baseProficiencyBonus
                     : validRule(stonecunningRule, "character.stonecunning")
@@ -224,6 +249,8 @@ public final class Schema2CharacterRuntime {
             if (!validProficiency)
                 throw new IllegalArgumentException("S2_CHARACTER_CHECK_RESULT");
         }
+
+        private static boolean validD20(Integer value) { return value != null && value >= 1 && value <= 20; }
     }
 
     static int ordinaryCheckProficiency(State state, CheckInput input) {
@@ -313,7 +340,7 @@ public final class Schema2CharacterRuntime {
                 };
                 if (restInput != null && !"REST_COMPLETED".equals(kind)) valid &= restInput.recoveredSpellSlots().isEmpty();
             } else valid &= restInput == null;
-            if ("CHECK_RESOLVED".equals(kind)) valid = resource == null && amount == 0 && recoveryTrigger == null && hpChoice == null
+            if (checkKind(kind)) valid = resource == null && amount == 0 && recoveryTrigger == null && hpChoice == null
                     && targetClass == null && GrowthChoices.EMPTY.equals(growthChoices) && restInput == null && checkInput != null;
             else valid &= checkInput == null;
             if (equipmentKind(kind)) {
@@ -391,6 +418,7 @@ public final class Schema2CharacterRuntime {
         require(previous.equals(history.current()) && rows <= MAX_HISTORY_CHILD_ROWS);
     }
     public static boolean spellbookKind(String kind) { return kind!=null && Set.of("SPELLBOOK_INITIALIZED","SPELLBOOK_ADVANCED","SPELLBOOK_PREPARED").contains(kind); }
+    public static boolean checkKind(String kind) { return ROLLED_CHECK.equals(kind) || PASSIVE_CHECK.equals(kind); }
     public static boolean restKind(String kind) { return kind != null && Set.of("REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED").contains(kind); }
     public static boolean equipmentKind(String kind) { return kind != null && Set.of("ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED").contains(kind); }
     public static boolean combatKind(String kind) { return kind != null && Set.of("COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED", "COMBAT_RESOURCE_SPENT", "COMBAT_HEALING_APPLIED", "COMBAT_ENVIRONMENT_HEALTH").contains(kind); }
@@ -400,7 +428,7 @@ public final class Schema2CharacterRuntime {
         require(event != null && event.command() != null); uuid(event.operationId());
         require(event.requestDigest() != null && event.requestDigest().matches("[0-9a-f]{64}") && KINDS.contains(event.kind()));
         validateState(event.after()); State after = event.after(), before = event.before(); Command command = event.command();
-        require("CHECK_RESOLVED".equals(event.kind()) == (event.checkResult() != null));
+        require(checkKind(event.kind()) == (event.checkResult() != null));
         require(healthKind(event.kind()) == (event.healthResult() != null));
         require(!Set.of(after.identity().runId(), after.identity().snapshotId(), after.campaignId(), after.characterId(), after.preparationOperationId()).contains(event.operationId()));
         if (before == null) require(event.kind().equals("INITIALIZED") && after.version() == 0 && after.level() == 1 && event.hitDieRoll() == null && after.equipment().isEmpty() && after.health().equals(HealthState.INITIAL) && after.spellbook()==null);
@@ -459,15 +487,19 @@ public final class Schema2CharacterRuntime {
                             && (event.kind().equals("COMBAT_DEATH_SAVE_RESOLVED") ? result.dice().size() <= 1 && result.dice().stream().allMatch(d -> d <= 4) : result.dice().isEmpty())
                             : result.deathD20() == null && result.recoveryD4() == null);
                 }
-            } else if (event.kind().equals("CHECK_RESOLVED")) {
+            } else if (checkKind(event.kind())) {
                 require(event.hitDieRoll() == null && before.rest().active() == null && before.equals(withVersion(after, before.version())));
                 CheckInput input = command.checkInput(); CheckResult result = event.checkResult();
-                require((result.effectiveAdvantage() != result.effectiveDisadvantage()) == (result.secondD20() != null));
-                int selected = result.secondD20() == null ? result.firstD20() : result.effectiveAdvantage()
-                        ? Math.max(result.firstD20(), result.secondD20()) : Math.min(result.firstD20(), result.secondD20());
+                require(PASSIVE_CHECK.equals(event.kind()) == (result.passiveBaseScore() != null));
+                if (ROLLED_CHECK.equals(event.kind())) {
+                    require((result.effectiveAdvantage() != result.effectiveDisadvantage()) == (result.secondD20() != null));
+                    int selected = result.secondD20() == null ? result.firstD20() : result.effectiveAdvantage()
+                            ? Math.max(result.firstD20(), result.secondD20()) : Math.min(result.firstD20(), result.secondD20());
+                    require(result.selectedD20() == selected);
+                }
                 require(result.stonecunningRule() == null ? result.proficiencyBonus() == ordinaryCheckProficiency(before, input)
                         : input.subject().equals(CheckInput.STONEWORK_ORIGIN));
-                require(result.selectedD20() == selected && result.abilityModifier() == Math.floorDiv(before.abilities().get(input.abilityKey()) - 10, 2)
+                require(result.abilityModifier() == Math.floorDiv(before.abilities().get(input.abilityKey()) - 10, 2)
                         && result.baseProficiencyBonus() == before.proficiencyBonus() && result.success() == (result.total() >= input.difficultyClass()));
             } else if (restKind(event.kind())) {
                 require(before.abilities().equals(after.abilities()) && before.level() == after.level() && before.classes().equals(after.classes()) && before.subclasses().equals(after.subclasses()) && before.features().equals(after.features()) && before.feats().equals(after.feats()) && before.proficiencies().equals(after.proficiencies()));

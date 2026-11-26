@@ -37,6 +37,8 @@ public final class Schema2CompositionKernel {
     public static final RuleIdentity STONECUNNING_DWARF = new RuleIdentity("srd51_runtime", "character.race", "race.dwarf");
     public static final RuleIdentity STONECUNNING_HISTORY = new RuleIdentity("srd51_runtime", "character.proficiency",
             "proficiency.skill.history");
+    public static final int MIN_PASSIVE_BASE_SCORE = 1, MAX_PASSIVE_BASE_SCORE = 20;
+    public static final int MIN_PASSIVE_ADVANTAGE_ADJUSTMENT = 0, MAX_PASSIVE_ADVANTAGE_ADJUSTMENT = 10;
     private static final String STONECUNNING_TYPE = "character.stonecunning";
     private static final int MAX_SUBRACE_HIT_POINT_BONUS = 5;
     public static final int MAX_PACKAGES = 8;
@@ -69,7 +71,8 @@ public final class Schema2CompositionKernel {
         STEALTH_DISADVANTAGE("stealth_disadvantage"), HANDS("hands"), STEALTH_SKILL("stealth_skill"),
         FIRST_LEVEL_BONUS("first_level_bonus"), PER_ADDITIONAL_LEVEL_BONUS("per_additional_level_bonus"),
         SKILL("skill"), PROFICIENCY_MULTIPLIER("proficiency_multiplier"),
-        ALLOW_ALTERNATE_SKILL_ABILITY("allow_alternate_skill_ability"),
+        ALLOW_ALTERNATE_SKILL_ABILITY("allow_alternate_skill_ability"), PASSIVE_BASE_SCORE("passive_base_score"),
+        PASSIVE_ADVANTAGE_ADJUSTMENT("passive_advantage_adjustment"),
         DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"),
         HEAVY_ARMOR_SPEED_POLICY("heavy_armor_speed_policy"), HEAVY_ARMOR_SPEED_PENALTY_FEET("heavy_armor_speed_penalty_feet"), REQUIRED_SUBCLASS("required_subclass"), REQUIRED_FEATURE("required_feature"), SLOT_RESOURCE("slot_resource"), BLESS("bless"), CURE_WOUNDS("cure_wounds"), MATERIAL_ITEM("material_item"), RANK2_SLOT_RESOURCE("rank2_slot_resource"), RANK3_SLOT_RESOURCE("rank3_slot_resource"), SPELL("spell"), ENABLED("enabled");
         private final String key;
@@ -157,7 +160,8 @@ public final class Schema2CompositionKernel {
     public record RestDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             String algorithm, String authorNote) implements Definition { }
     public record CheckDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
-            String algorithm, boolean allowAlternateSkillAbility, String authorNote) implements Definition { }
+            String algorithm, boolean allowAlternateSkillAbility, int passiveBaseScore,
+            int passiveAdvantageAdjustment, String authorNote) implements Definition { }
     public enum EquipmentKind { LIGHT_ARMOR, MEDIUM_ARMOR, HEAVY_ARMOR, SHIELD, TOOL, WEAPON, HOLY_SYMBOL }
     public enum VitalEffectKind { DAMAGE, HEALING, TEMP_HP }
     public enum DamageType { ACID, BLUDGEONING, COLD, FIRE, FORCE, LIGHTNING, NECROTIC, PIERCING, POISON, PSYCHIC, RADIANT, SLASHING, THUNDER }
@@ -1454,7 +1458,8 @@ public final class Schema2CompositionKernel {
             case "character.feat" -> Set.of("prerequisite", "execution_mode", "execution_algorithm");
             case "character.proficiency" -> Set.of("category");
             case "adventure.rest" -> Set.of("algorithm");
-            case "adventure.check" -> Set.of("algorithm", "allow_alternate_skill_ability");
+            case "adventure.check" -> Set.of("algorithm", "allow_alternate_skill_ability",
+                    "passive_base_score", "passive_advantage_adjustment");
             default -> Set.of("category", "minimum_enabled_members");
         });
         var row = shape(input, required, identity.ruleType().equals("character.proficiency")
@@ -1471,7 +1476,10 @@ public final class Schema2CompositionKernel {
         if (identity.ruleType().equals("adventure.check"))
             return new CheckDefinition(identity, name, description, page,
                     mechanismAlgorithm(identity.ruleType(), row.get("algorithm"), source.child("algorithm")),
-                    booleanAtom(row.get("allow_alternate_skill_ability"), source.child("allow_alternate_skill_ability")), note);
+                    booleanAtom(row.get("allow_alternate_skill_ability"), source.child("allow_alternate_skill_ability")),
+                    integer(row.get("passive_base_score"), MIN_PASSIVE_BASE_SCORE, MAX_PASSIVE_BASE_SCORE, source.child("passive_base_score")),
+                    integer(row.get("passive_advantage_adjustment"), MIN_PASSIVE_ADVANTAGE_ADJUSTMENT,
+                            MAX_PASSIVE_ADVANTAGE_ADJUSTMENT, source.child("passive_advantage_adjustment")), note);
         if (identity.ruleType().equals("character.subclass")) return new SubclassDefinition(identity, name, description, page,
                 typedReference(row.get("owner_class"), "character.class", source.child("owner_class")),
                 integer(row.get("selection_level"), 1, 20, source.child("selection_level")), note);
@@ -1733,6 +1741,9 @@ public final class Schema2CompositionKernel {
             case ARMOR_CLASS -> new IntegerValue(integer(value, 0, 20, source.child("value")));
             case STRENGTH_MINIMUM -> new IntegerValue(integer(value, 0, 30, source.child("value")));
             case STEALTH_DISADVANTAGE, ALLOW_ALTERNATE_SKILL_ABILITY -> new BooleanValue(booleanAtom(value, source.child("value")));
+            case PASSIVE_BASE_SCORE -> new IntegerValue(integer(value, MIN_PASSIVE_BASE_SCORE, MAX_PASSIVE_BASE_SCORE, source.child("value")));
+            case PASSIVE_ADVANTAGE_ADJUSTMENT -> new IntegerValue(integer(value, MIN_PASSIVE_ADVANTAGE_ADJUSTMENT,
+                    MAX_PASSIVE_ADVANTAGE_ADJUSTMENT, source.child("value")));
             case HANDS -> new IntegerValue(integer(value, 0, 2, source.child("value")));
             case DICE_COUNT -> new IntegerValue(integer(value, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 1 : 0, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 4 : 20, source.child("value")));
             case DICE_SIDES -> { if (((RuleIdentity)target).ruleType().equals("equipment.weapon_attack")) yield new IntegerValue(weaponDie(value,source.child("value"))); int sides = integer(value, 0, 12, source.child("value")); if (!Set.of(0,4,6,8,10,12).contains(sides)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported vital die", source); yield new IntegerValue(sides); }
@@ -2551,7 +2562,8 @@ public final class Schema2CompositionKernel {
         if (type.equals("equipment.item")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.ARMOR_CLASS, Field.STRENGTH_MINIMUM, Field.STEALTH_DISADVANTAGE, Field.HANDS, Field.PROFICIENCY, Field.STEALTH_SKILL, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.vital_effect")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.DICE_COUNT, Field.DICE_SIDES, Field.MODIFIER, Field.DAMAGE_TYPE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.check")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
-                Field.ALGORITHM, Field.ALLOW_ALTERNATE_SKILL_ABILITY, Field.AUTHOR_NOTE);
+                Field.ALGORITHM, Field.ALLOW_ALTERNATE_SKILL_ABILITY, Field.PASSIVE_BASE_SCORE,
+                Field.PASSIVE_ADVANTAGE_ADJUSTMENT, Field.AUTHOR_NOTE);
         if (type.equals("adventure.rest") || type.equals("adventure.health") || type.equals("adventure.combat")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (sourceType(type)) return type.equals("character.subrace")
                 ? List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.PARENT_RACE, Field.AUTHOR_NOTE)
@@ -2840,6 +2852,8 @@ public final class Schema2CompositionKernel {
         } else if (value instanceof CheckDefinition check) {
             result.put("description", check.description()); result.put("source_page", check.sourcePage()); result.put("algorithm", check.algorithm());
             result.put("allow_alternate_skill_ability", check.allowAlternateSkillAbility());
+            result.put("passive_base_score", check.passiveBaseScore());
+            result.put("passive_advantage_adjustment", check.passiveAdvantageAdjustment());
         } else if (value instanceof RestDefinition rest) {
             result.put("description", rest.description()); result.put("source_page", rest.sourcePage()); result.put("algorithm", rest.algorithm());
         } else result.put("minimum_enabled_members", value instanceof LanguageSetDefinition set

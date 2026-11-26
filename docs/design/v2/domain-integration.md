@@ -14,7 +14,7 @@
 | 授予与成长 | 语言工具、职业、子职业、ASI/专长、多职业 | 初始计划、成长事实、规则 | 合法选择、非法引用与等级/资格；完整保留初始和当前事实 |
 | 资源与休息 | 消耗、生命骰、短/长休、奥术回想 | 角色资源、累计经历时间和休息资格由角色拥有 | 核准确时间域、休息资格与间隔，失败无消耗 |
 | 物品与装备 | 简单物品数量、实例装备、穿脱 | 角色物品、规则、护甲/组件 | 数量与资格边界，战斗/施法读取同一装备 |
-| 检定与健康 | d20、优势劣势、伤害/治疗/临时HP、死亡豁免 | 服务器原骰、角色HP、历史 | 校验先于RNG，同请求不重掷，旧版本不写入 |
+| 检定与健康 | 主动掷骰、被动分数、伤害/治疗/临时 HP、死亡豁免 | 服务器原骰或确定性分数、角色 HP、历史 | 先校验请求与各分支，同请求复用结果，旧版本不写入 |
 | 场景与位置 | 节点图、局部网格、安置交接、DM 切焦点 | 世界节点、场景、唯一安置、焦点和各空间逻辑时钟 | 完整验证位置与焦点代次，后台冻结，全部空间直接恢复。见[世界与场景](world-and-scene-spaces.md) |
 | 战斗与动作 | 先攻回合、攻击、移动、OA、Ready、反应继续 | 场景、角色、规则和所属空间的动作流 | 焦点空间推进，受影响角色共同提交，全部未决窗口直接恢复 |
 | 施法 | 书籍、准备、位数及已支持法术 | 角色资源/装备、动作、规则 | Bless/Cure Wounds/Shield/Counterspell/Burning Hands 的实际支持边界 |
@@ -55,7 +55,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 | 回气附赠动作 | SQLite `combat-command/SECOND_WIND`；战斗及健康/资源 owner | 一级实际授予；角色资源/HP、战斗命令原骰及两条角色子历史，同根一次提交 | 保存和直接恢复已付成本、实际治疗与原攻击序列；不用新余额或表 | 本人 ACTIVE 回合、单职业 1–6 级、满 HP/耗尽/过期/回滚/准确授予 |
 | 资源与休息 | character-command；成长与休息网页的资源、生命骰、时间及奥术回想位数选择 | 当前资源、生命骰及休息由角色聚合拥有；`resources_character` 为核验投影 | 同一空间的推进量同根提交，角色累计秒可以不同；原骰、每日使用及消耗直接恢复 | 准确空间、累计日界、资格/预算/位数、失败无部分收益、保存/END/重开 |
 | 物品与装备 | `item`、`manual-item`；`character-command` 的装备分支 | 简单物品归 `scenes_world`，保留来源、说明、数量和状态；装备实例归角色，`equipment_instance` 核验 | 自由卡保留背包、麻绳和火把模板、临时物品与归档。规则装备保留取得、穿脱、掉落和移除事实 | 核对所有者、版本、数量和护甲限制，战斗与施法组件读取同一装备。恢复直接装载实例及历史 |
-| 检定与健康 | `character-command`、`check-effects`、`manual-check`。角色基础规则、`CampaignCheckEffects`、`CampaignManualCommands` | 候选原骰、选骰、DC、修正、成功状态、效果计划、HP/临时 HP/死亡及版本进入角色与根历史 | 自由卡支持属性、技能、豁免及 MANUAL，分支可按序调整自由卡 HP、授予模板或临时物品、定位并记录消息。规则卡按冻结规则执行属性、技能及工具检定，每个分支可对一个合格规则角色使用冻结健康效果、变更一个已有简单物品的数量、定位并记录消息 | 两分支、目标和版本核对先于取骰，选中分支后果和根/子历史共同提交。精确能力差异见下方[支持边界](#支持边界和设计修订) |
+| 检定与健康 | `character-command`、`check-effects`、`manual-check`。角色基础规则、`CampaignCheckEffects`、`CampaignManualCommands` | 原骰与选骰或被动分数依据、DC、修正、成功状态、效果计划、HP/临时 HP/死亡及版本进入角色与根历史 | 自由卡支持属性、技能、豁免及 MANUAL，分支可按序调整自由卡 HP、授予模板或临时物品、定位并记录消息。DM 按冻结规则执行规则卡的主动或被动属性、技能及工具检定，每个分支可对一个合格规则角色使用冻结健康效果、变更一个已有简单物品的数量、定位并记录消息 | 两分支、目标和版本核对先于检定与任何取骰，选中分支后果和根/子历史共同提交。精确能力差异见下方[支持边界](#支持边界和设计修订) |
 | 地图、场景与焦点 | `node-create`、`node-link`、`position`、`focus-set`、`scene-*`、`space-move`、`travel`；`CampaignSpaceCommands` | `scenes_world` 的世界节点、唯一安置、场景、焦点和各空间钟 | 自建节点与路线取代固定酒馆地图。首次安置、沿路线旅行、逐格移动及进出场使用各自命令。DM 裁定场景允许直接定位已入场的规则角色或自由卡 | 错锚点、占位、版本与焦点代次、后台冻结、源空间计时和跨文件恢复。三维区域及跨空间被动因果待采用 |
 | 战斗与动作 | combat-command；`CampaignDomainEngine`、`Schema2CombatRules` | `combat_scene` 完整当前/历史，`actions_frame` 为核验投影；角色 HP/资源仍属角色 | 先攻、回合、攻击、移动、OA、Ready、窗口/机会/父子帧与继续点完整保存 | OPEN/CLOSED 窗口保存恢复；支付/原骰只一次；跨角色后果共同提交 |
 | 倒地姿态与爬行 | `combat-command/DROP_PRONE/MOVE/EXPLORATION_MOVE/STAND_UP/READY_MOVE`；战斗、探索与动作继续 owner | 复用 `Combatant.prone`、半尺战斗成本、物理路径游标和探索速度预检，无第二份状态 | 完整文件保留姿态、已走前缀、反应支付及未决继续点；原包/结构不变，B 类应用能力 | [有限倒地合同](../../rules/schema-2-prone.md)；ACTIVE/Ready 爬行及失能停止保持；探索卧倒零耗时，爬行按当前速度限额，移动/起身各六秒并保留旧战斗预算，逐格区域与末尾到期同事务；战斗交接/END 重开不清姿态，起身前不能离场；推撞/擒抱未接入 |
@@ -72,12 +72,11 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@10`、`srd51_characters@10`、`srd51_magic@10`，第四个成员分别为
-`dm_runtime_house_rules@19` 与 `dm_runtime_house_rules@20`。绑定保留成员顺序、准确版本与
+`srd51_runtime@11`、`srd51_characters@11`、`srd51_magic@11`，第四个成员分别为
+`dm_runtime_house_rules@21` 与 `dm_runtime_house_rules@22`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和
-历史校验共同使用所选战役的冻结规则上下文。变体默认以感知结算运动，还允许 DM 为本次技能检定选择其他属性，石工知识采用三倍熟练，自定义工匠获得侏儒语，
-DM 定额钝击伤害为 3 HP。作者和消费者的对应关系见[规则包指南](../../../rule-packages/srd51-runtime/package-guide.md)。
+历史校验共同使用所选战役的冻结规则上下文。标准被动基数为 10，优劣势调整幅度为 5。检定变体分别使用 12 和 3，运动默认以感知结算，允许 DM 为本次技能检定选择其他属性。变体的石工知识采用三倍熟练，自定义工匠获得侏儒语，DM 定额钝击伤害为 3 HP。作者和消费者的对应关系见[规则包指南](../../../rule-packages/srd51-runtime/package-guide.md)。
 
 规则角色、自由卡和怪物共用网格与占位。自动战斗按场景内具备规则事实的参与者结算。
 进出场更新当前名册，已完成动作按各事件当时的名册和版本核验。
@@ -91,6 +90,7 @@ DM 定额钝击伤害为 3 HP。作者和消费者的对应关系见[规则包�
 | 规则角色、成长与装备 | `CampaignDomainEngineTest`、`CampaignDomainsIntegrationTest`；工作台角色/成长/装备/检定表单 | 完整初始/当前及历史、成长和装备共用同一卡、原骰与版本保留；晚写回滚，保存/END 重开后逐项比较 |
 | 自由卡与有序后果 | `CampaignManualIntegrationTest`、`StorageHttpIntegrationTest` 的自由卡旅程、`tools/storage/browser-manual-check-draft.cjs` | 自由字段/职业/熟练、混合网格、两分支事前验证、服务端骰、顺序与全部可能目标版本、共同提交及回滚。准确重开保留已执行后果，未提交草稿按运行隔离 |
 | 规则卡分支后果 | `CampaignCheckEffectsTest`、`CampaignRuleBindingIntegrationTest`、工作台规则卡检定表单 | 两分支的准确冻结效果与焦点/目标，含非法未选分支零取骰。同一角色的检定与健康子事件保留连续版本，事实、根历史和收据共同提交并按原文件校验 |
+| 规则卡被动检定 | `Schema2CheckCompositionTest`、`CampaignPassiveCheckIntegrationTest`、[独立作者场景](../../../rule-packages/srd51-runtime/scenarios/README.md#验证被动检定) | 核对标准及变体参数，实际分数、无检定骰、选中后果独立取骰、原子提交与同请求查证。完整文件保存、END 和重开时按原属性、装备、熟练及冻结材料重验分数和后果 |
 | 根历史与因果 | `CampaignDomainRootValidationTest` | 节点/物品语义、历史前缀、准确子事件归属及逐根空间时钟，拒绝最终值自洽但过程伪造的文件 |
 | 直接定位与分支定位 | `CampaignScenePlacementIntegrationTest`、`CampaignCheckEffectsTest`、`CampaignManualIntegrationTest`、`StorageHttpIntegrationTest`、`tools/storage/browser-smoke.cjs` | 焦点裁定场景的非相邻空格、双分支都预检、分支内逐步校验位置版本和占位、拒绝零取骰、晚写回滚、原请求查证、保存和重开。审计核对原格和目标格、版本、原骰、其他后果及历史。 |
 | 空间闭环 | `CampaignSpacesIntegrationTest`、`CampaignSpaceTimeBoundaryTest`；`tools/storage/browser-spaces.cjs` | DM 旅行、混合占位、两个待继续场景、旧焦点零 RNG、FINAL 重开及只继续原后缀 |

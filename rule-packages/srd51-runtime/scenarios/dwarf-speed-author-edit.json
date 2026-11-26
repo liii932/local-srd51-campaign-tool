@@ -1,5 +1,5 @@
 {
-  "members": ["srd51_runtime@10", "srd51_characters@10", "srd51_magic@10", "dm_runtime_house_rules@19"],
+  "members": ["srd51_runtime@11", "srd51_characters@11", "srd51_magic@11", "dm_runtime_house_rules@21"],
   "driver": "BundledSrd51Scenarios",
   "cases": ["dwarf-speed-author-edit"]
 }
