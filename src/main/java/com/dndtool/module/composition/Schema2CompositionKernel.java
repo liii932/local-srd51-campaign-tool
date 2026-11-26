@@ -29,6 +29,8 @@ public final class Schema2CompositionKernel {
     public static final String FIGHTER_EXTRA_ATTACK_ALGORITHM = "SRD_2014_FIGHTER_EXTRA_ATTACK_V1";
     public static final String CHAMPION_IMPROVED_CRITICAL_ALGORITHM = "SRD_2014_CHAMPION_IMPROVED_CRITICAL_V1";
     public static final String FIGHTER_SECOND_WIND_ALGORITHM = "SRD_2014_FIGHTER_SECOND_WIND_V1";
+    public static final String WALKING_SPEED_ALGORITHM = "SRD_2014_WALKING_SPEED_V1";
+    public static final String HEAVY_ARMOR_MOVEMENT_ALGORITHM = "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1";
     public static final int MAX_PACKAGES = 8;
     private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
     private static final int MAX_RUNTIME_CHAINS = 3072, MAX_RUNTIME_STEPS = 4096;
@@ -57,7 +59,8 @@ public final class Schema2CompositionKernel {
         FEATURE_KIND("feature_kind"), EXECUTION_ALGORITHM("execution_algorithm"), PREREQUISITE("prerequisite"),
         ABILITY_KEY("ability_key"), PROFICIENCY("proficiency"), GROWTH_GRANT("growth_grant"), ALGORITHM("algorithm"), KIND("kind"), ARMOR_CLASS("armor_class"), STRENGTH_MINIMUM("strength_minimum"),
         STEALTH_DISADVANTAGE("stealth_disadvantage"), HANDS("hands"), STEALTH_SKILL("stealth_skill"),
-        DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"), REQUIRED_SUBCLASS("required_subclass"), REQUIRED_FEATURE("required_feature"), SLOT_RESOURCE("slot_resource"), BLESS("bless"), CURE_WOUNDS("cure_wounds"), MATERIAL_ITEM("material_item"), RANK2_SLOT_RESOURCE("rank2_slot_resource"), RANK3_SLOT_RESOURCE("rank3_slot_resource"), SPELL("spell"), ENABLED("enabled");
+        DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"),
+        HEAVY_ARMOR_SPEED_POLICY("heavy_armor_speed_policy"), HEAVY_ARMOR_SPEED_PENALTY_FEET("heavy_armor_speed_penalty_feet"), REQUIRED_SUBCLASS("required_subclass"), REQUIRED_FEATURE("required_feature"), SLOT_RESOURCE("slot_resource"), BLESS("bless"), CURE_WOUNDS("cure_wounds"), MATERIAL_ITEM("material_item"), RANK2_SLOT_RESOURCE("rank2_slot_resource"), RANK3_SLOT_RESOURCE("rank3_slot_resource"), SPELL("spell"), ENABLED("enabled");
         private final String key;
         Field(String key) { this.key = key; }
         public String key() { return key; }
@@ -92,7 +95,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, ArmorMovementDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -161,8 +164,12 @@ public final class Schema2CompositionKernel {
     public record WeaponAttackDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             RuleIdentity item, WeaponAbilityPolicy abilityPolicy, int diceCount, int diceSides, DamageType damageType,
             int reachFeet, String algorithm, String authorNote) implements Definition { }
+    public enum HeavyArmorSpeedPolicy { APPLY, IGNORE }
     public record MovementDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
-            RuleIdentity owner, int walkSpeedFeet, String algorithm, String authorNote) implements Definition { }
+            RuleIdentity owner, int walkSpeedFeet, HeavyArmorSpeedPolicy heavyArmorSpeedPolicy,
+            String algorithm, String authorNote) implements Definition { }
+    public record ArmorMovementDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            int heavyArmorSpeedPenaltyFeet, String algorithm, String authorNote) implements Definition { }
     public record SpellDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             String algorithm, String authorNote) implements Definition { }
     public record SpellcastingDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
@@ -278,7 +285,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalArmorMovement, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -341,6 +348,9 @@ public final class Schema2CompositionKernel {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalMovement(MovementDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalArmorMovement(ArmorMovementDefinition definition, boolean enabled) implements FinalRule {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
 
@@ -1258,7 +1268,7 @@ public final class Schema2CompositionKernel {
     }
 
     private static boolean executionType(String type) {
-        return Set.of("equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
+        return Set.of("equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
     }
     private static Definition executionDefinition(Object input, RuleIdentity identity, Location source) {
         Set<String> required = new HashSet<>(Set.of("identity", "display_name", "description", "source_page", "algorithm"));
@@ -1269,7 +1279,9 @@ public final class Schema2CompositionKernel {
         } else if (identity.ruleType().equals("equipment.weapon_attack")) {
             required.addAll(Set.of("item", "ability_policy", "dice_count", "dice_sides", "damage_type", "reach_feet"));
         } else if (identity.ruleType().equals("character.movement")) {
-            required.addAll(Set.of("owner", "walk_speed_feet"));
+            required.addAll(Set.of("owner", "walk_speed_feet", "heavy_armor_speed_policy"));
+        } else if (identity.ruleType().equals("equipment.armor_movement")) {
+            required.add("heavy_armor_speed_penalty_feet");
         } else if (identity.ruleType().equals("character.spellcasting")) {
             required.addAll(Set.of("owner_class", "required_subclass", "required_feature", "slot_resource", "bless", "cure_wounds", "material_item", "ability_key"));
         } else if (identity.ruleType().equals("character.wizard_spellcasting")) {
@@ -1311,9 +1323,13 @@ public final class Schema2CompositionKernel {
         }
         if (identity.ruleType().equals("adventure.environment")) return new EnvironmentDefinition(identity,name,description,page,algorithm,note);
         if (identity.ruleType().equals("adventure.combat")) return new CombatDefinition(identity,name,description,page,algorithm,note);
-        if (identity.ruleType().equals("character.movement")) return new MovementDefinition(identity,name,description,page,
+        if (identity.ruleType().equals("character.movement")) return new MovementDefinition(identity, name, description, page,
                 typedReference(row.get("owner"), "character.race|character.subrace", source.child("owner")),
-                walkingSpeed(row.get("walk_speed_feet"), source.child("walk_speed_feet")),algorithm,note);
+                movementDistance(row.get("walk_speed_feet"), 5, source.child("walk_speed_feet")),
+                enumValue(HeavyArmorSpeedPolicy.class, row.get("heavy_armor_speed_policy"), source.child("heavy_armor_speed_policy")),
+                algorithm, note);
+        if (identity.ruleType().equals("equipment.armor_movement")) return new ArmorMovementDefinition(identity, name, description, page,
+                movementDistance(row.get("heavy_armor_speed_penalty_feet"), 0, source.child("heavy_armor_speed_penalty_feet")), algorithm, note);
         if (identity.ruleType().equals("equipment.weapon_attack")) return new WeaponAttackDefinition(identity,name,description,page,
                 typedReference(row.get("item"), "equipment.item", source.child("item")),
                 enumValue(WeaponAbilityPolicy.class,row.get("ability_policy"),source.child("ability_policy")),
@@ -1323,7 +1339,7 @@ public final class Schema2CompositionKernel {
         if (identity.ruleType().equals("equipment.item")) {
             EquipmentKind kind = enumValue(EquipmentKind.class, row.get("kind"), source.child("kind"));
             int ac = integer(row.get("armor_class"), 0, 20, source.child("armor_class"));
-            int strength = integer(row.get("strength_minimum"), 0, 15, source.child("strength_minimum"));
+            int strength = integer(row.get("strength_minimum"), 0, 30, source.child("strength_minimum"));
             int hands = integer(row.get("hands"), 0, 2, source.child("hands"));
             boolean stealth = booleanAtom(row.get("stealth_disadvantage"), source.child("stealth_disadvantage"));
             RuleIdentity proficiency = row.containsKey("proficiency") ? typedReference(row.get("proficiency"), kind == EquipmentKind.TOOL ? "character.tool" : "character.proficiency", source.child("proficiency")) : null;
@@ -1331,7 +1347,7 @@ public final class Schema2CompositionKernel {
                 throw fail("S2_TYPE",Stage.AUTHOR,"Only a one-hand holy symbol omits proficiency",source);
             RuleIdentity skill = row.containsKey("stealth_skill") ? typedReference(row.get("stealth_skill"), "character.proficiency", source.child("stealth_skill")) : null;
             boolean armor = Set.of(EquipmentKind.LIGHT_ARMOR, EquipmentKind.MEDIUM_ARMOR, EquipmentKind.HEAVY_ARMOR).contains(kind);
-            if (stealth != (skill != null) || (armor ? hands != 0 || ac < 10 || !Set.of(0,13,15).contains(strength)
+            if (stealth != (skill != null) || (armor ? hands != 0 || ac < 10
                     || (kind != EquipmentKind.HEAVY_ARMOR && strength != 0)
                     : strength != 0 || stealth || (kind == EquipmentKind.SHIELD ? hands != 1 || ac != 2 : hands < 1 || ac != 0)))
                 throw fail("S2_TYPE", Stage.AUTHOR, "Equipment kind and complete mechanics disagree", source);
@@ -1346,10 +1362,10 @@ public final class Schema2CompositionKernel {
             throw fail("S2_TYPE", Stage.AUTHOR, "Vital effect kind and complete dice mechanics disagree", source);
         return new VitalEffectDefinition(identity,name,description,page,kind,count,sides,modifier,damage,algorithm,note);
     }
-    private static int walkingSpeed(Object value, Location source) {
-        int result=integer(value,5,120,source);
-        if(result%5!=0) throw fail("S2_TYPE",Stage.AUTHOR,"Walking speed must use five-foot increments",source);
-        return result;
+    private static int movementDistance(Object value, int minimum, Location source) {
+        int feet = integer(value, minimum, 120, source);
+        if (feet % 5 != 0) throw fail("S2_TYPE", Stage.AUTHOR, "Movement distance must use five-foot increments", source);
+        return feet;
     }
     private static int weaponDie(Object value, Location source) {
         int result=integer(value,4,12,source);
@@ -1617,7 +1633,9 @@ public final class Schema2CompositionKernel {
             case OWNER -> new IdentityValue(typedReference(value, ((RuleIdentity)target).ruleType().equals("character.movement") ? "character.race|character.subrace" : "character.class|character.subclass",source.child("value")));
             case ABILITY_POLICY -> new TextValue(enumValue(WeaponAbilityPolicy.class,value,source.child("value")).name());
             case REACH_FEET -> new IntegerValue(reach(value,source.child("value")));
-            case WALK_SPEED_FEET -> new IntegerValue(walkingSpeed(value,source.child("value")));
+            case WALK_SPEED_FEET -> new IntegerValue(movementDistance(value, 5, source.child("value")));
+            case HEAVY_ARMOR_SPEED_POLICY -> new TextValue(enumValue(HeavyArmorSpeedPolicy.class, value, source.child("value")).name());
+            case HEAVY_ARMOR_SPEED_PENALTY_FEET -> new IntegerValue(movementDistance(value, 0, source.child("value")));
             case HIT_DIE_SIDES -> new IntegerValue(hitDieSides(value, source.child("value")));
             case SUPPORTED_MAXIMUM_LEVEL -> new IntegerValue(integer(value, 1, 20, source.child("value")));
             case PROFICIENCY_BONUS_PROFILE, MAXIMUM_PROFILE, RECOVERY_PROFILE -> new TextValue(profile(field, value, source.child("value")));
@@ -1638,7 +1656,7 @@ public final class Schema2CompositionKernel {
             case KIND -> new TextValue(((RuleIdentity) target).ruleType().equals("equipment.item")
                     ? enumValue(EquipmentKind.class, value, source.child("value")).name() : enumValue(VitalEffectKind.class, value, source.child("value")).name());
             case ARMOR_CLASS -> new IntegerValue(integer(value, 0, 20, source.child("value")));
-            case STRENGTH_MINIMUM -> { int minimum = integer(value, 0, 15, source.child("value")); if (!Set.of(0,13,15).contains(minimum)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported armor strength minimum", source); yield new IntegerValue(minimum); }
+            case STRENGTH_MINIMUM -> new IntegerValue(integer(value, 0, 30, source.child("value")));
             case STEALTH_DISADVANTAGE -> new BooleanValue(booleanAtom(value, source.child("value")));
             case HANDS -> new IntegerValue(integer(value, 0, 2, source.child("value")));
             case DICE_COUNT -> new IntegerValue(integer(value, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 1 : 0, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 4 : 20, source.child("value")));
@@ -1681,7 +1699,7 @@ public final class Schema2CompositionKernel {
         String type = string(row.get("rule_type"), source.child("rule_type"));
         if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
                 "character.class_progression", "character.resource", "character.subclass", "character.feature",
-                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
         String prefix = switch (type) {
@@ -1708,6 +1726,8 @@ public final class Schema2CompositionKernel {
         };
         if (prefix != null && !key.matches(prefix + "[.][a-z][a-z0-9_]*(?:[.][a-z0-9_]+)*"))
             throw fail("S2_TYPE", Stage.AUTHOR, "New character rules require their domain prefix and nonempty key segments", source.child("rule_key"));
+        if (type.equals("equipment.armor_movement") && !key.equals("armor_movement.heavy_armor"))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Heavy armor movement requires its stable rule key", source.child("rule_key"));
         return new RuleIdentity(module, type, key);
     }
 
@@ -1716,6 +1736,7 @@ public final class Schema2CompositionKernel {
             case "adventure.rest" -> integer(input, 87, 87, source);
             case "adventure.check" -> integer(input, 77, 77, source);
             case "equipment.item", "equipment.weapon_attack" -> integer(input, 62, 73, source);
+            case "equipment.armor_movement" -> integer(input, 63, 63, source);
             case "adventure.combat" -> integer(input, 90, 95, source);
             case "adventure.spell" -> integer(input, 114, 187, source);
             case "character.wizard_spellcasting" -> integer(input, 52, 53, source);
@@ -1738,9 +1759,10 @@ public final class Schema2CompositionKernel {
             case "adventure.check" -> "SRD_2014_ABILITY_CHECK_V1";
             case "adventure.rest" -> "SRD_2014_REST_V1";
             case "equipment.item" -> "SRD_2014_EQUIPMENT_V1";
+            case "equipment.armor_movement" -> HEAVY_ARMOR_MOVEMENT_ALGORITHM;
             case "adventure.combat" -> "SRD_2014_COMBAT_V1";
             case "equipment.weapon_attack" -> "SRD_2014_MELEE_WEAPON_ATTACK_V1";
-            case "character.movement" -> "SRD_2014_WALKING_SPEED_V1";
+            case "character.movement" -> WALKING_SPEED_ALGORITHM;
             case "character.spellcasting" -> "LIFE_DOMAIN_LEVEL1_V1";
             case "character.wizard_spellcasting" -> "SRD_2014_WIZARD_PREPARED_V1";
             case "adventure.environment" -> "DM_ANTIMAGIC_ZONE_V1";
@@ -1797,7 +1819,7 @@ public final class Schema2CompositionKernel {
 
     private static boolean tracedCharacterType(String type) {
         return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
-                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -2201,6 +2223,7 @@ public final class Schema2CompositionKernel {
         int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
         boolean extraAttackEnabled = false, improvedCriticalEnabled = false, secondWindEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
+        boolean armorMovementEnabled = false;
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
                 FinalRule checked = finalRule(rule, object.fields);
@@ -2219,8 +2242,13 @@ public final class Schema2CompositionKernel {
                     throw fail("S2_COMBAT_AMBIGUOUS",Stage.FINAL,"At most one combat algorithm may be enabled",object.source);
                 if(checked instanceof FinalWeaponAttack weapon && checked.enabled() && !weaponItems.add(weapon.definition().item()))
                     throw fail("S2_WEAPON_ATTACK_AMBIGUOUS",Stage.FINAL,"An item has multiple enabled melee profiles",object.source);
-                if(checked instanceof FinalMovement movement && checked.enabled() && !movementOwners.add(movement.definition().owner()))
-                    throw fail("S2_MOVEMENT_AMBIGUOUS",Stage.FINAL,"A character source has multiple enabled walking speeds",object.source);
+                if (checked instanceof FinalMovement movement && checked.enabled() && !movementOwners.add(movement.definition().owner()))
+                    throw fail("S2_MOVEMENT_AMBIGUOUS", Stage.FINAL, "A character source has multiple enabled walking speeds", object.source);
+                if (checked instanceof FinalArmorMovement && checked.enabled()) {
+                    if (armorMovementEnabled)
+                        throw fail("S2_ARMOR_MOVEMENT_AMBIGUOUS", Stage.FINAL, "Heavy armor movement must have one enabled rule", object.source);
+                    armorMovementEnabled = true;
+                }
                 if (checked instanceof FinalHealth && checked.enabled() && ++enabledHealth > 1)
                     throw fail("S2_HEALTH_AMBIGUOUS", Stage.FINAL, "At most one health algorithm may be enabled", object.source);
                 if (checked instanceof FinalItem item) validateEquipmentReferences(item, objects, object.source);
@@ -2391,7 +2419,10 @@ public final class Schema2CompositionKernel {
         if (type.equals("adventure.environment")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ALGORITHM,Field.AUTHOR_NOTE);
         if (type.equals("adventure.spell")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ALGORITHM,Field.AUTHOR_NOTE);
         if (type.equals("equipment.weapon_attack")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ITEM,Field.ABILITY_POLICY,Field.DICE_COUNT,Field.DICE_SIDES,Field.DAMAGE_TYPE,Field.REACH_FEET,Field.ALGORITHM,Field.AUTHOR_NOTE);
-        if (type.equals("character.movement")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.OWNER,Field.WALK_SPEED_FEET,Field.ALGORITHM,Field.AUTHOR_NOTE);
+        if (type.equals("character.movement")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.OWNER, Field.WALK_SPEED_FEET, Field.HEAVY_ARMOR_SPEED_POLICY, Field.ALGORITHM, Field.AUTHOR_NOTE);
+        if (type.equals("equipment.armor_movement")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.HEAVY_ARMOR_SPEED_PENALTY_FEET, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("equipment.item")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.ARMOR_CLASS, Field.STRENGTH_MINIMUM, Field.STEALTH_DISADVANTAGE, Field.HANDS, Field.PROFICIENCY, Field.STEALTH_SKILL, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.vital_effect")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.DICE_COUNT, Field.DICE_SIDES, Field.MODIFIER, Field.DAMAGE_TYPE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.rest") || type.equals("adventure.check") || type.equals("adventure.health") || type.equals("adventure.combat")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
@@ -2487,6 +2518,7 @@ public final class Schema2CompositionKernel {
             if (definition instanceof CombatDefinition value) return new FinalCombat(value, enabled);
             if (definition instanceof WeaponAttackDefinition value) return new FinalWeaponAttack(value, enabled);
             if (definition instanceof MovementDefinition value) return new FinalMovement(value, enabled);
+            if (definition instanceof ArmorMovementDefinition value) return new FinalArmorMovement(value, enabled);
             if (definition instanceof SpellDefinition value) return new FinalSpell(value, enabled);
             if (definition instanceof SpellcastingDefinition value) return new FinalSpellcasting(value, enabled);
             if (definition instanceof WizardSpellcastingDefinition value) return new FinalWizardSpellcasting(value, enabled);
@@ -2650,7 +2682,12 @@ public final class Schema2CompositionKernel {
             result.put("dice_count",weapon.diceCount());result.put("dice_sides",weapon.diceSides());result.put("damage_type",weapon.damageType().name());result.put("reach_feet",weapon.reachFeet());
         } else if (value instanceof MovementDefinition movement) {
             result.put("description",movement.description());result.put("source_page",movement.sourcePage());result.put("algorithm",movement.algorithm());
-            result.put("owner",identityJson(movement.owner()));result.put("walk_speed_feet",movement.walkSpeedFeet());
+            result.put("owner", identityJson(movement.owner())); result.put("walk_speed_feet", movement.walkSpeedFeet());
+            result.put("heavy_armor_speed_policy",
+                    movement.heavyArmorSpeedPolicy() == null ? null : movement.heavyArmorSpeedPolicy().name());
+        } else if (value instanceof ArmorMovementDefinition movement) {
+            result.put("description", movement.description()); result.put("source_page", movement.sourcePage());
+            result.put("algorithm", movement.algorithm()); result.put("heavy_armor_speed_penalty_feet", movement.heavyArmorSpeedPenaltyFeet());
         } else if (value instanceof HealthDefinition health) {
             result.put("description", health.description()); result.put("source_page", health.sourcePage()); result.put("algorithm", health.algorithm());
         } else if (value instanceof VitalEffectDefinition effect) {
@@ -2693,7 +2730,7 @@ public final class Schema2CompositionKernel {
         return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
     }
     private static boolean newAdvancementType(String type) {
-        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),

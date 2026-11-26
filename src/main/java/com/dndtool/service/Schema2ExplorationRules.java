@@ -63,12 +63,7 @@ public final class Schema2ExplorationRules {
         if(context==null||context.character().hitPoints()==0||context.character().health().dead()) throw invalid("S2_COMBAT_ACTOR_INACTIVE");
         Combatant mover=battle.combatants().stream().filter(c->c.characterId().equals(actor)).findFirst()
                 .orElseThrow(()->invalid("S2_COMBAT_CHARACTER_NOT_FOUND"));
-        var sources=context.initial().character().sources();
-        var movement=context.material().projection().rules().stream().filter(FinalMovement.class::isInstance).map(FinalMovement.class::cast)
-                .filter(r->r.enabled()&&(r.definition().owner().equals(sources.race())||r.definition().owner().equals(sources.subrace()))).toList();
-        if(movement.size()!=1||!movement.getFirst().definition().algorithm().equals("SRD_2014_WALKING_SPEED_V1")) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
-        int speed=Math.max(0,movement.getFirst().definition().walkSpeedFeet()
-                -new Schema2CharacterEquipmentRules().derive(context.material(),context.character()).speedPenalty());
+        int speed = new Schema2CharacterEquipmentRules().walkingSpeed(context.material(), context.initial(), context.character());
         int stepCostFeet=mover.prone()?10:5;
         return new MoveBudget(mover.position(), Math.min(Schema2CombatRules.MAX_PATH, speed / stepCostFeet), stepCostFeet);
     }

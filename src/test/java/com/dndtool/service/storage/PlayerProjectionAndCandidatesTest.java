@@ -1,6 +1,8 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CharacterRuntime;
+import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
+import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
@@ -104,6 +106,37 @@ class PlayerProjectionAndCandidatesTest {
         }
     }
 
+    @Test void eitherSupportedRaceCanApplyOrIgnoreTheCustomHeavyArmorPenalty() throws Exception {
+        try (var service = new CampaignStorageService(temporary.resolve("card-speed"))) {
+            CampaignRuleFixtures.createWithArmorMovement(service, "测试战役", 30, "APPLY", "IGNORE", 15, 17);
+            UUID player = member(service, "玩家");
+            var actors = new ArrayList<UUID>();
+            for (String race : List.of("human", "dwarf")) {
+                var created = command(service, "character-create", json("name", race, "kind", "PC", "classKey", "cleric",
+                        "backgroundKey", "acolyte", "raceKey", race));
+                UUID actor = UUID.fromString(created.lastCommand().subjectId());
+                actors.add(actor);
+                assign(service, actor, player);
+            }
+            assertEquals(Map.of("human", 30, "dwarf", 30), cardSpeeds(service, player));
+
+            PlayerSpaceFixture.placeAtWorld(service, actors.toArray(UUID[]::new));
+            var domain = service.accessSnapshot().snapshot().domains();
+            var plate = domain.material().restore().rule("equipment.item", "item.plate");
+            for (var character : domain.characters()) {
+                assertEquals(13, character.history().current().abilities().get("ability.strength"));
+                var acquire = new EquipmentInput(UUID.randomUUID(), plate, "CARRIED", "取得板甲");
+                characterCommand(service, character.id(), new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null,
+                        GrowthChoices.EMPTY, null, null, acquire, null));
+                var current = characterHistory(service.accessSnapshot().snapshot().domains(), character.id()).current();
+                var wear = new EquipmentInput(current.equipment().getFirst().itemId(), null, "WORN", "穿戴板甲");
+                characterCommand(service, character.id(), new Schema2CharacterRuntime.Command("ITEM_EQUIPPED", null, 0, null, null, null,
+                        GrowthChoices.EMPTY, null, null, wear, null));
+            }
+            assertEquals(Map.of("human", 30, "dwarf", 15), cardSpeeds(service, player));
+        }
+    }
+
     @Test void sceneCandidatesUseTheCurrentRosterAndSceneClockAfterDeparture() throws Exception {
         try (var service = create("scene-clock")) {
             UUID pc = character(service, "仍在场的战士", "PC");
@@ -152,6 +185,14 @@ class PlayerProjectionAndCandidatesTest {
 
     private static Schema2CharacterRuntime.History characterHistory(CampaignDomainData.State domain, UUID id) {
         return domain.characters().stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow().history();
+    }
+    private static Map<String, Integer> cardSpeeds(CampaignStorageService service, UUID player) {
+        var speeds = new HashMap<String, Integer>();
+        for (var element : PlayerCampaignProjection.project(service.accessSnapshot(), player).getAsJsonArray("cards")) {
+            var card = element.getAsJsonObject();
+            speeds.put(card.get("name").getAsString(), card.get("speed").getAsInt());
+        }
+        return speeds;
     }
     private CampaignStorageService create(String folder) throws Exception { var service = new CampaignStorageService(temporary.resolve(folder)); CampaignRuleFixtures.create(service, "测试战役"); return service; }
     private static CampaignStorageService.CampaignView command(CampaignStorageService service,String action,JsonObject input) { return PlayerSpaceFixture.send(service, action, input); }

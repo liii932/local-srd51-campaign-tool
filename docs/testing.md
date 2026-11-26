@@ -242,10 +242,10 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    ```
 
    自定义规则另从 WAR 外提供一份受支持的准确候选 ZIP。可在仓库外复制随附 `check-variant` 原包的
-   条目，将 `author-package.json` 的 `release_version` 改为 `"11"`，将 `rules.json` 中
+   条目，将 `author-package.json` 的 `release_version` 改为 `"15"`，将 `rules.json` 中
    `vital_effect.dm_damage` 的 `modifier` 改为 `2`，更新包内 `README.md` 后将这些文件打包在 ZIP
-   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@11`
-   原字节及摘要。随附 `check-variant` 仍按 `@10`、固定伤害 `3` 的独立场景验证。自定义组合前三包
+   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@15`
+   原字节及摘要。随附 `check-variant` 按 `@14`、固定伤害 `3` 的独立场景验证。自定义组合前三包
    使用标准包，第四包使用这份外部候选。
 
    通过工作台的本机规则库执行外部原包上传（`POST /api/host/storage/rule-import`），从随附列表导入
@@ -800,7 +800,12 @@ node tools/storage/browser-prone.cjs
 移动、起身、未决路径保存/END/重开、探索卧倒/爬行/起身、战斗交接和离场门、拒绝边界、幂等、过期和事务回滚。
 探索链应同时断言：卧倒不推进时钟；每段爬行最多按当前速度支付双倍成本，不能借旧 Dash；
 移动与起身各推进六秒，旧移动/动作/反应事实保持；完整文件直接恢复姿态，重试不重复推进时间。
-25 尺速度来自定向规则向量，不声称当前人类创建模板具有该速度。
+标准组合的 `dwarf-heavy-armor-speed` 让力量相同的矮人和人类法师穿上板甲，核对 25/20 尺速度、疾走增量、起身成本和未受训穿甲限制。
+按[作者场景指南](../rule-packages/srd51-runtime/scenarios/README.md#验证独立修改移动参数)运行
+`dwarf-speed-author-edit` 和 `heavy-armor-policy-author-edit`，分别覆盖只改矮人步速、交换策略及自定门槛与减速量。
+应用侧用 `Schema2DwarfMovementCompositionTest` 验证声明、覆盖、畸形值和冻结材料，用
+`Schema2CharacterEquipmentRulesTest` 检查来源、力量及穿戴。`CampaignProneIntegrationTest`
+检查探索距离、疾走额度和完整文件重开后的半速起身，`PlayerProjectionAndCandidatesTest` 核对交换策略后的本人卡片速度。
 `PlayerProneCandidateTest` 经过真实邀请、审批、控制和接管验证服务端候选，
 包括探索许可、撤权及旧候选拒绝；客户端不能指定移动成本或替他人修改姿态。
 

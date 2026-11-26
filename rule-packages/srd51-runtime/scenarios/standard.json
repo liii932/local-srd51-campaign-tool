@@ -1,6 +1,6 @@
 {
   "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules"],
-  "members": ["srd51_runtime@5", "srd51_characters@5", "srd51_magic@5", "dm_runtime_house_rules@9"],
+  "members": ["srd51_runtime@7", "srd51_characters@7", "srd51_magic@7", "dm_runtime_house_rules@13"],
   "driver": "BundledSrd51Scenarios",
   "cases": [
     "initial-character",
@@ -13,6 +13,7 @@
     "wizard-spellbook",
     "equipment-profiles",
     "plate-armor",
+    "dwarf-heavy-armor-speed",
     "weapon-damage",
     "monster-breath-profile",
     "rule-origins",

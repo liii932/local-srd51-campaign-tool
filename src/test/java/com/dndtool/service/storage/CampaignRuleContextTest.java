@@ -5,6 +5,7 @@ import com.dndtool.module.composition.Schema2CompositionKernel.FinalCheck;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2PreparationIdentity;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,22 @@ class CampaignRuleContextTest {
         assertEquals("STORAGE_RULE_SUPPORT_CHECK", rejected.getCause().getMessage());
     }
 
+    @Test void playableBindingAndRestorationRequireAnEnabledHeavyArmorMovementRule() throws Exception {
+        var artifacts = new ArrayList<>(BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD));
+        var armorMovement = CampaignRuleSupportTest.authorRow(BundledCampaignRules.CHARACTER_MODULE, "rules.json",
+                "rule_key", "armor_movement.heavy_armor");
+        artifacts.add(CampaignRuleSupportTest.extension("disable_armor_movement", artifacts, List.of(), List.of(),
+                List.of(CampaignRuleSupportTest.disabled(armorMovement))));
+        var typed = ProductionSchema2Projection.compose(artifacts);
+        var unsupported = assertThrows(IllegalArgumentException.class, () -> CampaignRuleSupport.validate(typed));
+        assertEquals("STORAGE_RULE_SUPPORT_COMBAT", unsupported.getMessage());
+        assertEquals("ACTION_FLOW_RULE_UNSUPPORTED", unsupported.getCause().getMessage());
+
+        var rejected = assertThrows(StorageException.class, Material.of(typed)::restore);
+        assertEquals("INVALID_FILE", rejected.code());
+        assertEquals("STORAGE_RULE_SUPPORT_COMBAT", rejected.getCause().getMessage());
+    }
+
     @Test void supportedBindingRequiresAllItsOwnFrozenRowsAndCurrentInterpretation() {
         var standard = material(BundledCampaignRules.STANDARD);
         var variant = material(BundledCampaignRules.CHECK_VARIANT);
@@ -95,7 +112,7 @@ class CampaignRuleContextTest {
         assertEquals("INVALID_FILE", assertThrows(StorageException.class, crossBound::restore).code());
         assertEquals("INVALID_FILE", assertThrows(StorageException.class, truncated::restore).code());
         assertEquals("INVALID_FILE", assertThrows(StorageException.class, malformed::restore).code());
-        assertEquals("INVALID_FILE", assertThrows(StorageException.class, () -> new Material("other_interpretation",
+        assertEquals("INVALID_FILE", assertThrows(StorageException.class, () -> new Material("DND_CAMPAIGN_SCHEMA_2_V2",
                 variant.binding(), variant.rules(), variant.entries(), variant.chains())).code());
 
         var legacy = CampaignDomainCodec.toJson(standard).getAsJsonObject();

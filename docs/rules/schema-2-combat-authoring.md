@@ -9,11 +9,12 @@
 码点长度、C0/C1 控制符、未知字段和精确 JSON 整数词法继承作者基础合同。引用必须包含完整身份，
 只能指向本包或先加载包；外部原始所有者必须是直接依赖。不从名称、说明或规则键猜测数值与能力。
 
-| 类型 | 键前缀 | 唯一算法 | 原文页 |
+| 类型 | 键前缀 | 支持的算法 | 原文页 |
 | --- | --- | --- | --- |
 | `adventure.combat` | `combat.*` | `SRD_2014_COMBAT_V1` | 90—95 |
 | `equipment.weapon_attack` | `weapon_attack.*` | `SRD_2014_MELEE_WEAPON_ATTACK_V1` | 62—73 |
 | `character.movement` | `movement.*` | `SRD_2014_WALKING_SPEED_V1` | 3—74 |
+| `equipment.armor_movement` | `armor_movement.heavy_armor`（准确键） | `SRD_2014_HEAVY_ARMOR_MOVEMENT_V1` | 63 |
 
 `adventure.combat` 没有自由动作参数。最终组合至多有一个启用定义；执行资格另要求准确启用规则。
 算法负责当前采用范围的一般动作、单击 Attack、回合和机会攻击；内容包不能登记 handler、阶段、
@@ -52,21 +53,34 @@
 
 ## 步行来源
 
-`character.movement` 另必需 `owner` 和 `walk_speed_feet`。`owner` 是准确的
-`character.race` 或 `character.subrace`；速度为 5—120 feet 的整数且必须为 5 的倍数。
-一个种族或亚种族原始 owner 至多一个启用的步行来源。禁用定义也保留真实 owner，启用定义要求
-owner 启用。实际角色必须按其冻结种族和亚种族找到唯一适用来源；多个适用来源拒绝歧义，
-不猜默认 30 feet，也不以最新来源补齐缺失事实。
+步行算法为每个种族或亚种声明基础速度和重甲策略。通用重甲规则为整个组合声明一次减速量，各件重甲声明自己的力量门槛。
 
-速度是定义，已走距离、剩余 movement、位置和路径是业务事实。护甲力量不足的速度减值沿
-真实装备派生；本定义不提供飞行、游泳、攀爬或自由移动模式，也不创建第二份 movement pool。
+| 冻结字段 | 有效值 | 标准包 |
+| --- | --- | --- |
+| `character.movement.walk_speed_feet` | 5–120 尺，5 的倍数 | 人类 30，矮人 25 |
+| `character.movement.heavy_armor_speed_policy` | `APPLY` 或 `IGNORE` | 人类 `APPLY`，矮人 `IGNORE` |
+| `equipment.armor_movement.heavy_armor_speed_penalty_feet` | 0–120 尺，5 的倍数 | 10 |
+| `equipment.item.strength_minimum` | 重甲取整数 0–30，0 表示无门槛；其余装备取 0 | 链甲 13，板甲 15 |
+
+`character.movement.owner` 必须引用完整的 `character.race` 或 `character.subrace` 身份。
+每个来源至多有一项启用的步行定义，启用定义要求来源也已启用。按角色的实际种族和亚种须能匹配唯一一项。
+组合至多启用一项 `equipment.armor_movement`。可建团组合必须恰有一项，完整文件恢复时也会复核。步速、通用减速量和策略均可用
+`set_field` 独立覆盖；力量门槛在对应装备上覆盖。所有数值必须使用精确 JSON 整数。
+
+当角色穿着重甲、实际力量严格低于该甲门槛且其策略为 `APPLY` 时，有效步速为
+`max(0, 基础步速 − 通用减速量)`。其余情形使用基础步速。护甲熟练、隐匿劣势和施法各按自身规则结算。
+战斗步行、疾走、Ready 移动、爬行、起身、探索移动与玩家本人角色卡共用有效步速。
+例如只把矮人基础步速改为 30 尺，穿板甲的低力量矮人即可步行 30 尺，疾走增加 30 尺，起身消耗 15 尺。
+同等条件的人类仍为 20 尺。角色可否创建取决于战役已通过校验的种族模板。
+规则依据见[矮人特性](../references/srd-5.1/pages/page-003.md)和[重甲力量要求](../references/srd-5.1/pages/page-063.md)。
 
 ## 覆盖、冻结与验证
 
 受支持的覆盖继续按制品合同保留完整原子、完整引用、原包和位置。战役工作库冻结最终规则及
 完整链，战斗命令、准备与焦点、装备和角色健康事实由各自业务聚合拥有。
 
-`Schema2CombatCompositionTest` 使用独立固定字节材料，当前场景执行见
-[战斗合同](schema-2-combat.md)和 `CampaignDomainsCombatIntegrationTest`。
+`Schema2CombatCompositionTest` 和 `Schema2DwarfMovementCompositionTest` 核对作者、覆盖与冻结材料。
+成品组合的 [`dwarf-heavy-armor-speed` 场景](../../rule-packages/srd51-runtime/scenarios/README.md)
+使用相同板甲和力量值验证标准策略。作者变体分别验证单改步速，以及交换策略、调整通用减速和板甲门槛。战斗命令见[战斗合同](schema-2-combat.md)。
 
 [旧版来源与镜像](https://github.com/liii932/local-srd51-campaign-tool/blob/4f485b3158c3bb3148463c68f9ada53839edaa1e/docs/rules/schema-2-combat-authoring.md)

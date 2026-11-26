@@ -52,13 +52,15 @@ public final class CampaignDomainCommands {
                 subject=result.subjectId();newText=CampaignDomainCodec.text(result.audit());
             }
             case "character-create" -> {
-                CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey");
+                if (input.has("raceKey")) CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey", "raceKey");
+                else CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey");
                 if (characters.size() >= 16) throw new StorageException("CAPACITY", "Campaign roster is full");
                 String name = CampaignJson.name(s(input, "name")), kind = s(input, "kind"), classKey = s(input, "classKey");
                 if (!Set.of("PC", "NPC").contains(kind)) throw CampaignJson.bad("Unsupported character kind");
                 subject = child(operationId, "character");
                 Schema2PreparationIdentity identity = characters.isEmpty() ? new Schema2PreparationIdentity(child(operationId, "rule-run"), child(operationId, "rule-snapshot")) : characters.getFirst().initial().character().identity();
-                var initial = context.initialPlan(UUID.fromString(snapshot.campaignId()), subject, identity, classKey, s(input, "backgroundKey"));
+                var initial = context.initialPlan(UUID.fromString(snapshot.campaignId()), subject, identity, classKey,
+                        s(input, "backgroundKey"), input.has("raceKey") ? s(input, "raceKey") : "human");
                 Map<String, Integer> abilities = context.initialAbilities(classKey);
                 var history = engine.initial(material, initial, child(operationId, "preparation"), abilities, context.initialChoices(classKey), operationId);
                 var character = new Character(name, kind, true, initial, history); characters.add(character);

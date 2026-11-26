@@ -2,14 +2,22 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.*;
 import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
+import com.dndtool.service.Schema2InitialProficiencyRules.Request;
+import com.dndtool.service.Schema2InitialProficiencyRules.Sources;
+import com.google.gson.JsonObject;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.*;
 import static com.dndtool.service.Schema2CheckTestFixture.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2CharacterEquipmentRulesTest {
+    private static final RuleIdentity HUMAN = new RuleIdentity(BASE, "character.race", "race.human");
+    private static final RuleIdentity DWARF = new RuleIdentity(BASE, "character.race", "race.dwarf");
+    private static final RuleIdentity SUBRACE = new RuleIdentity(BASE, "character.subrace", "subrace.hill_dwarf");
     private final Schema2CharacterEquipmentRules rules = new Schema2CharacterEquipmentRules();
     private final ProductionSchema2Projection material = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(packages("normal")));
     private State state = new Schema2CharacterProgressionRules().initial(material,
@@ -60,7 +68,7 @@ class Schema2CharacterEquipmentRulesTest {
         assertFalse(checks.prepare(material, state, check("ABILITY", "ability.wisdom", null, 10, false, false)).secondDieRequired());
     }
 
-    @Test void carriedToolsCannotBeUsedAndStrengthPenaltyAndNegativeDexterityAreDerivedCorrectly() {
+    @Test void carriedToolsCannotBeUsedAndNegativeDexterityAffectsArmorClass() {
         UUID tool = acquire(ITEM_TOOL);
         assertFalse(rules.hasPreparedTool(material, state, TOOL));
         assertThrows(IllegalArgumentException.class, () -> new Schema2CharacterCheckRules().prepare(material, state,
@@ -72,7 +80,109 @@ class Schema2CharacterEquipmentRulesTest {
         UUID medium = acquire(ITEM_MEDIUM); equip(medium, "WORN"); assertEquals(13, rules.derive(material, state).armorClass());
         apply(equipment("ITEM_UNEQUIPPED", medium, null, null));
         UUID plate = acquire(ITEM_HEAVY); equip(plate, "WORN");
-        assertEquals(18, rules.derive(material, state).armorClass()); assertEquals(10, rules.derive(material, state).speedPenalty());
+        assertEquals(18, rules.derive(material, state).armorClass());
+    }
+
+    @Test void armorSpeedPolicyFollowsSelectedFrozenMovementAndPreservesOtherArmorEffects() {
+        var movementMaterial = materialWithMovement(HeavyArmorSpeedPolicy.IGNORE, false);
+        var dwarf = plan(movementMaterial, DWARF, null);
+        var human = plan(movementMaterial, HUMAN, null);
+        var dwarfInPlate = wearingPlate(movementMaterial, dwarf, 13);
+        var humanInPlate = wearingPlate(movementMaterial, human, 13);
+
+        assertEquals(25, rules.walkingSpeed(movementMaterial, dwarf, dwarfInPlate));
+        assertEquals(20, rules.walkingSpeed(movementMaterial, human, humanInPlate));
+        assertEquals(30, rules.walkingSpeed(movementMaterial, human, wearingPlate(movementMaterial, human, 15)));
+        var effects = rules.derive(movementMaterial, dwarfInPlate);
+        assertEquals(18, effects.armorClass());
+        assertTrue(effects.castingForbidden());
+        assertTrue(effects.physicalCheckDisadvantage());
+        assertEquals(Set.of(STEALTH), effects.stealthSkills());
+        assertEquals(effects, rules.derive(movementMaterial, humanInPlate));
+    }
+
+    @Test void applyPolicyReducesTheDwarfWalkingSpeedInWornArmor() {
+        var movementMaterial = materialWithMovement(HeavyArmorSpeedPolicy.APPLY, false);
+        var dwarf = plan(movementMaterial, DWARF, null);
+        var armored = wearingPlate(movementMaterial, dwarf, 13);
+        assertEquals(15, rules.walkingSpeed(movementMaterial, dwarf, armored));
+        UUID plate = armored.equipment().getFirst().itemId();
+        var carryingPlate = rules.apply(movementMaterial, armored,
+                equipment("ITEM_UNEQUIPPED", plate, null, null), UUID.randomUUID());
+        assertEquals(25, rules.walkingSpeed(movementMaterial, dwarf, carryingPlate));
+    }
+
+    @Test void appliedPenaltyCannotReduceWalkingSpeedBelowZero() {
+        var slowMaterial = Schema2CombatTestFixture.material(5, 5);
+        var human = plan(slowMaterial, HUMAN, null);
+        assertEquals(0, rules.walkingSpeed(slowMaterial, human, wearingPlate(slowMaterial, human, 13)));
+    }
+
+    @Test void selectedRaceAndSubraceMustSupplyOneEnabledWalkingProfile() {
+        var missing = materialWithMovement(null, false);
+        var dwarf = plan(missing, DWARF, null);
+        var armored = wearingPlate(missing, dwarf, 13);
+        assertEquals(18, rules.derive(missing, armored).armorClass());
+        assertEquals("ACTION_FLOW_RULE_UNSUPPORTED",
+                assertThrows(IllegalArgumentException.class, () -> rules.walkingSpeed(missing, dwarf, armored)).getMessage());
+
+        var subraceOnly = materialWithMovement(null, true);
+        var subracePlan = plan(subraceOnly, DWARF, SUBRACE);
+        assertEquals(15, rules.walkingSpeed(subraceOnly, subracePlan, wearingPlate(subraceOnly, subracePlan, 13)));
+
+        var overlapping = materialWithMovement(HeavyArmorSpeedPolicy.IGNORE, true);
+        var hillDwarf = plan(overlapping, DWARF, SUBRACE);
+        assertEquals("ACTION_FLOW_RULE_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
+                () -> rules.walkingSpeed(overlapping, hillDwarf, wearingPlate(overlapping, hillDwarf, 13))).getMessage());
+    }
+
+    private static ProductionSchema2Projection materialWithMovement(HeavyArmorSpeedPolicy dwarfPolicy, boolean subraceMovement) {
+        var files = Schema2CombatTestFixture.packages();
+        Schema2GrantFixtures.edit(files, 0, "rules.json", root -> {
+            var rows = root.getAsJsonArray();
+            rows.add(definition(DWARF));
+            var subrace = definition(SUBRACE);
+            subrace.add("parent_race", jsonIdentity(DWARF));
+            rows.add(subrace);
+            if (dwarfPolicy != null) rows.add(movement(DWARF, "movement.dwarf", dwarfPolicy));
+            if (subraceMovement) rows.add(movement(SUBRACE, "movement.hill_dwarf", HeavyArmorSpeedPolicy.APPLY));
+        });
+        return ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+    }
+
+    private static JsonObject definition(RuleIdentity id) {
+        var row = new JsonObject();
+        row.add("identity", jsonIdentity(id));
+        row.addProperty("display_name", id.ruleKey());
+        row.addProperty("description", "Fixture for walking speed from selected sources.");
+        row.addProperty("source_page", 3);
+        return row;
+    }
+
+    private static JsonObject movement(RuleIdentity owner, String key, HeavyArmorSpeedPolicy policy) {
+        var row = definition(new RuleIdentity(BASE, "character.movement", key));
+        row.add("owner", jsonIdentity(owner));
+        row.addProperty("walk_speed_feet", 25);
+        row.addProperty("algorithm", WALKING_SPEED_ALGORITHM);
+        row.addProperty("heavy_armor_speed_policy", policy.name());
+        return row;
+    }
+
+    private static InitialPlan plan(ProductionSchema2Projection material, RuleIdentity race, RuleIdentity subrace) {
+        var sources = new Sources(race, subrace, new RuleIdentity(BASE, "character.background", "background.guard"), CLASS);
+        var plan = new Schema2InitialCharacterPlanService().prepareMaterial(IDENTITY, Schema2RulesBinding.from(material),
+                material, new Request(sources, Map.of()));
+        return new InitialPlan(CAMPAIGN, CHARACTER, plan);
+    }
+
+    private State wearingPlate(ProductionSchema2Projection material, InitialPlan plan, int strength) {
+        var abilities = new HashMap<>(fullAbilities());
+        abilities.put("ability.strength", strength);
+        abilities.put("ability.constitution", strength == 13 ? 15 : 13);
+        State state = new Schema2CharacterProgressionRules().initial(material, plan, PREPARATION, abilities, INITIAL_CHOICES);
+        UUID plate = UUID.randomUUID();
+        state = rules.apply(material, state, equipment("ITEM_ACQUIRED", plate, ITEM_HEAVY, "CARRIED"), plate);
+        return rules.apply(material, state, equipment("ITEM_EQUIPPED", plate, null, "WORN"), UUID.randomUUID());
     }
 
     @Test void exactInstanceAndArmorTimeCapacitiesAreCheckedBeforeMutation() {

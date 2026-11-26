@@ -16,11 +16,13 @@ import com.dndtool.service.Schema2SpellRules;
 import com.dndtool.service.Schema2WizardSpellbookRules;
 import com.dndtool.service.storage.CampaignRuleContext;
 import java.util.ArrayDeque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
@@ -44,6 +46,9 @@ public final class BundledSrd51Scenarios {
                 scenario("wizard-spellbook", BundledSrd51Scenarios::verifyWizardSpellbook),
                 scenario("equipment-profiles", BundledSrd51Scenarios::verifyEquipmentProfiles),
                 scenario("plate-armor", BundledSrd51Scenarios::verifyPlateArmor),
+                scenario("dwarf-heavy-armor-speed", BundledSrd51Scenarios::verifyDwarfHeavyArmorSpeed),
+                scenario("dwarf-speed-author-edit", BundledSrd51Scenarios::verifyDwarfSpeedAuthorEdit),
+                scenario("heavy-armor-policy-author-edit", BundledSrd51Scenarios::verifyHeavyArmorPolicyAuthorEdit),
                 scenario("weapon-damage", BundledSrd51Scenarios::verifyWeaponDamage),
                 scenario("monster-breath-profile", BundledSrd51Scenarios::verifyMonsterBreathProfile),
                 scenario("rule-origins", BundledSrd51Scenarios::verifyRuleOrigins),
@@ -188,6 +193,110 @@ public final class BundledSrd51Scenarios {
         expectNumber(18, equipment.derive(rules.projection(), fighter).armorClass());
     }
 
+    private void verifyDwarfHeavyArmorSpeed() {
+        verifyArmorPair(25, 25, 20);
+    }
+
+    private void verifyDwarfSpeedAuthorEdit() {
+        verifyArmorPair(30, 30, 20);
+    }
+
+    private void verifyHeavyArmorPolicyAuthorEdit() {
+        verifyArmorPair(25, 20, 30);
+        armoredWizard(UUID.randomUUID(), UUID.randomUUID(), "dwarf", 14, 25, 25);
+    }
+
+    private void verifyArmorPair(int dwarfBaseSpeed, int dwarfArmoredSpeed, int humanArmoredSpeed) {
+        var movement = (FinalMovement) find("character.movement", "movement.dwarf");
+        assertEquals(rules.rule("character.race", "race.dwarf"), movement.definition().owner());
+        assertEquals("SRD_2014_WALKING_SPEED_V1", movement.definition().algorithm());
+        expectNumber(3, movement.definition().sourcePage());
+        expectNumber(dwarfBaseSpeed, movement.definition().walkSpeedFeet());
+
+        UUID campaign = UUID.randomUUID(), dwarf = UUID.randomUUID(), human = UUID.randomUUID();
+        var roster = Map.of(dwarf, armoredWizard(campaign, dwarf, "dwarf", 8, dwarfBaseSpeed, dwarfArmoredSpeed),
+                human, armoredWizard(campaign, human, "human", 8, 30, humanArmoredSpeed));
+        verifyArmoredMovement(campaign, roster, dwarf, human, dwarfArmoredSpeed);
+        verifyArmoredMovement(campaign, roster, human, dwarf, humanArmoredSpeed);
+    }
+
+    private Schema2CombatRules.Context armoredWizard(UUID campaign, UUID actor, String race, int strength,
+            int baseSpeed, int armoredSpeed) {
+        var material = rules.projection();
+        var plan = rules.initialPlan(campaign, actor, Schema2PreparationIdentity.random(), "wizard", "custom_artisan", race);
+        assertEquals(rules.rule("character.race", "race." + race), plan.character().sources().race());
+        Map<String, Integer> abilities = new HashMap<>(rules.initialAbilities("wizard"));
+        String strengthKey = "ability.strength";
+        String oldAbility = abilities.entrySet().stream().filter(entry -> entry.getValue() == strength)
+                .findFirst().orElseThrow().getKey();
+        int oldStrength = abilities.put(strengthKey, strength);
+        abilities.put(oldAbility, oldStrength);
+        State initial = new Schema2CharacterProgressionRules().initial(material, plan, UUID.randomUUID(), abilities,
+                rules.initialChoices("wizard"));
+        expectNumber(strength, initial.abilities().get(strengthKey));
+        State wizard = initializeSpellbook(new Schema2WizardSpellbookRules(), initial);
+        var equipment = new Schema2CharacterEquipmentRules();
+        var plate = rules.rule("equipment.item", "item.plate");
+        UUID armor = UUID.randomUUID();
+        State carrying = equipment.apply(material, wizard, equipmentCommand("ITEM_ACQUIRED", armor, plate, "CARRIED"), armor);
+        expectNumber(baseSpeed, equipment.walkingSpeed(material, plan, carrying));
+        State wearing = equipment.apply(material, carrying,
+                equipmentCommand("ITEM_EQUIPPED", armor, null, "WORN"), UUID.randomUUID());
+        expectNumber(armoredSpeed, equipment.walkingSpeed(material, plan, wearing));
+        var armorEffects = equipment.derive(material, wearing);
+        expectNumber(18, armorEffects.armorClass());
+        assertTrue(armorEffects.castingForbidden());
+        assertTrue(armorEffects.physicalCheckDisadvantage());
+        assertTrue(armorEffects.stealthSkills().contains(rules.rule("character.proficiency", "proficiency.skill.stealth")));
+        return new Schema2CombatRules.Context(material, plan, wearing);
+    }
+
+    private void verifyArmoredMovement(UUID campaign, Map<UUID, Schema2CombatRules.Context> roster,
+            UUID actor, UUID opponent, int expectedSpeed) {
+        var combat = new Schema2CombatRules();
+        UUID combatId = UUID.randomUUID();
+        int cells = expectedSpeed / 5;
+        var battle = startBattle(combat, combatId, campaign, roster, actor, opponent,
+                new Schema2CombatState.Position(2, cells), List.of(18, 14, 9, 5));
+        assertEquals(List.of(14, 5), battle.initiative().stream().map(Schema2CombatState.Initiative::d20).toList());
+        var path = IntStream.rangeClosed(1, cells + 1).mapToObj(y -> new Schema2CombatState.Position(0, y)).toList();
+        expectRejection("moving five feet beyond armor-adjusted speed", "S2_COMBAT_MOVEMENT_ALLOWANCE", () -> combat.preflight(
+                UUID.randomUUID(), combatId, campaign, roster, battle, Schema2CombatState.Command.move(actor, path)));
+        var move = Schema2CombatState.Command.move(actor, path.subList(0, cells));
+        var moved = combat.resolve(combat.preflight(UUID.randomUUID(), combatId, campaign, roster, battle, move),
+                sides -> { throw new AssertionError("Ordinary movement drew a die"); });
+        assertEquals(Schema2CombatState.MovementStatus.COMPLETED, moved.after().flows().getLast().movement().status());
+
+        var casting = rules.rule("character.wizard_spellcasting", "spellcasting.wizard");
+        var burningHands = rules.rule("adventure.spell", "spell.burning_hands");
+        var spell = new Schema2CombatState.CastInput(casting, burningHands, List.of(), null, 1, null, 0);
+        expectRejection("casting after movement in untrained plate armor", "S2_SPELL_ARMOR", () -> combat.preflight(
+                UUID.randomUUID(), combatId, campaign, roster, moved.after(), Schema2CombatState.Command.cast(actor, spell)));
+
+        var dashed = turnAction(combat, combatId, campaign, roster, moved.after(), actor, Schema2CombatState.Kind.DASH);
+        var mover = activeCombatant(dashed);
+        assertEquals(path.get(cells - 1), mover.position());
+        expectNumber(expectedSpeed * 2, mover.movementSpentHalfFeet());
+        expectNumber(expectedSpeed, mover.movementBonus());
+        var prone = turnAction(combat, combatId, campaign, roster, dashed, actor, Schema2CombatState.Kind.DROP_PRONE);
+        assertTrue(activeCombatant(prone).prone());
+        var standing = turnAction(combat, combatId, campaign, roster, prone, actor, Schema2CombatState.Kind.STAND_UP);
+        var standingMover = activeCombatant(standing);
+        assertEquals(false, standingMover.prone());
+        expectNumber(expectedSpeed, standingMover.movementSpentHalfFeet() - mover.movementSpentHalfFeet());
+    }
+
+    private static Schema2CombatState.Combatant activeCombatant(Schema2CombatState.Battle battle) {
+        return battle.combatants().stream().filter(row -> row.characterId().equals(battle.activeActor())).findFirst().orElseThrow();
+    }
+
+    private static Schema2CombatState.Battle turnAction(Schema2CombatRules combat, UUID combatId, UUID campaign,
+            Map<UUID, Schema2CombatRules.Context> roster, Schema2CombatState.Battle battle, UUID actor, Schema2CombatState.Kind kind) {
+        var command = Schema2CombatState.Command.action(kind, actor);
+        return combat.resolve(combat.preflight(UUID.randomUUID(), combatId, campaign, roster, battle, command),
+                sides -> { throw new AssertionError(kind + " drew a die"); }).after();
+    }
+
     private void verifyWeaponDamage() {
         var material = rules.projection();
         UUID campaign = UUID.randomUUID(), attacker = UUID.randomUUID(), target = UUID.randomUUID();
@@ -282,12 +391,20 @@ public final class BundledSrd51Scenarios {
 
     private static Schema2CombatState.Battle startBattle(Schema2CombatRules combat, UUID combatId, UUID campaign,
             Map<UUID, Schema2CombatRules.Context> roster, UUID actor, UUID target) {
+        return startBattle(combat, combatId, campaign, roster, actor, target,
+                new Schema2CombatState.Position(1, 0), List.of(18, 9));
+    }
+
+    private static Schema2CombatState.Battle startBattle(Schema2CombatRules combat, UUID combatId, UUID campaign,
+            Map<UUID, Schema2CombatRules.Context> roster, UUID actor, UUID target,
+            Schema2CombatState.Position targetPosition, List<Integer> initiativeDice) {
         var start = Schema2CombatState.Command.start(List.of(
                 new Schema2CombatState.Deployment(actor, new Schema2CombatState.Position(0, 0), 0),
-                new Schema2CombatState.Deployment(target, new Schema2CombatState.Position(1, 0), 1)), List.of(actor, target));
-        var dice = new ArrayDeque<>(List.of(18, 9));
+                new Schema2CombatState.Deployment(target, targetPosition, 1)), List.of(actor, target));
+        var dice = new ArrayDeque<>(initiativeDice);
         var result = combat.resolve(combat.preflight(UUID.randomUUID(), combatId, campaign, roster, null, start),
                 sides -> dice.removeFirst());
+        assertTrue(dice.isEmpty());
         assertEquals(actor, result.after().activeActor());
         return result.after();
     }

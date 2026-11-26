@@ -36,9 +36,10 @@ public final class CampaignRuleSupport {
         var check = required(rules, FinalCheck.class, "CHECK");
         required(rules, FinalHealth.class, "HEALTH");
         required(rules, FinalRest.class, "REST");
-        var context = new CampaignRuleContext(projection, check.identity());
+        CampaignRuleContext context;
         try {
-            Schema2CombatRules.validateFrozenSupport(projection, context.rule("character.race", "race.human"));
+            context = new CampaignRuleContext(projection, check.identity());
+            Schema2CombatRules.validateFrozenSupport(projection, context.creationRaces());
         } catch (IllegalArgumentException invalid) {
             throw unsupported("COMBAT", invalid);
         }
@@ -148,9 +149,11 @@ public final class CampaignRuleSupport {
                 var choices = context.initialChoices(characterClass);
                 var abilities = context.initialAbilities(characterClass);
                 for (String background : CampaignRuleContext.INITIAL_BACKGROUNDS) {
-                    var plan = context.initialPlan(CAMPAIGN, CHARACTER, IDENTITY, characterClass, background);
-                    var history = engine.initial(context.projection(), plan, PREPARATION, abilities, choices, OPERATION);
-                    Schema2FeatureSupport.requireSupportedFeatures(context.projection(), history.current(), "S2_FEATURE_OWNER");
+                    for (var race : context.creationRaces()) {
+                        var plan = context.initialPlan(CAMPAIGN, CHARACTER, IDENTITY, characterClass, background, race.ruleKey());
+                        var history = engine.initial(context.projection(), plan, PREPARATION, abilities, choices, OPERATION);
+                        Schema2FeatureSupport.requireSupportedFeatures(context.projection(), history.current(), "S2_FEATURE_OWNER");
+                    }
                 }
             }
         } catch (IllegalArgumentException invalid) {

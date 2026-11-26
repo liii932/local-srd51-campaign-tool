@@ -78,6 +78,39 @@ class Schema2EquipmentHealthCompositionTest {
             assertThrows(Schema2Exception.class,()->Schema2GrantFixtures.artifacts(files));
         }
     }
+    @Test void heavyArmorStrengthThresholdSupportsCustomAuthorsAndOverridesAcrossTheFullRange() {
+        var files = Schema2EquipmentHealthFixtures.packages();
+        Schema2GrantFixtures.edit(files, 0, "rules.json", rows -> equipment(rows, "item.heavy_armor")
+                .addProperty("strength_minimum", 17));
+        changeStrengthMinimum(files, "item.heavy_armor", 30);
+        var material = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+        var projection = material.projection();
+        var chain = projection.chains().stream().filter(row -> row.field() == Field.STRENGTH_MINIMUM
+                && row.target().equals(new RuleIdentity("vitals_base", "equipment.item", "item.heavy_armor")))
+                .findFirst().orElseThrow();
+        assertEquals(new IntegerValue(17), chain.steps().getFirst().after().value());
+        assertEquals(new IntegerValue(30), chain.steps().getLast().after().value());
+        var restored = ProductionSchema2Projection.restore(material.members(), projection.rules(), projection.entries(), projection.chains());
+        assertArrayEquals(material.finalRulesJson(), restored.finalRulesJson());
+        assertArrayEquals(material.chainsJson(), restored.chainsJson());
+
+        for (int invalid : List.of(-1, 31)) {
+            var authored = Schema2EquipmentHealthFixtures.packages();
+            Schema2GrantFixtures.edit(authored, 0, "rules.json", rows -> equipment(rows, "item.heavy_armor")
+                    .addProperty("strength_minimum", invalid));
+            assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(authored));
+            var overridden = Schema2EquipmentHealthFixtures.packages();
+            changeStrengthMinimum(overridden, "item.heavy_armor", invalid);
+            assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(overridden));
+        }
+
+        var overridden = Schema2EquipmentHealthFixtures.packages();
+        changeStrengthMinimum(overridden, "item.light_armor", 1);
+        var artifacts = Schema2GrantFixtures.artifacts(overridden);
+        assertEquals("S2_TYPE", assertThrows(Schema2Exception.class,
+                () -> ProductionSchema2Projection.compose(artifacts)).diagnostic().code());
+    }
+
     @Test void typedReferenceCategoryStealthSkillAvailabilityAndHealthUniquenessFailClosed() {
         for(String target:List.of("proficiency.weapon","proficiency.strength","proficiency.missing")) {
             var files=Schema2EquipmentHealthFixtures.packages();
@@ -101,6 +134,34 @@ class Schema2EquipmentHealthCompositionTest {
             assertThrows(Schema2Exception.class,()->ProductionSchema2Projection.restore(material.members(),material.projection().rules(),material.projection().entries(),chains));
         }
     }
+    private static JsonObject equipment(JsonElement rows, String key) {
+        for (var element : rows.getAsJsonArray()) {
+            var row = element.getAsJsonObject();
+            if (row.getAsJsonObject("identity").get("rule_key").getAsString().equals(key)) return row;
+        }
+        throw new AssertionError(key);
+    }
+
+    private static void changeStrengthMinimum(List<Map<String, byte[]>> files, String key, int value) {
+        Schema2GrantFixtures.edit(files, 1, "changes.json", rows -> {
+            var target = Schema2GrantFixtures.rule("vitals_base", "equipment.item", key);
+            for (var element : rows.getAsJsonArray()) {
+                var change = element.getAsJsonObject();
+                if (target.equals(change.get("target")) && change.has("field")
+                        && change.get("field").getAsString().equals("strength_minimum")) {
+                    change.addProperty("value", value);
+                    return;
+                }
+            }
+            var change = new JsonObject();
+            change.addProperty("op", "set_field");
+            change.add("target", target);
+            change.addProperty("field", "strength_minimum");
+            change.addProperty("value", value);
+            rows.getAsJsonArray().add(change);
+        });
+    }
+
     private static JsonObject modifierChange(JsonElement root){for(var element:root.getAsJsonArray()){var row=element.getAsJsonObject();if(row.has("field")&&row.get("field").getAsString().equals("modifier"))return row;}throw new AssertionError("modifier change");}
     private static JsonObject row(JsonElement root,String type){for(var element:root.getAsJsonArray()){var row=element.getAsJsonObject();if(row.getAsJsonObject("identity").get("rule_type").getAsString().equals(type))return row;}throw new AssertionError(type);}
 }

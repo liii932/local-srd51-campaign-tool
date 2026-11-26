@@ -14,6 +14,7 @@
 `equipment.item`、`adventure.health`、`adventure.vital_effect` 的字段、条件引用及严格清空。
 这四类定义已接通作者、纯组合、真实来源和[准确镜像/事实存储](schema-2-character-fact-storage.md)；
 运行命令与历史语义由[角色基础消费者](schema-2-character-foundations.md)验证。
+[步行与重甲作者合同](schema-2-combat-authoring.md#步行来源)规定 `character.movement` 与 `equipment.armor_movement` 的字段、唯一性和装备门槛的应用方式。
 作者/来源、材料还原、仓储恢复与业务验证各有职责，不能从单独一层推断完整执行资格。
 
 “生产编码”指可用于真实制品保管和准确身份绑定的字节合同，不表示完整基础、机制支持、

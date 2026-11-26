@@ -1,20 +1,20 @@
 {
   "author_schema_version": 2,
   "module_key": "srd51_characters",
-  "release_version": "5",
+  "release_version": "7",
   "package_display_name": "SRD 5.1 — finite characters mechanisms",
   "role": "extension",
   "dependencies": [
     {
       "module_key": "srd51_runtime",
       "supported_versions": [
-        "5"
+        "7"
       ]
     }
   ],
   "compatible_combinations": [
     {
-      "srd51_runtime": "5"
+      "srd51_runtime": "7"
     }
   ],
   "load_order_constraints": [],

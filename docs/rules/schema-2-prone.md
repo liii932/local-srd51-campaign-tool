@@ -34,8 +34,8 @@ Ready 移动另可在触发时以反应爬行。
 ## 应用与模组责任
 
 这组行为属于应用能力修改（B）。既有 `adventure.combat` 的 `SRD_2014_COMBAT_V1`
-声明战斗解释，`character.movement` 的 `SRD_2014_WALKING_SPEED_V1` 提供准确种族速度，
-护甲 owner 提供已有速度惩罚。没有新增作者参数、同义算法或包名特判。
+声明战斗解释，`character.movement` 提供所选种族的[步行算法](schema-2-combat-authoring.md#步行来源)。
+爬行和起身使用计入所穿重甲力量门槛、冻结步行策略与通用减速量后的有效步速。
 `CampaignRuleSupport`、严格组合和实际角色支持检查继续约束所选材料及全部已取得影响。
 
 | 接合边界 | 复用入口与状态 | 修改类别 |

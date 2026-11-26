@@ -11,15 +11,81 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static com.dndtool.service.Schema2CombatState.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CampaignProneIntegrationTest {
     @TempDir Path temporary;
+
+    @ParameterizedTest(name = "customized armor movement: {0}")
+    @ValueSource(booleans = {false, true})
+    void armorMovementControlsExplorationDashStandingAndPlayerCardAfterReopen(boolean customized) throws Exception {
+        try (var f = new Fixture(temporary)) {
+            int dwarfSpeed = customized ? 30 : 25;
+            int humanSteps = customized ? 3 : 4;
+            if (customized) CampaignRuleFixtures.createWithArmorMovement(f.service, "重甲移动", dwarfSpeed, "IGNORE", "APPLY", 15, 17);
+            else CampaignRuleFixtures.create(f.service, "重甲移动");
+            var rules = f.state().material().restore();
+            var catalog = rules.metadata().catalog();
+            assertEquals(List.of("race.dwarf", "race.human"), catalog.stream()
+                    .filter(row -> row.type().equals("character.race") && row.creationChoice())
+                    .map(CampaignRuleContext.CatalogEntry::key).sorted().toList());
+            var armorRule = catalog.stream().filter(row -> row.type().equals("equipment.armor_movement")).findFirst().orElseThrow();
+            assertTrue(armorRule.executable());
+            assertFalse(armorRule.creationChoice());
+            assertEquals(customized, armorRule.overrides().stream()
+                    .anyMatch(override -> override.field().equals("heavy_armor_speed_penalty_feet")));
+            var dwarfInput = input("name", "矮人牧师", "kind", "PC", "classKey", "cleric", "backgroundKey", "acolyte",
+                    "raceKey", "race.dwarf");
+            var bad = dwarfInput.deepCopy();
+            bad.addProperty("raceKey", "race.elf");
+            var before = f.access();
+            assertEquals("STORAGE_RACE_UNAVAILABLE", assertCode("DOMAIN_REJECTED",
+                    () -> f.subject("character-create", bad)).getMessage());
+            assertEquals(before, f.access());
+            UUID dwarf = f.subject("character-create", dwarfInput);
+            UUID human = f.subject("character-create", input("name", "人类冒险者", "kind", "NPC", "classKey", customized ? "fighter" : "cleric",
+                    "backgroundKey", "acolyte"));
+            var races = f.state().characters().stream().collect(java.util.stream.Collectors.toMap(
+                    CampaignDomainData.Character::id, card -> card.initial().character().sources().race().ruleKey()));
+            assertEquals(java.util.Map.of(dwarf, "race.dwarf", human, "race.human"), races);
+            UUID player = f.subject("member-add", input("name", "玩家"));
+            f.subject("control-set", input("characterId", dwarf, "memberId", player, "controlVersion", 0));
+            PlayerSpaceFixture.placeAtWorld(f.service, dwarf, human);
+            for (UUID actor : List.of(dwarf, human)) {
+                assertEquals(customized && actor.equals(human) ? 15 : 13, f.card(actor).abilities().get("ability.strength"));
+                UUID plate = UUID.randomUUID();
+                f.equipment(plate.toString(), actor, "ITEM_ACQUIRED", new EquipmentInput(plate,
+                        rules.rule("equipment.item", "item.plate"), "CARRIED", "取得板甲"));
+                f.equipment(id(), actor, "ITEM_EQUIPPED", new EquipmentInput(plate, null, "WORN", "穿戴板甲"));
+            }
+            f.enterScene(List.of(new Deployment(dwarf, cell(0, 0), 0), new Deployment(human, cell(0, 2), 1)));
+            var humanPath = IntStream.rangeClosed(1, humanSteps + 1).mapToObj(x -> cell(x, 2)).toList();
+            f.reject(Command.exploreMove(human, humanPath), "S2_EXPLORATION_PATH");
+            f.combat(Command.exploreMove(human, humanPath.subList(0, humanSteps)));
+            var dwarfPath = IntStream.rangeClosed(1, dwarfSpeed / 5).mapToObj(x -> cell(x, 0)).toList();
+            f.combat(Command.exploreMove(dwarf, dwarfPath));
+            f.combat(Command.reenter(dwarf, List.of(dwarf, human)), 20, 10);
+            f.combat(Command.action(Kind.DASH, dwarf));
+            assertEquals(dwarfSpeed, f.actor(dwarf).movementBonus());
+            f.combat(Command.action(Kind.DROP_PRONE, dwarf));
+            f.reopen();
+            assertEquals(rules.binding(), f.state().material().restore().binding());
+            assertEquals(dwarfSpeed, f.actor(dwarf).movementBonus());
+            f.combat(Command.action(Kind.STAND_UP, dwarf));
+            assertEquals(dwarfSpeed, f.actor(dwarf).movementSpentHalfFeet(), "Standing costs half the walking speed");
+            assertEquals(dwarfPath.getLast(), f.actor(dwarf).position());
+            var card = PlayerCampaignProjection.project(f.access(), player).getAsJsonArray("cards").get(0).getAsJsonObject();
+            assertEquals(dwarfSpeed, card.get("speed").getAsInt(), "The player card shows speed independently of the Dash allowance");
+        }
+    }
 
     @Test void postureCostsOnlyMovementAndSurvivesTurnsAndExploration() throws Exception {
         try (var f = new Fixture(temporary)) {

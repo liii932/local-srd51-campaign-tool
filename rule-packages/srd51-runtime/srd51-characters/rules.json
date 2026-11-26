@@ -965,5 +965,18 @@
       "rule_key": "tool.mason_tools"
     },
     "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.armor_movement",
+      "rule_key": "armor_movement.heavy_armor"
+    },
+    "display_name": "Heavy armor walking speed penalty",
+    "description": "Worn heavy armor reduces walking speed if its Strength requirement is unmet and the character's movement profile applies the penalty.",
+    "source_page": 63,
+    "heavy_armor_speed_penalty_feet": 10,
+    "algorithm": "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1"
   }
 ]

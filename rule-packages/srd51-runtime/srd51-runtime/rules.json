@@ -265,8 +265,8 @@
       "rule_type": "character.race",
       "rule_key": "race.dwarf"
     },
-    "display_name": "Dwarf (language and artisan tool training)",
-    "description": "Only Common, Dwarvish, artisan tool choice and 25-foot walking speed execute. Racial ability increases, poison defenses and heavy-armor speed exception are unsupported metadata.",
+    "display_name": "Dwarf (language, artisan tool training and walking speed)",
+    "description": "Common, Dwarvish, artisan tool choice and walking speed with the heavy armor speed exception. Racial ability increases and poison defenses remain outside the supported racial traits.",
     "source_page": 3
   },
   {
@@ -783,7 +783,7 @@
       "rule_key": "movement.human"
     },
     "display_name": "Human walking speed",
-    "description": "Base walking speed only; special racial movement exceptions are unsupported.",
+    "description": "Heavy armor applies the shared walking speed penalty when its Strength requirement is unmet.",
     "source_page": 5,
     "owner": {
       "kind": "rule",
@@ -792,6 +792,7 @@
       "rule_key": "race.human"
     },
     "walk_speed_feet": 30,
+    "heavy_armor_speed_policy": "APPLY",
     "algorithm": "SRD_2014_WALKING_SPEED_V1"
   },
   {
@@ -802,7 +803,7 @@
       "rule_key": "movement.dwarf"
     },
     "display_name": "Dwarf walking speed",
-    "description": "Base walking speed only; special racial movement exceptions are unsupported.",
+    "description": "Wearing heavy armor does not reduce walking speed for insufficient Strength.",
     "source_page": 3,
     "owner": {
       "kind": "rule",
@@ -811,6 +812,7 @@
       "rule_key": "race.dwarf"
     },
     "walk_speed_feet": 25,
+    "heavy_armor_speed_policy": "IGNORE",
     "algorithm": "SRD_2014_WALKING_SPEED_V1"
   }
 ]
