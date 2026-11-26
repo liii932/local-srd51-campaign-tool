@@ -18,13 +18,18 @@ public final class Schema2CombatTestFixture {
     public static final RuleIdentity WEAPON_ATTACK=new RuleIdentity(BASE,"equipment.weapon_attack","weapon_attack.ordinary");
     public static final RuleIdentity TWO_HANDED_ATTACK=new RuleIdentity(BASE,"equipment.weapon_attack","weapon_attack.two_handed");
     public static final RuleIdentity MOVEMENT=new RuleIdentity(BASE,"character.movement","movement.human");
+    public static final RuleIdentity ARMOR_MOVEMENT=new RuleIdentity(BASE,"equipment.armor_movement","armor_movement.heavy_armor");
     private Schema2CombatTestFixture() { }
     public static List<Map<String,byte[]>> packages() {
         var files=Schema2CheckTestFixture.packages("normal");
         JsonArray definitions=Schema2GrantFixtures.json(files.getFirst().get("rules.json")).getAsJsonArray();
         JsonObject combat=definition(COMBAT,91);combat.addProperty("algorithm","SRD_2014_COMBAT_V1");definitions.add(combat);
         JsonObject movement=definition(MOVEMENT,7);movement.add("owner",jsonIdentity(new RuleIdentity(BASE,"character.race","race.human")));
-        movement.addProperty("walk_speed_feet",30);movement.addProperty("algorithm","SRD_2014_WALKING_SPEED_V1");definitions.add(movement);
+        movement.addProperty("walk_speed_feet",30);movement.addProperty("algorithm",WALKING_SPEED_ALGORITHM);
+        movement.addProperty("heavy_armor_speed_policy",HeavyArmorSpeedPolicy.APPLY.name());definitions.add(movement);
+        JsonObject armorMovement=definition(ARMOR_MOVEMENT,63);
+        armorMovement.addProperty("algorithm",HEAVY_ARMOR_MOVEMENT_ALGORITHM);
+        armorMovement.addProperty("heavy_armor_speed_penalty_feet",10);definitions.add(armorMovement);
         for(var pair:List.of(Map.entry(WEAPON_ATTACK,ITEM_WEAPON),Map.entry(TWO_HANDED_ATTACK,ITEM_TWO_HANDED))) {
             JsonObject attack=definition(pair.getKey(),65);attack.add("item",jsonIdentity(pair.getValue()));attack.addProperty("ability_policy","FINESSE");
             attack.addProperty("dice_count",1);attack.addProperty("dice_sides",8);attack.addProperty("damage_type","SLASHING");

@@ -135,7 +135,10 @@ public final class PlayerCampaignProjection {
     private static JsonObject ruleCard(CampaignDomainData.State domain, CampaignDomainData.Character c) {
         var state = c.history().current(); JsonObject card = base(c.id(), c.name(), c.kind(), state.hitPoints(), state.maximumHitPoints(), state.level());
         card.addProperty("className", ruleName(domain, state.characterClass())); card.addProperty("proficiencyBonus", state.proficiencyBonus());
-        card.addProperty("armorClass", new Schema2CharacterEquipmentRules().derive(domain.material().restore().projection(), state).armorClass());
+        var material = domain.material().restore().projection();
+        var equipmentRules = new Schema2CharacterEquipmentRules();
+        card.addProperty("armorClass", equipmentRules.derive(material, state).armorClass());
+        card.addProperty("speed", equipmentRules.walkingSpeed(material, c.initial(), state));
         card.add("abilities", abilities(state.abilities()));
         JsonObject health = new JsonObject(); health.addProperty("temporaryHp", state.health().temporaryHitPoints());
         health.addProperty("deathSuccesses", state.health().deathSuccesses()); health.addProperty("deathFailures", state.health().deathFailures());

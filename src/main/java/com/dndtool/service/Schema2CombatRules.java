@@ -256,9 +256,9 @@ public final class Schema2CombatRules {
     }
 
     /** Checks the rule-only combat dependencies of the current character and deployment entry points. */
-    public static void validateFrozenSupport(ProductionSchema2Projection material, RuleIdentity race) {
+    public static void validateFrozenSupport(ProductionSchema2Projection material, List<RuleIdentity> races) {
         combatRule(material);
-        movement(material, race, null);
+        for (RuleIdentity race : races) Schema2CharacterEquipmentRules.validateWalkingSpeed(material, race, null);
         for (FinalRule row : material.projection().rules())
             if (row instanceof FinalItem item && item.enabled() && item.definition().kind() == EquipmentKind.WEAPON)
                 weaponProfile(material, item.identity());
@@ -271,15 +271,7 @@ public final class Schema2CombatRules {
         return rows.getFirst().identity();
     }
     int speed(Context context) {
-        var sources = context.initial().character().sources();
-        int speed = movement(context.material(), sources.race(), sources.subrace()).walkSpeedFeet();
-        return Math.max(0, speed - equipment.derive(context.material(), context.character()).speedPenalty());
-    }
-    private static MovementDefinition movement(ProductionSchema2Projection material, RuleIdentity race, RuleIdentity subrace) {
-        var rows = material.projection().rules().stream().filter(FinalMovement.class::isInstance).map(FinalMovement.class::cast)
-                .filter(row -> row.enabled() && (row.definition().owner().equals(race) || row.definition().owner().equals(subrace))).toList();
-        if (rows.size() != 1 || !rows.getFirst().definition().algorithm().equals("SRD_2014_WALKING_SPEED_V1")) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
-        return rows.getFirst().definition();
+        return equipment.walkingSpeed(context.material(), context.initial(), context.character());
     }
     private ItemDefinition itemDefinition(Context context, EquipmentItem instance) {
         var rows = context.material().projection().rules().stream().filter(FinalItem.class::isInstance).map(FinalItem.class::cast)

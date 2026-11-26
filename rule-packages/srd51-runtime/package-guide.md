@@ -10,8 +10,7 @@ The campaign freezes the complete typed projection, identities and field chains.
 The rule library imports and accepts exact package releases for new campaigns.
 External ZIPs can supply new content for mechanisms the installed application
 already implements without rebuilding the WAR. Using a mechanism for the first
-time requires an application release that implements it, including for Improved
-Critical and Second Wind. An active campaign keeps the exact ordered members and
+time requires an application release that implements it. An active campaign keeps the exact ordered members and
 rules frozen at creation. Opening a saved campaign requires the original ZIPs
 for those exact members, explicit acceptance in the local rule library, and an
 application that supports the saved mechanisms.
@@ -20,13 +19,13 @@ application that supports the saved mechanisms.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `5` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, walking speed and rests |
-| `srd51_characters` version `5` | extension | `srd51_runtime=5` | Fighter/cleric/wizard growth, resources, equipment, checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `5` | extension | `srd51_runtime=5`, `srd51_characters=5` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `9` | extension | `srd51_runtime=5` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `7` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
+| `srd51_characters` version `7` | extension | `srd51_runtime=7` | Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `7` | extension | `srd51_runtime=7`, `srd51_characters=7` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `13` | extension | `srd51_runtime=7` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `10` as its
+first three members and selects `dm_runtime_house_rules` version `14` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -63,11 +62,21 @@ selected 19 automatically hits even if the total falls short of the target's
 Armor Class, including any Shield bonus. Critical hits roll twice the weapon
 damage dice and add the fixed damage modifier once.
 
-Human sources grant Common and one standard language. Dwarf sources also
-demonstrate a real artisan-tool choice. Acolyte grants two standard language
-choices. The custom artisan source is an explicit project customization with
-Dwarvish and smith's tools. Initial source facts currently include languages
-and tools only: background skill and narrative-feature effects are not added.
+Human is the default race source and grants Common and one standard language.
+The bundled dwarf source grants Common, Dwarvish and one artisan's tool
+proficiency. Acolyte grants two standard languages. The custom artisan source is
+an explicit project customization with Dwarvish and smith's tools. Background
+skill and narrative-feature effects remain outside this scope.
+
+Each `character.movement` rule defines its owner's `walk_speed_feet` and
+`heavy_armor_speed_policy` using `SRD_2014_WALKING_SPEED_V1`. The bundled human
+profile uses 30 feet and `APPLY`. The bundled dwarf profile uses 25 feet and
+`IGNORE`. If policy is `APPLY` and worn heavy armor requires more Strength than
+the character has, the shared `armor_movement.heavy_armor` rule deducts its
+`heavy_armor_speed_penalty_feet` (10 in this combination), to a minimum of zero.
+Wearable armor declares its own `strength_minimum`. Armor Class, Stealth
+disadvantage and penalties for wearing armor without proficiency apply
+independently.
 
 Armor profiles use leather 11, scale mail 14, chain mail 16 with Strength 13,
 plate 18 with Strength 15, and shield +2. Scale mail, chain mail and plate
@@ -94,7 +103,7 @@ explicit DM house rule, separate from the SRD Antimagic Field spell.
 ## Unsupported boundaries
 
 This selection does not supply racial ability increases, complete racial
-traits, dwarf poison defenses or its heavy-armor speed exception, background
+traits, dwarf poison defenses, background
 skill/feature effects, starting equipment packages, cantrips, general cleric
 preparation, spell transcription, versatile/thrown weapon modes or full class
 feature execution. Fighter Fighting Style and Action Surge are catalog-only

@@ -2,6 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -12,7 +13,7 @@ public final class Schema2CharacterEquipmentRules {
     private static final Set<String> KINDS = Set.of("ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED");
     private final Schema2CharacterProgressionRules growth = new Schema2CharacterProgressionRules();
     private final Schema2CharacterRestRules rests = new Schema2CharacterRestRules();
-    public record Derived(int armorClass, int speedPenalty, boolean castingForbidden,
+    public record Derived(int armorClass, boolean castingForbidden,
             boolean physicalCheckDisadvantage, Set<RuleIdentity> stealthSkills) {
         public Derived { stealthSkills = Set.copyOf(stealthSkills); }
     }
@@ -91,20 +92,63 @@ public final class Schema2CharacterEquipmentRules {
     public Derived derive(ProductionSchema2Projection material, State state) {
         validateState(material, state); requireNoUnownedEffects(material,state);
         int dexterity = Math.floorDiv(state.abilities().get("ability.dexterity") - 10, 2);
-        int ac = 10 + dexterity, shield = 0, speed = 0; boolean untrained = false;
+        int ac = 10 + dexterity, shield = 0; boolean untrained = false;
         Set<RuleIdentity> stealth = new HashSet<>();
         for (EquipmentItem instance : state.equipment()) {
             if (Set.of("CARRIED","GROUND").contains(instance.location())) continue;
             ItemDefinition item = definition(material, instance.item());
             if (armor(item.kind())) {
                 ac = item.armorClass() + switch (item.kind()) { case LIGHT_ARMOR -> dexterity; case MEDIUM_ARMOR -> Math.min(2, dexterity); default -> 0; };
-                if (state.abilities().get("ability.strength") < item.strengthMinimum()) speed = 10;
                 if (item.stealthDisadvantage()) stealth.add(item.stealthSkill());
             } else if (item.kind() == EquipmentKind.SHIELD) shield = 2;
             if ((armor(item.kind()) || item.kind() == EquipmentKind.SHIELD)
                     && state.proficiencies().stream().noneMatch(fact -> fact.target().equals(item.proficiency()))) untrained = true;
         }
-        return new Derived(ac + shield, speed, untrained, untrained, stealth);
+        return new Derived(ac + shield, untrained, untrained, stealth);
+    }
+
+    /** Validates the unique walking profile selected by the character's frozen sources. */
+    static void validateWalkingSpeed(ProductionSchema2Projection material, RuleIdentity race, RuleIdentity subrace) {
+        movement(material, race, subrace);
+        heavyArmorSpeedPenalty(material);
+    }
+
+    /** Derives current walking speed in feet from the bound sources and worn armor. */
+    public int walkingSpeed(ProductionSchema2Projection material, InitialPlan initial, State state) {
+        if (!initial.campaignId().equals(state.campaignId()) || !initial.characterId().equals(state.characterId())
+                || !initial.character().identity().equals(state.identity()))
+            throw invalid("S2_EQUIPMENT_CHARACTER_BINDING");
+        initial.character().binding().verify(material);
+        var sources = initial.character().sources();
+        MovementDefinition movement = movement(material, sources.race(), sources.subrace());
+        int penalty = heavyArmorSpeedPenalty(material);
+        validateState(material, state);
+        requireNoUnownedEffects(material, state);
+        var worn = state.equipment().stream().filter(item -> item.location().equals("WORN")).findFirst().orElse(null);
+        if (worn != null && movement.heavyArmorSpeedPolicy() == HeavyArmorSpeedPolicy.APPLY) {
+            ItemDefinition armor = definition(material, worn.item());
+            if (armor.kind() == EquipmentKind.HEAVY_ARMOR && state.abilities().get("ability.strength") < armor.strengthMinimum())
+                return Math.max(0, movement.walkSpeedFeet() - penalty);
+        }
+        return movement.walkSpeedFeet();
+    }
+
+    private static MovementDefinition movement(ProductionSchema2Projection material, RuleIdentity race, RuleIdentity subrace) {
+        var rows = material.projection().rules().stream().filter(FinalMovement.class::isInstance).map(FinalMovement.class::cast)
+                .filter(row -> row.enabled() && (row.definition().owner().equals(race) || row.definition().owner().equals(subrace))).toList();
+        if (rows.size() != 1) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
+        MovementDefinition movement = rows.getFirst().definition();
+        if (!WALKING_SPEED_ALGORITHM.equals(movement.algorithm()) || movement.heavyArmorSpeedPolicy() == null)
+            throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
+        return movement;
+    }
+
+    private static int heavyArmorSpeedPenalty(ProductionSchema2Projection material) {
+        var rows = material.projection().rules().stream().filter(FinalArmorMovement.class::isInstance)
+                .map(FinalArmorMovement.class::cast).filter(FinalArmorMovement::enabled).toList();
+        if (rows.size() != 1 || !HEAVY_ARMOR_MOVEMENT_ALGORITHM.equals(rows.getFirst().definition().algorithm()))
+            throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
+        return rows.getFirst().definition().heavyArmorSpeedPenaltyFeet();
     }
 
     public boolean hasPreparedTool(ProductionSchema2Projection material, State state, RuleIdentity proficiency) {

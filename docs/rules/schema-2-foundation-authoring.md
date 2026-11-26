@@ -41,17 +41,19 @@
 
 `equipment.item` 另外必需 `kind`、`armor_class`、`strength_minimum`、
 `stealth_disadvantage`、`hands`；`proficiency` 按物品类别要求，`stealth_skill` 按隐匿劣势要求。
-整数初步范围分别为 AC 0—20、力量要求 0—15、手数 0—2；完整声明还必须满足下表。
+整数初步范围分别为 AC 0—20、力量要求 0—30、手数 0—2；完整声明还必须满足下表。
 `stealth_disadvantage` 必须是 JSON 布尔值，不能用文本或整数替代。
 
 | `kind` | AC | 力量要求 | 手数 | `proficiency` |
 | --- | --- | --- | --- | --- |
 | `LIGHT_ARMOR`、`MEDIUM_ARMOR` | 10—20 | 0 | 0 | `character.proficiency`，类别 `ARMOR` |
-| `HEAVY_ARMOR` | 10—20 | 0、13 或 15 | 0 | `character.proficiency`，类别 `ARMOR` |
+| `HEAVY_ARMOR` | 10—20 | 整数 0—30 | 0 | `character.proficiency`，类别 `ARMOR` |
 | `SHIELD` | 2 | 0 | 1 | `character.proficiency`，类别 `ARMOR` |
 | `TOOL` | 0 | 0 | 1 或 2 | `character.tool` |
 | `WEAPON` | 0 | 0 | 1 或 2 | `character.proficiency`，类别 `WEAPON` |
 | `HOLY_SYMBOL` | 0 | 0 | 1 | 必须省略 |
+
+力量要求为 0 表示无门槛。力量低于所穿重甲门槛时，按[步行来源及通用重甲规则](schema-2-combat-authoring.md#步行来源)结算减速。
 
 仅护甲可声明隐匿劣势。`stealth_disadvantage=true` 时必须提供完整 `stealth_skill`，
 其目标必须是 `category=SKILL` 且 `ability_key=ability.dexterity` 的真实熟练定义；

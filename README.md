@@ -11,7 +11,7 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 隔离本地启动与浏览器验收见[测试指南](./docs/testing.md#sqlite-结构完整文件与运行验收)。
 使用标准规则即可开始。要使用外部包或家规组合，在“自定义规则组合”中逐包审阅、接受并预览。工作台可以：
 
-- 创建标准数组的有限 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史；
+- 创建标准数组的人类或矮人 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史。标准包矮人穿重甲时保有 25 尺步速，家规可分别调整[基础步速、重甲策略、减速量和力量门槛](docs/rules/schema-2-combat-authoring.md#步行来源)；
 - 单职业战士 1 级正常取得[回气](docs/rules/schema-2-second-wind.md)，在本人战斗回合用附赠动作恢复 `1d10＋战士等级` HP，次数随标准短休或长休恢复；
 - 单职业战士正常升到 5 级取得[额外攻击](docs/rules/schema-2-extra-attack.md)，自己回合的每个 Attack 动作可攻击两次，6 级保持；首击后的余数随完整文件保存恢复；
 - 单职业战士 3 级选择勇士后取得[精通重击](docs/rules/schema-2-improved-critical.md)，3–6 级已支持的近战武器攻击选中 19 或 20 时重击，普通攻击、借机攻击和 Ready 共用结算；

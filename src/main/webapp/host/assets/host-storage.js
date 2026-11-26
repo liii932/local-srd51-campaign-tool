@@ -233,6 +233,7 @@
         if (select.form.id === 'domain-resource') return rule.directResourceSpend;
         return rule.executable;
       });
+      if (select.name === 'raceKey') entries.sort((a, b) => Number(b.key === 'race.human') - Number(a.key === 'race.human'));
       options(select, entries.map(ruleValue), value => ruleFromValue(value).name || ruleFromValue(value).key);
     }
     for (const select of document.querySelectorAll('.ability-choice')) options(select, abilities.map(key => 'ability.' + key), key => abilityNames[abilities.indexOf(key.substring(8))]);
@@ -1386,7 +1387,8 @@
   }
   const multipleRules = select => Array.from(select.selectedOptions, option => typedRule(option.value));
   domainForm('domain-create', 'character-create', (_, values) => ({name: values.name, kind: values.kind,
-    classKey: ruleFromValue(values.classKey).key, backgroundKey: ruleFromValue(values.backgroundKey).key}));
+    raceKey: ruleFromValue(values.raceKey).key, classKey: ruleFromValue(values.classKey).key,
+    backgroundKey: ruleFromValue(values.backgroundKey).key}));
   domainForm('domain-profile', 'character-profile', (_, values) => ({characterId: values.characterId, name: values.name, kind: values.kind, active: values.active === 'on'}));
   characterForm('domain-growth', (_, values) => ({...baseCharacter('CHARACTER_ADVANCED'), hpChoice: values.hpChoice, targetClass: typedRule(values.class),
     growthChoices: {type: 'character.GrowthChoices', subclass: typedRule(values.subclass), feat: typedRule(values.feat),

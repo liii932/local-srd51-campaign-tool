@@ -98,6 +98,20 @@
     },
     "walk_speed_feet": 30,
     "author_note": "Original source note.",
-    "algorithm": "SRD_2014_WALKING_SPEED_V1"
+    "algorithm": "SRD_2014_WALKING_SPEED_V1",
+    "heavy_armor_speed_policy": "APPLY"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "combat_base",
+      "rule_type": "equipment.armor_movement",
+      "rule_key": "armor_movement.heavy_armor"
+    },
+    "display_name": "Heavy armor walking speed penalty",
+    "description": "A worn heavy armor item can reduce walking speed when Strength is below its requirement.",
+    "source_page": 63,
+    "heavy_armor_speed_penalty_feet": 10,
+    "algorithm": "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1"
   }
 ]
