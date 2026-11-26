@@ -68,7 +68,10 @@ final class Schema2CheckTestFixture {
         if (!mode.equals("features")) for (int index = definitions.size() - 1; index >= 0; index--)
             if (definitions.get(index).getAsJsonObject().getAsJsonObject("identity").get("rule_type").getAsString().equals("character.feature")) definitions.remove(index);
         if (!mode.equals("missing")) {
-            JsonObject check = definition(CHECK, 77); check.addProperty("algorithm", Schema2CharacterCheckRules.ALGORITHM); definitions.add(check);
+            JsonObject check = definition(CHECK, 77);
+            check.addProperty("algorithm", Schema2CharacterCheckRules.ALGORITHM);
+            check.addProperty("allow_alternate_skill_ability", mode.equals("alternate-skill-ability"));
+            definitions.add(check);
         }
         var tool = definition(TOOL, 70); tool.addProperty("category", "ARTISAN"); definitions.add(tool);
         var stealth = definition(STEALTH, 56); stealth.addProperty("category", "SKILL"); stealth.addProperty("ability_key", "ability.dexterity"); definitions.add(stealth);

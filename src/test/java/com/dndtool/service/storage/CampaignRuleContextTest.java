@@ -32,6 +32,11 @@ class CampaignRuleContextTest {
         var variantCatalog = variant.metadata();
         assertEquals(savedVariant.interpretation(), variantCatalog.interpretation());
         assertEquals(savedVariant.binding(), variantCatalog.binding());
+        assertEquals(Boolean.FALSE, catalogRule(standardCatalog, "check.srd2014").allowAlternateSkillAbility());
+        var variantCheck = catalogRule(variantCatalog, "check.srd2014");
+        assertEquals(Boolean.TRUE, variantCheck.allowAlternateSkillAbility());
+        assertTrue(variantCheck.overrides().contains(new CampaignRuleContext.FieldOverride("allow_alternate_skill_ability",
+                BundledCampaignRules.HOUSE_RULE_MODULE, "10", null, null)));
         var standardAthletics = catalogRule(standardCatalog, "proficiency.skill.athletics");
         var variantAthletics = catalogRule(variantCatalog, "proficiency.skill.athletics");
         assertEquals("ability.strength", standardAthletics.abilityKey());

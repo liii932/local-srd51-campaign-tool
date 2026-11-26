@@ -10,6 +10,7 @@
     "description": "Server-owned ability check mechanism.",
     "source_page": 77,
     "algorithm": "SRD_2014_ABILITY_CHECK_V1",
+    "allow_alternate_skill_ability": false,
     "author_note": "Original rule"
   }
 ]

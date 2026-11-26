@@ -107,6 +107,10 @@ class CampaignRuleBindingIntegrationTest {
                 sides -> { dice.add(sides); return 10; })) {
             var ordinary = start(service, BundledCampaignRules.STANDARD);
             var ordinaryBinding = assertBinding(service, ordinary, STR, HOUSE_RELEASE, "language.dwarvish", 6);
+            var ordinaryBefore = service.accessSnapshot();
+            assertCode("DOMAIN_REJECTED", () -> submit(service, id(), input(service, ordinary, WIS, 14)));
+            assertEquals(ordinaryBefore, service.accessSnapshot());
+            assertTrue(dice.isEmpty());
             var ordinaryRequest = id();
             submit(service, ordinaryRequest, input(service, ordinary, STR, 14));
             assertResult(service, ordinary, ordinaryRequest, new CheckResult(10, null, 10, 2, 2, 14, true, false, false, 2, null),
@@ -125,7 +129,6 @@ class CampaignRuleBindingIntegrationTest {
             var variantBefore = service.accessSnapshot();
             assertCode("STALE_EPOCH", () -> service.domainCommand(id(), ordinaryView.epoch(), variantBefore.revision(),
                     "check-effects", input(service, variant, WIS, 14)));
-            assertCode("DOMAIN_REJECTED", () -> submit(service, id(), input(service, variant, STR, 14)));
             assertEquals(variantBefore, service.accessSnapshot());
             assertEquals(List.of(20), dice);
 

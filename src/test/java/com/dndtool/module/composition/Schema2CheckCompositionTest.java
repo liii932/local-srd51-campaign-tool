@@ -1,11 +1,15 @@
 package com.dndtool.module.composition;
 
+import com.google.gson.JsonNull;
+import com.google.gson.JsonPrimitive;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2CheckCompositionTest {
+    private static final String ALTERNATE_ABILITY = "allow_alternate_skill_ability";
+
     @Test void fixedAuthorFilesProduceTypedCheckAndAllOriginalOverrideFacts() {
         var material = Schema2CheckFixtures.projection();
         var check = assertInstanceOf(FinalCheck.class, material.projection().rules().getFirst());
@@ -14,7 +18,14 @@ class Schema2CheckCompositionTest {
         assertEquals("Server-owned ability check mechanism.", check.definition().description());
         assertEquals(77, check.definition().sourcePage());
         assertEquals("SRD_2014_ABILITY_CHECK_V1", check.definition().algorithm()); assertNull(check.definition().authorNote());
-        assertEquals(6, material.projection().chains().size());
+        assertTrue(check.definition().allowAlternateSkillAbility());
+        assertEquals(7, material.projection().chains().size());
+        var alternate = material.projection().chains().stream()
+                .filter(c -> c.field() == Field.ALLOW_ALTERNATE_SKILL_ABILITY).findFirst().orElseThrow();
+        assertEquals(List.of(false, true), alternate.steps().stream()
+                .map(s -> ((BooleanValue) s.after().value()).value()).toList());
+        assertEquals(List.of("checks_base", "checks_extension"), alternate.steps().stream()
+                .map(s -> s.provider().moduleKey()).toList());
         var names = material.projection().chains().stream().filter(c -> c.field() == Field.DISPLAY_NAME).findFirst().orElseThrow();
         assertEquals(List.of("Ability check", "Reviewed ability check"), names.steps().stream().map(s -> ((TextValue) s.after().value()).value()).toList());
         assertEquals(List.of("checks_base", "checks_extension"), names.steps().stream().map(s -> s.provider().moduleKey()).toList());
@@ -47,6 +58,50 @@ class Schema2CheckCompositionTest {
         Schema2GrantFixtures.edit(unknown, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).addProperty("script", "return 20"));
         assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(unknown));
     }
+    @Test void alternateAbilityRequiresAnExplicitBooleanThatCannotBeCleared() {
+        var missing = Schema2CheckFixtures.packages();
+        Schema2GrantFixtures.edit(missing, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).remove(ALTERNATE_ABILITY));
+        assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(missing));
+
+        for (var invalid : List.of(new JsonPrimitive("true"), new JsonPrimitive(1), JsonNull.INSTANCE)) {
+            var original = Schema2CheckFixtures.packages();
+            Schema2GrantFixtures.edit(original, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).add(ALTERNATE_ABILITY, invalid));
+            assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(original));
+
+            var override = Schema2CheckFixtures.packages();
+            Schema2GrantFixtures.edit(override, 1, "changes.json", root -> {
+                var row = root.getAsJsonArray().asList().getLast().getAsJsonObject();
+                assertEquals(ALTERNATE_ABILITY, row.get("field").getAsString());
+                row.add("value", invalid);
+            });
+            assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(override));
+        }
+
+        var cleared = Schema2CheckFixtures.packages();
+        Schema2GrantFixtures.edit(cleared, 1, "changes.json", root -> {
+            var row = root.getAsJsonArray().asList().getLast().getAsJsonObject();
+            row.addProperty("op", "clear_field");
+            row.remove("value");
+        });
+        assertEquals("S2_FIELD_NOT_CLEARABLE", assertThrows(Schema2Exception.class,
+                () -> Schema2GrantFixtures.artifacts(cleared)).diagnostic().code());
+    }
+
+    @Test void aStoredCheckOptionMustAgreeWithItsCompleteBooleanChain() {
+        var material = Schema2CheckFixtures.projection();
+        var check = assertInstanceOf(FinalCheck.class, material.projection().rules().getFirst());
+        var definition = check.definition();
+        var forged = new FinalCheck(new CheckDefinition(definition.identity(), definition.displayName(),
+                definition.description(), definition.sourcePage(), definition.algorithm(), false, definition.authorNote()), check.enabled());
+        assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                material.members(), List.of(forged), material.projection().entries(), material.projection().chains()));
+
+        var incomplete = material.projection().chains().stream()
+                .filter(c -> c.field() != Field.ALLOW_ALTERNATE_SKILL_ABILITY).toList();
+        assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                material.members(), material.projection().rules(), material.projection().entries(), incomplete));
+    }
+
     @Test void atMostOneEnabledRuleAndDirectOriginalOwnerDependencyRemainRequired() {
         var files = Schema2CheckFixtures.packages();
         Schema2GrantFixtures.edit(files, 0, "rules.json", root -> {

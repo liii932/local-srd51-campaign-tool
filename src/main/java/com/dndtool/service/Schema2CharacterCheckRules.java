@@ -7,7 +7,7 @@ import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
-/** SRD ability, default-ability skill and tool checks in the closed INTERNAL run. */
+/** SRD ability, skill and tool checks in the closed INTERNAL run. */
 public final class Schema2CharacterCheckRules {
     public static final String ALGORITHM = "SRD_2014_ABILITY_CHECK_V1";
     private final Schema2CharacterProgressionRules growth = new Schema2CharacterProgressionRules();
@@ -59,14 +59,17 @@ public final class Schema2CharacterCheckRules {
         var definitions = material.projection().rules().stream().filter(FinalCheck.class::isInstance)
                 .map(FinalCheck.class::cast).filter(FinalCheck::enabled).toList();
         CheckInput input = command.checkInput();
-        if (definitions.size() != 1 || !ALGORITHM.equals(definitions.getFirst().definition().algorithm())
-                || !definitions.getFirst().identity().equals(input.rule())) throw invalid("S2_CHECK_RULE_UNSUPPORTED");
+        if (definitions.size() != 1) throw invalid("S2_CHECK_RULE_UNSUPPORTED");
+        var definition = definitions.getFirst().definition();
+        if (!ALGORITHM.equals(definition.algorithm()) || !definition.identity().equals(input.rule()))
+            throw invalid("S2_CHECK_RULE_UNSUPPORTED");
         if (input.kind().equals("SKILL")) {
             var targets = material.projection().rules().stream().filter(FinalProficiency.class::isInstance)
                     .map(FinalProficiency.class::cast).filter(row -> row.identity().equals(input.proficiency())).toList();
             if (targets.size() != 1 || !targets.getFirst().enabled()
-                    || targets.getFirst().definition().category() != ProficiencyCategory.SKILL
-                    || !input.abilityKey().equals(targets.getFirst().definition().abilityKey()))
+                    || targets.getFirst().definition().category() != ProficiencyCategory.SKILL)
+                throw invalid("S2_CHECK_SKILL_UNSUPPORTED");
+            if (!definition.allowAlternateSkillAbility() && !input.abilityKey().equals(targets.getFirst().definition().abilityKey()))
                 throw invalid("S2_CHECK_SKILL_UNSUPPORTED");
         } else if (input.kind().equals("TOOL")) {
             var targets = material.projection().rules().stream().filter(FinalTool.class::isInstance)
@@ -79,9 +82,10 @@ public final class Schema2CharacterCheckRules {
         int proficiency = stonecunning == null ? Schema2CharacterRuntime.ordinaryCheckProficiency(before, input)
                 : before.proficiencyBonus() * stonecunning.proficiencyMultiplier();
         var derived = equipment.derive(material, before);
-        boolean physical = input.abilityKey().equals("ability.strength") || input.abilityKey().equals("ability.dexterity");
+        boolean dexterity = input.abilityKey().equals("ability.dexterity");
+        boolean physical = dexterity || input.abilityKey().equals("ability.strength");
         boolean disadvantage = input.disadvantage() || physical && derived.physicalCheckDisadvantage()
-                || input.kind().equals("SKILL") && derived.stealthSkills().contains(input.proficiency());
+                || dexterity && input.kind().equals("SKILL") && derived.stealthSkills().contains(input.proficiency());
         return new PreparedCheck(input, modifier, proficiency, stonecunning == null ? null : stonecunning.identity(),
                 withNextVersion(before), input.advantage(), disadvantage);
     }

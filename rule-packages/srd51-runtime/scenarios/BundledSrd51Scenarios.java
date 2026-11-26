@@ -29,7 +29,7 @@ import java.util.stream.IntStream;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
-/** Authored expectations for the standard SRD 5.1 combination. */
+/** Authored expectations for the SRD 5.1 runtime combinations. */
 public final class BundledSrd51Scenarios {
     private static final Map<String, Integer> ARRAY = Map.of("ability.strength", 15, "ability.dexterity", 14,
             "ability.constitution", 13, "ability.intelligence", 12, "ability.wisdom", 10, "ability.charisma", 8);
@@ -46,6 +46,8 @@ public final class BundledSrd51Scenarios {
                 scenario("fighter-growth", BundledSrd51Scenarios::verifyFighterGrowth),
                 scenario("hill-dwarf-toughness", BundledSrd51Scenarios::verifyHillDwarfToughness),
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
+                scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
+                scenario("alternate-skill-enabled", BundledSrd51Scenarios::verifyAlternateSkillEnabled),
                 scenario("stonecunning", BundledSrd51Scenarios::verifyStonecunning),
                 scenario("stonecunning-variant", BundledSrd51Scenarios::verifyStonecunningVariant),
                 scenario("fighter-extra-attack", BundledSrd51Scenarios::verifyFighterExtraAttack),
@@ -179,6 +181,45 @@ public final class BundledSrd51Scenarios {
         assertEquals(ARRAY, state.abilities());
     }
 
+    private void verifyAlternateSkillDisabled() {
+        verifyAlternateSkillSetting(false);
+        var plan = initialPlan("fighter");
+        var fighter = initial(plan, "fighter");
+        var swim = skillCheck("ability.constitution", "athletics", 13, CheckInput.GENERAL);
+        expectRejection("Constitution (Athletics) in the standard composition", "S2_CHECK_SKILL_UNSUPPORTED",
+                () -> new Schema2CharacterCheckRules().prepare(rules.projection(), plan, fighter, swim));
+    }
+
+    private void verifyAlternateSkillEnabled() {
+        verifyAlternateSkillSetting(true);
+        var swim = skillCheck("ability.constitution", "athletics", 13, CheckInput.GENERAL);
+        var fighter = initialPlan("fighter");
+        verifySkillResult(fighter, initial(fighter, "fighter"), swim, 1, 2, 13, true, null);
+        var cleric = initialPlan("cleric");
+        verifySkillResult(cleric, initial(cleric, "cleric"), swim, 1, 0, 11, false, null);
+    }
+
+    private void verifyAlternateSkillSetting(boolean allowed) {
+        var check = (FinalCheck) find("adventure.check", "check.srd2014");
+        assertEquals(rules.checkRule(), check.identity());
+        assertEquals(allowed, check.definition().allowAlternateSkillAbility());
+        var chain = rules.projection().projection().chains().stream()
+                .filter(row -> row.target().equals(check.identity()) && row.field() == Field.ALLOW_ALTERNATE_SKILL_ABILITY)
+                .findFirst().orElseThrow();
+        expectNumber(allowed ? 2 : 1, chain.steps().size());
+        var declaration = chain.steps().getFirst();
+        assertEquals("declared", declaration.origin());
+        assertEquals("srd51_characters", declaration.provider().moduleKey());
+        assertEquals(new FieldState(StateKind.PRESENT, new BooleanValue(false)), declaration.after());
+        if (allowed) {
+            var override = chain.steps().getLast();
+            assertEquals("set_field", override.op());
+            assertEquals("dm_runtime_house_rules", override.provider().moduleKey());
+            assertEquals(declaration.after(), override.before());
+            assertEquals(new FieldState(StateKind.PRESENT, new BooleanValue(true)), override.after());
+        }
+    }
+
     private void verifyStonecunning() {
         var trait = (FinalStonecunning) find("character.stonecunning", "stonecunning.dwarf");
         var history = rules.rule("character.proficiency", "proficiency.skill.history");
@@ -217,6 +258,12 @@ public final class BundledSrd51Scenarios {
         expectNumber(3, fifth.proficiencyBonus());
         verifyStoneworkCheck(dwarf, fifth, CheckInput.STONEWORK_ORIGIN, 9, trait.identity());
         verifyStoneworkCheck(dwarf, fifth, CheckInput.GENERAL, 0, null);
+        var alternateHistory = skillCheck("ability.constitution", "history", 15, CheckInput.GENERAL);
+        verifySkillResult(dwarf, fifth, alternateHistory, 2, 0, 12, false, null);
+        expectRejection("the stonework subject with Constitution (History)", "S2_CHARACTER_CHECK_INPUT",
+                () -> skillCheck("ability.constitution", "history", 15, CheckInput.STONEWORK_ORIGIN));
+        expectRejection("the stonework subject with Intelligence (Athletics)", "S2_CHARACTER_CHECK_INPUT",
+                () -> skillCheck("ability.intelligence", "athletics", 15, CheckInput.STONEWORK_ORIGIN));
     }
 
     private InitialPlan stonecunningPlan(String characterClass, String race, String subrace) {
@@ -225,18 +272,28 @@ public final class BundledSrd51Scenarios {
     }
 
     private void verifyStoneworkCheck(InitialPlan plan, State state, String subject, int bonus, RuleIdentity source) {
+        var command = skillCheck("ability.intelligence", "history", 15, subject);
+        verifySkillResult(plan, state, command, 1, bonus, 11 + bonus, 11 + bonus >= 15, source);
+    }
+
+    private Command skillCheck(String ability, String skill, int dc, String subject) {
+        var input = new CheckInput(rules.checkRule(), "SKILL", ability,
+                rules.rule("character.proficiency", "proficiency.skill." + skill), dc, false, false,
+                "The DM specifies the purpose of the skill check.", subject);
+        return new Command("CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null, input);
+    }
+
+    private void verifySkillResult(InitialPlan plan, State state, Command command, int modifier, int bonus,
+            int total, boolean success, RuleIdentity source) {
         var checks = new Schema2CharacterCheckRules();
-        var input = new CheckInput(rules.checkRule(), "SKILL", "ability.intelligence",
-                rules.rule("character.proficiency", "proficiency.skill.history"), 15, false, false,
-                "The DM specifies the subject of the History check.", subject);
-        var command = new Command("CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null, input);
         var result = checks.resolve(checks.prepare(rules.projection(), plan, state, command), 10, null);
         expectNumber(10, result.firstD20());
-        expectNumber(1, result.abilityModifier());
+        expectNumber(10, result.selectedD20());
+        expectNumber(modifier, result.abilityModifier());
         expectNumber(state.proficiencyBonus(), result.baseProficiencyBonus());
         expectNumber(bonus, result.proficiencyBonus());
-        expectNumber(11 + bonus, result.total());
-        assertEquals(11 + bonus >= 15, result.success());
+        expectNumber(total, result.total());
+        assertEquals(success, result.success());
         assertEquals(source, result.stonecunningRule());
     }
 

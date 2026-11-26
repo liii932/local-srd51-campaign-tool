@@ -23,7 +23,9 @@
 | `adventure.health` | `health.*` | `SRD_2014_HEALTH_V1` | 整数 98 |
 | `adventure.vital_effect` | `vital_effect.*` | `DIRECT_VITAL_EFFECT_V1` | 整数 96—99 |
 
-检定与健康类型没有其他领域字段；一个最终组合分别至多包含一个启用的检定定义和一个启用的
+检定定义必需 JSON 布尔字段 `allow_alternate_skill_ability`。标准包取 false，按技能声明的默认属性检定。随附变体通过 `set_field` 改为 true，允许 DM 为单次技能检定选用六属性之一。字段必须提供，拒绝 null、字符串、数字和 `clear_field`。技能的 `ability_key` 仍指定界面预选属性。[运行合同](schema-2-character-foundations.md#技能搭配不同属性)
+
+健康类型没有其他领域字段。一个最终组合分别至多包含一个启用的检定定义和一个启用的
 健康定义。零个启用定义可作为有限材料组合，但不能据此获得相应业务执行资格。
 
 出处对应本地 SRD 的[属性与优势 p.76](../references/srd-5.1/pages/page-076.md)、

@@ -1,27 +1,27 @@
 {
   "author_schema_version": 2,
   "module_key": "srd51_magic",
-  "release_version": "9",
+  "release_version": "10",
   "package_display_name": "SRD 5.1 — finite magic mechanisms",
   "role": "extension",
   "dependencies": [
     {
       "module_key": "srd51_runtime",
       "supported_versions": [
-        "9"
+        "10"
       ]
     },
     {
       "module_key": "srd51_characters",
       "supported_versions": [
-        "9"
+        "10"
       ]
     }
   ],
   "compatible_combinations": [
     {
-      "srd51_runtime": "9",
-      "srd51_characters": "9"
+      "srd51_runtime": "10",
+      "srd51_characters": "10"
     }
   ],
   "load_order_constraints": [],

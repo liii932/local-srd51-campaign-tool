@@ -22,7 +22,7 @@ verify_character_package() {
 verify_character_package "$candidates/srd51-characters.zip" --case weapon-damage
 ```
 
-核对 `MODULE srd51_characters@9` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
+核对 `MODULE srd51_characters@10` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
 
 多项装备声明同时改动时，在同一个命令中重复 `--case`。这些用例共用一次解包、驱动编译、引擎 JVM 启动和规则组合。每项自行准备角色、场景和骰流，按传入的次序执行。省略 `--case` 时按清单次序执行全部用例。任何失败都使整批退出非零。输出分别给出准备、组合与通过用例的耗时，可用 shell 的 `time` 测整条命令。
 
@@ -33,7 +33,7 @@ verify_character_package "$candidates/srd51-characters.zip" \
 
 ## 验证矮人石工知识
 
-标准组合验证石工来历检定的双倍熟练贡献。第四成员换为检定变体后，相同题材按三倍熟练结算。通过 `--module` 指定外部候选，核对输出的实际加载路径与成员身份。
+标准组合验证智力（历史）检定辨认石工来历时的双倍熟练贡献。第四成员换为检定变体后，相同题材按三倍熟练结算。体质（历史）按普通检定结算，指定石工来历题材时则在输入校验中拒绝。通过 `--module` 指定外部候选，核对输出的实际加载路径与成员身份。
 
 ```bash
 war=target/dnd-tool-se-0.2.1.war
@@ -150,8 +150,8 @@ with ZipFile(directory / "dm-runtime-house-rules.zip") as source, ZipFile(direct
         data = source.read(member)
         if member.filename == "author-package.json":
             manifest = json.loads(data)
-            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["9"]})
-            manifest["compatible_combinations"][0]["srd51_characters"] = "9"
+            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["10"]})
+            manifest["compatible_combinations"][0]["srd51_characters"] = "10"
             manifest["files"].append({"kind": "changes", "path": "changes.json"})
             data = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
         target.writestr(member, data)
@@ -166,15 +166,19 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
 
 ## 核验家规覆盖
 
-以下命令可独立复制。家规包占第四个位置。两项用例分别从新建的合法一级战士直接执行定额伤害和运动检定。
+家规包占第四个位置。两种组合均验证默认属性的运动检定，标准组合使用力量，检定变体使用感知。标准组合在预检中拒绝体质（运动）。检定变体接受体质（运动），用一级战士和牧师对照熟练与未熟练时的加值、总值和成败。两种组合均核对冻结开关及其来源，检定变体另验证定额伤害。
 
 ```bash
+war=target/dnd-tool-se-0.2.1.war
+scenarios=rule-packages/srd51-runtime/scenarios
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.2.1.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
+  --case skill-check --case alternate-skill-disabled "$scenarios/standard.json"
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
-  rule-packages/srd51-runtime/scenarios/check-variant.json
+  --case alternate-skill-enabled "$scenarios/check-variant.json"
 ```
 
 可用一个临时副本证明 `fixed-damage` 会抓到回归。保留上面的 `candidates`，从正确包复制所有条目，只改动伤害声明的 `modifier`。以下命令预期退出码为 1，并显示 `fixed damage rolled expected 3, got 4`。换回原 ZIP 即可验证通过。
@@ -208,8 +212,8 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 
 | 清单 | 可选择的行为 |
 |---|---|
-| [standard.json](standard.json)、[check-variant.json](check-variant.json) | `initial-character` 验证初始 HP、语言与工具；`skill-check` 验证检定属性、熟练、成败与错误属性拒绝；`fixed-damage` 验证固定伤害和剩余 HP。 |
-| 矮人石工知识 | `stonecunning` 验证标准包的双倍熟练及普通历史对照；`stonecunning-variant` 验证五级矮人的三倍熟练贡献 +9。 |
+| [standard.json](standard.json)、[check-variant.json](check-variant.json) | `initial-character` 验证初始 HP、语言与工具。`skill-check` 验证默认检定属性、熟练与成败。`alternate-skill-disabled` 和 `alternate-skill-enabled` 验证开关来源及体质（运动）的预检和结算。`fixed-damage` 验证固定伤害和剩余 HP。 |
+| 矮人石工知识 | `stonecunning` 验证标准包的双倍熟练及普通历史对照。`stonecunning-variant` 验证五级矮人的三倍熟练贡献 +9，以及其他属性或其他技能不能使用石工来历题材。 |
 | 标准组合的角色与装备 | `fighter-growth`、`fighter-extra-attack` 实际升级以验证授予等级。`hill-dwarf-toughness` 验证一级 HP 和后续两种升级方式。`cleric-growth-limit` 验证牧师的升级上限。`plate-armor` 使用一级战士穿甲后派生 AC。`dwarf-heavy-armor-speed` 对照穿板甲的矮人与人类实际移动。`weapon-damage` 使用真实持用、攻击与健康结算，固定普通命中及两颗伤害骰，验证应用量和目标 HP。 |
 | 标准组合的其他声明 | `class-templates`、`wizard-spellbook`、`wizard-evocation`、`burning-hands`（施法预检）、`equipment-profiles`、`monster-breath-profile`、`rule-origins`。 |
 
