@@ -978,5 +978,42 @@
     "source_page": 63,
     "heavy_armor_speed_penalty_feet": 10,
     "algorithm": "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subrace",
+      "rule_key": "subrace.hill_dwarf"
+    },
+    "display_name": "Hill Dwarf",
+    "description": "The Hill Dwarf source provides Dwarven Toughness and inherits walking speed, languages and tool training from Dwarf.",
+    "source_page": 4,
+    "parent_race": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.race",
+      "rule_key": "race.dwarf"
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subrace_hit_points",
+      "rule_key": "subrace_hit_points.hill_dwarf"
+    },
+    "display_name": "Dwarven Toughness",
+    "description": "Applies a first-level hit point increase and an increase on each additional level for characters created with the owning subrace.",
+    "source_page": 4,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.subrace",
+      "rule_key": "subrace.hill_dwarf"
+    },
+    "first_level_bonus": 1,
+    "per_additional_level_bonus": 1,
+    "algorithm": "SRD_2014_SUBRACE_HIT_POINTS_V1"
   }
 ]

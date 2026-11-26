@@ -179,7 +179,7 @@
   const abilityNames = ['力量', '敏捷', '体质', '智力', '感知', '魅力'];
   const battleStatus = value => ({ACTIVE: '战斗中', EXPLORATION: '探索', ENDED: '已关闭'})[value] || '场景';
   const locationName = value => ({CARRIED: '携带', WORN: '穿戴', MAIN_HAND: '主手', OFF_HAND: '副手', BOTH_HANDS: '双手', GROUND: '地面'})[value] || value;
-  const ruleCategory = value => ({'character.class': '职业', 'character.class_progression': '职业成长', 'character.race': '种族', 'character.background': '背景',
+  const ruleCategory = value => ({'character.class': '职业', 'character.class_progression': '职业成长', 'character.race': '种族', 'character.subrace': '亚种', 'character.subrace_hit_points': '亚种生命值', 'character.background': '背景',
     'character.subclass': '子职', 'character.feature': '职业特性', 'character.feat': '专长', 'character.resource': '资源', 'character.proficiency': '技能熟练',
     'character.language': '语言', 'character.tool': '工具', 'character.rest': '休息', 'equipment.item': '装备', 'adventure.check': '检定', 'adventure.health': '健康',
     'adventure.vital_effect': 'DM 生命效果', 'adventure.combat': '战斗', 'adventure.weapon_attack': '攻击', 'adventure.movement': '移动', 'adventure.spell': '法术',
@@ -245,8 +245,17 @@
       options(select, eligible.map(character => character.id), personName);
     }
     for (const select of document.querySelectorAll('.node-choice')) options(select, (domain().nodes || []).map(node => node.id), id => domain().nodes.find(node => node.id === id).name);
+    refreshCreationSubraces();
     refreshCharacterChoices();
     refreshCheckAbility();
+  }
+  function refreshCreationSubraces() {
+    const {raceKey, subraceKey} = byId('domain-create').elements;
+    const choices = catalog().filter(rule => rule.type === 'character.subrace' && rule.creationChoice &&
+      rule.parentRace && ruleValue(rule.parentRace) === raceKey.value);
+    options(subraceKey, choices.map(ruleValue), value => ruleFromValue(value).name);
+    subraceKey.disabled = choices.length === 0;
+    subraceKey.parentElement.hidden = subraceKey.disabled;
   }
   function refreshCheckAbility() {
     const form = byId('domain-check');
@@ -1386,9 +1395,11 @@
     });
   }
   const multipleRules = select => Array.from(select.selectedOptions, option => typedRule(option.value));
+  byId('domain-create').elements.raceKey.addEventListener('change', refreshCreationSubraces);
   domainForm('domain-create', 'character-create', (_, values) => ({name: values.name, kind: values.kind,
     raceKey: ruleFromValue(values.raceKey).key, classKey: ruleFromValue(values.classKey).key,
-    backgroundKey: ruleFromValue(values.backgroundKey).key}));
+    backgroundKey: ruleFromValue(values.backgroundKey).key,
+    ...(values.subraceKey ? {subraceKey: ruleFromValue(values.subraceKey).key} : {})}));
   domainForm('domain-profile', 'character-profile', (_, values) => ({characterId: values.characterId, name: values.name, kind: values.kind, active: values.active === 'on'}));
   characterForm('domain-growth', (_, values) => ({...baseCharacter('CHARACTER_ADVANCED'), hpChoice: values.hpChoice, targetClass: typedRule(values.class),
     growthChoices: {type: 'character.GrowthChoices', subclass: typedRule(values.subclass), feat: typedRule(values.feat),

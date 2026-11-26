@@ -18,7 +18,7 @@ final class Schema2GrowthRules {
     record Prepared(State capacityState, int hitDieSides, int constitutionModifier, int minimum, int maximum) { }
 
     State initial(ProductionSchema2Projection material, Schema2InitialCharacterPlanService.InitialPlan initial,
-            UUID preparation, Map<String, Integer> abilities, GrowthChoices choices) {
+            UUID preparation, Map<String, Integer> abilities, GrowthChoices choices, int subraceHitPointBonus) {
         Catalog catalog = new Catalog(material);
         RuleIdentity starting = initial.character().sources().characterClass();
         ClassProgressionDefinition progression = catalog.growth(starting);
@@ -30,7 +30,7 @@ final class Schema2GrowthRules {
         for (var grant : initial.character().grants()) if (!grant.suppressed() && grant.category() == GrantCategory.TOOL)
             grants.add(new ProficiencyState(grant.slot(), grant.target(), 1));
         grants = proficiencyGrants(catalog, progression.identity(), "starting_proficiencies", 1, grants, choices.proficiencyChoices());
-        long hp = Math.max(1, progression.hitDieSides() + modifier(abilities, "ability.constitution"));
+        long hp = Math.max(1, progression.hitDieSides() + modifier(abilities, "ability.constitution")) + subraceHitPointBonus;
         State state = new State(initial.character().identity(), initial.campaignId(), initial.characterId(), preparation,
                 starting, abilities, 1, 2, hp, hp, classes, List.of(new HitDicePool(progression.hitDieSides(), 1, 1)),
                 subclasses, features(catalog, classes, subclasses), List.of(), grants, 0,
@@ -39,7 +39,7 @@ final class Schema2GrowthRules {
     }
 
     Prepared prepare(ProductionSchema2Projection material, State before, RuleIdentity targetClass, int targetLevel,
-            String hpChoice, GrowthChoices choices) {
+            String hpChoice, GrowthChoices choices, int subraceHitPointBonus) {
         Catalog catalog = new Catalog(material);
         if (choices == null || targetClass == null) fail("S2_GROWTH_REQUEST");
         if (before.level() >= 20 || targetLevel != before.level() + 1) fail("S2_GROWTH_LEVEL");
@@ -86,8 +86,9 @@ final class Schema2GrowthRules {
         dice.sort(Comparator.comparingInt(HitDicePool::sides));
         int constitution = modifier(abilities, "ability.constitution");
         int retroactive = before.level() * (constitution - modifier(before.abilities(), "ability.constitution"));
-        int minimum = Math.max(1, (hpChoice.equals("FIXED_AVERAGE") ? target.hitDieSides() / 2 + 1 : 1) + constitution) + retroactive;
-        int maximum = hpChoice.equals("FIXED_AVERAGE") ? minimum : Math.max(1, target.hitDieSides() + constitution) + retroactive;
+        int fixedIncrease = retroactive + subraceHitPointBonus;
+        int minimum = Math.max(1, (hpChoice.equals("FIXED_AVERAGE") ? target.hitDieSides() / 2 + 1 : 1) + constitution) + fixedIncrease;
+        int maximum = hpChoice.equals("FIXED_AVERAGE") ? minimum : Math.max(1, target.hitDieSides() + constitution) + fixedIncrease;
         if (before.maximumHitPoints() + maximum > 65_535) fail("S2_GROWTH_HIT_POINT_LIMIT");
         Map<RuleIdentity, ResourceState> oldResources = new HashMap<>();
         before.resources().forEach(resource -> oldResources.put(resource.identity(), resource));

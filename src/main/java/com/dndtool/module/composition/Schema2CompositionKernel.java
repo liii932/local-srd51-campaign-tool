@@ -31,6 +31,8 @@ public final class Schema2CompositionKernel {
     public static final String FIGHTER_SECOND_WIND_ALGORITHM = "SRD_2014_FIGHTER_SECOND_WIND_V1";
     public static final String WALKING_SPEED_ALGORITHM = "SRD_2014_WALKING_SPEED_V1";
     public static final String HEAVY_ARMOR_MOVEMENT_ALGORITHM = "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1";
+    public static final String SUBRACE_HIT_POINTS_ALGORITHM = "SRD_2014_SUBRACE_HIT_POINTS_V1";
+    private static final int MAX_SUBRACE_HIT_POINT_BONUS = 5;
     public static final int MAX_PACKAGES = 8;
     private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
     private static final int MAX_RUNTIME_CHAINS = 3072, MAX_RUNTIME_STEPS = 4096;
@@ -59,6 +61,7 @@ public final class Schema2CompositionKernel {
         FEATURE_KIND("feature_kind"), EXECUTION_ALGORITHM("execution_algorithm"), PREREQUISITE("prerequisite"),
         ABILITY_KEY("ability_key"), PROFICIENCY("proficiency"), GROWTH_GRANT("growth_grant"), ALGORITHM("algorithm"), KIND("kind"), ARMOR_CLASS("armor_class"), STRENGTH_MINIMUM("strength_minimum"),
         STEALTH_DISADVANTAGE("stealth_disadvantage"), HANDS("hands"), STEALTH_SKILL("stealth_skill"),
+        FIRST_LEVEL_BONUS("first_level_bonus"), PER_ADDITIONAL_LEVEL_BONUS("per_additional_level_bonus"),
         DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"),
         HEAVY_ARMOR_SPEED_POLICY("heavy_armor_speed_policy"), HEAVY_ARMOR_SPEED_PENALTY_FEET("heavy_armor_speed_penalty_feet"), REQUIRED_SUBCLASS("required_subclass"), REQUIRED_FEATURE("required_feature"), SLOT_RESOURCE("slot_resource"), BLESS("bless"), CURE_WOUNDS("cure_wounds"), MATERIAL_ITEM("material_item"), RANK2_SLOT_RESOURCE("rank2_slot_resource"), RANK3_SLOT_RESOURCE("rank3_slot_resource"), SPELL("spell"), ENABLED("enabled");
         private final String key;
@@ -95,7 +98,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, ArmorMovementDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, ArmorMovementDefinition, SubraceHitPointsDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -170,6 +173,9 @@ public final class Schema2CompositionKernel {
             String algorithm, String authorNote) implements Definition { }
     public record ArmorMovementDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             int heavyArmorSpeedPenaltyFeet, String algorithm, String authorNote) implements Definition { }
+    public record SubraceHitPointsDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity owner, int firstLevelBonus, int perAdditionalLevelBonus,
+            String algorithm, String authorNote) implements Definition { }
     public record SpellDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             String algorithm, String authorNote) implements Definition { }
     public record SpellcastingDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
@@ -285,7 +291,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalArmorMovement, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalArmorMovement, FinalSubraceHitPoints, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -354,6 +360,9 @@ public final class Schema2CompositionKernel {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
 
+    public record FinalSubraceHitPoints(SubraceHitPointsDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
     public record FinalSpell(SpellDefinition definition, boolean enabled) implements FinalRule {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
@@ -646,6 +655,10 @@ public final class Schema2CompositionKernel {
                         validateCombatReferences(original instanceof WeaponAttackDefinition weapon ? new FinalWeaponAttack(weapon,true)
                                 : new FinalMovement((MovementDefinition)original,true),originalReferences,source);
                     }
+                    if (original instanceof SubraceHitPointsDefinition hitPoints) {
+                        var owner = originalObjectAt(hitPoints.owner(), chains, declarations.get(declaration.getKey()), source);
+                        validateSubraceHitPointsOwner(owner, true, source);
+                    }
                     if (original instanceof SpellcastingDefinition casting) {
                         Map<Identity,MutableObject> originalReferences=new HashMap<>(); int declarationIndex=declarations.get(declaration.getKey());
                         for (RuleIdentity target : spellcastingReferences(casting).values()) {
@@ -815,6 +828,11 @@ public final class Schema2CompositionKernel {
                 if (row.value instanceof MovementDefinition movement) {
                     checkReference(pack,movement.owner(),"character.race|character.subrace",objects,row.location.child("owner"));
                     validateCombatReferences(new FinalMovement(movement,true),objects,row.location);
+                }
+                if (row.value instanceof SubraceHitPointsDefinition hitPoints) {
+                    Location ownerLocation = row.location.child("owner");
+                    checkReference(pack, hitPoints.owner(), "character.subrace", objects, ownerLocation);
+                    validateSubraceHitPointsOwner(objects.get(hitPoints.owner()), true, ownerLocation);
                 }
                 if (row.value instanceof SpellcastingDefinition casting) {
                     for (var reference : spellcastingReferences(casting).entrySet())
@@ -1268,7 +1286,7 @@ public final class Schema2CompositionKernel {
     }
 
     private static boolean executionType(String type) {
-        return Set.of("equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
+        return Set.of("equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
     }
     private static Definition executionDefinition(Object input, RuleIdentity identity, Location source) {
         Set<String> required = new HashSet<>(Set.of("identity", "display_name", "description", "source_page", "algorithm"));
@@ -1282,6 +1300,8 @@ public final class Schema2CompositionKernel {
             required.addAll(Set.of("owner", "walk_speed_feet", "heavy_armor_speed_policy"));
         } else if (identity.ruleType().equals("equipment.armor_movement")) {
             required.add("heavy_armor_speed_penalty_feet");
+        } else if (identity.ruleType().equals("character.subrace_hit_points")) {
+            required.addAll(Set.of("owner", "first_level_bonus", "per_additional_level_bonus"));
         } else if (identity.ruleType().equals("character.spellcasting")) {
             required.addAll(Set.of("owner_class", "required_subclass", "required_feature", "slot_resource", "bless", "cure_wounds", "material_item", "ability_key"));
         } else if (identity.ruleType().equals("character.wizard_spellcasting")) {
@@ -1330,6 +1350,11 @@ public final class Schema2CompositionKernel {
                 algorithm, note);
         if (identity.ruleType().equals("equipment.armor_movement")) return new ArmorMovementDefinition(identity, name, description, page,
                 movementDistance(row.get("heavy_armor_speed_penalty_feet"), 0, source.child("heavy_armor_speed_penalty_feet")), algorithm, note);
+        if (identity.ruleType().equals("character.subrace_hit_points")) return new SubraceHitPointsDefinition(identity, name, description, page,
+                typedReference(row.get("owner"), "character.subrace", source.child("owner")),
+                integer(row.get("first_level_bonus"), 0, MAX_SUBRACE_HIT_POINT_BONUS, source.child("first_level_bonus")),
+                integer(row.get("per_additional_level_bonus"), 0, MAX_SUBRACE_HIT_POINT_BONUS, source.child("per_additional_level_bonus")),
+                algorithm, note);
         if (identity.ruleType().equals("equipment.weapon_attack")) return new WeaponAttackDefinition(identity,name,description,page,
                 typedReference(row.get("item"), "equipment.item", source.child("item")),
                 enumValue(WeaponAbilityPolicy.class,row.get("ability_policy"),source.child("ability_policy")),
@@ -1630,12 +1655,21 @@ public final class Schema2CompositionKernel {
             case SOURCE_PAGE -> new IntegerValue(sourcePage(((RuleIdentity) target).ruleType(), value, source.child("value")));
             case MINIMUM_ENABLED_MEMBERS -> new IntegerValue(integer(value, 1, 128, source.child("value")));
             case LANGUAGE, TOOL, PARENT_RACE, OWNER_CLASS, PROFICIENCY, STEALTH_SKILL, ITEM, REQUIRED_SUBCLASS, REQUIRED_FEATURE, SLOT_RESOURCE, RANK2_SLOT_RESOURCE, RANK3_SLOT_RESOURCE, BLESS, CURE_WOUNDS, MATERIAL_ITEM, SPELL -> new IdentityValue(typedReference(value, referenceType(field), source.child("value")));
-            case OWNER -> new IdentityValue(typedReference(value, ((RuleIdentity)target).ruleType().equals("character.movement") ? "character.race|character.subrace" : "character.class|character.subclass",source.child("value")));
+            case OWNER -> {
+                String ownerType = switch (((RuleIdentity) target).ruleType()) {
+                    case "character.movement" -> "character.race|character.subrace";
+                    case "character.subrace_hit_points" -> "character.subrace";
+                    default -> "character.class|character.subclass";
+                };
+                yield new IdentityValue(typedReference(value, ownerType, source.child("value")));
+            }
             case ABILITY_POLICY -> new TextValue(enumValue(WeaponAbilityPolicy.class,value,source.child("value")).name());
             case REACH_FEET -> new IntegerValue(reach(value,source.child("value")));
             case WALK_SPEED_FEET -> new IntegerValue(movementDistance(value, 5, source.child("value")));
             case HEAVY_ARMOR_SPEED_POLICY -> new TextValue(enumValue(HeavyArmorSpeedPolicy.class, value, source.child("value")).name());
             case HEAVY_ARMOR_SPEED_PENALTY_FEET -> new IntegerValue(movementDistance(value, 0, source.child("value")));
+            case FIRST_LEVEL_BONUS, PER_ADDITIONAL_LEVEL_BONUS ->
+                    new IntegerValue(integer(value, 0, MAX_SUBRACE_HIT_POINT_BONUS, source.child("value")));
             case HIT_DIE_SIDES -> new IntegerValue(hitDieSides(value, source.child("value")));
             case SUPPORTED_MAXIMUM_LEVEL -> new IntegerValue(integer(value, 1, 20, source.child("value")));
             case PROFICIENCY_BONUS_PROFILE, MAXIMUM_PROFILE, RECOVERY_PROFILE -> new TextValue(profile(field, value, source.child("value")));
@@ -1699,7 +1733,7 @@ public final class Schema2CompositionKernel {
         String type = string(row.get("rule_type"), source.child("rule_type"));
         if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
                 "character.class_progression", "character.resource", "character.subclass", "character.feature",
-                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
         String prefix = switch (type) {
@@ -1716,6 +1750,7 @@ public final class Schema2CompositionKernel {
             case "adventure.combat" -> "combat";
             case "equipment.weapon_attack" -> "weapon_attack";
             case "character.movement" -> "movement";
+            case "character.subrace_hit_points" -> "subrace_hit_points";
             case "character.spellcasting", "character.wizard_spellcasting" -> "spellcasting";
             case "adventure.environment" -> "environment";
             case "adventure.monster" -> "monster";
@@ -1737,6 +1772,7 @@ public final class Schema2CompositionKernel {
             case "adventure.check" -> integer(input, 77, 77, source);
             case "equipment.item", "equipment.weapon_attack" -> integer(input, 62, 73, source);
             case "equipment.armor_movement" -> integer(input, 63, 63, source);
+            case "character.subrace_hit_points" -> integer(input, 4, 4, source);
             case "adventure.combat" -> integer(input, 90, 95, source);
             case "adventure.spell" -> integer(input, 114, 187, source);
             case "character.wizard_spellcasting" -> integer(input, 52, 53, source);
@@ -1763,6 +1799,7 @@ public final class Schema2CompositionKernel {
             case "adventure.combat" -> "SRD_2014_COMBAT_V1";
             case "equipment.weapon_attack" -> "SRD_2014_MELEE_WEAPON_ATTACK_V1";
             case "character.movement" -> WALKING_SPEED_ALGORITHM;
+            case "character.subrace_hit_points" -> SUBRACE_HIT_POINTS_ALGORITHM;
             case "character.spellcasting" -> "LIFE_DOMAIN_LEVEL1_V1";
             case "character.wizard_spellcasting" -> "SRD_2014_WIZARD_PREPARED_V1";
             case "adventure.environment" -> "DM_ANTIMAGIC_ZONE_V1";
@@ -1819,7 +1856,7 @@ public final class Schema2CompositionKernel {
 
     private static boolean tracedCharacterType(String type) {
         return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
-                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -2068,6 +2105,11 @@ public final class Schema2CompositionKernel {
             throw fail("S2_TYPE",Stage.FINAL,"Weapon attack requires an actual weapon item",source);
     }
 
+    private static void validateSubraceHitPointsOwner(MutableObject owner, boolean profileEnabled, Location source) {
+        if (owner == null || profileEnabled && !enabled(owner))
+            throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Subrace hit points require an available subrace owner", source);
+    }
+
     private record SpellMetadata(int level,int page,boolean wizard) { }
     private static final Map<String,SpellMetadata> SPELL_METADATA=Map.ofEntries(
             Map.entry("SRD_2014_BLESS_V1",new SpellMetadata(1,122,false)),
@@ -2224,6 +2266,7 @@ public final class Schema2CompositionKernel {
         boolean extraAttackEnabled = false, improvedCriticalEnabled = false, secondWindEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
         boolean armorMovementEnabled = false;
+        Set<RuleIdentity> subraceHitPointOwners = new HashSet<>();
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
                 FinalRule checked = finalRule(rule, object.fields);
@@ -2244,6 +2287,13 @@ public final class Schema2CompositionKernel {
                     throw fail("S2_WEAPON_ATTACK_AMBIGUOUS",Stage.FINAL,"An item has multiple enabled melee profiles",object.source);
                 if (checked instanceof FinalMovement movement && checked.enabled() && !movementOwners.add(movement.definition().owner()))
                     throw fail("S2_MOVEMENT_AMBIGUOUS", Stage.FINAL, "A character source has multiple enabled walking speeds", object.source);
+                if (checked instanceof FinalSubraceHitPoints hitPoints) {
+                    RuleIdentity owner = hitPoints.definition().owner();
+                    validateSubraceHitPointsOwner(objects.get(owner), hitPoints.enabled(), object.source);
+                    if (hitPoints.enabled() && !subraceHitPointOwners.add(owner))
+                        throw fail("S2_SUBRACE_HIT_POINTS_AMBIGUOUS", Stage.FINAL,
+                                "A subrace has multiple enabled hit point profiles", object.source);
+                }
                 if (checked instanceof FinalArmorMovement && checked.enabled()) {
                     if (armorMovementEnabled)
                         throw fail("S2_ARMOR_MOVEMENT_AMBIGUOUS", Stage.FINAL, "Heavy armor movement must have one enabled rule", object.source);
@@ -2423,6 +2473,8 @@ public final class Schema2CompositionKernel {
                 Field.OWNER, Field.WALK_SPEED_FEET, Field.HEAVY_ARMOR_SPEED_POLICY, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("equipment.armor_movement")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
                 Field.HEAVY_ARMOR_SPEED_PENALTY_FEET, Field.ALGORITHM, Field.AUTHOR_NOTE);
+        if (type.equals("character.subrace_hit_points")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.OWNER, Field.FIRST_LEVEL_BONUS, Field.PER_ADDITIONAL_LEVEL_BONUS, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("equipment.item")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.ARMOR_CLASS, Field.STRENGTH_MINIMUM, Field.STEALTH_DISADVANTAGE, Field.HANDS, Field.PROFICIENCY, Field.STEALTH_SKILL, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.vital_effect")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.DICE_COUNT, Field.DICE_SIDES, Field.MODIFIER, Field.DAMAGE_TYPE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.rest") || type.equals("adventure.check") || type.equals("adventure.health") || type.equals("adventure.combat")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
@@ -2519,6 +2571,7 @@ public final class Schema2CompositionKernel {
             if (definition instanceof WeaponAttackDefinition value) return new FinalWeaponAttack(value, enabled);
             if (definition instanceof MovementDefinition value) return new FinalMovement(value, enabled);
             if (definition instanceof ArmorMovementDefinition value) return new FinalArmorMovement(value, enabled);
+            if (definition instanceof SubraceHitPointsDefinition value) return new FinalSubraceHitPoints(value, enabled);
             if (definition instanceof SpellDefinition value) return new FinalSpell(value, enabled);
             if (definition instanceof SpellcastingDefinition value) return new FinalSpellcasting(value, enabled);
             if (definition instanceof WizardSpellcastingDefinition value) return new FinalWizardSpellcasting(value, enabled);
@@ -2688,6 +2741,13 @@ public final class Schema2CompositionKernel {
         } else if (value instanceof ArmorMovementDefinition movement) {
             result.put("description", movement.description()); result.put("source_page", movement.sourcePage());
             result.put("algorithm", movement.algorithm()); result.put("heavy_armor_speed_penalty_feet", movement.heavyArmorSpeedPenaltyFeet());
+        } else if (value instanceof SubraceHitPointsDefinition hitPoints) {
+            result.put("description", hitPoints.description());
+            result.put("source_page", hitPoints.sourcePage());
+            result.put("owner", hitPoints.owner() == null ? null : identityJson(hitPoints.owner()));
+            result.put("first_level_bonus", hitPoints.firstLevelBonus());
+            result.put("per_additional_level_bonus", hitPoints.perAdditionalLevelBonus());
+            result.put("algorithm", hitPoints.algorithm());
         } else if (value instanceof HealthDefinition health) {
             result.put("description", health.description()); result.put("source_page", health.sourcePage()); result.put("algorithm", health.algorithm());
         } else if (value instanceof VitalEffectDefinition effect) {
@@ -2730,7 +2790,7 @@ public final class Schema2CompositionKernel {
         return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
     }
     private static boolean newAdvancementType(String type) {
-        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),

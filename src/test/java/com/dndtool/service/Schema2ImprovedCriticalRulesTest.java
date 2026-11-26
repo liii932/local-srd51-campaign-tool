@@ -6,6 +6,7 @@ import com.dndtool.service.Schema2CharacterRuntime.FeatureState;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CharacterRuntime.State;
 import com.dndtool.service.Schema2CombatRules.Context;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2CombatState.*;
 import com.google.gson.JsonObject;
 import java.util.ArrayDeque;
@@ -70,13 +71,14 @@ class Schema2ImprovedCriticalRulesTest {
     }
 
     @Test void actualChampionAcquisitionIsRequiredAndMulticlassPreflightRejectsTheGrant() {
-        State second = advance(character(UUID.randomUUID()).character(), GrowthChoices.EMPTY);
+        Context source = character(UUID.randomUUID());
+        State second = advance(source.initial(), source.character(), GrowthChoices.EMPTY);
         assertTrue(second.features().isEmpty());
         assertEquals(20, Schema2FeatureSupport.weaponCriticalMinimum(material, second));
-        State champion = advance(second, subclass(CHAMPION));
+        State champion = advance(source.initial(), second, subclass(CHAMPION));
         assertEquals(List.of(GRANT), champion.features());
         assertEquals(19, Schema2FeatureSupport.weaponCriticalMinimum(material, champion));
-        State other = advance(second, subclass(SUBCLASS));
+        State other = advance(source.initial(), second, subclass(SUBCLASS));
         assertEquals(20, Schema2FeatureSupport.weaponCriticalMinimum(material, other));
         State forged = new State(other.identity(), other.campaignId(), other.characterId(), other.preparationOperationId(),
                 other.characterClass(), other.abilities(), other.level(), other.proficiencyBonus(), other.hitPoints(),
@@ -85,13 +87,13 @@ class Schema2ImprovedCriticalRulesTest {
         assertEquals("S2_COMBAT_FEATURE_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
                 () -> Schema2FeatureSupport.weaponCriticalMinimum(material, forged)).getMessage());
         assertEquals("S2_GROWTH_IMPROVED_CRITICAL_SCOPE", assertThrows(IllegalArgumentException.class,
-                () -> growth.prepareAdvance(material, champion, ALT_CLASS, 4, "SERVER_ROLL", fullMulticlassChoices())).getMessage());
+                () -> growth.prepareAdvance(material, source.initial(), champion, ALT_CLASS, 4, "SERVER_ROLL", fullMulticlassChoices())).getMessage());
     }
 
     private AttackAttempt strike(RuleIdentity subclass, boolean armored, boolean dodge, int... rolls) {
         UUID attacker = UUID.randomUUID(), target = UUID.randomUUID();
         Context source = character(attacker);
-        State trained = advance(advance(source.character(), GrowthChoices.EMPTY), subclass(subclass));
+        State trained = advance(source.initial(), advance(source.initial(), source.character(), GrowthChoices.EMPTY), subclass(subclass));
         State armed = equip(trained, ITEM_WEAPON, "MAIN_HAND");
         Context opponent = character(target);
         State defense = armored ? equip(equip(opponent.character(), ITEM_HEAVY, "WORN"), ITEM_SHIELD, "MAIN_HAND") : opponent.character();
@@ -132,9 +134,9 @@ class Schema2ImprovedCriticalRulesTest {
         return new Context(material, initial, growth.initial(material, initial, UUID.randomUUID(), fullAbilities(), INITIAL_CHOICES));
     }
 
-    private State advance(State before, GrowthChoices choices) {
+    private State advance(InitialPlan initial, State before, GrowthChoices choices) {
         return growth.advance(material,
-                growth.prepareAdvance(material, before, FIGHTER, before.level() + 1, "FIXED_AVERAGE", choices), null);
+                growth.prepareAdvance(material, initial, before, FIGHTER, before.level() + 1, "FIXED_AVERAGE", choices), null);
     }
 
     private State equip(State before, RuleIdentity item, String location) {

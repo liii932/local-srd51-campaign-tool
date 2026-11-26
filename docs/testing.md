@@ -242,10 +242,10 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    ```
 
    自定义规则另从 WAR 外提供一份受支持的准确候选 ZIP。可在仓库外复制随附 `check-variant` 原包的
-   条目，将 `author-package.json` 的 `release_version` 改为 `"15"`，将 `rules.json` 中
+   条目，将 `author-package.json` 的 `release_version` 改为 `"17"`，将 `rules.json` 中
    `vital_effect.dm_damage` 的 `modifier` 改为 `2`，更新包内 `README.md` 后将这些文件打包在 ZIP
-   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@15`
-   原字节及摘要。随附 `check-variant` 按 `@14`、固定伤害 `3` 的独立场景验证。自定义组合前三包
+   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@17`
+   原字节及摘要。随附 `check-variant` 按 `@16`、固定伤害 `3` 的独立场景验证。自定义组合前三包
    使用标准包，第四包使用这份外部候选。
 
    通过工作台的本机规则库执行外部原包上传（`POST /api/host/storage/rule-import`），从随附列表导入
@@ -742,6 +742,8 @@ WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边
 <a id="extra-attack-verification"></a>
 
 ## 战士 Extra Attack 的真实链路验证
+
+标准组合的 `hill-dwarf-toughness` 和[作者变体](../rule-packages/srd51-runtime/scenarios/README.md#验证山丘矮人强韧)用独立期望对照普通矮人、标准 1/1 与家规 2/0。应用侧 `Schema2SubraceHitPointsCompositionTest` 检查声明、覆盖及冻结材料，`Schema2GrowthRulesTest` 检查成长，`CampaignHillDwarfIntegrationTest` 检查父种族、升级幂等、原骰和完整文件重开。
 
 标准组合的 `--case fighter-extra-attack` 实际推进到职业 4、5、6 级，检查授予、来源和 Attack 动作额度。应用侧的 `Schema2ExtraAttackRulesTest` 使用固定 ZIP 检查缺失、提前、重复、错误等级或来源的特性状态。另需验收 Host 表单与首击检查点时，对已启动的全新隔离候选执行：
 

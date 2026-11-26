@@ -32,7 +32,7 @@ class Schema2ReactionSpellRulesTest {
         List<List<RuleIdentity>> learning=List.of(List.of(spell("detect_magic"),spell("disguise_self")),List.of(spell("expeditious_retreat"),spell("false_life")),List.of(spell("feather_fall"),spell("find_familiar")),List.of(COUNTERSPELL,spell("fog_cloud")));
         for(int next=2;next<=level;next++) {
             GrowthChoices choices=next==2?new GrowthChoices(EVOCATION,Map.of(),null,Map.of()):next==4?new GrowthChoices(null,Map.of("ability.intelligence",2),null,Map.of()):GrowthChoices.EMPTY;
-            state=growth.advance(material,growth.prepareAdvance(material,state,WIZARD,next,"FIXED_AVERAGE",choices),null);
+            state=growth.advance(material,growth.prepareAdvance(material,initial,state,WIZARD,next,"FIXED_AVERAGE",choices),null);
             state=book.apply(material,state,Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_ADVANCED",new SpellbookInput(CASTING,learning.get(next-2),state.spellbook().prepared())));
         }
         if(level==5) {

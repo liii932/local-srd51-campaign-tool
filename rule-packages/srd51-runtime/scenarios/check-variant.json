@@ -1,6 +1,6 @@
 {
   "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-check-variant"],
-  "members": ["srd51_runtime@7", "srd51_characters@7", "srd51_magic@7", "dm_runtime_house_rules@14"],
+  "members": ["srd51_runtime@8", "srd51_characters@8", "srd51_magic@8", "dm_runtime_house_rules@16"],
   "cases": ["initial-character", "skill-check", "fixed-damage"],
   "character": {
     "characterClass": "fighter",

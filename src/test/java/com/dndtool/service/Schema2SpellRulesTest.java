@@ -182,7 +182,7 @@ class Schema2SpellRulesTest {
         assertEquals(SLOT_RESOURCE, casting.prepare(roster, battle, a, input).slotResource());
         Context caster = roster.get(a);
         var progression = new Schema2CharacterProgressionRules();
-        var advance = progression.prepareAdvance(castingMaterial, caster.character(), ALT_CLASS, 2,
+        var advance = progression.prepareAdvance(castingMaterial, caster.initial(), caster.character(), ALT_CLASS, 2,
                 "FIXED_AVERAGE", fullMulticlassChoices());
         State multiclass = progression.advance(castingMaterial, advance, null);
         assertEquals(2, multiclass.classes().size());

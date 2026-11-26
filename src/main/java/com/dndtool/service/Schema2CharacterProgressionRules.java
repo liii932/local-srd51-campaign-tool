@@ -7,14 +7,12 @@ import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.service.Schema2CharacterRuntime.ResourceState;
 import com.dndtool.service.Schema2CharacterRuntime.State;
 import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
-/**
- * Internal statistics/resource execution over schema-2 facts. This capability never completes
- * class features, subclass/ASI/feat choices, multiclass advancement or an actual rest.
- */
+/** Standard-array initialization and level advancement over retained schema-2 character facts. */
 public final class Schema2CharacterProgressionRules {
     private final Schema2GrowthRules growth = new Schema2GrowthRules();
     public static final String FIXED_AVERAGE = "FIXED_AVERAGE", SERVER_ROLL = "SERVER_ROLL";
@@ -25,26 +23,26 @@ public final class Schema2CharacterProgressionRules {
             .thenComparing(RuleIdentity::ruleType).thenComparing(RuleIdentity::ruleKey);
     private static final Comparator<ResourceState> RESOURCE_ORDER = Comparator.comparing(ResourceState::identity, IDENTITY_ORDER);
 
-    /** Internal standard-array statistics only; retained T1 sources and choices are independently checked. */
-    public State initial(ProductionSchema2Projection material, Schema2InitialCharacterPlanService.InitialPlan plan,
+    /** Standard-array initialization verifies the retained sources and choices against the exact material. */
+    public State initial(ProductionSchema2Projection material, InitialPlan plan,
             UUID preparationOperationId, Map<String, Integer> abilities) {
         return initial(material, plan, preparationOperationId, abilities, GrowthChoices.EMPTY);
     }
-    public State initial(ProductionSchema2Projection material, Schema2InitialCharacterPlanService.InitialPlan plan,
+    public State initial(ProductionSchema2Projection material, InitialPlan plan,
             UUID preparationOperationId, Map<String, Integer> abilities, GrowthChoices choices) {
         if (material == null || plan == null || preparationOperationId == null) throw invalid("S2_GROWTH_REQUEST");
         abilities(abilities);
         if (!abilities.values().stream().sorted().toList().equals(STANDARD_ARRAY))
             throw invalid("S2_GROWTH_STANDARD_ARRAY");
-        plan.character().binding().verify(material);
-        var rebuilt = new Schema2InitialProficiencyRules().prepare(material,
-                new Schema2InitialProficiencyRules.Request(plan.character().sources(), plan.character().choices()));
-        if (!rebuilt.slots().equals(plan.character().slots()) || !rebuilt.grants().equals(plan.character().grants()))
-            throw invalid("S2_INITIAL_PLAN_MISMATCH");
+        verifyInitialPlan(material, plan);
         RuleIdentity characterClass = plan.character().sources().characterClass();
         ClassProgressionDefinition progression = progression(material, characterClass);
-        if (progression.advancementScope() == ProgressionScope.CHARACTER_ADVANCEMENT)
-            return validateState(material, growth.initial(material, plan, preparationOperationId, abilities, choices));
+        var subraceHitPoints = subraceHitPoints(material, plan);
+        if (progression.advancementScope() == ProgressionScope.CHARACTER_ADVANCEMENT) {
+            int bonus = subraceHitPoints == null ? 0 : subraceHitPoints.firstLevelBonus();
+            return validateState(material, growth.initial(material, plan, preparationOperationId, abilities, choices, bonus));
+        }
+        if (subraceHitPoints != null) throw invalid("S2_GROWTH_SUBRACE_HIT_POINTS_SCOPE");
         if (!GrowthChoices.EMPTY.equals(choices)) throw invalid("S2_GROWTH_CHOICES_UNSUPPORTED");
         long hitPoints = Math.max(1, progression.hitDieSides() + modifier(abilities, "ability.constitution"));
         State result = new State(plan.character().identity(), plan.campaignId(), plan.characterId(), preparationOperationId,
@@ -55,26 +53,37 @@ public final class Schema2CharacterProgressionRules {
     }
 
     /** All catalog/state/target validation and resource calculations precede any server RNG call. */
-    public PreparedAdvance prepareAdvance(ProductionSchema2Projection material, State state,
+    public PreparedAdvance prepareAdvance(ProductionSchema2Projection material, InitialPlan plan, State state,
             RuleIdentity targetClass, int targetLevel, String hpChoiceAlgorithm) {
-        return prepareAdvance(material, state, targetClass, targetLevel, hpChoiceAlgorithm, GrowthChoices.EMPTY);
+        return prepareAdvance(material, plan, state, targetClass, targetLevel, hpChoiceAlgorithm, GrowthChoices.EMPTY);
     }
-    public PreparedAdvance prepareAdvance(ProductionSchema2Projection material, State state,
+    public PreparedAdvance prepareAdvance(ProductionSchema2Projection material, InitialPlan plan, State state,
             RuleIdentity targetClass, int targetLevel, String hpChoiceAlgorithm, GrowthChoices choices) {
         validateState(material, state);
+        if (plan == null || !plan.campaignId().equals(state.campaignId()) || !plan.characterId().equals(state.characterId())
+                || !plan.character().identity().equals(state.identity())
+                || !plan.character().sources().characterClass().equals(state.characterClass()))
+            throw invalid("S2_GROWTH_INITIAL_BINDING");
+        verifyInitialPlan(material, plan);
         requireMutationCapacity(state);
+        if (state.health() == null) throw invalid("S2_HEALTH_STATE");
+        if (state.health().dead()) throw invalid("S2_HEALTH_DEAD");
+        if (state.hitPoints() == 0) throw invalid("S2_HEALTH_UNCONSCIOUS");
         if (state.rest().active() != null) throw invalid("S2_GROWTH_REST_ACTIVE");
         if (hpChoiceAlgorithm == null || !HP_CHOICES.contains(hpChoiceAlgorithm)) throw invalid("S2_GROWTH_HP_CHOICE");
-        if (progression(material, state.characterClass()).advancementScope() == ProgressionScope.CHARACTER_ADVANCEMENT) {
-            var result = growth.prepare(material, state, targetClass, targetLevel, hpChoiceAlgorithm, choices);
+        ClassProgressionDefinition progression = progression(material, state.characterClass());
+        var subraceHitPoints = subraceHitPoints(material, plan);
+        if (progression.advancementScope() == ProgressionScope.CHARACTER_ADVANCEMENT) {
+            int bonus = subraceHitPoints == null ? 0 : subraceHitPoints.perAdditionalLevelBonus();
+            var result = growth.prepare(material, state, targetClass, targetLevel, hpChoiceAlgorithm, choices, bonus);
             return new PreparedAdvance(Schema2RulesBinding.from(material), state, hpChoiceAlgorithm, targetLevel,
                     result.hitDieSides(), result.constitutionModifier(), result.minimum(), result.maximum(),
                     result.capacityState().resources(), ProgressionScope.CHARACTER_ADVANCEMENT, result.capacityState());
         }
+        if (subraceHitPoints != null) throw invalid("S2_GROWTH_SUBRACE_HIT_POINTS_SCOPE");
         if (!GrowthChoices.EMPTY.equals(choices)) throw invalid("S2_GROWTH_CHOICES_UNSUPPORTED");
         if (!state.characterClass().equals(targetClass)) throw invalid("S2_GROWTH_MULTICLASS_UNSUPPORTED");
         if (state.level() >= 20 || targetLevel != state.level() + 1) throw invalid("S2_GROWTH_LEVEL");
-        ClassProgressionDefinition progression = progression(material, state.characterClass());
         if (targetLevel > progression.supportedMaximumLevel()) throw invalid("S2_GROWTH_LEVEL_UNSUPPORTED");
         int constitution = modifier(state.abilities(), "ability.constitution");
         int minimum = Math.max(1, (FIXED_AVERAGE.equals(hpChoiceAlgorithm)
@@ -93,22 +102,39 @@ public final class Schema2CharacterProgressionRules {
     public State advance(ProductionSchema2Projection material, PreparedAdvance prepared, Integer serverRoll) {
         if (material == null || prepared == null) throw invalid("S2_GROWTH_REQUEST");
         prepared.binding.verify(material);
-        int increase;
+        int difference = 0;
         if (FIXED_AVERAGE.equals(prepared.hpChoiceAlgorithm)) {
             if (serverRoll != null) throw invalid("S2_GROWTH_ROLL");
-            increase = prepared.minimumHitPointIncrease;
         } else {
             if (serverRoll == null || serverRoll < 1 || serverRoll > prepared.hitDieSides)
                 throw invalid("S2_GROWTH_ROLL");
-            increase = Math.max(1, serverRoll + prepared.constitutionModifier)
-                    + (prepared.minimumHitPointIncrease - Math.max(1, 1 + prepared.constitutionModifier));
+            difference = Math.max(1, serverRoll + prepared.constitutionModifier)
+                    - Math.max(1, 1 + prepared.constitutionModifier);
         }
         State capacity = prepared.capacityState;
-        long difference = increase - prepared.minimumHitPointIncrease;
         return validateState(material, new State(capacity.identity(), capacity.campaignId(), capacity.characterId(), capacity.preparationOperationId(),
                 capacity.characterClass(), capacity.abilities(), capacity.level(), capacity.proficiencyBonus(),
                 capacity.hitPoints() + difference, capacity.maximumHitPoints() + difference, capacity.classes(), capacity.hitDicePools(),
                 capacity.subclasses(), capacity.features(), capacity.feats(), capacity.proficiencies(), capacity.version(), capacity.resources(), capacity.rest(), capacity.equipment(), capacity.health(), capacity.spellbook()));
+    }
+
+    private static void verifyInitialPlan(ProductionSchema2Projection material, InitialPlan plan) {
+        var character = plan.character();
+        character.binding().verify(material);
+        var rebuilt = new Schema2InitialProficiencyRules().prepare(material,
+                new Schema2InitialProficiencyRules.Request(character.sources(), character.choices()));
+        if (!rebuilt.slots().equals(character.slots()) || !rebuilt.grants().equals(character.grants()))
+            throw invalid("S2_INITIAL_PLAN_MISMATCH");
+    }
+
+    private static SubraceHitPointsDefinition subraceHitPoints(ProductionSchema2Projection material, InitialPlan plan) {
+        RuleIdentity subrace = plan.character().sources().subrace();
+        if (subrace == null) return null;
+        var matches = material.projection().rules().stream().filter(FinalSubraceHitPoints.class::isInstance)
+                .map(FinalSubraceHitPoints.class::cast).filter(FinalSubraceHitPoints::enabled)
+                .map(FinalSubraceHitPoints::definition).filter(definition -> definition.owner().equals(subrace)).toList();
+        if (matches.size() > 1) throw invalid("S2_GROWTH_SUBRACE_HIT_POINTS");
+        return matches.isEmpty() ? null : matches.getFirst();
     }
 
     public State spendOrdinary(ProductionSchema2Projection material, State state, RuleIdentity identity, long amount) {
@@ -280,7 +306,7 @@ public final class Schema2CharacterProgressionRules {
     private static int modifier(Map<String, Integer> values, String key) { return Math.floorDiv(values.get(key) - 10, 2); }
     private static IllegalArgumentException invalid(String code) { return new IllegalArgumentException(code); }
 
-    /** Only this rules object can construct a successfully preflighted statistics advancement. */
+    /** Only this rules object can construct a successfully preflighted level gain. */
     public static final class PreparedAdvance {
         private final Schema2RulesBinding binding;
         private final State state;

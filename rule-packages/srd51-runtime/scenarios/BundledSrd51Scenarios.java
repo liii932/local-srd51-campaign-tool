@@ -1,4 +1,5 @@
 import com.dndtool.service.Schema2CharacterEquipmentRules;
+import com.dndtool.service.Schema2CharacterHealthRules;
 import com.dndtool.service.Schema2CharacterProgressionRules;
 import com.dndtool.service.Schema2CharacterRuntime.Command;
 import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
@@ -41,6 +42,8 @@ public final class BundledSrd51Scenarios {
         ModuleScenario.run(args, Map.ofEntries(
                 scenario("class-templates", BundledSrd51Scenarios::verifyClassTemplates),
                 scenario("fighter-growth", BundledSrd51Scenarios::verifyFighterGrowth),
+                scenario("hill-dwarf-toughness", BundledSrd51Scenarios::verifyHillDwarfToughness),
+                scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("fighter-extra-attack", BundledSrd51Scenarios::verifyFighterExtraAttack),
                 scenario("cleric-growth-limit", BundledSrd51Scenarios::verifyClericGrowthLimit),
                 scenario("wizard-spellbook", BundledSrd51Scenarios::verifyWizardSpellbook),
@@ -94,7 +97,8 @@ public final class BundledSrd51Scenarios {
         var material = rules.projection();
         var growth = new Schema2CharacterProgressionRules();
         RuleIdentity fighter = rules.rule("character.class", "class.fighter");
-        State state = fighterAtLevelFour(growth);
+        var plan = initialPlan("fighter");
+        State state = fighterAtLevelFour(growth, plan);
         expectNumber(36, state.maximumHitPoints());
         expectNumber(15, state.abilities().get("ability.constitution"));
         var critical = (FinalFeature) find("character.feature", "feature.champion_improved_critical");
@@ -106,9 +110,69 @@ public final class BundledSrd51Scenarios {
                 new FeatureState(secondWind, fighter, 1)), state.features());
         assertTrue(rules.metadata().catalog().stream().anyMatch(row -> row.key().equals(critical.identity().ruleKey()) && row.executable()));
         expectRejection("taking the first wizard level with Intelligence 12", "S2_GROWTH_PREREQUISITE",
-                () -> growth.prepareAdvance(material, state, rules.rule("character.class", "class.wizard"),
+                () -> growth.prepareAdvance(material, plan, state, rules.rule("character.class", "class.wizard"),
                         5, "FIXED_AVERAGE", GrowthChoices.EMPTY));
         expectNumber(4, state.level());
+    }
+
+    private void verifyHillDwarfToughness() {
+        verifyDwarvenToughness(1, 1);
+    }
+
+    private void verifyHillDwarfToughnessAuthorEdit() {
+        var trait = rules.rule("character.subrace_hit_points", "subrace_hit_points.hill_dwarf");
+        for (Field field : List.of(Field.FIRST_LEVEL_BONUS, Field.PER_ADDITIONAL_LEVEL_BONUS)) {
+            var chain = rules.projection().projection().chains().stream()
+                    .filter(row -> row.target().equals(trait) && row.field() == field).findFirst().orElseThrow();
+            assertEquals("dm_runtime_house_rules", chain.steps().getLast().provider().moduleKey());
+        }
+        verifyDwarvenToughness(2, 0);
+    }
+
+    private void verifyDwarvenToughness(int firstLevelBonus, int perAdditionalLevelBonus) {
+        var race = rules.rule("character.race", "race.dwarf");
+        var subrace = (FinalCharacterSource) find("character.subrace", "subrace.hill_dwarf");
+        var trait = (FinalSubraceHitPoints) find("character.subrace_hit_points", "subrace_hit_points.hill_dwarf");
+        assertEquals(race, subrace.definition().parentRace());
+        assertEquals(subrace.identity(), trait.definition().owner());
+        assertEquals(SUBRACE_HIT_POINTS_ALGORITHM, trait.definition().algorithm());
+        expectNumber(4, trait.definition().sourcePage());
+        expectNumber(firstLevelBonus, trait.definition().firstLevelBonus());
+        expectNumber(perAdditionalLevelBonus, trait.definition().perAdditionalLevelBonus());
+
+        UUID campaign = UUID.randomUUID();
+        var identity = Schema2PreparationIdentity.random();
+        var dwarf = rules.initialPlan(campaign, UUID.randomUUID(), identity, "fighter", "custom_artisan", "dwarf");
+        var hillDwarf = rules.initialPlan(campaign, UUID.randomUUID(), identity, "fighter", "custom_artisan",
+                "dwarf", "subrace.hill_dwarf");
+        assertEquals(race, dwarf.character().sources().race());
+        assertEquals(null, dwarf.character().sources().subrace());
+        assertEquals(race, hillDwarf.character().sources().race());
+        assertEquals(subrace.identity(), hillDwarf.character().sources().subrace());
+        verifyToughnessGrowth(dwarf, 0, 0);
+        verifyToughnessGrowth(hillDwarf, firstLevelBonus, perAdditionalLevelBonus);
+    }
+
+    private void verifyToughnessGrowth(InitialPlan plan, int firstLevelBonus, int perAdditionalLevelBonus) {
+        var material = rules.projection();
+        var growth = new Schema2CharacterProgressionRules();
+        var first = initial(plan, "fighter");
+        verifyHitPoints(first, 1, 11 + firstLevelBonus, 0);
+        var injured = new Schema2CharacterHealthRules().applyDamage(material, first, 3, false).state();
+        var second = advanceFighter(growth, plan, injured, 2, GrowthChoices.EMPTY);
+        verifyHitPoints(second, 2, 18 + firstLevelBonus + perAdditionalLevelBonus, 3);
+        var champion = new GrowthChoices(rules.rule("character.subclass", "subclass.champion"), Map.of(), null, Map.of());
+        var rolled = growth.prepareAdvance(material, plan, second, first.characterClass(), 3, "SERVER_ROLL", champion);
+        var third = growth.advance(material, rolled, 3);
+        verifyHitPoints(third, 3, 22 + firstLevelBonus + 2 * perAdditionalLevelBonus, 3);
+    }
+
+    private static void verifyHitPoints(State state, int level, int maximum, int missing) {
+        expectNumber(level, state.level());
+        expectNumber(level, state.maximumHitDice());
+        expectNumber(maximum, state.maximumHitPoints());
+        expectNumber(maximum - missing, state.hitPoints());
+        assertEquals(ARRAY, state.abilities());
     }
 
     private void verifyFighterExtraAttack() {
@@ -121,25 +185,27 @@ public final class BundledSrd51Scenarios {
         assertEquals(FeatureExecution.AUTOMATIC, feature.definition().executionMode());
         assertTrue(rules.metadata().catalog().stream().anyMatch(row -> row.key().equals(feature.identity().ruleKey()) && row.executable()));
 
-        State fourth = fighterAtLevelFour(growth);
+        var plan = initialPlan("fighter");
+        State fourth = fighterAtLevelFour(growth, plan);
         var improvedCritical = fourth.features().getFirst();
         var secondWind = fourth.features().getLast();
         expectNumber(1, Schema2FeatureSupport.attacksPerAttackAction(material, fourth));
-        State fifth = advanceFighter(growth, fourth, 5, GrowthChoices.EMPTY);
+        State fifth = advanceFighter(growth, plan, fourth, 5, GrowthChoices.EMPTY);
         expectNumber(3, fifth.proficiencyBonus());
         var acquired = new FeatureState(feature.identity(), fighter, 5);
         assertEquals(List.of(improvedCritical, acquired, secondWind), fifth.features());
         expectNumber(2, Schema2FeatureSupport.attacksPerAttackAction(material, fifth));
-        State sixth = advanceFighter(growth, fifth, 6, new GrowthChoices(null, Map.of("ability.strength", 2), null, Map.of()));
+        State sixth = advanceFighter(growth, plan, fifth, 6, new GrowthChoices(null, Map.of("ability.strength", 2), null, Map.of()));
         assertEquals(fifth.features(), sixth.features());
         expectNumber(2, Schema2FeatureSupport.attacksPerAttackAction(material, sixth));
     }
 
     private void verifyClericGrowthLimit() {
         var growth = new Schema2CharacterProgressionRules();
-        State cleric = initial("cleric");
+        var plan = initialPlan("cleric");
+        State cleric = initial(plan, "cleric");
         expectRejection("advancing the cleric to level two", "S2_GROWTH_LEVEL_UNSUPPORTED",
-                () -> growth.prepareAdvance(rules.projection(), cleric, rules.rule("character.class", "class.cleric"),
+                () -> growth.prepareAdvance(rules.projection(), plan, cleric, rules.rule("character.class", "class.cleric"),
                         2, "FIXED_AVERAGE", GrowthChoices.EMPTY));
     }
 
@@ -350,8 +416,9 @@ public final class BundledSrd51Scenarios {
         var growth = new Schema2CharacterProgressionRules();
         var books = new Schema2WizardSpellbookRules();
         RuleIdentity casting = rules.rule("character.wizard_spellcasting", "spellcasting.wizard");
-        State wizard = initializeSpellbook(books, initial("wizard"));
-        wizard = growth.advance(material, growth.prepareAdvance(material, wizard,
+        var plan = initialPlan("wizard");
+        State wizard = initializeSpellbook(books, initial(plan, "wizard"));
+        wizard = growth.advance(material, growth.prepareAdvance(material, plan, wizard,
                 rules.rule("character.class", "class.wizard"), 2, "FIXED_AVERAGE",
                 new GrowthChoices(rules.rule("character.subclass", "subclass.evocation"), Map.of(), null, Map.of())), null);
         wizard = books.apply(material, wizard, Command.spellbook("SPELLBOOK_ADVANCED", new SpellbookInput(casting,
@@ -414,22 +481,26 @@ public final class BundledSrd51Scenarios {
                 new EquipmentInput(item, rule, location, "DM confirms ownership and ordinary noncombat preparation."), null);
     }
 
-    private State fighterAtLevelFour(Schema2CharacterProgressionRules growth) {
-        State state = advanceFighter(growth, initial("fighter"), 2, GrowthChoices.EMPTY);
+    private State fighterAtLevelFour(Schema2CharacterProgressionRules growth, InitialPlan plan) {
+        State state = advanceFighter(growth, plan, initial(plan, "fighter"), 2, GrowthChoices.EMPTY);
         var champion = new GrowthChoices(rules.rule("character.subclass", "subclass.champion"), Map.of(), null, Map.of());
-        state = advanceFighter(growth, state, 3, champion);
-        return advanceFighter(growth, state, 4, new GrowthChoices(null, Map.of("ability.constitution", 2), null, Map.of()));
+        state = advanceFighter(growth, plan, state, 3, champion);
+        return advanceFighter(growth, plan, state, 4, new GrowthChoices(null, Map.of("ability.constitution", 2), null, Map.of()));
     }
 
-    private State advanceFighter(Schema2CharacterProgressionRules growth, State state, int level, GrowthChoices choices) {
+    private State advanceFighter(Schema2CharacterProgressionRules growth, InitialPlan plan, State state, int level, GrowthChoices choices) {
         var material = rules.projection();
-        return growth.advance(material, growth.prepareAdvance(material, state,
+        return growth.advance(material, growth.prepareAdvance(material, plan, state,
                 rules.rule("character.class", "class.fighter"), level, "FIXED_AVERAGE", choices), null);
     }
 
+    private InitialPlan initialPlan(String characterClass) {
+        return rules.initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(),
+                characterClass, "custom_artisan");
+    }
+
     private State initial(String characterClass) {
-        var plan = rules.initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), characterClass, "custom_artisan");
-        return initial(plan, characterClass);
+        return initial(initialPlan(characterClass), characterClass);
     }
 
     private State initial(InitialPlan plan, String characterClass) {
