@@ -4,6 +4,7 @@ import com.dndtool.module.AdvancementValueProfile;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.service.CampaignDomainEngine;
 import com.dndtool.service.Schema2ArcaneRecoveryRules;
+import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2FeatureSupport;
@@ -39,7 +40,9 @@ public final class CampaignRuleSupport {
         CampaignRuleContext context;
         try {
             context = new CampaignRuleContext(projection, check.identity());
-            Schema2CombatRules.validateFrozenSupport(projection, context.creationRaces());
+            Schema2CombatRules.validateFrozenSupport(projection);
+            for (var ancestry : context.creationAncestries())
+                Schema2CharacterEquipmentRules.validateWalkingSpeed(projection, ancestry.race(), ancestry.subrace());
         } catch (IllegalArgumentException invalid) {
             throw unsupported("COMBAT", invalid);
         }
@@ -149,8 +152,9 @@ public final class CampaignRuleSupport {
                 var choices = context.initialChoices(characterClass);
                 var abilities = context.initialAbilities(characterClass);
                 for (String background : CampaignRuleContext.INITIAL_BACKGROUNDS) {
-                    for (var race : context.creationRaces()) {
-                        var plan = context.initialPlan(CAMPAIGN, CHARACTER, IDENTITY, characterClass, background, race.ruleKey());
+                    for (var ancestry : context.creationAncestries()) {
+                        var plan = context.initialPlan(CAMPAIGN, CHARACTER, IDENTITY, characterClass, background,
+                                ancestry.race().ruleKey(), ancestry.subrace() == null ? null : ancestry.subrace().ruleKey());
                         var history = engine.initial(context.projection(), plan, PREPARATION, abilities, choices, OPERATION);
                         Schema2FeatureSupport.requireSupportedFeatures(context.projection(), history.current(), "S2_FEATURE_OWNER");
                     }

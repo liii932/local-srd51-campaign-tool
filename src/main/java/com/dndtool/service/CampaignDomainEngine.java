@@ -366,7 +366,7 @@ public final class CampaignDomainEngine {
     private Schema2CharacterProgressionRules.PreparedAdvance prepareAdvance(Schema2CharacterMaterial material, State before, Schema2CharacterRuntime.Command command) {
         if (command.growthChoices().feat() != null) throw rejected("S2_GROWTH_FEAT_UNSUPPORTED");
         spellbooks.requireLearningCompleteBeforeAdvance(material.projection(),before);
-        var prepared = rules.prepareAdvance(material.projection(), before,
+        var prepared = rules.prepareAdvance(material.projection(), material.initial(), before,
                 command.kind().equals("CHARACTER_ADVANCED") ? command.targetClass() : before.characterClass(),
                 before.level() + 1, command.hpChoice(), command.growthChoices());
         ProgressionScope required = command.kind().equals("CHARACTER_ADVANCED")

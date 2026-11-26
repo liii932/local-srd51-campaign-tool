@@ -49,7 +49,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 |---|---|---|---|---|
 | 规则与模块 | 标准四包直接开团。`/api/host/storage/rule-*` 提供原包导入、审阅、下载、准确接受、有序组合预览及操作查证/恢复。`LocalRuleLibrary`、`CampaignRuleSupport`、`CampaignRuleContext` | 本机原包和 SQLite 接受账本。`rules_runtime_material` 保存解释合同、准确有序绑定、规则、条目与字段链 | 新建和完整文件打开按原包重新组合。标准组合核对随附原包，自定义组合核对本机接受。冻结材料供业务、保存与同版残留恢复使用 | 准确内置/外部组合及实际家规差异，缺包、未接受、错误顺序、错绑、坏规则及来源链拒绝。完整规则 DRAFT 发布资格另管 |
 | 战役与生命周期 | `/api/host/storage` 下的 `create`、`open`、`recover`、`save`、`end`、`import`、`download`、`delete`、`discard` | `core_*`、分配/输入/清理材料、受管保存文件，由 `CampaignStorageService` 和 `ManagedCampaignFiles` 协调 | INITIAL/MANUAL/FINAL 共用 Snapshot、严格 codec 和 P0—P3。导入登记完整文件的原 fileKey，打开才建立新运行并核对本机规则。同版残留显式恢复原库 | 初始化与发布中断、提交响应丢失、锁与旧 epoch、旧格式与坏文件、精确放弃和删除，周期 AUTO 待采用 |
-| 规则角色与初始授予 | `character-create`、`character-profile`；`CampaignDomainEngine`、初始授予规则 | `characters_runtime_character` 的 InitialPlan、initial event/current/history；名字、PC/NPC 与活动状态进入根历史 | 标准数组、语言/工具及有限职业授予。创建默认人类来源，标准组合可选择矮人，文件保存准确种族来源和初始授予 | 准确引用、初始来源、活动状态、Unicode、文件初始前缀。种族属性提升、完整背景技能、起始装备整包和任意加入等级待采用 |
+| 规则角色与初始授予 | `character-create`、`character-profile`；`CampaignDomainEngine`、初始授予规则 | `characters_runtime_character` 的 InitialPlan、initial event/current/history；名字、PC/NPC 与活动状态进入根历史 | 标准数组、语言/工具及有限职业授予。创建默认人类来源，标准组合可选择矮人及其山丘亚种，文件保存准确种族、亚种和初始授予，强韧由初始计划与冻结规则派生 | 准确引用、初始来源、活动状态、Unicode、文件初始前缀。种族属性提升、完整背景技能、起始装备整包和任意加入等级待采用 |
 | 自由角色卡 | `manual-create`、`manual-profile`、`manual-field`、`manual-class`、`manual-proficiency`；`CampaignManualData/Commands` | `scenes_world` 的自由卡聚合及 `manual_character` 核验投影 | 六属性、HP/AC/速度、十二职业等级、技能/豁免熟练；空白卡及平民、守卫、狼 NPC 模板，保存初始卡、当前卡和每次根历史 | 自由卡承担简易建卡，独立生命值/定额治疗建档入口已退出。自由卡 HP 为 DM 记录值，检定和字段校验由自由卡领域负责 |
 | 成长与职业 | `character-command` 的成长分支、角色成长与法术书规则 | 所属规则角色的职业、子职业、ASI、授予及成长事件 | 所选机制的未来写入结构预建，按真实消费者写初始及前后事实 | 战士 1–6、生命牧师 1、法师 1–5 的有限模板，含有限兼职前提及熟练选择。[Extra Attack](../../rules/schema-2-extra-attack.md)由单职业战士 5 级正常成长授予，6 级保持；勇士 3–6 级取得[精通重击](../../rules/schema-2-improved-critical.md)，普通/OA/Ready 近战共用 19/20 重击判定。无消费者专长拒绝取得，多施法职业的共享法术位仍待采用 |
 | 回气附赠动作 | SQLite `combat-command/SECOND_WIND`；战斗及健康/资源 owner | 一级实际授予；角色资源/HP、战斗命令原骰及两条角色子历史，同根一次提交 | 保存和直接恢复已付成本、实际治疗与原攻击序列；不用新余额或表 | 本人 ACTIVE 回合、单职业 1–6 级、满 HP/耗尽/过期/回滚/准确授予 |
@@ -72,8 +72,8 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@7`、`srd51_characters@7`、`srd51_magic@7`，第四个成员分别为
-`dm_runtime_house_rules@13` 与 `dm_runtime_house_rules@14`。绑定保留成员顺序、准确版本与
+`srd51_runtime@8`、`srd51_characters@8`、`srd51_magic@8`，第四个成员分别为
+`dm_runtime_house_rules@15` 与 `dm_runtime_house_rules@16`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和
 历史校验共同使用所选战役的冻结规则上下文。变体以感知结算运动检定，自定义工匠获得侏儒语，

@@ -86,13 +86,13 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 
 | 包 | 角色与直接依赖 |
 |---|---|
-| `srd51_runtime@7` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
-| `srd51_characters@7` | extension，直接依赖 `srd51_runtime@7`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
-| `srd51_magic@7` | extension，直接依赖前两包 |
-| `dm_runtime_house_rules@13` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@7` |
-| `dm_runtime_house_rules@14` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@7` 与 `srd51_characters@7` |
+| `srd51_runtime@8` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
+| `srd51_characters@8` | extension，直接依赖 `srd51_runtime@8`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
+| `srd51_magic@8` | extension，直接依赖前两包 |
+| `dm_runtime_house_rules@15` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@8` |
+| `dm_runtime_house_rules@16` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@8` 与 `srd51_characters@8` |
 
-标准组合选择家规 @13，变体选择 @14。变体的运动技能改用感知、
+标准组合选择家规 @15，变体选择 @16。变体的运动技能改用感知、
 固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。这是内容覆盖，不增加新
 算法，也不代表 SRD 原文。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
@@ -112,6 +112,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级。`character-create` 默认用
 人类来源。具有有效矮人创建模板的组合可通过 `raceKey: "dwarf"` 选择矮人。模板选取石匠工具，
 侍僧背景另选精灵语和侏儒语；创建时按本战役目录重验这些选择并保存准确种族来源与授予。
+在矮人模板下，可选 `subraceKey: "subrace.hill_dwarf"`。请求同时提供对应的 `raceKey`。省略亚种时使用普通种族模板。服务器核对父种族和启用的亚种来源，完整保存选取的身份。山丘矮人的[强韧贡献](rules/schema-2-character-statistics.md#山丘矮人强韧)由战役冻结材料供建卡、升级和重开共用。
 标准包矮人的基础步速为 25 尺，重甲策略为 `IGNORE`。家规可分别覆盖[步速、策略、通用减速量和装备门槛](rules/schema-2-combat-authoring.md#步行来源)。重甲的护甲等级、隐匿劣势与
 未受训穿甲的限制分别生效。种族属性提升、完整背景技能和起始装备整包均超出该范围。
 单职业战士从一级取得[回气](rules/schema-2-second-wind.md)，在本人战斗回合使用附赠动作

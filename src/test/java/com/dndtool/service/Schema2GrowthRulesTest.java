@@ -2,17 +2,25 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.*;
+import com.dndtool.module.composition.Schema2GrantFixtures;
+import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.service.Schema2CharacterRuntime.*;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2PreparationIdentity;
+import com.google.gson.JsonObject;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.SUBRACE_HIT_POINTS_ALGORITHM;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2GrowthRulesTest {
+    private static final RuleIdentity DWARF = new RuleIdentity(BASE, "character.race", "race.dwarf");
+    private static final RuleIdentity HILL_DWARF = new RuleIdentity(BASE, "character.subrace", "subrace.hill_dwarf");
     private final Schema2CharacterProgressionRules rules = new Schema2CharacterProgressionRules();
     private final ProductionSchema2Projection material = fullProjection();
+    private final InitialPlan retainedPlan = fullPlan(material, Schema2PreparationIdentity.random(), UUID.randomUUID(), UUID.randomUUID());
 
     @Test void completeGrowthRetainsChoicesBlockedAcquisitionMixedDiceAndTotalLevelBonus() {
         State first = initial(fullAbilities());
@@ -50,6 +58,85 @@ class Schema2GrowthRulesTest {
         assertEquals(new ResourceState(LATER, 2, 3, false), resource(state, LATER));
         assertEquals(new ResourceState(EXT_ENERGY, 2, 3, false), resource(state, EXT_ENERGY));
         assertCode("S2_RESOURCE_REST_REQUIRED", () -> rules.recoverResources(material, initial(fullAbilities()), "LONG_REST"));
+    }
+
+    @Test void selectedSubraceAddsIndependentFirstAndLaterHpThroughFixedRollAsiAndMulticlass() {
+        var combined = materialWithSubrace(fullPackages(), 2, 3);
+        var plan = dwarfPlan(combined, HILL_DWARF);
+        State first = rules.initial(combined, plan, UUID.randomUUID(), fullAbilities(), fullInitialChoices());
+        assertEquals(13, first.maximumHitPoints());
+        assertEquals(13, first.hitPoints());
+        assertEquals(1, first.maximumHitDice());
+        assertEquals(11, rules.initial(combined, dwarfPlan(combined, null), UUID.randomUUID(),
+                fullAbilities(), fullInitialChoices()).maximumHitPoints());
+
+        State injured = withVitality(first, 11, 13, first.health());
+        var fixed = rules.prepareAdvance(combined, plan, injured, CLASS, 2, "FIXED_AVERAGE");
+        assertEquals(10, fixed.minimumHitPointIncrease());
+        assertEquals(10, fixed.maximumHitPointIncrease());
+        State second = rules.advance(combined, fixed, null);
+        assertEquals(23, second.maximumHitPoints());
+        assertEquals(21, second.hitPoints());
+
+        var rolled = rules.prepareAdvance(combined, plan, second, CLASS, 3, "SERVER_ROLL", choices(SUBCLASS, Map.of(), null));
+        assertEquals(5, rolled.minimumHitPointIncrease());
+        assertEquals(14, rolled.maximumHitPointIncrease());
+        State third = rules.advance(combined, rolled, 4);
+        assertEquals(31, third.maximumHitPoints());
+        assertEquals(29, third.hitPoints());
+
+        var asi = choices(null, Map.of("ability.constitution", 2), null);
+        State fourth = rules.advance(combined, rules.prepareAdvance(combined, plan, third, CLASS, 4, "FIXED_AVERAGE", asi), null);
+        assertEquals(45, fourth.maximumHitPoints());
+        assertEquals(43, fourth.hitPoints());
+        var mixed = rules.prepareAdvance(combined, plan, fourth, ALT_CLASS, 5, "FIXED_AVERAGE", fullMulticlassChoices());
+        State fifth = rules.advance(combined, mixed, null);
+        assertEquals(54, fifth.maximumHitPoints());
+        assertEquals(52, fifth.hitPoints());
+        assertEquals(List.of(new HitDicePool(6, 1, 1), new HitDicePool(10, 4, 4)), fifth.hitDicePools());
+    }
+
+    @Test void selectedSubraceCannotBypassPlanHealthOrMaximumRollPreflight() {
+        var combined = materialWithSubrace(fullPackages(), 2, 3);
+        var plan = dwarfPlan(combined, HILL_DWARF);
+        State first = rules.initial(combined, plan, UUID.randomUUID(), fullAbilities(), fullInitialChoices());
+        assertCode("S2_GROWTH_INITIAL_BINDING", () -> rules.prepareAdvance(combined, null, first, CLASS, 2, "SERVER_ROLL"));
+        var other = dwarfPlan(combined, HILL_DWARF);
+        assertCode("S2_GROWTH_INITIAL_BINDING", () -> rules.prepareAdvance(combined, other, first, CLASS, 2, "SERVER_ROLL"));
+        assertCode("S2_RULES_BINDING_MISMATCH", () -> rules.prepareAdvance(material, plan, first, CLASS, 2, "SERVER_ROLL"));
+
+        State atZero = withVitality(first, 0, first.maximumHitPoints(), HealthState.INITIAL);
+        assertCode("S2_HEALTH_UNCONSCIOUS", () -> rules.prepareAdvance(combined, plan, atZero, CLASS, 2, "SERVER_ROLL"));
+        State dead = withVitality(first, 0, first.maximumHitPoints(), new HealthState(0, 0, 0, false, true, null));
+        assertCode("S2_HEALTH_DEAD", () -> rules.prepareAdvance(combined, plan, dead, CLASS, 2, "SERVER_ROLL"));
+        State nearMaximum = withVitality(first, 65_524, 65_524, first.health());
+        assertCode("S2_GROWTH_HIT_POINT_LIMIT", () -> rules.prepareAdvance(combined, plan, nearMaximum, CLASS, 2, "SERVER_ROLL"));
+    }
+
+    @Test void additionalLevelBonusAppliesAfterTheMinimumHitPointGain() {
+        var combined = materialWithSubrace(fullPackages(), 0, 3);
+        var plan = dwarfPlan(combined, HILL_DWARF);
+        var abilities = new HashMap<>(fullAbilities());
+        abilities.put("ability.constitution", 8);
+        abilities.put("ability.wisdom", 13);
+        State first = rules.initial(combined, plan, UUID.randomUUID(), abilities, fullInitialChoices());
+        var advance = rules.prepareAdvance(combined, plan, first, CLASS, 2, "SERVER_ROLL");
+        assertEquals(4, advance.minimumHitPointIncrease());
+        assertEquals(first.maximumHitPoints() + 4, rules.advance(combined, advance, 1).maximumHitPoints());
+    }
+
+    @Test void statisticsOnlyScopeRejectsSelectedSubraceHitPointsAtCreationAndAdvance() {
+        var limited = materialWithSubrace(packages(), 2, 3);
+        var hillDwarf = dwarfPlan(limited, HILL_DWARF);
+        assertCode("S2_GROWTH_SUBRACE_HIT_POINTS_SCOPE",
+                () -> rules.initial(limited, hillDwarf, UUID.randomUUID(), abilities()));
+        var basePlan = dwarfPlan(limited, null);
+        State dwarf = rules.initial(limited, basePlan, UUID.randomUUID(), abilities());
+        var wrongPlan = new InitialPlan(basePlan.campaignId(), basePlan.characterId(),
+                new Schema2InitialCharacterPlanService().prepareMaterial(basePlan.character().identity(), Schema2RulesBinding.from(limited),
+                        limited, new Schema2InitialProficiencyRules.Request(hillDwarf.character().sources(), Map.of())));
+        assertCode("S2_GROWTH_SUBRACE_HIT_POINTS_SCOPE",
+                () -> rules.prepareAdvance(limited, wrongPlan, dwarf, CLASS, 2, "SERVER_ROLL"));
     }
 
     @Test void multiclassRequiresCurrentAndNewPrerequisitesAndPreservesOrSemantics() {
@@ -115,10 +202,9 @@ class Schema2GrowthRulesTest {
             }
         });
         var requiringSelection = ProductionSchema2Projection.compose(com.dndtool.module.composition.Schema2GrantFixtures.artifacts(files));
-        State first = rules.initial(requiringSelection, fullPlan(requiringSelection,
-                new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID()),
-                UUID.randomUUID(), fullAbilities(), fullInitialChoices());
-        assertCode("S2_GROWTH_FEATURE_SELECTION_UNSUPPORTED", () -> rules.prepareAdvance(requiringSelection,
+        var plan = fullPlan(requiringSelection, Schema2PreparationIdentity.random(), UUID.randomUUID(), UUID.randomUUID());
+        State first = rules.initial(requiringSelection, plan, UUID.randomUUID(), fullAbilities(), fullInitialChoices());
+        assertCode("S2_GROWTH_FEATURE_SELECTION_UNSUPPORTED", () -> rules.prepareAdvance(requiringSelection, plan,
                 first, CLASS, 2, "SERVER_ROLL", GrowthChoices.EMPTY));
         assertEquals(1, first.level()); assertEquals(0, first.version());
     }
@@ -146,12 +232,48 @@ class Schema2GrowthRulesTest {
         assertSame(first, rules.validateState(combined, first));
     }
 
+    private static ProductionSchema2Projection materialWithSubrace(List<Map<String, byte[]>> files, int firstBonus, int laterBonus) {
+        Schema2GrantFixtures.edit(files, 0, "rules.json", root -> {
+            var rows = root.getAsJsonArray();
+            rows.add(ancestryDefinition(DWARF));
+            var hillDwarf = ancestryDefinition(HILL_DWARF);
+            hillDwarf.add("parent_race", jsonIdentity(DWARF));
+            rows.add(hillDwarf);
+            var hitPoints = ancestryDefinition(new RuleIdentity(BASE, "character.subrace_hit_points", "subrace_hit_points.hill_dwarf"));
+            hitPoints.add("owner", jsonIdentity(HILL_DWARF));
+            hitPoints.addProperty("algorithm", SUBRACE_HIT_POINTS_ALGORITHM);
+            hitPoints.addProperty("first_level_bonus", firstBonus);
+            hitPoints.addProperty("per_additional_level_bonus", laterBonus);
+            rows.add(hitPoints);
+        });
+        return ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+    }
+    private static JsonObject ancestryDefinition(RuleIdentity identity) {
+        var row = new JsonObject();
+        row.add("identity", jsonIdentity(identity));
+        row.addProperty("display_name", identity.ruleKey());
+        row.addProperty("description", "Subrace hit point fixture.");
+        row.addProperty("source_page", 4);
+        return row;
+    }
+    private static InitialPlan dwarfPlan(ProductionSchema2Projection material, RuleIdentity subrace) {
+        var sources = new Schema2InitialProficiencyRules.Sources(DWARF, subrace,
+                new RuleIdentity(BASE, "character.background", "background.guard"), CLASS);
+        var prepared = new Schema2InitialCharacterPlanService().prepareMaterial(Schema2PreparationIdentity.random(),
+                Schema2RulesBinding.from(material), material, new Schema2InitialProficiencyRules.Request(sources, Map.of()));
+        return new InitialPlan(UUID.randomUUID(), UUID.randomUUID(), prepared);
+    }
+    private static State withVitality(State state, long current, long maximum, HealthState health) {
+        return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(),
+                state.characterClass(), state.abilities(), state.level(), state.proficiencyBonus(), current, maximum, state.classes(),
+                state.hitDicePools(), state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version(),
+                state.resources(), state.rest(), state.equipment(), health, state.spellbook());
+    }
     private State initial(Map<String, Integer> abilities) {
-        return rules.initial(material, fullPlan(material, new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID()),
-                UUID.randomUUID(), abilities, fullInitialChoices());
+        return rules.initial(material, retainedPlan, UUID.randomUUID(), abilities, fullInitialChoices());
     }
     private Schema2CharacterProgressionRules.PreparedAdvance prepare(State state, RuleIdentity target, GrowthChoices choices) {
-        var prepared = rules.prepareAdvance(material, state, target, state.level() + 1, "FIXED_AVERAGE", choices);
+        var prepared = rules.prepareAdvance(material, retainedPlan, state, target, state.level() + 1, "FIXED_AVERAGE", choices);
         assertEquals(ProgressionScope.CHARACTER_ADVANCEMENT, prepared.scope()); return prepared;
     }
     private State advance(State state, RuleIdentity target, GrowthChoices choices) { return rules.advance(material, prepare(state, target, choices), null); }

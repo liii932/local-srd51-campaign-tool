@@ -4,6 +4,7 @@ import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.service.Schema2CharacterRuntime.FeatureState;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CharacterRuntime.State;
+import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.storage.BundledCampaignRules;
 import com.dndtool.service.storage.CampaignRuleContext;
 import com.dndtool.service.storage.CampaignRuleSupport;
@@ -26,11 +27,11 @@ class Schema2ExtraAttackRulesTest {
                 "fighter", "custom_artisan");
         State first = growth.initial(rules.projection(), plan, UUID.randomUUID(),
                 rules.initialAbilities("fighter"), rules.initialChoices("fighter"));
-        State second = advance(first, GrowthChoices.EMPTY);
-        State third = advance(second, new GrowthChoices(rules.rule("character.subclass", "subclass.champion"),
+        State second = advance(plan, first, GrowthChoices.EMPTY);
+        State third = advance(plan, second, new GrowthChoices(rules.rule("character.subclass", "subclass.champion"),
                 Map.of(), null, Map.of()));
-        State fourth = advance(third, new GrowthChoices(null, Map.of("ability.constitution", 2), null, Map.of()));
-        State fifth = advance(fourth, GrowthChoices.EMPTY);
+        State fourth = advance(plan, third, new GrowthChoices(null, Map.of("ability.constitution", 2), null, Map.of()));
+        State fifth = advance(plan, fourth, GrowthChoices.EMPTY);
 
         var extraAttack = rules.rule("character.feature", "feature.fighter_extra_attack");
         var grant = new FeatureState(extraAttack, fighter, 5);
@@ -56,8 +57,8 @@ class Schema2ExtraAttackRulesTest {
                 () -> Schema2FeatureSupport.attacksPerAttackAction(rules.projection(), forged)).getMessage());
     }
 
-    private State advance(State state, GrowthChoices choices) {
-        var step = growth.prepareAdvance(rules.projection(), state, fighter, state.level() + 1, "FIXED_AVERAGE", choices);
+    private State advance(InitialPlan initial, State state, GrowthChoices choices) {
+        var step = growth.prepareAdvance(rules.projection(), initial, state, fighter, state.level() + 1, "FIXED_AVERAGE", choices);
         return growth.advance(rules.projection(), step, null);
     }
 

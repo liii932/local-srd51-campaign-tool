@@ -19,13 +19,13 @@ application that supports the saved mechanisms.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `7` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
-| `srd51_characters` version `7` | extension | `srd51_runtime=7` | Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `7` | extension | `srd51_runtime=7`, `srd51_characters=7` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `13` | extension | `srd51_runtime=7` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `8` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
+| `srd51_characters` version `8` | extension | `srd51_runtime=8` | Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `8` | extension | `srd51_runtime=8`, `srd51_characters=8` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `15` | extension | `srd51_runtime=8` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `14` as its
+first three members and selects `dm_runtime_house_rules` version `16` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -67,6 +67,14 @@ The bundled dwarf source grants Common, Dwarvish and one artisan's tool
 proficiency. Acolyte grants two standard languages. The custom artisan source is
 an explicit project customization with Dwarvish and smith's tools. Background
 skill and narrative-feature effects remain outside this scope.
+
+The Hill Dwarf source inherits Dwarf languages, tool training and walking speed.
+Its `character.subrace_hit_points` rule uses `SRD_2014_SUBRACE_HIT_POINTS_V1`
+with a separate `first_level_bonus` and `per_additional_level_bonus`. The
+bundled values are each 1, for a Hill Dwarf's initial HP and every subsequent
+supported level, whether level-up HP uses a fixed average or a server roll.
+Each field accepts integers from 0 through 5. Additional HP uses the selected
+subrace from the frozen creation plan. The supported ability array is unchanged.
 
 Each `character.movement` rule defines its owner's `walk_speed_feet` and
 `heavy_armor_speed_policy` using `SRD_2014_WALKING_SPEED_V1`. The bundled human
@@ -129,7 +137,7 @@ fixed DOS timestamps, fixed regular-file mode, no comments and no extra fields
 make the resource bytes deterministic. Run the script with Python 3; `--check`
 compares the expected archive bytes with the checked-in resources without writes.
 
-Numeric material is selected from local SRD pages 3/5 (race sources), 15–17
+Numeric material is selected from local SRD pages 3–5 (race sources and Dwarven Toughness), 15–17
 (cleric/Life), 24–25 (fighter), 52–54 (Wizard), 56–58 (advancement/multiclass/
 Grappler), 59–61 (languages/backgrounds), 63–66/70 (equipment/tools), 77–85
 (checks/ability mappings), 87 (rests), 90–99 (combat/health), the spell-specific

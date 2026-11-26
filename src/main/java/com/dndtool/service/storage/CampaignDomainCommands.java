@@ -52,7 +52,8 @@ public final class CampaignDomainCommands {
                 subject=result.subjectId();newText=CampaignDomainCodec.text(result.audit());
             }
             case "character-create" -> {
-                if (input.has("raceKey")) CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey", "raceKey");
+                if (input.has("subraceKey")) CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey", "raceKey", "subraceKey");
+                else if (input.has("raceKey")) CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey", "raceKey");
                 else CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey");
                 if (characters.size() >= 16) throw new StorageException("CAPACITY", "Campaign roster is full");
                 String name = CampaignJson.name(s(input, "name")), kind = s(input, "kind"), classKey = s(input, "classKey");
@@ -60,7 +61,8 @@ public final class CampaignDomainCommands {
                 subject = child(operationId, "character");
                 Schema2PreparationIdentity identity = characters.isEmpty() ? new Schema2PreparationIdentity(child(operationId, "rule-run"), child(operationId, "rule-snapshot")) : characters.getFirst().initial().character().identity();
                 var initial = context.initialPlan(UUID.fromString(snapshot.campaignId()), subject, identity, classKey,
-                        s(input, "backgroundKey"), input.has("raceKey") ? s(input, "raceKey") : "human");
+                        s(input, "backgroundKey"), input.has("raceKey") ? s(input, "raceKey") : "human",
+                        input.has("subraceKey") ? s(input, "subraceKey") : null);
                 Map<String, Integer> abilities = context.initialAbilities(classKey);
                 var history = engine.initial(material, initial, child(operationId, "preparation"), abilities, context.initialChoices(classKey), operationId);
                 var character = new Character(name, kind, true, initial, history); characters.add(character);

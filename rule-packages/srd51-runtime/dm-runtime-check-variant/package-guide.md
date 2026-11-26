@@ -1,8 +1,8 @@
 # Finite DM check variant
 
-The `dm_runtime_house_rules` version `14` extension is the fourth member of
+The `dm_runtime_house_rules` version `16` extension is the fourth member of
 the bundled check variant. The first three members are
-`srd51_runtime=7`, `srd51_characters=7` and `srd51_magic=7`, in that order.
+`srd51_runtime=8`, `srd51_characters=8` and `srd51_magic=8`, in that order.
 
 The variant uses Wisdom for Athletics, grants Gnomish in the custom artisan
 background, and sets the DM's fixed bludgeoning damage to 3 HP. These are

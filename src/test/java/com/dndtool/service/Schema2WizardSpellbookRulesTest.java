@@ -39,9 +39,10 @@ class Schema2WizardSpellbookRulesTest {
     @Test void learningMustBeCompleteBeforeNextGrowthAndCannotChangePreparedList() {
         State initial=initialContext(MATERIAL,UUID.randomUUID(),UUID.randomUUID()).character();
         assertCode("S2_SPELLBOOK_LEARNING_REQUIRED",()->books.requireLearningCompleteBeforeAdvance(MATERIAL,initial));
-        State first=learnedContext(MATERIAL,UUID.randomUUID(),UUID.randomUUID(),1).character();
+        var context=learnedContext(MATERIAL,UUID.randomUUID(),UUID.randomUUID(),1);
+        State first=context.character();
         var growth=new Schema2CharacterProgressionRules();
-        State second=growth.advance(MATERIAL,growth.prepareAdvance(MATERIAL,first,WIZARD,2,"FIXED_AVERAGE",new GrowthChoices(EVOCATION,Map.of(),null,Map.of())),null);
+        State second=growth.advance(MATERIAL,growth.prepareAdvance(MATERIAL,context.initial(),first,WIZARD,2,"FIXED_AVERAGE",new GrowthChoices(EVOCATION,Map.of(),null,Map.of())),null);
         assertCode("S2_SPELLBOOK_LEARNING_REQUIRED",()->books.requireLearningCompleteBeforeAdvance(MATERIAL,second));
         assertCode("S2_SPELLBOOK_LEARNING",()->books.apply(MATERIAL,second,Command.spellbook("SPELLBOOK_ADVANCED",new SpellbookInput(CASTING,learnedAt(2),List.of(spell("detect_magic"))))));
         assertCode("S2_SPELLBOOK_REST_REQUIRED",()->books.apply(MATERIAL,first,Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(SHIELD)))));

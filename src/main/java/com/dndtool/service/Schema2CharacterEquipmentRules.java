@@ -108,7 +108,7 @@ public final class Schema2CharacterEquipmentRules {
     }
 
     /** Validates the unique walking profile selected by the character's frozen sources. */
-    static void validateWalkingSpeed(ProductionSchema2Projection material, RuleIdentity race, RuleIdentity subrace) {
+    public static void validateWalkingSpeed(ProductionSchema2Projection material, RuleIdentity race, RuleIdentity subrace) {
         movement(material, race, subrace);
         heavyArmorSpeedPenalty(material);
     }

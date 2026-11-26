@@ -6,6 +6,29 @@
 当前 SQLite 工作台接入的角色模板和机制见[领域接合表](../design/v2/domain-integration.md)；
 实际休息和恢复见[休息合同](schema-2-character-rest.md)。
 
+## 山丘矮人强韧
+
+标准包在 `character.subrace / subrace.hill_dwarf` 上声明强韧。选择矮人时可选此亚种。
+建卡保存种族和亚种的完整规则身份。普通矮人只取得其种族来源，山丘矮人另外取得亚种来源。
+强韧增加生命值上限，山丘矮人的感知提升和矮人的体质提升各有独立来源，当前模板继续使用标准数组。[SRD 第 4 页](../references/srd-5.1/pages/page-004.md)
+
+| `character.subrace_hit_points` 的必需字段 | 作者合同 |
+| --- | --- |
+| `identity`、`display_name`、`description`、`source_page`、`algorithm` | 键前缀 `subrace_hit_points.`，第 4 页，算法 `SRD_2014_SUBRACE_HIT_POINTS_V1`。可选 `author_note` |
+| `owner` | 指向完整 `character.subrace` 身份。启用贡献要求启用的亚种，同一亚种最多一项启用贡献 |
+| `first_level_bonus` | 一级生命值加值，精确整数 0–5，标准值 1 |
+| `per_additional_level_bonus` | 每获得一个后续角色总等级的加值，精确整数 0–5，标准值 1 |
+
+两个数值可独立 `set_field` 覆盖，通过同一条字段来源链冻结。选择的亚种没有启用贡献时，加值为 0。
+角色总等级为 L 时，累计贡献是 `first_level_bonus + (L - 1) × per_additional_level_bonus`。
+一级先算职业初始 HP，再加一级贡献。此后先按固定值或实际生命骰及体质算本级增量并取最低 1，
+另计适用的体质追溯调整，再加一份后续等级贡献。进入另一个职业也只取后续等级加值。
+升级时当前和最大 HP 增加同样的数值，保留原先损失的 HP。实际掷骰和生命骰数量由职业规则决定。
+完整文件按原初始计划、冻结规则和已记录的骰点重验。纯统计范围 `STATISTICS_AND_RESOURCES_ONLY` 对选中带启用 HP 贡献的亚种明确拒绝。
+
+体质 14 的两名战士采用固定值成长时，普通矮人的最大 HP 从 12 升至 20，标准山丘矮人从 13 升至 22。
+家规将两个字段分别设为 2 和 0 时，山丘矮人从 14 升至 22，一级的 2 点在以后各级保留。
+
 ## 类型化作者模型
 
 以下两个规则类型使用完整 `RuleIdentity(module_key, rule_type, rule_key)`，不能只用 `rule_key`

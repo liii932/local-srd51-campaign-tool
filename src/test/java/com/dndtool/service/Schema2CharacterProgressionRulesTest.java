@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class Schema2CharacterProgressionRulesTest {
     private final Schema2CharacterProgressionRules rules = new Schema2CharacterProgressionRules();
     private final ProductionSchema2Projection material = projection();
+    private final Schema2InitialCharacterPlanService.InitialPlan retainedPlan = plan();
 
     @Test void initialStatisticsUseOnlyAnExactStandardArrayAndCompleteRetainedT1Plan() {
         State state = initial();
@@ -41,7 +42,7 @@ class Schema2CharacterProgressionRulesTest {
 
     @Test void fixedStatisticsAdvancementPreservesSpentResourcesAndAddsOnlyNewCapacity() {
         State state = rules.spend(material, initial(), ENERGY, 2);
-        var prepared = rules.prepareAdvance(material, state, CLASS, 2, "FIXED_AVERAGE");
+        var prepared = rules.prepareAdvance(material, retainedPlan, state, CLASS, 2, "FIXED_AVERAGE");
         assertEquals(10, prepared.hitDieSides()); assertEquals(7, prepared.minimumHitPointIncrease());
         assertEquals(7, prepared.maximumHitPointIncrease());
         assertEquals(ProgressionScope.STATISTICS_AND_RESOURCES_ONLY, prepared.scope());
@@ -49,31 +50,31 @@ class Schema2CharacterProgressionRulesTest {
         assertEquals(18, second.maximumHitPoints()); assertEquals(18, second.hitPoints()); assertEquals(2, second.hitDice());
         assertEquals(new ResourceState(ENERGY, 1, 3, false), resource(second, ENERGY));
         assertEquals(new ResourceState(EXT_ENERGY, 2, 2, false), resource(second, EXT_ENERGY));
-        State third = rules.advance(material, rules.prepareAdvance(material, second, CLASS, 3, "FIXED_AVERAGE"), null);
+        State third = rules.advance(material, rules.prepareAdvance(material, retainedPlan, second, CLASS, 3, "FIXED_AVERAGE"), null);
         assertEquals(new ResourceState(ENERGY, 2, 4, false), resource(third, ENERGY));
         assertEquals(new ResourceState(LATER, 1, 1, false), resource(third, LATER));
         assertEquals(3, third.level()); assertEquals(3, third.maximumHitDice());
-        assertCode("S2_GROWTH_LEVEL_UNSUPPORTED", () -> rules.prepareAdvance(material, third, CLASS, 4, "FIXED_AVERAGE"));
+        assertCode("S2_GROWTH_LEVEL_UNSUPPORTED", () -> rules.prepareAdvance(material, retainedPlan, third, CLASS, 4, "FIXED_AVERAGE"));
     }
 
     @Test void preflightIsClosedAndRejectsMulticlassSkippedLevelsAndUnknownChoices() {
         State state = initial();
         assertTrue(Arrays.stream(Schema2CharacterProgressionRules.PreparedAdvance.class.getDeclaredConstructors())
                 .allMatch(constructor -> Modifier.isPrivate(constructor.getModifiers())));
-        assertCode("S2_GROWTH_MULTICLASS_UNSUPPORTED", () -> rules.prepareAdvance(material, state,
+        assertCode("S2_GROWTH_MULTICLASS_UNSUPPORTED", () -> rules.prepareAdvance(material, retainedPlan, state,
                 new RuleIdentity(BASE, "character.class", "class.other"), 2, "SERVER_ROLL"));
-        assertCode("S2_GROWTH_LEVEL", () -> rules.prepareAdvance(material, state, CLASS, 3, "SERVER_ROLL"));
-        assertCode("S2_GROWTH_HP_CHOICE", () -> rules.prepareAdvance(material, state, CLASS, 2, "CLIENT_ROLL"));
-        assertCode("S2_GROWTH_HP_CHOICE", () -> rules.prepareAdvance(material, state, CLASS, 2, null));
+        assertCode("S2_GROWTH_LEVEL", () -> rules.prepareAdvance(material, retainedPlan, state, CLASS, 3, "SERVER_ROLL"));
+        assertCode("S2_GROWTH_HP_CHOICE", () -> rules.prepareAdvance(material, retainedPlan, state, CLASS, 2, "CLIENT_ROLL"));
+        assertCode("S2_GROWTH_HP_CHOICE", () -> rules.prepareAdvance(material, retainedPlan, state, CLASS, 2, null));
     }
 
     @Test void rolledStatisticsRequireOneBoundedServerResultAndFixedChoiceRejectsARoll() {
-        var prepared = rules.prepareAdvance(material, initial(), CLASS, 2, "SERVER_ROLL");
+        var prepared = rules.prepareAdvance(material, retainedPlan, initial(), CLASS, 2, "SERVER_ROLL");
         assertEquals(2, prepared.minimumHitPointIncrease()); assertEquals(11, prepared.maximumHitPointIncrease());
         for (Integer roll : Arrays.asList(null, 0, 11)) assertCode("S2_GROWTH_ROLL", () -> rules.advance(material, prepared, roll));
         assertEquals(13, rules.advance(material, prepared, 1).maximumHitPoints());
         assertEquals(22, rules.advance(material, prepared, 10).maximumHitPoints());
-        var fixed = rules.prepareAdvance(material, initial(), CLASS, 2, "FIXED_AVERAGE");
+        var fixed = rules.prepareAdvance(material, retainedPlan, initial(), CLASS, 2, "FIXED_AVERAGE");
         assertCode("S2_GROWTH_ROLL", () -> rules.advance(material, fixed, 5));
     }
 
@@ -130,8 +131,8 @@ class Schema2CharacterProgressionRulesTest {
         assertEquals(new ResourceState(ENERGY, 0, 0, true), resource(state, ENERGY));
         State spent = rules.spend(unlimited, state, ENERGY, 1_000_000);
         assertEquals(new ResourceState(ENERGY, 0, 0, true), resource(spent, ENERGY));
-        State second = rules.advance(unlimited, rules.prepareAdvance(unlimited, spent, CLASS, 2, "FIXED_AVERAGE"), null);
-        State third = rules.advance(unlimited, rules.prepareAdvance(unlimited, second, CLASS, 3, "FIXED_AVERAGE"), null);
+        State second = rules.advance(unlimited, rules.prepareAdvance(unlimited, plan, spent, CLASS, 2, "FIXED_AVERAGE"), null);
+        State third = rules.advance(unlimited, rules.prepareAdvance(unlimited, plan, second, CLASS, 3, "FIXED_AVERAGE"), null);
         assertEquals(new ResourceState(ENERGY, 4, 4, false), resource(third, ENERGY));
     }
 
@@ -141,10 +142,10 @@ class Schema2CharacterProgressionRulesTest {
                 state.characterClass(), state.abilities(), state.level(), state.proficiencyBonus(), state.hitPoints(), state.maximumHitPoints(),
                 state.classes(), state.hitDicePools(), state.subclasses(), state.features(), state.feats(), state.proficiencies(), 127, state.resources(), state.rest());
         assertSame(full, rules.validateState(material, full));
-        assertCode("S2_GROWTH_EVENT_LIMIT", () -> rules.prepareAdvance(material, full, CLASS, 2, "SERVER_ROLL"));
+        assertCode("S2_GROWTH_EVENT_LIMIT", () -> rules.prepareAdvance(material, retainedPlan, full, CLASS, 2, "SERVER_ROLL"));
     }
 
-    private State initial() { return rules.initial(material, plan(), UUID.randomUUID(), abilities()); }
+    private State initial() { return rules.initial(material, retainedPlan, UUID.randomUUID(), abilities()); }
     private Schema2InitialCharacterPlanService.InitialPlan plan() {
         return initialPlan(material, new Schema2PreparationIdentity(UUID.randomUUID(), UUID.randomUUID()), UUID.randomUUID(), UUID.randomUUID());
     }

@@ -87,7 +87,7 @@ public final class Schema2WizardFixtures {
             books.requireLearningCompleteBeforeAdvance(material,state);
             GrowthChoices choices=next==2?new GrowthChoices(EVOCATION,Map.of(),null,Map.of())
                     :next==4?new GrowthChoices(null,Map.of("ability.intelligence",2),null,Map.of()):GrowthChoices.EMPTY;
-            state=growth.advance(material,growth.prepareAdvance(material,state,WIZARD,next,"FIXED_AVERAGE",choices),null);
+            state=growth.advance(material,growth.prepareAdvance(material,context.initial(),state,WIZARD,next,"FIXED_AVERAGE",choices),null);
             state=books.apply(material,state,Command.spellbook("SPELLBOOK_ADVANCED",new SpellbookInput(CASTING,learnedAt(next),state.spellbook().prepared())));
         }
         return new Context(material,context.initial(),state);

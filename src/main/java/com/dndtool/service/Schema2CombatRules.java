@@ -256,9 +256,8 @@ public final class Schema2CombatRules {
     }
 
     /** Checks the rule-only combat dependencies of the current character and deployment entry points. */
-    public static void validateFrozenSupport(ProductionSchema2Projection material, List<RuleIdentity> races) {
+    public static void validateFrozenSupport(ProductionSchema2Projection material) {
         combatRule(material);
-        for (RuleIdentity race : races) Schema2CharacterEquipmentRules.validateWalkingSpeed(material, race, null);
         for (FinalRule row : material.projection().rules())
             if (row instanceof FinalItem item && item.enabled() && item.definition().kind() == EquipmentKind.WEAPON)
                 weaponProfile(material, item.identity());

@@ -25,27 +25,40 @@ public final class CampaignRuleContext {
     private final ProductionSchema2Projection projection;
     private final Schema2RulesBinding binding;
     private final RuleIdentity checkRule;
-    private final List<RuleIdentity> creationRaces;
+    record CreationAncestry(RuleIdentity race, RuleIdentity subrace) { }
+    private final List<CreationAncestry> creationAncestries;
 
     CampaignRuleContext(ProductionSchema2Projection projection, RuleIdentity checkRule) {
         this.projection = projection;
         this.binding = Schema2RulesBinding.from(projection);
         this.checkRule = checkRule;
-        var races = new ArrayList<RuleIdentity>();
-        races.add(rule("character.race", "race.human"));
-        var dwarfSources = projection.projection().rules().stream().filter(FinalCharacterSource.class::isInstance)
-                .filter(FinalRule::enabled).map(FinalRule::identity)
-                .filter(identity -> identity.ruleType().equals("character.race") && identity.ruleKey().equals("race.dwarf")).toList();
-        if (dwarfSources.size() > 1) throw new IllegalArgumentException("STORAGE_RULE_AMBIGUOUS");
-        races.addAll(dwarfSources);
-        this.creationRaces = List.copyOf(races);
+        var ancestries = new ArrayList<CreationAncestry>();
+        ancestries.add(new CreationAncestry(rule("character.race", "race.human"), null));
+        var dwarf = optionalSource("character.race", "race.dwarf");
+        var hill = optionalSource("character.subrace", "subrace.hill_dwarf");
+        if (dwarf != null) ancestries.add(new CreationAncestry(dwarf.identity(), null));
+        if (hill != null) {
+            if (dwarf == null || !dwarf.identity().equals(hill.parentRace()))
+                throw new IllegalArgumentException("S2_INITIAL_SUBRACE_PARENT");
+            ancestries.add(new CreationAncestry(dwarf.identity(), hill.identity()));
+        }
+        this.creationAncestries = List.copyOf(ancestries);
     }
 
     public String interpretation() { return INTERPRETATION; }
     public Schema2RulesBinding binding() { return binding; }
     public ProductionSchema2Projection projection() { return projection; }
     public RuleIdentity checkRule() { return checkRule; }
-    List<RuleIdentity> creationRaces() { return creationRaces; }
+    List<CreationAncestry> creationAncestries() { return creationAncestries; }
+
+    private CharacterSourceDefinition optionalSource(String type, String key) {
+        var matches = projection.projection().rules().stream()
+                .filter(FinalCharacterSource.class::isInstance).map(FinalCharacterSource.class::cast)
+                .filter(row -> row.enabled() && row.identity().ruleType().equals(type) && row.identity().ruleKey().equals(key))
+                .map(FinalCharacterSource::definition).toList();
+        if (matches.size() > 1) throw new IllegalArgumentException("STORAGE_RULE_AMBIGUOUS");
+        return matches.isEmpty() ? null : matches.getFirst();
+    }
 
     /** Resolves an application template alias to one enabled, fully qualified rule. */
     public RuleIdentity rule(String type, String key) {
@@ -64,15 +77,24 @@ public final class CampaignRuleContext {
 
     public InitialPlan initialPlan(UUID campaignId, UUID characterId, Schema2PreparationIdentity preparationIdentity,
             String classKey, String backgroundKey, String raceKey) {
-        String key = raceKey != null && raceKey.startsWith("race.") ? raceKey : "race." + raceKey;
-        var race = creationRaces.stream().filter(candidate -> candidate.ruleKey().equals(key)).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("STORAGE_RACE_UNAVAILABLE"));
+        return initialPlan(campaignId, characterId, preparationIdentity, classKey, backgroundKey, raceKey, null);
+    }
+
+    public InitialPlan initialPlan(UUID campaignId, UUID characterId, Schema2PreparationIdentity preparationIdentity,
+            String classKey, String backgroundKey, String raceKey, String subraceKey) {
+        String race = raceKey != null && raceKey.startsWith("race.") ? raceKey : "race." + raceKey;
+        String subrace = subraceKey == null || subraceKey.startsWith("subrace.") ? subraceKey : "subrace." + subraceKey;
+        var ancestry = creationAncestries.stream().filter(candidate -> candidate.race().ruleKey().equals(race)
+                && java.util.Objects.equals(candidate.subrace() == null ? null : candidate.subrace().ruleKey(), subrace))
+                .findFirst().orElseThrow(() -> new IllegalArgumentException(
+                        subrace == null ? "STORAGE_RACE_UNAVAILABLE" : "STORAGE_SUBRACE_UNAVAILABLE"));
         var prepared = new Schema2InitialCharacterPlanService().prepareMaterial(preparationIdentity,
-                binding, projection, initialRequest(classKey, backgroundKey, race));
+                binding, projection, initialRequest(classKey, backgroundKey, ancestry));
         return new InitialPlan(campaignId, characterId, prepared);
     }
 
-    private Schema2InitialProficiencyRules.Request initialRequest(String classKey, String backgroundKey, RuleIdentity race) {
+    private Schema2InitialProficiencyRules.Request initialRequest(String classKey, String backgroundKey, CreationAncestry ancestry) {
+        RuleIdentity race = ancestry.race();
         String chosenClass = classKey(classKey);
         String background = backgroundKey(backgroundKey);
         boolean dwarf = race.ruleKey().equals("race.dwarf");
@@ -85,7 +107,7 @@ public final class CampaignRuleContext {
         if (background.equals("acolyte")) choices.put(slot(backgroundSource, "proficiency_grants", "languages"),
                 List.of(rule("character.language", dwarf ? "language.elvish" : "language.dwarvish"),
                         rule("character.language", "language.gnomish")));
-        var sources = new Schema2InitialProficiencyRules.Sources(race, null, backgroundSource,
+        var sources = new Schema2InitialProficiencyRules.Sources(race, ancestry.subrace(), backgroundSource,
                 rule("character.class", "class." + chosenClass));
         return new Schema2InitialProficiencyRules.Request(sources, choices);
     }
@@ -156,7 +178,7 @@ public final class CampaignRuleContext {
                                 String collection, String entryKey) { }
     public record CatalogEntry(String moduleKey, String type, String key, String name, boolean enabled,
                                boolean executable, String description, String abilityKey, String category,
-                               boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
+                               RuleIdentity parentRace, boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
                                List<FieldOverride> overrides) {
         public CatalogEntry { overrides = List.copyOf(overrides); }
     }
@@ -191,7 +213,8 @@ public final class CampaignRuleContext {
         for (FinalRule row : projection.projection().rules()) {
             Definition definition = row.definition();
             boolean creationChoice = row.enabled() && switch (row.identity().ruleType()) {
-                case "character.race" -> creationRaces.contains(row.identity());
+                case "character.race" -> creationAncestries.stream().anyMatch(a -> row.identity().equals(a.race()));
+                case "character.subrace" -> creationAncestries.stream().anyMatch(a -> row.identity().equals(a.subrace()));
                 case "character.class" -> INITIAL_CLASSES.stream().anyMatch(key -> row.identity().ruleKey().equals("class." + key));
                 case "character.background" -> INITIAL_BACKGROUNDS.stream().anyMatch(key -> row.identity().ruleKey().equals("background." + key));
                 default -> false;
@@ -203,7 +226,7 @@ public final class CampaignRuleContext {
                             || feature.executionMode() != FeatureExecution.AUTOMATIC))
                     && !(definition instanceof ResourceDefinition resource && resource.executionMode() == ResourceExecution.BLOCKED)
                     && !(definition instanceof FeatDefinition)
-                    && !(Set.of("character.race", "character.class", "character.background").contains(row.identity().ruleType()) && !creationChoice)
+                    && !(Set.of("character.race", "character.subrace", "character.class", "character.background").contains(row.identity().ruleType()) && !creationChoice)
                     && !row.identity().ruleType().startsWith("catalog.");
             var proficiency = definition instanceof ProficiencyDefinition value ? value : null;
             boolean directResourceSpend = executable && definition instanceof ResourceDefinition
@@ -211,6 +234,7 @@ public final class CampaignRuleContext {
             catalog.add(new CatalogEntry(row.identity().moduleKey(), row.identity().ruleType(),
                     row.identity().ruleKey(), definition.displayName(), row.enabled(), executable, description(definition),
                     proficiency == null ? null : proficiency.abilityKey(), proficiency == null ? null : proficiency.category().name(),
+                    definition instanceof CharacterSourceDefinition source ? source.parentRace() : null,
                     creationChoice, spellbookChoice, directResourceSpend,
                     overrides.getOrDefault(row.identity(), List.of())));
         }
@@ -247,6 +271,7 @@ public final class CampaignRuleContext {
             case WeaponAttackDefinition d -> d.description();
             case MovementDefinition d -> d.description();
             case ArmorMovementDefinition d -> d.description();
+            case SubraceHitPointsDefinition d -> d.description();
             case SpellDefinition d -> d.description();
             case SpellcastingDefinition d -> d.description();
             case WizardSpellcastingDefinition d -> d.description();
