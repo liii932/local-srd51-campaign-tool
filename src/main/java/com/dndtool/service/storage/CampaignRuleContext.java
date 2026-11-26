@@ -178,6 +178,7 @@ public final class CampaignRuleContext {
                                 String collection, String entryKey) { }
     public record CatalogEntry(String moduleKey, String type, String key, String name, boolean enabled,
                                boolean executable, String description, String abilityKey, String category,
+                               Boolean allowAlternateSkillAbility,
                                RuleIdentity parentRace, boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
                                List<FieldOverride> overrides) {
         public CatalogEntry { overrides = List.copyOf(overrides); }
@@ -234,6 +235,7 @@ public final class CampaignRuleContext {
             catalog.add(new CatalogEntry(row.identity().moduleKey(), row.identity().ruleType(),
                     row.identity().ruleKey(), definition.displayName(), row.enabled(), executable, description(definition),
                     proficiency == null ? null : proficiency.abilityKey(), proficiency == null ? null : proficiency.category().name(),
+                    definition instanceof CheckDefinition check ? check.allowAlternateSkillAbility() : null,
                     definition instanceof CharacterSourceDefinition source ? source.parentRace() : null,
                     creationChoice, spellbookChoice, directResourceSpend,
                     overrides.getOrDefault(row.identity(), List.of())));

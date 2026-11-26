@@ -38,6 +38,65 @@ class Schema2CharacterCheckRulesTest {
         }
     }
 
+    @Test void alternateSkillChecksUseTheSelectedAbilityAndOneExactProficiencyBonus() {
+        var enabled = alternateSkillMaterial();
+        var state = alternateSkillState(enabled);
+        assertEquals(2, state.proficiencies().stream().filter(value -> value.target().equals(ATHLETICS)).count());
+        for (var ability : Map.of("ability.strength", 2, "ability.dexterity", 1, "ability.constitution", 1,
+                "ability.intelligence", 0, "ability.wisdom", -1, "ability.charisma", 2).entrySet()) {
+            int modifier = ability.getValue();
+            var command = check("SKILL", ability.getKey(), ATHLETICS, 12 + modifier, false, false);
+            var result = rules.resolve(rules.prepare(enabled, state, command), 10, null);
+            assertEquals(new CheckResult(10, null, 10, modifier, 2, 12 + modifier, true, false, false, 2, null), result);
+            assertEquals(state.proficiencies(), rules.verify(enabled, state, command, result).proficiencies());
+        }
+        var untrained = check("SKILL", "ability.constitution", OTHER_SKILL, 12, false, false);
+        assertEquals(new CheckResult(10, null, 10, 1, 0, 11, false, false, false, 2, null),
+                rules.resolve(rules.prepare(enabled, state, untrained), 10, null));
+        for (var skill : List.of(WEAPON, new Schema2CompositionKernel.RuleIdentity(BASE,
+                "character.proficiency", "proficiency.skill.unknown"))) {
+            var error = assertThrows(IllegalArgumentException.class, () -> rules.prepare(enabled, state,
+                    check("SKILL", "ability.constitution", skill, 12, false, false)));
+            assertEquals("S2_CHECK_SKILL_UNSUPPORTED", error.getMessage());
+        }
+    }
+
+    @Test void armorDisadvantageUsesTheActualAbilityAndDexterityStealthPair() {
+        var enabled = alternateSkillMaterial();
+        var state = alternateSkillState(enabled);
+        var equipment = new Schema2CharacterEquipmentRules();
+        UUID armor = UUID.randomUUID();
+        var carrying = equipment.apply(enabled, state, equipment("ITEM_ACQUIRED", armor, ITEM_MEDIUM, "CARRIED"), armor);
+        var proficientArmor = equipment.apply(enabled, carrying, equipment("ITEM_EQUIPPED", armor, null, "WORN"), UUID.randomUUID());
+        var dexterityStealth = check("SKILL", "ability.dexterity", STEALTH, 10, false, false);
+        var strengthStealth = check("SKILL", "ability.strength", STEALTH, 10, false, false);
+        var dexterity = rules.prepare(enabled, proficientArmor, dexterityStealth);
+        assertEquals(new CheckResult(18, 3, 3, 1, 0, 4, false, false, true, 2, null),
+                rules.resolve(dexterity, 18, 3));
+        assertFalse(rules.prepare(enabled, proficientArmor, strengthStealth).secondDieRequired());
+
+        UUID shield = UUID.randomUUID();
+        carrying = equipment.apply(enabled, proficientArmor, equipment("ITEM_ACQUIRED", shield, ITEM_SHIELD, "CARRIED"), shield);
+        var untrainedShield = equipment.apply(enabled, carrying, equipment("ITEM_EQUIPPED", shield, null, "OFF_HAND"), UUID.randomUUID());
+        assertTrue(rules.prepare(enabled, untrainedShield, strengthStealth).secondDieRequired());
+        var constitutionAthletics = check("SKILL", "ability.constitution", ATHLETICS, 10, false, false);
+        assertFalse(rules.prepare(enabled, untrainedShield, constitutionAthletics).secondDieRequired());
+        var dexterityAthletics = check("SKILL", "ability.dexterity", ATHLETICS, 10, true, false);
+        var cancelled = rules.resolve(rules.prepare(enabled, untrainedShield, dexterityAthletics), 10, null);
+        assertTrue(cancelled.effectiveAdvantage());
+        assertTrue(cancelled.effectiveDisadvantage());
+        assertFalse(dexterityAthletics.checkInput().disadvantage());
+    }
+
+    private static ProductionSchema2Projection alternateSkillMaterial() {
+        return ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(packages("alternate-skill-ability")));
+    }
+
+    private static State alternateSkillState(ProductionSchema2Projection material) {
+        return new Schema2CharacterProgressionRules().initial(material,
+                fullPlan(material, IDENTITY, CAMPAIGN, CHARACTER), PREPARATION, fullAbilities(), INITIAL_CHOICES);
+    }
+
     @Test void advantageDisadvantageAndCancellationUseExactDiceAndNoNaturalOneOrTwentyOverride() {
         for (boolean advantage : List.of(false, true)) for (boolean disadvantage : List.of(false, true)) {
             var prepared = rules.prepare(material, initial, check("ABILITY", "ability.strength", null, 10, advantage, disadvantage));

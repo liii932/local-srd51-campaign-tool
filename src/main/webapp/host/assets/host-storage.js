@@ -177,6 +177,7 @@
   }
   const abilities = ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'];
   const abilityNames = ['力量', '敏捷', '体质', '智力', '感知', '魅力'];
+  const abilityName = key => abilityNames[abilities.indexOf(key.slice(8))];
   const battleStatus = value => ({ACTIVE: '战斗中', EXPLORATION: '探索', ENDED: '已关闭'})[value] || '场景';
   const locationName = value => ({CARRIED: '携带', WORN: '穿戴', MAIN_HAND: '主手', OFF_HAND: '副手', BOTH_HANDS: '双手', GROUND: '地面'})[value] || value;
   const ruleCategory = value => ({'character.class': '职业', 'character.class_progression': '职业成长', 'character.race': '种族', 'character.subrace': '亚种', 'character.subrace_hit_points': '亚种生命值', 'character.background': '背景',
@@ -236,7 +237,7 @@
       if (select.name === 'raceKey') entries.sort((a, b) => Number(b.key === 'race.human') - Number(a.key === 'race.human'));
       options(select, entries.map(ruleValue), value => ruleFromValue(value).name || ruleFromValue(value).key);
     }
-    for (const select of document.querySelectorAll('.ability-choice')) options(select, abilities.map(key => 'ability.' + key), key => abilityNames[abilities.indexOf(key.substring(8))]);
+    for (const select of document.querySelectorAll('.ability-choice')) options(select, abilities.map(key => 'ability.' + key), abilityName);
     for (const select of document.querySelectorAll('.domain-character')) {
       const form = select.form?.id;
       const people = form === 'domain-item' ? allPeople() : roster();
@@ -267,9 +268,22 @@
     options(proficiency, entries.map(ruleValue), value => ruleFromValue(value).name);
     proficiency.disabled = !skill && !tool;
     proficiency.required = skill || tool;
-    if (skill) form.elements.ability.value = ruleFromValue(proficiency.value)?.abilityKey || '';
-    form.elements.ability.disabled = skill;
-    const history = skill && proficiency.value === 'srd51_runtime/character.proficiency/proficiency.skill.history'
+    const ability = form.elements.ability;
+    const selectedSkill = skill ? ruleFromValue(proficiency.value) : null;
+    const mayChoose = selectedSkill && ruleFromValue(form.elements.rule.value)?.allowAlternateSkillAbility === true;
+    const selection = selectedSkill ? `${workspaceScope}/${proficiency.value}` : '';
+    if (skill && (!mayChoose || selection !== ability.dataset.skillSelection)) ability.value = selectedSkill?.abilityKey || '';
+    ability.dataset.skillSelection = selection;
+    ability.disabled = skill && !mayChoose;
+    const hint = byId('check-skill-default');
+    hint.hidden = !mayChoose;
+    hint.textContent = mayChoose ? `该技能的默认属性为${abilityName(selectedSkill.abilityKey)}。` : '';
+    refreshCheckSubject();
+  }
+  function refreshCheckSubject() {
+    const form = byId('domain-check');
+    const history = form.elements.kind.value === 'SKILL'
+      && form.elements.proficiency.value === 'srd51_runtime/character.proficiency/proficiency.skill.history'
       && form.elements.ability.value === 'ability.intelligence';
     const subject = form.elements.subject;
     subject.disabled = !history;
@@ -554,6 +568,10 @@
     renderCharacterBrowser();
     byId('character-browser-scroll').scrollTop = 0;
   }
+  function checkName(input) {
+    const ability = abilityName(input.abilityKey);
+    return input.proficiency ? `${ability}（${ruleName(input.proficiency)}）` : ability;
+  }
   function renderRuleCharacter(character) {
     const card = document.createElement('article'); card.className = 'card character-card'; const current = character.state;
     text(card, 'strong', `${character.name} · ${character.kind === 'NPC' ? 'NPC' : '角色'}${character.active ? '' : ' · 离队'}`);
@@ -579,11 +597,12 @@
     const recentCheck = character.history?.events?.findLast(event => event.checkResult);
     if (recentCheck) {
       const result = recentCheck.checkResult;
-      const subject = recentCheck.command.checkInput.subject === 'STONEWORK_ORIGIN' ? '（辨认石工作品来历）' : '';
+      const input = recentCheck.command.checkInput;
+      const subject = input.subject === 'STONEWORK_ORIGIN' ? '（辨认石工作品来历）' : '';
       const proficiency = result.stonecunningRule
         ? `石工知识 ${result.baseProficiencyBonus} × ${result.proficiencyBonus / result.baseProficiencyBonus}`
         : `熟练 ${result.proficiencyBonus}`;
-      text(card, 'p', `最近检定${subject}：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + ${proficiency} = ${result.total}，${result.success ? '成功' : '失败'}`);
+      text(card, 'p', `最近检定 · ${checkName(input)}${subject}：d20 ${result.selectedD20} + 属性 ${result.abilityModifier} + ${proficiency} = ${result.total}，${result.success ? '成功' : '失败'}`);
     }
     const recentHealth = character.history?.events?.findLast(event => event.healthResult);
     if (recentHealth) { const result = recentHealth.healthResult; text(card, 'p', `最近健康操作：${recentHealth.before?.hitPoints ?? '—'} → ${recentHealth.after.hitPoints}；掷骰 ${[...(result.dice || []), result.deathD20, result.recoveryD4].filter(value => value !== null && value !== undefined).join('、') || '无'}`); }
@@ -621,7 +640,7 @@
         for (const effect of chosen || []) if (typeof effect.text === 'string' && effect.text) details.push(effect.text);
         text(history, 'li', details.join('；'));
       } else if (root.kind === 'check-effects') {
-        const audit = JSON.parse(root.after), details = [`${root.sequence}. 检定及后果 · ${personName(root.subjectId)} · ${audit.success ? '成功' : '失败'}`];
+        const audit = JSON.parse(root.after), details = [`${root.sequence}. 检定及后果 · ${personName(root.subjectId)} · ${checkName(audit.input.command.checkInput)} · ${audit.success ? '成功' : '失败'}`];
         if (audit.healthOperationId) {
           for (const character of roster()) {
             const event = character.history.events.find(event => event.operationId === audit.healthOperationId);
@@ -637,7 +656,8 @@
       } else {
         const event = roster().find(character => character.id === root.subjectId)?.history?.events?.find(event => event.operationId === root.operationId);
         const recovery = arcaneRecoveryResult(event);
-        text(history, 'li', `${root.sequence}. ${operationName(root.kind)}${allPeople().some(character => character.id === root.subjectId) ? ` · ${personName(root.subjectId)}` : ''}${root.kind === 'note' ? ` · ${root.after}` : ''}${recovery ? ` · ${recovery}` : ''}`);
+        const check = event?.command?.checkInput;
+        text(history, 'li', `${root.sequence}. ${operationName(root.kind)}${allPeople().some(character => character.id === root.subjectId) ? ` · ${personName(root.subjectId)}` : ''}${root.kind === 'note' ? ` · ${root.after}` : ''}${check ? ` · ${checkName(check)}` : ''}${recovery ? ` · ${recovery}` : ''}`);
       }
     }
     const world = byId('domain-world-summary'); world.replaceChildren();
@@ -1446,7 +1466,7 @@
     if (!character) throw new Error('请先创建或选择检定角色。');
     const input = {characterId: character.id, characterVersion: String(character.version), command: {...baseCharacter('CHECK_RESOLVED'),
       checkInput: {type: 'character.CheckInput', rule: typedRule(values.rule), kind: values.kind,
-        abilityKey: values.kind === 'SKILL' ? ruleFromValue(values.proficiency).abilityKey : values.ability,
+        abilityKey: form.elements.ability.value,
         proficiency: values.kind === 'ABILITY' ? null : typedRule(values.proficiency), difficultyClass: values.difficultyClass,
         advantage: values.advantage === 'on', disadvantage: values.disadvantage === 'on', adjudication: values.adjudication,
         subject: values.subject || 'GENERAL'}}};
@@ -1605,6 +1625,8 @@
   byId('domain-rest').elements.kind.addEventListener('change', refreshArcaneRecovery);
   byId('domain-check').elements.kind.addEventListener('change', refreshCheckAbility);
   byId('domain-check').elements.proficiency.addEventListener('change', refreshCheckAbility);
+  byId('domain-check').elements.rule.addEventListener('change', refreshCheckAbility);
+  byId('domain-check').elements.ability.addEventListener('change', refreshCheckSubject);
   for (const select of document.querySelectorAll('.check-branch-character')) select.addEventListener('change', refreshCheckBranches);
   for (const select of document.querySelectorAll('.world-item-choice')) select.addEventListener('change', event => {
     const item = domain().items.find(item => item.id === event.currentTarget.value), form = event.currentTarget.form;

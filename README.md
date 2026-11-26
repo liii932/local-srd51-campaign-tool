@@ -29,9 +29,8 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 
 标准规则使用 WAR 随附身份清单中的四个准确原包。若某个原包损坏，仅依赖它的内置组合不可用。
 自定义组合可选用本机规则库里已导入、接受的内置或外部原包。组合最多八包，
-经过严格生产 reader、依赖/覆盖组合及当前机制与创建模板的完整支持校验。标准组合见[包指南](./rule-packages/srd51-runtime/package-guide.md)，第二组合见
-[家规说明](./rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)：运动改用感知、
-固定直接伤害为 3、工匠初始语言改为侏儒语。创建、候选、结算、来源展示和恢复使用同一战役
+经过严格生产 reader、依赖/覆盖组合及当前机制与创建模板的完整支持校验。随附家规让运动默认使用感知，DM 也可为长途游泳选用体质（运动）。该组合的固定直接伤害为 3，工匠初始语言为侏儒语。[标准包指南](./rule-packages/srd51-runtime/package-guide.md) · [家规说明](./rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)
+创建、候选、结算、来源展示和恢复使用同一战役
 冻结上下文；不能在活动战役中切换。它们不是完整 SRD `RELEASED` 发布，
 不借用旧完整规则族的 `DRAFT` 身份。Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、
 Wizard 到 5 级；未接入的职业特性保留目录元数据，不自动授予。

@@ -491,7 +491,8 @@
     "display_name": "Ability checks",
     "description": "Server-owned ordinary ability, skill and equipped-tool checks.",
     "source_page": 77,
-    "algorithm": "SRD_2014_ABILITY_CHECK_V1"
+    "algorithm": "SRD_2014_ABILITY_CHECK_V1",
+    "allow_alternate_skill_ability": false
   },
   {
     "identity": {

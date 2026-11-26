@@ -19,13 +19,13 @@ application that supports the saved mechanisms.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `9` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
-| `srd51_characters` version `9` | extension | `srd51_runtime=9` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `9` | extension | `srd51_runtime=9`, `srd51_characters=9` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `17` | extension | `srd51_runtime=9` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `10` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
+| `srd51_characters` version `10` | extension | `srd51_runtime=10` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `10` | extension | `srd51_runtime=10`, `srd51_characters=10` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `19` | extension | `srd51_runtime=10` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `18` as its
+first three members and selects `dm_runtime_house_rules` version `20` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -67,6 +67,13 @@ The bundled dwarf source grants Common, Dwarvish and one artisan's tool
 proficiency. Acolyte grants two standard languages. The custom artisan source is
 an explicit project customization with Dwarvish and smith's tools. Background
 skill and narrative-feature effects remain outside this scope.
+
+The standard check uses the skill's declared ability. To enable the optional
+rule on SRD p. 78, a package can set the check's Boolean field
+`allow_alternate_skill_ability` to true. The DM may then choose, for example,
+Constitution (Athletics) for a long swim. The chosen ability supplies the
+modifier and the selected skill determines ordinary proficiency. The bundled
+check variant enables this option and defaults Athletics to Wisdom.
 
 Dwarf and Hill Dwarf can apply Stonecunning when the DM identifies a supported
 Intelligence (History) check about the origin of stonework. The standard
