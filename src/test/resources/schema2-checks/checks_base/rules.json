@@ -17,6 +17,7 @@
       "numerator": 1,
       "denominator": 2
     },
+    "contest_minimum_winning_margin": 1,
     "author_note": "Original rule"
   }
 ]

@@ -14,6 +14,7 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 - 创建标准数组的人类或矮人 fighter、Life-domain cleric 或 Wizard PC/NPC，保存初始卡、当前卡和完整角色历史。标准包矮人穿重甲时保有 25 尺步速，家规可分别调整[基础步速、重甲策略、减速量和力量门槛](docs/rules/schema-2-combat-authoring.md#步行来源)；
 - 矮人可选山丘矮人亚种，标准[强韧](docs/rules/schema-2-character-statistics.md#山丘矮人强韧)在一级和以后每个角色总等级各增加 1 点最大 HP。
 - DM 可用[被动检定](docs/rules/schema-2-character-foundations.md#被动检定)判断反复搜寻等任务是否成功。标准包采用 10 加适用修正，优势加 5、劣势减 5，可预设成败后果并在保存重开后继续。
+- 两名角色争抢同一件物品时，DM 可发起[对抗检定](docs/rules/schema-2-character-foundations.md#对抗检定)。双方分别掷骰，标准包领先 1 分即胜，检定变体需领先 2 分。
 - 角色结伴过沼泽等共同任务可用[团队属性检定](docs/rules/schema-2-character-foundations.md#团队属性检定)。每人各掷一次检定，标准包至少一半成功即全队成功，检定变体要求三分之二。
 - DM 可在智力（历史）检定中选择“辨认石工作品来历”。矮人的[石工知识](docs/rules/schema-2-character-foundations.md#石工知识)在标准包下提供双倍熟练加值。
 - 单职业战士 1 级正常取得[回气](docs/rules/schema-2-second-wind.md)，在本人战斗回合用附赠动作恢复 `1d10＋战士等级` HP，次数随标准短休或长休恢复；

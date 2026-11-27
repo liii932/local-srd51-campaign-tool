@@ -102,7 +102,8 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 优势/劣势与自然骰（[76—77](../references/srd-5.1/pages/page-076.md)、[94](../references/srd-5.1/pages/page-094.md)） | 普通检定、有限攻击/先攻/豁免按实际范围自动合并；原骰保存 | 局部闭环；自然 1/20 只适用于对应类型，新增贡献须证明来源与时机 | [基础](#foundation)、[战斗](#combat)、[怪物](#monsters) |
 | 普通豁免（[83](../references/srd-5.1/pages/page-083.md)） | 当前真实 save 入口限吐息 DEX、伤害后专注 CON、死亡豁免及既有特定分支 | 未有通用六属性 save 命令；缺各效果 DC/属性/自动失败/完整贡献与对应事件，不能拿能力检定替代 | [怪物](#monsters)、[施法](#spells) |
 | 团队属性检定（[79](../references/srd-5.1/pages/page-079.md)） | DM 在焦点世界节点选择规则角色，共享属性或技能与 DC，按各人条件分别掷骰。标准包至少一半成功即全队成功，家规可覆盖该比例 | 一个根记录全部角色原骰对应关系、所需与实际成功人数及选中消息，完整文件恢复后可继续检定 | [团队检定](schema-2-character-foundations.md#团队属性检定)、[冻结字段](schema-2-foundation-authoring.md#团队成功比例) |
-| 对抗、共同工作（[77](../references/srd-5.1/pages/page-077.md)、[79](../references/srd-5.1/pages/page-079.md)） | 原文；尚待接通 | 双方各掷并比较总值，平手保持现状；工作协助另需核验协助者能否独立尝试以及合作是否有效 | [基础](#foundation) |
+| 对抗检定（[77](../references/srd-5.1/pages/page-077.md)） | DM 在焦点世界节点选择两名规则角色，双方各用适合其行动的属性或技能，比较总值。标准领先 1 分即胜，检定变体需领先 2 分，差距不足保持现状 | 根记录保存双方原骰、修正、总值和共同裁定。完整文件重开可回看并继续对抗。战斗动作中的擒抱、推撞另需目标、额度与状态规则 | [对抗检定](schema-2-character-foundations.md#对抗检定)、[字段](schema-2-foundation-authoring.md#对抗最小获胜分差) |
+| 共同工作（[79](../references/srd-5.1/pages/page-079.md)） | 原文；尚待接通 | 须核验协助者能否独立尝试、合作是否有效并将优势用于主检定 | [基础](#foundation) |
 | 被动检定、感知/隐藏关系（[78—79](../references/srd-5.1/pages/page-078.md)、[94](../references/srd-5.1/pages/page-094.md)） | 规则角色可对 DM 指定的 DC 执行[被动检定](schema-2-character-foundations.md#被动检定)。标准 10 + 适用修正，优势 +5、劣势 −5。基础分与幅度可由规则包覆盖；直接检定、分支后果和完整文件重开共用冻结规则 | 怪物被动察觉仍是元数据。自动隐蔽与发现、观察者和目标的感官与场景条件待接入 | [基础](#foundation)、[怪物](#monsters) |
 | 专精、半熟练、最低值、重掷/骰后替换（[12—14](../references/srd-5.1/pages/page-012.md)、[39—40](../references/srd-5.1/pages/page-039.md)） | 旧特性元数据；未接通 | 缺贡献去重/取整、原骰→重掷/替换关系、触发窗口、资源一次消费；Lucky/Reliable Talent/Indomitable 不因有 d20 工具而完成 | [成长](#growth)、[动作流](#combat) |
 | 奖励/惩罚骰、伤害骰与百分骰（[76](../references/srd-5.1/pages/page-076.md)、[96](../references/srd-5.1/pages/page-096.md)及具体条目） | 真实 Bless d4、健康声明 d4—d12、近战伤害与有限共享 d6；通用组合/百分骰机制未接入 | 已接分支局部闭环；缺每种规则批准的骰式、修正时点与独立审计，不能接受客户端任意骰式或结果 | [基础](#foundation)、[施法](#spells)、[怪物](#monsters) |
@@ -250,7 +251,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 其余法术位特殊恢复 | 角色服务、休息规则、法术书规则及角色仓储 | 以已接入的有限 Arcane Recovery 为基础，扩展其余准确恢复来源；Natural Recovery 等仍须自己的资格、休息/日界、位阶选择和原事实恢复，不能借同类算法自动开放。 |
 | 范围法术的其余完整语义 | 战斗服务、施法规则、共享伤害规则、场景仓储 | 以有限 Burning Hands 为基础，分别接通点燃对象、Sculpt 选择、抗魔区域、Ready 持有及探索施放的真实 owner；每个新法术仍须自己的授权、成本、目标/伤害参数、反应与恢复闭环。 |
 | 普通生物攻击与怪物 OA | 战斗规则/服务、怪物规则、动作流及装备/健康事实 | 建怪物攻击 profile、Multiattack 边界和真实 reach/reaction，PC MOVE/Ready move 不再因缺失 OA producer 被迫拒绝；逐动作保留伤害与后继。 |
-| 通用 save/对抗与 Grapple/Shove | 检定规则、战斗规则/服务、角色/场景仓储 | 完整 save/双方检定事实、平手与目标候选、Attack 替代额度、抓取关系/体型/手位/移动/失能解除；专长只在其真实关系具备后采用。 |
+| 通用 save/对抗与 Grapple/Shove | 检定规则、战斗规则/服务、角色/场景仓储 | 实现通用豁免。战斗中的对抗还须接入目标选择、Attack 替代额度、体型与手位、抓取移动及失能解除；专长只在其真实关系具备后采用。 |
 | 条件 producer 与贡献 | 持续效果、健康、战斗/检定、施法 owner | 先按逐状态表闭合一个真实 producer、免疫、叠加/期限及所有受影响消费者，再扩展内容；不能用通用条件名称集合代替语义。 |
 | 角色防御与伤害后反应 | 成长/来源、效果 owner、共享伤害与动作流 | 明确来源与 gate、同一 APPLY/CON cut、失败后有界选择、资源一次消费；Protection from Energy、Cutting Words、Evasion 等分别接入。 |
 | 普通经济/库存后再接魔法物品 | 当前装备实例 owner；经济/同调/使用 owner 尚须建立 | 数量/重量/金钱/容器事务与战斗交互先闭合；同调/充能/物品施法/诅咒分别接休息、授权、效果及恢复。 |

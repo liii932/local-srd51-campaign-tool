@@ -47,6 +47,9 @@
     GROUP_CHECK_WORLD_REQUIRED: '请将团队属性检定所在的世界节点设为执行焦点。',
     GROUP_CHECK_DUPLICATE_PARTICIPANT: '团队属性检定中每名角色只能选择一次。',
     GROUP_CHECK_RULE_UNSUPPORTED: '请选择当前战役的检定规则。',
+    CONTEST_CHECK_WORLD_REQUIRED: '请将对抗所在的世界节点设为执行焦点。',
+    CONTEST_CHECK_DUPLICATE_PARTICIPANT: '发起方与应对方须为不同角色。',
+    CONTEST_CHECK_RULE_UNSUPPORTED: '请选择当前战役的检定规则。',
     SCENE_FOCUS_REQUIRED: '请先将局部场景设为执行焦点。',
     RULE_SCENE_OWNER_REQUIRED: '请使用当前规则场景允许的动作。',
     ACTION_FLOW_BUSY: '请先继续结算当前待处理行动。',
@@ -142,6 +145,7 @@
     if (scope !== workspaceScope) {
       manualCheckDraft = resetManualCheck(workspaceScope === undefined ? scope : null);
       byId('domain-group-check').reset();
+      byId('domain-contest-check').reset();
       workspaceScope = scope;
       characterBrowserKey = null;
       characterBrowserIndex = 0;
@@ -254,6 +258,7 @@
     refreshCharacterChoices();
     refreshCheckAbility();
     refreshCheckAbility(byId('domain-group-check'));
+    refreshContestCheckAbilities();
   }
   function refreshCreationSubraces() {
     const {raceKey, subraceKey} = byId('domain-create').elements;
@@ -263,28 +268,32 @@
     subraceKey.disabled = choices.length === 0;
     subraceKey.parentElement.hidden = subraceKey.disabled;
   }
-  function refreshCheckAbility(form = byId('domain-check')) {
-    const group = form.id === 'domain-group-check';
-    const kind = form.elements.kind.value;
+  function refreshCheckAbility(form = byId('domain-check'), fields = form.elements) {
+    const individual = form.id === 'domain-check';
+    const kind = fields.kind.value;
     const skill = kind === 'SKILL', tool = kind === 'TOOL';
     const entries = catalog().filter(rule => rule.enabled && rule.executable
       && (skill && rule.type === 'character.proficiency' && rule.category === 'SKILL' || tool && rule.type === 'character.tool'));
-    const proficiency = form.elements.proficiency;
+    const proficiency = fields.proficiency;
     options(proficiency, entries.map(ruleValue), value => ruleFromValue(value).name);
     proficiency.disabled = !skill && !tool;
     proficiency.required = skill || tool;
-    if (group) proficiency.closest('label').hidden = !skill;
-    const ability = form.elements.ability;
+    if (!individual) proficiency.closest('label').hidden = !skill;
+    const ability = fields.ability;
     const selectedSkill = skill ? ruleFromValue(proficiency.value) : null;
     const mayChoose = selectedSkill && ruleFromValue(form.elements.rule.value)?.allowAlternateSkillAbility === true;
     const selection = selectedSkill ? `${workspaceScope}/${proficiency.value}` : '';
     if (skill && (!mayChoose || selection !== ability.dataset.skillSelection)) ability.value = selectedSkill?.abilityKey || '';
     ability.dataset.skillSelection = selection;
     ability.disabled = skill && !mayChoose;
-    const hint = byId(group ? 'group-check-skill-default' : 'check-skill-default');
+    const hint = ability.closest('label').querySelector('small');
     hint.hidden = !mayChoose;
     hint.textContent = mayChoose ? `该技能的默认属性为${abilityName(selectedSkill.abilityKey)}。` : '';
-    if (!group) refreshCheckSubject();
+    if (individual) refreshCheckSubject();
+  }
+  function refreshContestCheckAbilities() {
+    const form = byId('domain-contest-check');
+    for (const side of form.querySelectorAll('[data-contest-side]')) refreshCheckAbility(form, side.elements);
   }
   function refreshCheckSubject() {
     const form = byId('domain-check');
@@ -589,11 +598,15 @@
     const adjustment = passive ? `，优劣势调整 ${result.passiveAdjustment}` : '';
     return `${checkName(input)}${subject} · ${base}，属性修正 ${result.abilityModifier}，${proficiency}${adjustment}，共 ${result.total}（DC ${input.difficultyClass}，${result.success ? '成功' : '失败'}）`;
   }
+  function eligibleWorldCheckCharacters() {
+    if (focusToken().space?.kind !== 'WORLD') return [];
+    return roster().filter(character => character.active && inFocus(character.id)
+      && Number(character.hitPoints) > 0 && !character.state.rest?.active);
+  }
   function renderGroupCheckForm(state) {
     const form = byId('domain-group-check'), parent = byId('group-check-participants');
     const focus = state.space.focus.space, world = focus?.kind === 'WORLD';
-    const eligible = world ? roster().filter(character => character.active && inFocus(character.id)
-      && Number(character.hitPoints) > 0 && !character.state.rest?.active) : [];
+    const eligible = eligibleWorldCheckCharacters();
     const scope = `${workspaceScope}/${state.space.focus.generation}`;
     const previous = parent.dataset.scope === scope ? new Map(Array.from(parent.querySelectorAll('[data-character]'), row => [row.dataset.character, {
       joined: row.querySelector('input').checked, mode: row.querySelector('select').value
@@ -647,6 +660,43 @@
       result.total, result.success ? '成功' : '失败'
     ]));
   }
+  function updateContestCheckAvailability() {
+    const form = byId('domain-contest-check'), focus = focusToken().space;
+    const [initiator, responder] = Array.from(form.querySelectorAll('[data-contest-side]'), side => side.elements.characterId);
+    const repeated = initiator.value && initiator.value === responder.value;
+    form.querySelector('button').disabled = !initiator.value || !responder.value || Boolean(repeated);
+    byId('contest-check-location').textContent = focus?.kind !== 'WORLD' ? '请先将执行焦点设为世界节点。'
+      : initiator.options.length < 3 ? '此节点至少需要两名可行动的规则角色。'
+      : repeated ? '发起方与应对方须为不同角色。' : `世界节点 · ${spaceName(focus)}`;
+  }
+  function renderContestCheckForm(state) {
+    const form = byId('domain-contest-check'), focus = state.space.focus;
+    const scope = `${workspaceScope}/${focus.generation}`;
+    const eligible = eligibleWorldCheckCharacters().map(character => character.id);
+    for (const side of form.querySelectorAll('[data-contest-side]')) {
+      const select = side.elements.characterId;
+      if (form.dataset.scope !== scope) select.value = '';
+      options(select, eligible, personName);
+      select.disabled = eligible.length < 2;
+    }
+    form.dataset.scope = scope;
+    updateContestCheckAvailability();
+    const result = byId('contest-check-result');
+    result.replaceChildren();
+    const latest = focus.space?.kind === 'WORLD' && state.roots.findLast(root => root.kind === 'contest-check' && root.subjectId === focus.space.id);
+    if (latest) renderContestCheckResult(result, latest);
+  }
+  function renderContestCheckResult(parent, root, showSequence = false) {
+    const audit = JSON.parse(root.after), request = JSON.parse(root.space.request);
+    const outcome = {INITIATOR_WINS: '发起方获胜', RESPONDER_WINS: '应对方获胜', UNCHANGED: '局势不变'}[audit.outcome];
+    text(parent, 'p', `${showSequence ? root.sequence + '. ' : ''}对抗检定 · ${outcome}`);
+    text(parent, 'p', `获胜须至少领先 ${audit.minimumWinningMargin} 点。裁定说明：${request.adjudication}`);
+    table(parent, ['一方', '角色', '检定', 'd20 原骰', '选用', '属性修正', '熟练', '总值'],
+      [['发起方', audit.initiator, request.initiator], ['应对方', audit.responder, request.responder]].map(([side, result, input]) => [
+        side, personName(result.characterId), checkName(input), [result.firstD20, result.secondD20].filter(die => die != null).join(' / '),
+        result.selectedD20, result.abilityModifier, result.proficiencyBonus, result.total
+      ]));
+  }
   function renderRuleCharacter(character) {
     const card = document.createElement('article'); card.className = 'card character-card'; const current = character.state;
     text(card, 'strong', `${character.name} · ${character.kind === 'NPC' ? 'NPC' : '角色'}${character.active ? '' : ' · 离队'}`);
@@ -688,6 +738,7 @@
     renderSpaces(state);
     renderCharacterBrowser();
     renderGroupCheckForm(state);
+    renderContestCheckForm(state);
     const history = byId('storage-history'); history.replaceChildren();
     for (const root of state.roots || []) {
       if (root.kind === 'manual-check') {
@@ -709,6 +760,8 @@
         text(history, 'li', details.join('；'));
       } else if (root.kind === 'group-check') {
         renderGroupCheckResult(text(history, 'li', ''), root, true);
+      } else if (root.kind === 'contest-check') {
+        renderContestCheckResult(text(history, 'li', ''), root, true);
       } else if (root.kind === 'check-effects') {
         const audit = JSON.parse(root.after);
         const executor = roster().find(character => character.id === root.subjectId);
@@ -1559,6 +1612,21 @@
       proficiency: values.kind === 'SKILL' ? typedRule(values.proficiency) : null, difficultyClass: values.difficultyClass,
       adjudication: values.adjudication, participants, successMessage: values.successMessage, failureMessage: values.failureMessage};
   });
+  domainForm('domain-contest-check', 'contest-check', (form, values) => {
+    const adjudication = values.adjudication.normalize('NFC');
+    if (!adjudication.trim() || [...adjudication].length > 500) throw new Error('裁定说明须填写 1–500 个字符。');
+    const [initiator, responder] = Array.from(form.querySelectorAll('[data-contest-side]'), side => {
+      const {characterId, kind, ability, proficiency, rollMode} = side.elements;
+      const character = roster().find(character => character.id === characterId.value);
+      if (!character) throw new Error('请选择对抗双方的角色。');
+      const mode = rollMode.value;
+      return {characterId: character.id, characterVersion: String(character.version), kind: kind.value,
+        abilityKey: ability.value, proficiency: kind.value === 'SKILL' ? typedRule(proficiency.value) : null,
+        advantage: mode === 'ADVANTAGE' || mode === 'BOTH', disadvantage: mode === 'DISADVANTAGE' || mode === 'BOTH'};
+    });
+    if (initiator.characterId === responder.characterId) throw new Error(messages.CONTEST_CHECK_DUPLICATE_PARTICIPANT);
+    return {rule: typedRule(values.rule), adjudication, initiator, responder};
+  });
   characterForm('domain-health', (_, values) => ({...baseCharacter(values.kind), healthInput: {type: 'character.HealthInput', rule: typedRule(values.rule),
     effect: values.kind === 'HEALTH_EFFECT_RESOLVED' ? typedRule(values.effect) : null, temporaryChoice: values.kind === 'HEALTH_EFFECT_RESOLVED' ? values.temporaryChoice || null : null, adjudication: values.adjudication}}));
   characterForm('domain-spellbook', (form, values, character) => ({...baseCharacter(values.kind), spellbookInput: {type: 'character.SpellbookInput', castingRule: typedRule(values.castingRule),
@@ -1716,6 +1784,13 @@
     const form = byId(id);
     for (const name of ['kind', 'proficiency', 'rule'])
       form.elements[name].addEventListener('change', () => refreshCheckAbility(form));
+  }
+  const contestCheckForm = byId('domain-contest-check');
+  contestCheckForm.elements.rule.addEventListener('change', refreshContestCheckAbilities);
+  for (const side of contestCheckForm.querySelectorAll('[data-contest-side]')) {
+    side.elements.characterId.addEventListener('change', updateContestCheckAvailability);
+    for (const name of ['kind', 'proficiency'])
+      side.elements[name].addEventListener('change', () => refreshCheckAbility(contestCheckForm, side.elements));
   }
   byId('domain-check').elements.ability.addEventListener('change', refreshCheckSubject);
   for (const select of document.querySelectorAll('.check-branch-character')) select.addEventListener('change', refreshCheckBranches);

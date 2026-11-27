@@ -8,6 +8,7 @@ import java.util.*;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static com.dndtool.service.Schema2CharacterRuntime.PASSIVE_CHECK;
 import static com.dndtool.service.Schema2CharacterRuntime.checkKind;
+import static com.dndtool.service.Schema2CharacterRuntime.validCheckSelection;
 
 /** SRD ability, skill and tool checks in the closed INTERNAL run. */
 public final class Schema2CharacterCheckRules {
@@ -15,30 +16,53 @@ public final class Schema2CharacterCheckRules {
     private final Schema2CharacterProgressionRules growth = new Schema2CharacterProgressionRules();
     private final Schema2CharacterRestRules rests = new Schema2CharacterRestRules();
     private final Schema2CharacterEquipmentRules equipment = new Schema2CharacterEquipmentRules();
+    private final Schema2CharacterHealthRules health = new Schema2CharacterHealthRules();
 
-    /** Only full preflight can create this capability; the caller checks history capacity before RNG. */
-    public static final class PreparedCheck {
-        private final CheckInput input;
+    public record RollInput(RuleIdentity rule, String kind, String abilityKey, RuleIdentity proficiency,
+                            boolean advantage, boolean disadvantage) {
+        public RollInput {
+            if (!validCheckSelection(rule, kind, abilityKey, proficiency)) throw invalid("S2_CHARACTER_CHECK_INPUT");
+        }
+    }
+
+    public static final class PreparedRoll {
+        private final CheckDefinition definition;
         private final int abilityModifier, proficiencyBonus;
         private final RuleIdentity stonecunningRule;
         private final boolean effectiveAdvantage, effectiveDisadvantage;
-        private final Integer passiveBaseScore, passiveAdjustment;
-        private final State capacityState;
-        private PreparedCheck(CheckInput input, int abilityModifier, int proficiencyBonus, RuleIdentity stonecunningRule,
-                State capacityState, boolean effectiveAdvantage, boolean effectiveDisadvantage,
-                Integer passiveBaseScore, Integer passiveAdjustment) {
-            this.input = input;
+        private PreparedRoll(CheckDefinition definition, int abilityModifier, int proficiencyBonus, RuleIdentity stonecunningRule,
+                             boolean effectiveAdvantage, boolean effectiveDisadvantage) {
+            this.definition = definition;
             this.abilityModifier = abilityModifier;
             this.proficiencyBonus = proficiencyBonus;
             this.stonecunningRule = stonecunningRule;
-            this.capacityState = capacityState;
             this.effectiveAdvantage = effectiveAdvantage;
             this.effectiveDisadvantage = effectiveDisadvantage;
+        }
+        public boolean secondDieRequired() { return effectiveAdvantage != effectiveDisadvantage; }
+    }
+
+    public record RolledScore(int firstD20, Integer secondD20, int selectedD20, int abilityModifier,
+                              int proficiencyBonus, int total, boolean effectiveAdvantage, boolean effectiveDisadvantage) { }
+
+    public enum ContestOutcome { INITIATOR_WINS, RESPONDER_WINS, UNCHANGED }
+
+    /** The caller checks history capacity before obtaining any dice for an ordinary check. */
+    public static final class PreparedCheck {
+        private final CheckInput input;
+        private final PreparedRoll roll;
+        private final Integer passiveBaseScore, passiveAdjustment;
+        private final State capacityState;
+        private PreparedCheck(CheckInput input, PreparedRoll roll, State capacityState,
+                Integer passiveBaseScore, Integer passiveAdjustment) {
+            this.input = input;
+            this.roll = roll;
+            this.capacityState = capacityState;
             this.passiveBaseScore = passiveBaseScore;
             this.passiveAdjustment = passiveAdjustment;
         }
         public boolean isPassive() { return passiveBaseScore != null; }
-        public boolean secondDieRequired() { return !isPassive() && effectiveAdvantage != effectiveDisadvantage; }
+        public boolean secondDieRequired() { return !isPassive() && roll.secondDieRequired(); }
         public State capacityState() { return capacityState; }
     }
 
@@ -47,10 +71,28 @@ public final class Schema2CharacterCheckRules {
     }
 
     public PreparedCheck prepare(ProductionSchema2Projection material, InitialPlan initial, State before, Command command) {
-        growth.validateState(material, before); rests.validateState(material, before);
         if (!checkKind(command.kind()) || command.checkInput() == null
                 || before.version() >= Schema2CharacterRuntime.MAX_EVENTS - 1)
             throw invalid("S2_CHECK_COMMAND");
+        CheckInput input = command.checkInput();
+        PreparedRoll roll = prepareRoll(material, initial, before, new RollInput(input.rule(), input.kind(),
+                input.abilityKey(), input.proficiency(), input.advantage(), input.disadvantage()), input.subject());
+        boolean passive = PASSIVE_CHECK.equals(command.kind());
+        int adjustment = (roll.effectiveAdvantage ? roll.definition.passiveAdvantageAdjustment() : 0)
+                - (roll.effectiveDisadvantage ? roll.definition.passiveAdvantageAdjustment() : 0);
+        return new PreparedCheck(input, roll, withNextVersion(before), passive ? roll.definition.passiveBaseScore() : null,
+                passive ? adjustment : null);
+    }
+
+    public PreparedRoll prepareContestRoll(ProductionSchema2Projection material, State before, RollInput input) {
+        if (input == null || !Set.of("ABILITY", "SKILL").contains(input.kind())) throw invalid("S2_CONTEST_CHECK_INPUT");
+        health.validateState(before);
+        return prepareRoll(material, null, before, input, CheckInput.GENERAL);
+    }
+
+    private PreparedRoll prepareRoll(ProductionSchema2Projection material, InitialPlan initial, State before,
+                                     RollInput input, String subject) {
+        growth.validateState(material, before); rests.validateState(material, before);
         if (before.rest().active() != null) throw invalid("S2_CHECK_REST_ACTIVE");
         if (before.hitPoints() == 0 || before.health().dead()) throw invalid("S2_CHECK_HEALTH");
         for (ClassLevel characterClass : before.classes()) {
@@ -65,7 +107,6 @@ public final class Schema2CharacterCheckRules {
         Schema2FeatureSupport.requireSupportedFeatures(material, before, "S2_CHECK_EFFECT_UNSUPPORTED");
         var definitions = material.projection().rules().stream().filter(FinalCheck.class::isInstance)
                 .map(FinalCheck.class::cast).filter(FinalCheck::enabled).toList();
-        CheckInput input = command.checkInput();
         if (definitions.size() != 1) throw invalid("S2_CHECK_RULE_UNSUPPORTED");
         var definition = definitions.getFirst().definition();
         if (!ALGORITHM.equals(definition.algorithm()) || !definition.identity().equals(input.rule()))
@@ -85,20 +126,16 @@ public final class Schema2CharacterCheckRules {
             if (!equipment.hasPreparedTool(material, before, input.proficiency())) throw invalid("S2_CHECK_TOOL_UNAVAILABLE");
         }
         int modifier = Math.floorDiv(before.abilities().get(input.abilityKey()) - 10, 2);
-        var stonecunning = input.subject().equals(CheckInput.STONEWORK_ORIGIN) ? stonecunning(material, initial, before) : null;
-        int proficiency = stonecunning == null ? Schema2CharacterRuntime.ordinaryCheckProficiency(before, input)
+        var stonecunning = subject.equals(CheckInput.STONEWORK_ORIGIN) ? stonecunning(material, initial, before) : null;
+        int proficiency = stonecunning == null ? Schema2CharacterRuntime.ordinaryCheckProficiency(before, input.proficiency())
                 : before.proficiencyBonus() * stonecunning.proficiencyMultiplier();
         var derived = equipment.derive(material, before);
         boolean dexterity = input.abilityKey().equals("ability.dexterity");
         boolean physical = dexterity || input.abilityKey().equals("ability.strength");
         boolean disadvantage = input.disadvantage() || physical && derived.physicalCheckDisadvantage()
                 || dexterity && input.kind().equals("SKILL") && derived.stealthSkills().contains(input.proficiency());
-        boolean passive = PASSIVE_CHECK.equals(command.kind());
-        int adjustment = (input.advantage() ? definition.passiveAdvantageAdjustment() : 0)
-                - (disadvantage ? definition.passiveAdvantageAdjustment() : 0);
-        return new PreparedCheck(input, modifier, proficiency, stonecunning == null ? null : stonecunning.identity(),
-                withNextVersion(before), input.advantage(), disadvantage,
-                passive ? definition.passiveBaseScore() : null, passive ? adjustment : null);
+        return new PreparedRoll(definition, modifier, proficiency, stonecunning == null ? null : stonecunning.identity(),
+                input.advantage(), disadvantage);
     }
 
     private static StonecunningDefinition stonecunning(ProductionSchema2Projection material, InitialPlan initial, State before) {
@@ -121,23 +158,40 @@ public final class Schema2CharacterCheckRules {
 
     /** No random source is reachable here; also used to verify retained results during recovery. */
     public CheckResult resolve(PreparedCheck prepared, int firstD20, Integer secondD20) {
-        if (prepared == null || prepared.isPassive() || firstD20 < 1 || firstD20 > 20
+        if (prepared == null || prepared.isPassive()) throw invalid("S2_CHECK_RANDOM_RESULT");
+        RolledScore score = resolveRoll(prepared.roll, firstD20, secondD20);
+        return new CheckResult(score.firstD20(), score.secondD20(), score.selectedD20(), score.abilityModifier(), score.proficiencyBonus(),
+                score.total(), score.total() >= prepared.input.difficultyClass(), score.effectiveAdvantage(), score.effectiveDisadvantage(),
+                prepared.capacityState.proficiencyBonus(), prepared.roll.stonecunningRule);
+    }
+
+    public RolledScore resolveRoll(PreparedRoll prepared, int firstD20, Integer secondD20) {
+        if (prepared == null || firstD20 < 1 || firstD20 > 20
                 || prepared.secondDieRequired() != (secondD20 != null)
                 || secondD20 != null && (secondD20 < 1 || secondD20 > 20)) throw invalid("S2_CHECK_RANDOM_RESULT");
         int selected = secondD20 == null ? firstD20 : prepared.effectiveAdvantage
                 ? Math.max(firstD20, secondD20) : Math.min(firstD20, secondD20);
         int total = selected + prepared.abilityModifier + prepared.proficiencyBonus;
-        return new CheckResult(firstD20, secondD20, selected, prepared.abilityModifier, prepared.proficiencyBonus,
-                total, total >= prepared.input.difficultyClass(), prepared.effectiveAdvantage, prepared.effectiveDisadvantage,
-                prepared.capacityState.proficiencyBonus(), prepared.stonecunningRule);
+        return new RolledScore(firstD20, secondD20, selected, prepared.abilityModifier, prepared.proficiencyBonus,
+                total, prepared.effectiveAdvantage, prepared.effectiveDisadvantage);
+    }
+
+    public static ContestOutcome compareContest(int initiatorTotal, int responderTotal, int minimumWinningMargin) {
+        if (minimumWinningMargin < MIN_CONTEST_WINNING_MARGIN || minimumWinningMargin > MAX_CONTEST_WINNING_MARGIN)
+            throw invalid("S2_CONTEST_WINNING_MARGIN");
+        long difference = (long) initiatorTotal - responderTotal;
+        if (difference >= minimumWinningMargin) return ContestOutcome.INITIATOR_WINS;
+        if (difference <= -minimumWinningMargin) return ContestOutcome.RESPONDER_WINS;
+        return ContestOutcome.UNCHANGED;
     }
 
     public CheckResult resolvePassive(PreparedCheck prepared) {
         if (prepared == null || !prepared.isPassive()) throw invalid("S2_CHECK_RANDOM_RESULT");
-        int total = prepared.passiveBaseScore + prepared.abilityModifier + prepared.proficiencyBonus + prepared.passiveAdjustment;
-        return new CheckResult(null, null, null, prepared.abilityModifier, prepared.proficiencyBonus, total,
-                total >= prepared.input.difficultyClass(), prepared.effectiveAdvantage, prepared.effectiveDisadvantage,
-                prepared.capacityState.proficiencyBonus(), prepared.stonecunningRule, prepared.passiveBaseScore, prepared.passiveAdjustment);
+        var roll = prepared.roll;
+        int total = prepared.passiveBaseScore + roll.abilityModifier + roll.proficiencyBonus + prepared.passiveAdjustment;
+        return new CheckResult(null, null, null, roll.abilityModifier, roll.proficiencyBonus, total,
+                total >= prepared.input.difficultyClass(), roll.effectiveAdvantage, roll.effectiveDisadvantage,
+                prepared.capacityState.proficiencyBonus(), roll.stonecunningRule, prepared.passiveBaseScore, prepared.passiveAdjustment);
     }
 
     public State verify(ProductionSchema2Projection material, State before, Command command, CheckResult result) {

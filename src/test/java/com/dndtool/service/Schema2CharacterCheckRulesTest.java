@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import static com.dndtool.module.composition.Schema2CompositionKernel.STONECUNNING_HISTORY;
 import static com.dndtool.module.composition.Schema2ProgressionFixtures.*;
 import static com.dndtool.service.Schema2CheckTestFixture.*;
+import static com.dndtool.service.Schema2CharacterCheckRules.ContestOutcome.*;
+import static com.dndtool.service.Schema2CharacterCheckRules.compareContest;
 import static com.dndtool.service.Schema2CharacterRuntime.PASSIVE_CHECK;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,6 +39,24 @@ class Schema2CharacterCheckRulesTest {
                 check("ABILITY", "ability.strength", null, 12, false, false))) {
             assertEquals(0, rules.resolve(rules.prepare(material, initial, command), 10, null).proficiencyBonus());
         }
+    }
+
+    @Test void contestUsesIndependentScoresAndAppliesTheWinningMarginToEitherSide() {
+        var initiator = rules.prepareContestRoll(material, initial, new Schema2CharacterCheckRules.RollInput(
+                CHECK, "ABILITY", "ability.wisdom", null, true, false));
+        var responder = rules.prepareContestRoll(material, initial, new Schema2CharacterCheckRules.RollInput(
+                CHECK, "SKILL", "ability.strength", ATHLETICS, false, false));
+        assertTrue(initiator.secondDieRequired());
+        assertFalse(responder.secondDieRequired());
+        var first = rules.resolveRoll(initiator, 4, 16);
+        var second = rules.resolveRoll(responder, 10, null);
+        assertEquals(new Schema2CharacterCheckRules.RolledScore(4, 16, 16, -1, 0, 15, true, false), first);
+        assertEquals(new Schema2CharacterCheckRules.RolledScore(10, null, 10, 2, 2, 14, false, false), second);
+        assertEquals(INITIATOR_WINS, compareContest(first.total(), second.total(), 1));
+        assertEquals(RESPONDER_WINS, compareContest(second.total(), first.total(), 1));
+        assertEquals(UNCHANGED, compareContest(first.total(), second.total(), 2));
+        assertEquals(UNCHANGED, compareContest(second.total(), first.total(), 2));
+        assertEquals(UNCHANGED, compareContest(first.total(), first.total(), 1));
     }
 
     @Test void alternateSkillChecksUseTheSelectedAbilityAndOneExactProficiencyBonus() {

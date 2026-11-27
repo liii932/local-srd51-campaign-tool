@@ -40,6 +40,7 @@ public final class CampaignDomainCodec {
         register("adjudication-command", CampaignAdjudicationCommands.class);
         register("check-effects", CampaignCheckEffects.class);
         register(CampaignGroupCheck.ACTION, CampaignGroupCheck.class);
+        register(CampaignContestCheck.ACTION, CampaignContestCheck.class);
         register("manual", CampaignManualData.class);
         register("manual-command", CampaignManualCommands.class);
     }

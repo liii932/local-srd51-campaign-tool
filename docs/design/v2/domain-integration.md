@@ -14,7 +14,7 @@
 | 授予与成长 | 语言工具、职业、子职业、ASI/专长、多职业 | 初始计划、成长事实、规则 | 合法选择、非法引用与等级/资格；完整保留初始和当前事实 |
 | 资源与休息 | 消耗、生命骰、短/长休、奥术回想 | 角色资源、累计经历时间和休息资格由角色拥有 | 核准确时间域、休息资格与间隔，失败无消耗 |
 | 物品与装备 | 简单物品数量、实例装备、穿脱 | 角色物品、规则、护甲/组件 | 数量与资格边界，战斗/施法读取同一装备 |
-| 检定与健康 | 主动掷骰、被动分数、团队属性检定、伤害/治疗/临时 HP、死亡豁免 | 服务器原骰或确定性分数、角色 HP、历史 | 先校验请求与各分支，同请求复用结果，旧版本不写入 |
+| 检定与健康 | 主动掷骰、被动分数、团队属性检定、对抗检定、伤害/治疗/临时 HP、死亡豁免 | 服务器原骰或确定性分数、角色 HP、历史 | 先校验请求与各分支，同请求复用结果，旧版本不写入 |
 | 场景与位置 | 节点图、局部网格、安置交接、DM 切焦点 | 世界节点、场景、唯一安置、焦点和各空间逻辑时钟 | 完整验证位置与焦点代次，后台冻结，全部空间直接恢复。见[世界与场景](world-and-scene-spaces.md) |
 | 战斗与动作 | 先攻回合、攻击、移动、OA、Ready、反应继续 | 场景、角色、规则和所属空间的动作流 | 焦点空间推进，受影响角色共同提交，全部未决窗口直接恢复 |
 | 施法 | 书籍、准备、位数及已支持法术 | 角色资源/装备、动作、规则 | Bless/Cure Wounds/Shield/Counterspell/Burning Hands 的实际支持边界 |
@@ -72,8 +72,8 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@12`、`srd51_characters@12`、`srd51_magic@12`，第四个成员分别为
-`dm_runtime_house_rules@23` 与 `dm_runtime_house_rules@24`。绑定保留成员顺序、准确版本与
+`srd51_runtime@13`、`srd51_characters@13`、`srd51_magic@13`，第四个成员分别为
+`dm_runtime_house_rules@25` 与 `dm_runtime_house_rules@26`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和
 历史校验共同使用所选战役的冻结规则上下文。标准被动基数为 10，优劣势调整幅度为 5。检定变体分别使用 12 和 3，运动默认以感知结算，允许 DM 为本次技能检定选择其他属性。变体的石工知识采用三倍熟练，自定义工匠获得侏儒语，DM 定额钝击伤害为 3 HP。作者和消费者的对应关系见[规则包指南](../../../rule-packages/srd51-runtime/package-guide.md)。
@@ -91,6 +91,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 | 自由卡与有序后果 | `CampaignManualIntegrationTest`、`StorageHttpIntegrationTest` 的自由卡旅程、`tools/storage/browser-manual-check-draft.cjs` | 自由字段/职业/熟练、混合网格、两分支事前验证、服务端骰、顺序与全部可能目标版本、共同提交及回滚。准确重开保留已执行后果，未提交草稿按运行隔离 |
 | 规则卡分支后果 | `CampaignCheckEffectsTest`、`CampaignRuleBindingIntegrationTest`、工作台规则卡检定表单 | 两分支的准确冻结效果与焦点/目标，含非法未选分支零取骰。同一角色的检定与健康子事件保留连续版本，事实、根历史和收据共同提交并按原文件校验 |
 | 规则卡被动检定 | `Schema2CheckCompositionTest`、`CampaignPassiveCheckIntegrationTest`、[独立作者场景](../../../rule-packages/srd51-runtime/scenarios/README.md#验证被动检定) | 核对标准及变体参数，实际分数、无检定骰、选中后果独立取骰、原子提交与同请求查证。完整文件保存、END 和重开时按原属性、装备、熟练及冻结材料重验分数和后果 |
+| 对抗检定 | `CampaignContestCheck`、`CampaignContestCheckIntegrationTest`、[独立作者场景](../../../rule-packages/srd51-runtime/scenarios/README.md#验证对抗检定) | 同一世界节点的双方各自检定，按冻结分差确定领先方或保持现状。战役根保存双方原骰与共同裁定，完整文件重开后可继续对抗。 |
 | 团队属性检定 | `CampaignGroupCheck`、`CampaignGroupCheckIntegrationTest`、[作者场景](../../../rule-packages/srd51-runtime/scenarios/README.md#验证团队属性检定) | 焦点世界节点的一份根记录关联每名参与者的检定。保存重开后按原骰重验共同成败与命中消息，下一次检定沿用冻结比例。 |
 | 根历史与因果 | `CampaignDomainRootValidationTest` | 节点/物品语义、历史前缀、准确子事件归属及逐根空间时钟，拒绝最终值自洽但过程伪造的文件 |
 | 直接定位与分支定位 | `CampaignScenePlacementIntegrationTest`、`CampaignCheckEffectsTest`、`CampaignManualIntegrationTest`、`StorageHttpIntegrationTest`、`tools/storage/browser-smoke.cjs` | 焦点裁定场景的非相邻空格、双分支都预检、分支内逐步校验位置版本和占位、拒绝零取骰、晚写回滚、原请求查证、保存和重开。审计核对原格和目标格、版本、原骰、其他后果及历史。 |

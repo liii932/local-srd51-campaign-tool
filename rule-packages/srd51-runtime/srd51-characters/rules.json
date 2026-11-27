@@ -489,7 +489,7 @@
       "rule_key": "check.srd2014"
     },
     "display_name": "Ability checks",
-    "description": "Server-owned rolled, passive and group checks with a frozen group success threshold.",
+    "description": "Server-owned rolled, passive, group and opposed checks with frozen settlement parameters.",
     "source_page": 77,
     "algorithm": "SRD_2014_ABILITY_CHECK_V1",
     "allow_alternate_skill_ability": false,
@@ -498,7 +498,8 @@
     "group_success_threshold": {
       "numerator": 1,
       "denominator": 2
-    }
+    },
+    "contest_minimum_winning_margin": 1
   },
   {
     "identity": {

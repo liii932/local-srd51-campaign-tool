@@ -22,6 +22,7 @@ import com.dndtool.service.storage.CampaignDomainCodec;
 import com.dndtool.service.storage.CampaignDomainCommands;
 import com.dndtool.service.storage.CampaignDomainData;
 import com.dndtool.service.storage.CampaignGroupCheck;
+import com.dndtool.service.storage.CampaignContestCheck;
 import com.dndtool.service.storage.CampaignJson;
 import com.dndtool.service.storage.CampaignRuleContext;
 import com.dndtool.service.storage.CampaignSpaceCommands;
@@ -59,6 +60,8 @@ public final class BundledSrd51Scenarios {
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
                 scenario("alternate-skill-enabled", BundledSrd51Scenarios::verifyAlternateSkillEnabled),
+                scenario("contest-check", checks -> checks.verifyContestCheck(1, "INITIATOR_WINS")),
+                scenario("contest-check-variant", checks -> checks.verifyContestCheck(2, "UNCHANGED")),
                 scenario("group-check", checks -> checks.verifyGroupCheck(1, 2, 2, true)),
                 scenario("group-check-variant", checks -> checks.verifyGroupCheck(2, 3, 3, false)),
                 scenario("passive-check", checks -> checks.verifyPassiveChecks(10, 5)),
@@ -226,26 +229,7 @@ public final class BundledSrd51Scenarios {
         verifyCheckField(check.identity(), Field.GROUP_SUCCESS_THRESHOLD, new GroupSuccessThreshold(1, 2),
                 new GroupSuccessThreshold(numerator, denominator));
 
-        var campaign = new GroupCheckParty(rules);
-        var node = new JsonObject();
-        node.addProperty("name", "Swamp");
-        UUID swamp = campaign.apply("node-create", node).subjectId();
-        var focus = new JsonObject();
-        focus.add("target", CampaignSpaceCommands.refJson(CampaignSpaceData.Ref.world(swamp)));
-        campaign.apply("focus-set", focus);
-        for (String name : List.of("Ash", "Brook", "Clay", "Dale", "Elm")) {
-            var fighter = new JsonObject();
-            fighter.addProperty("name", name);
-            fighter.addProperty("kind", "PC");
-            fighter.addProperty("classKey", "fighter");
-            fighter.addProperty("backgroundKey", "acolyte");
-            UUID id = campaign.apply("character-create", fighter).subjectId();
-            var position = new JsonObject();
-            position.addProperty("characterId", id.toString());
-            position.addProperty("nodeId", swamp.toString());
-            campaign.apply("position", position);
-        }
-
+        var campaign = checkParty("Swamp", List.of("Ash", "Brook", "Clay", "Dale", "Elm"));
         var request = new JsonObject();
         request.add("rule", CampaignDomainCodec.toJson(rules.checkRule()));
         request.addProperty("kind", "SKILL");
@@ -262,7 +246,7 @@ public final class BundledSrd51Scenarios {
                 numerator, denominator, expectedSuccess ? 3 : 4, expectedSuccess);
     }
 
-    private static void checkGroupRolls(GroupCheckParty campaign, JsonObject request, List<Integer> rolls,
+    private static void checkGroupRolls(CheckParty campaign, JsonObject request, List<Integer> rolls,
             List<Boolean> individualSuccess, int numerator, int denominator, int required, boolean expectedSuccess) {
         var party = campaign.state.characters().subList(0, rolls.size());
         var participants = new JsonArray();
@@ -298,13 +282,95 @@ public final class BundledSrd51Scenarios {
         }
     }
 
-    private static final class GroupCheckParty {
+    private void verifyContestCheck(int expectedMargin, String narrowOutcome) {
+        var check = (FinalCheck) find("adventure.check", "check.srd2014");
+        verifyCheckField(check.identity(), Field.CONTEST_MINIMUM_WINNING_MARGIN, new IntegerValue(1), new IntegerValue(expectedMargin));
+        var campaign = checkParty("River crossing", List.of("Ash", "Brook"));
+        var request = new JsonObject();
+        request.add("rule", CampaignDomainCodec.toJson(rules.checkRule()));
+        request.addProperty("adjudication", "Who retrieves the loose mooring line?");
+        var characters = campaign.state.characters();
+        // Perception (+1 Wisdom, +2 proficiency) competes against a plain Strength check (+2).
+        request.add("initiator", contestSide(characters.getFirst(), "ability.wisdom",
+                rules.rule("character.proficiency", "proficiency.skill.perception"), true));
+        request.add("responder", contestSide(characters.getLast(), "ability.strength", null, false));
+        checkContestRolls(campaign, request, List.of(4, 13, 13), 16, 15, expectedMargin, narrowOutcome);
+        checkContestRolls(campaign, request, List.of(4, 12, 13), 15, 15, expectedMargin, "UNCHANGED");
+        checkContestRolls(campaign, request, List.of(4, 11, 14), 14, 16, expectedMargin, "RESPONDER_WINS");
+    }
+
+    private static JsonObject contestSide(CampaignDomainData.Character character, String ability,
+            RuleIdentity skill, boolean advantage) {
+        var side = new JsonObject();
+        side.addProperty("characterId", character.id().toString());
+        side.addProperty("characterVersion", Long.toString(character.history().current().version()));
+        side.addProperty("kind", skill == null ? "ABILITY" : "SKILL");
+        side.addProperty("abilityKey", ability);
+        side.add("proficiency", CampaignDomainCodec.toJson(skill));
+        side.addProperty("advantage", advantage);
+        side.addProperty("disadvantage", false);
+        return side;
+    }
+
+    private static void checkContestRolls(CheckParty campaign, JsonObject request, List<Integer> rolls,
+            int initiatorTotal, int responderTotal, int expectedMargin, String outcome) {
+        var characters = campaign.state.characters();
+        campaign.dice.addAll(rolls);
+        var root = campaign.apply("contest-check", request);
+        assertTrue(campaign.dice.isEmpty());
+        assertEquals(characters, campaign.state.characters());
+        assertEquals(rolls, root.rolls().stream().map(CampaignSpaceData.Die::value).toList());
+        var audit = CampaignDomainCodec.fromJson(JsonParser.parseString(root.after()), CampaignContestCheck.Audit.class);
+        expectNumber(expectedMargin, audit.minimumWinningMargin());
+        assertEquals(outcome, audit.outcome().name());
+        var initiator = audit.initiator();
+        var responder = audit.responder();
+        assertEquals(characters.getFirst().id(), initiator.characterId());
+        assertEquals(characters.getLast().id(), responder.characterId());
+        expectNumber(rolls.get(0), initiator.firstD20());
+        assertEquals(rolls.get(1), initiator.secondD20());
+        expectNumber(rolls.get(1), initiator.selectedD20());
+        expectNumber(1, initiator.abilityModifier());
+        expectNumber(2, initiator.proficiencyBonus());
+        expectNumber(initiatorTotal, initiator.total());
+        expectNumber(rolls.get(2), responder.firstD20());
+        assertEquals(null, responder.secondD20());
+        expectNumber(rolls.get(2), responder.selectedD20());
+        expectNumber(2, responder.abilityModifier());
+        expectNumber(0, responder.proficiencyBonus());
+        expectNumber(responderTotal, responder.total());
+    }
+
+    private CheckParty checkParty(String place, List<String> names) {
+        var campaign = new CheckParty(rules);
+        var node = new JsonObject();
+        node.addProperty("name", place);
+        UUID nodeId = campaign.apply("node-create", node).subjectId();
+        var focus = new JsonObject();
+        focus.add("target", CampaignSpaceCommands.refJson(CampaignSpaceData.Ref.world(nodeId)));
+        campaign.apply("focus-set", focus);
+        for (String name : names) {
+            var fighter = new JsonObject();
+            fighter.addProperty("name", name);
+            fighter.addProperty("kind", "PC");
+            fighter.addProperty("classKey", "fighter");
+            fighter.addProperty("backgroundKey", "acolyte");
+            UUID id = campaign.apply("character-create", fighter).subjectId();
+            var position = new JsonObject();
+            position.addProperty("characterId", id.toString());
+            position.addProperty("nodeId", nodeId.toString());
+            campaign.apply("position", position);
+        }
+        return campaign;
+    }
+
+    private static final class CheckParty {
         private final String campaignId = UUID.randomUUID().toString();
         private final CampaignDomainCommands commands = new CampaignDomainCommands();
         private final ArrayDeque<Integer> dice = new ArrayDeque<>();
         private CampaignDomainData.State state;
 
-        GroupCheckParty(CampaignRuleContext rules) {
+        CheckParty(CampaignRuleContext rules) {
             state = CampaignDomainData.State.initial(rules.projection());
         }
 
