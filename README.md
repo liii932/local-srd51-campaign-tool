@@ -26,7 +26,7 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 - 规则角色可在探索中或本人战斗回合[主动卧倒、双倍成本爬行和起身](docs/rules/schema-2-prone.md)；探索卧倒不耗时，移动与起身各推进六秒，战斗起身花半速；复用倒地攻防、OA 与 Ready 移动，姿态和未决路径随完整文件恢复；
 - 建立世界节点、路线及有界网格场景，显式入退场、旅行与切换唯一执行焦点；后台时钟、角色、效果与未决动作冻结；
 - 在[战役工作台](./docs/storage-vitality-loop.md#战役工作台)左栏管理规则库与玩家，中栏主持当前场景，右栏翻阅角色卡。
-- 地狱犬可在自己回合啮咬，或在敌人离开触及前使用反应啮咬。主持人可以在窗口保存重开，继续原路线。[怪物近战与借机攻击](docs/rules/schema-2-monster-attacks.md)
+- 狼与地狱犬都可在本人回合或借机时啮咬。狼命中后目标做 DC 11 力量豁免，失败倒地。主持人可在借机或护盾术窗口保存重开，在战役记录查看原骰和姿态。[怪物近战与借机攻击](docs/rules/schema-2-monster-attacks.md)
 - 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、唯一安置、简单物品、角色状态与消息根历史；
 - 管理独立的 DM-managed 自由卡、基础字段、职业等级和熟练，为 MANUAL/SAVING_THROW 检定设置有序后果，
   在同一运行内复用检定草稿，并在共享网格上使用 DM 裁定战斗和阵营。
@@ -141,13 +141,13 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 ## 构建与测试
 
 从源码生成应用 WAR 可在仓库根目录运行 `mvn -DskipTests package`，产物为
-`target/dnd-tool-se-0.4.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
+`target/dnd-tool-se-0.5.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
 JUnit 用例，例如启动逻辑用 `mvn '-Dtest=StorageApplicationListenerTest' test`。
 
 可运行规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
 
 ```sh
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.4.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.5.0.war \
   --case weapon-damage rule-packages/srd51-runtime/scenarios/standard.json
 ```
 

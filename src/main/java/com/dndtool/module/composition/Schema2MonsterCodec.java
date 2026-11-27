@@ -57,7 +57,7 @@ final class Schema2MonsterCodec {
         return new MonsterActionProfile(name,description,page,mode,"HELL_HOUND_FIRE_BREATH_V1",new MonsterSavePolicy("ability.dexterity","FIXED_DC",dc,"FULL","HALF"),new MonsterDamageProfile(6,6,DamageType.FIRE,"OTHER_DELIVERY","NO_ABILITY_MODIFIER"),new MonsterArea("CONE",15,"EXCLUDE_ORIGIN"),new MonsterRecharge(6,5,true,true,true),null);
     }
     private static MonsterAttackProfile attackProfile(Object input,Location s) {
-        var profile=shape(input,Set.of("hit_bonus","reach_feet","damage"),Set.of(),s);
+        var profile=shape(input,Set.of("hit_bonus","reach_feet","damage"),Set.of("on_hit"),s);
         int hitBonus=n(profile,"hit_bonus",MONSTER_ATTACK_MIN_BONUS,MONSTER_ATTACK_MAX_BONUS,s);
         int reach=n(profile,"reach_feet",5,10,s);
         if(!MONSTER_ATTACK_REACH_FEET.contains(reach))throw bad(s.child("reach_feet"));
@@ -76,7 +76,16 @@ final class Schema2MonsterCodec {
             int modifier=n(row,"modifier",MONSTER_ATTACK_MIN_BONUS,MONSTER_ATTACK_MAX_BONUS,location);
             damage.add(new MonsterAttackDamage(type,count,sides,modifier));
         }
-        return new MonsterAttackProfile(hitBonus,reach,damage);
+        MonsterOnHitSave onHit = profile.containsKey("on_hit")
+                ? onHitSave(profile.get("on_hit"), s.child("on_hit")) : null;
+        return new MonsterAttackProfile(hitBonus, reach, damage, onHit);
+    }
+    private static MonsterOnHitSave onHitSave(Object input, Location source) {
+        var row = shape(input, Set.of("ability_key", "dc", "fail_outcome"), Set.of(), source);
+        var save = new MonsterOnHitSave(n(row, "dc", MONSTER_ON_HIT_SAVE_MIN_DC, MONSTER_ON_HIT_SAVE_MAX_DC, source));
+        exact(row.get("ability_key"), save.abilityKey(), source.child("ability_key"));
+        exact(row.get("fail_outcome"), save.failOutcome(), source.child("fail_outcome"));
+        return save;
     }
     static Map<String,Object> statBlockJson(MonsterStatBlock d) {
         var a=d.abilities();
@@ -93,9 +102,14 @@ final class Schema2MonsterCodec {
             if(hasSaveFields||d.attackProfile()==null)throw new IllegalArgumentException("Invalid monster melee action fields");
             MonsterAttackProfile attack=d.attackProfile();
             r.put("mechanism",d.mechanism());
-            r.put("attack_profile",json("hit_bonus",attack.hitBonus(),"reach_feet",attack.reachFeet(),"damage",
+            var profile = json("hit_bonus",attack.hitBonus(),"reach_feet",attack.reachFeet(),"damage",
                     attack.damage().stream().map(row->json("damage_type",row.damageType().name(),
-                            "dice_count",row.diceCount(),"dice_sides",row.diceSides(),"modifier",row.modifier())).toList()));
+                            "dice_count",row.diceCount(),"dice_sides",row.diceSides(),"modifier",row.modifier())).toList());
+            if (attack.onHit() != null) {
+                var save = attack.onHit();
+                profile.put("on_hit", json("ability_key", save.abilityKey(), "dc", save.dc(), "fail_outcome", save.failOutcome()));
+            }
+            r.put("attack_profile", profile);
             return r;
         }
         if(d.attackProfile()!=null)throw new IllegalArgumentException("Save-damage action has a melee attack profile");

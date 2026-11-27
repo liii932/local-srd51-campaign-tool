@@ -86,6 +86,8 @@ public final class BundledSrd51Scenarios {
                 scenario("weapon-damage", BundledSrd51Scenarios::verifyWeaponDamage),
                 scenario("monster-melee", suite -> suite.verifyMonsterMelee(false)),
                 scenario("monster-melee-variant", suite -> suite.verifyMonsterMelee(true)),
+                scenario("wolf-bite", suite -> suite.verifyWolfBite(11, Schema2CombatState.OnHitOutcome.SAVE_SUCCEEDED)),
+                scenario("wolf-bite-variant", suite -> suite.verifyWolfBite(12, Schema2CombatState.OnHitOutcome.PRONE_APPLIED)),
                 scenario("monster-breath-profile", BundledSrd51Scenarios::verifyMonsterBreathProfile),
                 scenario("rule-origins", BundledSrd51Scenarios::verifyRuleOrigins),
                 scenario("wizard-evocation", BundledSrd51Scenarios::verifyWizardEvocation),
@@ -719,6 +721,96 @@ public final class BundledSrd51Scenarios {
                 expectNumber(attack.damageAmount(), health.before().hitPoints() - health.after().hitPoints());
             }
         }
+    }
+
+    private void verifyWolfBite(int dc, Schema2CombatState.OnHitOutcome expectedOutcome) {
+        UUID campaign = UUID.randomUUID(), scene = UUID.randomUUID();
+        UUID attacker = UUID.randomUUID(), target = UUID.randomUUID(), ally = UUID.randomUUID();
+        var material = rules.projection();
+        var wolf = (FinalMonster) find("adventure.monster", "monster.wolf");
+        assertTrue(wolf.enabled());
+        var definition = wolf.definition();
+        expectNumber(393, definition.sourcePage());
+        var block = definition.statBlock();
+        assertEquals(MonsterCreatureType.BEAST, block.creatureType());
+        assertEquals(new MonsterAbilities(12, 15, 12, 3, 12, 6), block.abilities());
+        expectNumber(13, block.armorClass());
+        expectNumber(40, block.walkSpeedFeet());
+        assertEquals(List.of(MonsterTraitScope.PERCEPTION_HEARING_SMELL_ONLY,
+                MonsterTraitScope.ATTACK_ROLL_PACK_TACTICS_ONLY), block.traits().stream().map(MonsterTrait::scope).toList());
+
+        var bite = new EntryIdentity(wolf.identity(), "actions", "srd51_magic", "bite");
+        var profile = material.projection().entries().stream().filter(FinalEntry::enabled).map(FinalEntry::entry)
+                .filter(MonsterActionEntry.class::isInstance).map(MonsterActionEntry.class::cast)
+                .filter(entry -> entry.identity().equals(bite)).findFirst().orElseThrow().actionProfile();
+        expectNumber(393, profile.sourcePage());
+        assertEquals(new MonsterOnHitSave(dc), profile.attackProfile().onHit());
+
+        var plan = rules.initialPlan(campaign, ally, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var roster = Map.of(ally, new Schema2CombatRules.Context(material, plan, initial(plan, "fighter")));
+        var start = Schema2CombatState.Command.start(
+                List.of(new Schema2CombatState.Deployment(ally, new Schema2CombatState.Position(1, 1), 1)),
+                List.of(new Schema2CombatState.MonsterDeployment(attacker, wolf.identity(), new Schema2CombatState.Position(0, 0), 1),
+                        new Schema2CombatState.MonsterDeployment(target, wolf.identity(), new Schema2CombatState.Position(1, 0), 0)),
+                List.of(attacker, target, ally));
+        var combat = new Schema2CombatRules();
+        var initiative = new ArrayDeque<>(List.of(3, 20, 2));
+        var battle = combat.resolve(combat.preflight(UUID.randomUUID(), scene, campaign, roster, null, start), sides -> {
+            expectNumber(20, sides);
+            return initiative.removeFirst();
+        }).after();
+        assertTrue(initiative.isEmpty());
+        assertEquals(attacker, battle.activeActor());
+        expectNumber(11, battle.monsters().stream().filter(monster -> monster.monsterId().equals(target))
+                .findFirst().orElseThrow().hitPoints());
+        assertTrue(!battle.combatants().stream().filter(actor -> actor.characterId().equals(target)).findFirst().orElseThrow().prone());
+
+        var values = new ArrayDeque<>(List.of(12, 5, 2, 3, 10));
+        var dieSizes = new ArrayDeque<>(List.of(20, 20, 4, 4, 20));
+        var result = combat.resolve(combat.preflight(UUID.randomUUID(), scene, campaign, roster, battle,
+                Schema2CombatState.Command.monsterAttack(attacker, target, bite)), sides -> {
+            expectNumber(dieSizes.removeFirst(), sides);
+            return values.removeFirst();
+        });
+        assertTrue(values.isEmpty() && dieSizes.isEmpty());
+        assertEquals(List.of(new Schema2CombatState.Roll("ATTACK_D20", attacker, 20, 12),
+                new Schema2CombatState.Roll("ATTACK_D20_SECOND", attacker, 20, 5),
+                new Schema2CombatState.Roll("MONSTER_ATTACK_DAMAGE_PIERCING", attacker, 4, 2),
+                new Schema2CombatState.Roll("MONSTER_ATTACK_DAMAGE_PIERCING", attacker, 4, 3),
+                new Schema2CombatState.Roll("MONSTER_HIT_STR_D20", target, 20, 10)), result.rolls());
+        var attack = result.after().flows().getLast().attacks().getFirst();
+        assertTrue(attack.hit() && !attack.critical() && attack.advantage());
+        expectNumber(12, attack.firstD20());
+        expectNumber(5, attack.secondD20());
+        expectNumber(12, attack.selectedD20());
+        expectNumber(13, attack.armorClass());
+        var evidence = attack.monsterAttack();
+        assertEquals(bite, evidence.action());
+        expectNumber(4, evidence.hitBonus());
+        expectNumber(5, evidence.reachFeet());
+        assertEquals(List.of(ally), evidence.packTacticsAllies());
+        assertEquals(List.of(new Schema2CombatState.AttackDamageComponent(DamageType.PIERCING, 2, 4, 2,
+                List.of(2, 3), 7, 7, List.of())), evidence.damageComponents());
+        expectNumber(7, attack.damageAmount());
+        expectNumber(4, result.after().monsters().stream().filter(monster -> monster.monsterId().equals(target))
+                .findFirst().orElseThrow().hitPoints());
+
+        var onHit = evidence.onHit();
+        assertEquals(expectedOutcome, onHit.outcome());
+        expectNumber(dc, onHit.difficultyClass());
+        expectNumber(10, onHit.selectedD20());
+        var save = onHit.savingThrow();
+        assertEquals("ability.strength", save.abilityKey());
+        assertEquals(Schema2CombatState.CheckMode.ROLL, save.mode());
+        expectNumber(10, save.firstD20());
+        assertEquals(null, save.secondD20());
+        expectNumber(1, save.abilityModifier());
+        expectNumber(0, save.proficiencyBonus());
+        expectNumber(dc, save.difficultyClass());
+        expectNumber(11, save.total());
+        assertEquals(expectedOutcome == Schema2CombatState.OnHitOutcome.SAVE_SUCCEEDED, save.success());
+        assertEquals(expectedOutcome == Schema2CombatState.OnHitOutcome.PRONE_APPLIED, result.after().combatants().stream()
+                .filter(actor -> actor.characterId().equals(target)).findFirst().orElseThrow().prone());
     }
 
     private void verifyMonsterBreathProfile() {

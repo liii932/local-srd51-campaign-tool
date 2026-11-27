@@ -30,6 +30,11 @@ public final class CampaignDomainEngine {
                 throw rejected("CAMPAIGN_CHARACTER_RECORD");
         }
     }
+    /** Scene admission restores the campaign monster and its last authoritative posture together. */
+    public record MonsterArrival(MonsterInstance instance, boolean prone) {
+        public MonsterArrival { Objects.requireNonNull(instance); }
+    }
+
     public record CombatResult(Schema2CombatHistory.History history, List<CharacterRecord> characters, int elapsedSeconds) {
         public CombatResult { characters = List.copyOf(characters); }
     }
@@ -183,14 +188,14 @@ public final class CampaignDomainEngine {
 
     public CombatResult executeScene(ProductionSchema2Projection material, List<CharacterRecord> supplied,
             Schema2CombatHistory.History previous, UUID campaignId, UUID sceneId, long sceneSecond, UUID operationId,
-            Schema2CombatState.Command command, Map<UUID,MonsterInstance> arrivingMonsters, IntUnaryOperator dice) {
+            Schema2CombatState.Command command, Map<UUID,MonsterArrival> arrivingMonsters, IntUnaryOperator dice) {
         return executeScene(material, supplied, previous, campaignId, sceneId, sceneSecond, operationId,
                 command, arrivingMonsters, dice, Set.of());
     }
 
     public CombatResult executeScene(ProductionSchema2Projection material, List<CharacterRecord> supplied,
             Schema2CombatHistory.History previous, UUID campaignId, UUID sceneId, long sceneSecond, UUID operationId,
-            Schema2CombatState.Command command, Map<UUID,MonsterInstance> arrivingMonsters, IntUnaryOperator dice,
+            Schema2CombatState.Command command, Map<UUID,MonsterArrival> arrivingMonsters, IntUnaryOperator dice,
             Set<UUID> reservedOperations) {
         Schema2ExplorationRules.requireSceneTime(sceneSecond, 0);
         if (previous == null ? command.kind() != Kind.OPEN_SCENE : !Schema2CombatHistory.spatial(previous))
@@ -205,7 +210,7 @@ public final class CampaignDomainEngine {
 
     private CombatResult executeCombat(ProductionSchema2Projection material, List<CharacterRecord> supplied,
             Schema2CombatHistory.History previous, UUID campaign, UUID combatId, long sceneSecond, UUID operationId,
-            Schema2CombatState.Command command, Map<UUID,MonsterInstance> arrivingMonsters, IntUnaryOperator dice,
+            Schema2CombatState.Command command, Map<UUID,MonsterArrival> arrivingMonsters, IntUnaryOperator dice,
             Set<UUID> reservedOperations) {
         var all = records(material, supplied);
         List<Member> members = supplied.stream().map(record -> new Member(record.history().current().characterId(),

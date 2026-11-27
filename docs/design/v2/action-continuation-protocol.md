@@ -422,6 +422,8 @@ granted,performed,pending_attempt_ref` 和各已消费 ordinal。每个 ordinal 
    spend；受擒者选同样的两项技能，对方固定 STR(Athletics)。挣脱方领先达到战役冻结门槛才结束指定关系。其余结果保持关系并保留已用 action；逃脱前被规则结束时记
    `RELATION_ALREADY_ENDED`，既有成本保留、未做检定不补骰。
 
+狼的啮咬复用普通及借机攻击的最终命中判定。护盾术决定之后，命中才会在同一结算中处理伤害和强制力量豁免，随后发布攻击完成。抓者倒地后保留仍有效的擒抱，继续拖带时依当前姿态重新核算整个剩余路径。[已接入的怪物近战合同](../../rules/schema-2-monster-attacks.md)
+
 主动 `RELEASE_GRAPPLE` 仅由擒抱者获授权控制者发出，指定准确关系、版本、焦点，若有
 活动流则另给准确当前叶子。在焦点场景的任意已提交停点开放，包括对方回合和窗口、choice 等待；
 同一命令内无可插入的中间写点。接纳不消费 action、reaction、movement、时间或骰，不代

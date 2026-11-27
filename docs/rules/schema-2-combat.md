@@ -56,7 +56,7 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 | `DASH` / `DISENGAGE` / `DODGE` | 消费 action，分别增加速度等额移动、免除本人本回合机会攻击、建立真实闪避贡献。 |
 | `MOVE` | 接受完整有限路径，按实际走过的段消费移动；倒地时每尺花两尺移动，有机会攻击时在离开触及之前提交暂停。 |
 | `DROP_PRONE` | SQLite 规则角色在本人 ACTIVE 回合或 EXPLORATION 主动卧倒，不消费 action、reaction、移动、攻击额度或时间；仅存活且 HP 大于零的角色可用，已有倒地或未决流拒绝。 |
-| `STAND_UP` | ACTIVE 本人回合清除倒地、消费速度的一半；半尺预算使 25 尺速度精确消费 12.5 尺。EXPLORATION 以独立六秒活动起身并推进场景时间，起身前不能离场。 |
+| `STAND_UP` | ACTIVE 本人回合清除倒地、消费速度的一半；半尺预算使 25 尺速度精确消费 12.5 尺。EXPLORATION 以独立六秒活动起身并推进场景时间，尚未死亡的倒地规则角色起身前不能离场。怪物姿态随它的实例转场。 |
 | `END_TURN` | 关闭未完成的攻击序列，轮到下个角色；其反应恢复，必要的死亡豁免由服务器执行一次。 |
 | `CAST` | 仅一级单职业生命领域的始终准备 Bless/Cure Wounds；真实组件、完整目标、action 与共享一级位通过首 RNG/写入前预检，成本与后果同事务接受。 |
 | `END_CONCENTRATION` | 没有活动动作流时主动结束本人专注，不消费 action，可在他人回合执行。 |
@@ -82,7 +82,7 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 
 施法资格、组件、共享法术位、Wizard 法术书、Bless／Shield 贡献、专注、同名覆盖、独立压制、
 Ready 及探索持续见[施法合同](schema-2-spells.md)。怪物吐息与其适用防御见
-[有限怪物合同](schema-2-monster-breath.md)。怪物近战与 OA 共享攻击、Shield 和伤害结算，来源和分量证据见[怪物近战](schema-2-monster-attacks.md)。战士 5–6 级 Extra Attack 按[独立能力合同](schema-2-extra-attack.md)接合。
+[有限怪物合同](schema-2-monster-breath.md)。怪物近战与 OA 共享攻击、Shield 和伤害结算，狼命中后续接一次力量豁免。来源、伤害和倒地裁定见[怪物近战](schema-2-monster-attacks.md)。战士 5–6 级 Extra Attack 按[独立能力合同](schema-2-extra-attack.md)接合。
 勇士 3–6 级 Improved Critical 由同一武器消费者用于普通、OA 和 Ready 单击，
 反应后用原选骰重验；19 的自动命中解释与准确授予门见[精通重击合同](schema-2-improved-critical.md)。
 SQLite 的[一级回气](schema-2-second-wind.md)在无未决流时同根完成资源扣减与治疗，

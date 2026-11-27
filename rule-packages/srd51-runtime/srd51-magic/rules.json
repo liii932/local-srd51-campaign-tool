@@ -633,5 +633,72 @@
       "traits": []
     },
     "author_note": "The Commoner Club action is catalog metadata."
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.wolf"
+    },
+    "display_name": "Wolf",
+    "description": "Selected SRD stat block with the Bite action.",
+    "source_page": 393,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "BEAST",
+      "alignment": "unaligned",
+      "armor_class": 13,
+      "armor_description": "natural armor",
+      "hit_points": 11,
+      "hit_dice_count": 2,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 2,
+      "walk_speed_feet": 40,
+      "abilities": {
+        "strength": 12,
+        "dexterity": 15,
+        "constitution": 12,
+        "intelligence": 3,
+        "wisdom": 12,
+        "charisma": 6
+      },
+      "saving_throws": [],
+      "skills": [
+        {
+          "skill_key": "skill.perception",
+          "bonus": 3
+        },
+        {
+          "skill_key": "skill.stealth",
+          "bonus": 4
+        }
+      ],
+      "damage_defenses": [],
+      "condition_immunities": [],
+      "darkvision_feet": 0,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 13,
+      "languages": [],
+      "challenge_numerator": 1,
+      "challenge_denominator": 4,
+      "experience_points": 50,
+      "traits": [
+        {
+          "key": "keen_hearing_and_smell",
+          "display_name": "Keen Hearing and Smell",
+          "description": "Advantage on hearing- or smell-dependent Wisdom (Perception) checks.",
+          "scope": "PERCEPTION_HEARING_SMELL_ONLY"
+        },
+        {
+          "key": "pack_tactics",
+          "display_name": "Pack Tactics",
+          "description": "Advantage on an attack if a non-incapacitated ally is within 5 feet of the target.",
+          "scope": "ATTACK_ROLL_PACK_TACTICS_ONLY"
+        }
+      ]
+    }
   }
 ]

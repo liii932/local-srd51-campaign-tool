@@ -72,13 +72,13 @@ class Schema2MonsterCompositionTest {
         assertEquals(MonsterActionMode.MELEE_ATTACK_V1, action.mode());
         assertEquals(MONSTER_MELEE_ATTACK_MECHANISM, action.mechanism());
         assertEquals(new MonsterAttackProfile(2, 10, List.of(new MonsterAttackDamage(DamageType.FIRE, 1, 6, 1),
-                new MonsterAttackDamage(DamageType.BLUDGEONING, 1, 4, -1))), action.attackProfile());
+                new MonsterAttackDamage(DamageType.BLUDGEONING, 1, 4, -1)), null), action.attackProfile());
         assertEquals(replacement, Schema2GrantFixtures.json(ProductionSchema2Codec.canonical(Schema2MonsterCodec.actionProfileJson(action))));
         var chain = projection.projection().chains().stream()
                 .filter(row -> row.target().equals(club) && row.field() == Field.ACTION_PROFILE).findFirst().orElseThrow();
         assertEquals(2, chain.steps().size());
         var declaration = ((MonsterActionProfileValue) chain.steps().getFirst().after().value()).value();
-        assertEquals(new MonsterAttackProfile(2, 5, List.of(new MonsterAttackDamage(DamageType.BLUDGEONING, 1, 4, -1))),
+        assertEquals(new MonsterAttackProfile(2, 5, List.of(new MonsterAttackDamage(DamageType.BLUDGEONING, 1, 4, -1)), null),
                 declaration.attackProfile());
         assertEquals(chain.steps().getFirst().after(), chain.steps().getLast().before());
         assertEquals(new MonsterActionProfileValue(action), chain.steps().getLast().after().value());
@@ -115,6 +115,76 @@ class Schema2MonsterCompositionTest {
         rejectMelee(profile -> firstDamage(profile).addProperty("modifier", -11));
         rejectMelee(profile -> firstDamage(profile).remove("modifier"));
         rejectMelee(profile -> firstDamage(profile).addProperty("delivery", "SCRIPT"));
+    }
+
+    @Test void onHitSaveSurvivesFrozenRestoreAndDcChangesTheFinalDigest() {
+        var baseline = composeOnHitSave(11);
+        var variant = composeOnHitSave(12);
+        assertNotEquals(baseline.finalRulesSha256(), variant.finalRulesSha256());
+        assertNotEquals(baseline.chainSha256(), variant.chainSha256());
+        var action = variant.projection().entries().stream().map(FinalEntry::entry)
+                .filter(MonsterActionEntry.class::isInstance).map(MonsterActionEntry.class::cast)
+                .filter(entry -> entry.identity().rule().equals(Schema2MonsterFixtures.COMMONER)).findFirst().orElseThrow();
+        assertEquals(new MonsterOnHitSave(12), action.actionProfile().attackProfile().onHit());
+        var expected = meleeProfile();
+        expected.getAsJsonObject("attack_profile").add("on_hit", onHitSave(12));
+        assertEquals(expected, Schema2GrantFixtures.json(ProductionSchema2Codec.canonical(
+                Schema2MonsterCodec.actionProfileJson(action.actionProfile()))));
+
+        var restored = ProductionSchema2Projection.restore(variant.members(), variant.projection().rules(),
+                variant.projection().entries(), variant.projection().chains());
+        assertArrayEquals(variant.finalRulesJson(), restored.finalRulesJson());
+        assertArrayEquals(variant.chainsJson(), restored.chainsJson());
+        assertDoesNotThrow(() -> composeOnHitSave(1));
+        assertDoesNotThrow(() -> composeOnHitSave(30));
+    }
+
+    @Test void onHitSaveRejectsMissingDuplicateForeignAndOutOfBoundsFields() {
+        for (String field : List.of("ability_key", "dc", "fail_outcome"))
+            rejectOnHit(save -> save.remove(field));
+        rejectOnHit(save -> save.addProperty("ability_key", "ability.dexterity"));
+        rejectOnHit(save -> save.addProperty("fail_outcome", "GRAPPLED"));
+        rejectOnHit(save -> save.addProperty("success_outcome", "HALF"));
+        rejectOnHit(save -> save.addProperty("dc", 0));
+        rejectOnHit(save -> save.addProperty("dc", 31));
+        rejectOnHit(save -> save.addProperty("dc", 11.5));
+        rejectOnHit(save -> save.addProperty("dc", "11"));
+        rejectMelee(profile -> profile.getAsJsonObject("attack_profile").add("on_hit", JsonNull.INSTANCE));
+        rejectMelee(profile -> profile.getAsJsonObject("attack_profile").add("on_hit", new JsonArray()));
+        rejectMelee(profile -> profile.add("on_hit", onHitSave(11)));
+
+        var files = Schema2MonsterFixtures.packages();
+        var profile = meleeProfile();
+        profile.getAsJsonObject("attack_profile").add("on_hit", onHitSave(11));
+        Schema2GrantFixtures.edit(files, 2, "actions.json", root -> root.getAsJsonArray().get(5).getAsJsonObject()
+                .add("action_profile", profile));
+        var actions = new String(files.get(2).get("actions.json"), StandardCharsets.UTF_8);
+        assertTrue(actions.contains("\"dc\":11"));
+        files.get(2).put("actions.json", actions.replace("\"dc\":11", "\"dc\":11,\"dc\":12").getBytes(StandardCharsets.UTF_8));
+        assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(files));
+    }
+
+    private static ProductionSchema2Projection composeOnHitSave(int dc) {
+        var files = Schema2MonsterFixtures.packages();
+        var profile = meleeProfile();
+        profile.getAsJsonObject("attack_profile").add("on_hit", onHitSave(dc));
+        Schema2GrantFixtures.edit(files, 2, "actions.json", root -> root.getAsJsonArray().get(5).getAsJsonObject()
+                .add("action_profile", profile));
+        return ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
+    }
+
+    private static JsonObject onHitSave(int dc) {
+        var save = new JsonObject();
+        save.addProperty("ability_key", "ability.strength");
+        save.addProperty("dc", dc);
+        save.addProperty("fail_outcome", "PRONE");
+        return save;
+    }
+
+    private static void rejectOnHit(java.util.function.Consumer<JsonObject> edit) {
+        var save = onHitSave(11);
+        edit.accept(save);
+        rejectMelee(profile -> profile.getAsJsonObject("attack_profile").add("on_hit", save));
     }
 
     private static JsonObject meleeProfile() {

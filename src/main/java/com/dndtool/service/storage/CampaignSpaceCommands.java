@@ -212,7 +212,7 @@ public final class CampaignSpaceCommands {
                 var rule = CampaignDomainCodec.fromJson(input.get("monster"), com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity.class);
                 subject = operation; var deployment = new Schema2CombatState.MonsterDeployment(subject, rule, new Schema2CombatState.Position(0, 0), 0);
                 var instance = new CampaignDomainEngine().initialMonster(before.material().restore().projection(), deployment);
-                List<Monster> monsters = new ArrayList<>(before.space().monsters()); monsters.add(new Monster(subject, s(input, "name"), rule, instance.hitPoints(), instance.dead(), instance.actionUses(), 0));
+                List<Monster> monsters = new ArrayList<>(before.space().monsters()); monsters.add(new Monster(subject, s(input, "name"), rule, instance.hitPoints(), instance.dead(), false, instance.actionUses(), 0));
                 state = withSpace(before, ordered(before.space().focus(), before.space().scenes(), before.space().clocks(), monsters), replace(before.positions(), new Position(subject, current, null, 0, 0)));
             }
             default -> throw new StorageException("UNSUPPORTED_COMMAND", "Unsupported spatial command");
@@ -256,15 +256,19 @@ public final class CampaignSpaceCommands {
         var records = CampaignDomainValidation.records(after).stream().filter(r -> union.contains(r.initial().characterId())).toList();
         Set<UUID> rules = new HashSet<>(); after.characters().forEach(c -> rules.add(c.id()));
         var characters = after.positions().stream().filter(p -> p.space().equals(Ref.scene(scene)) && rules.contains(p.characterId())).map(p -> new Schema2CombatState.Deployment(p.characterId(), p.grid(), p.side())).toList();
-        Map<UUID,Schema2CombatState.MonsterInstance> instances = new HashMap<>(); List<Schema2CombatState.MonsterDeployment> monsters = new ArrayList<>();
+        Map<UUID,CampaignDomainEngine.MonsterArrival> arrivals = new HashMap<>();
+        List<Schema2CombatState.MonsterDeployment> monsters = new ArrayList<>();
         for (Monster monster : after.space().monsters()) { Position p = position(after, monster.id()); if (p != null && p.space().equals(Ref.scene(scene))) {
             monsters.add(new Schema2CombatState.MonsterDeployment(monster.id(), monster.rule(), p.grid(), p.side()));
-            if (previous == null || previous.current().monsters().stream().noneMatch(m -> m.monsterId().equals(monster.id()))) instances.put(monster.id(), new Schema2CombatState.MonsterInstance(monster.id(), monster.rule(), monster.hitPoints(), monster.dead(), monster.actions()));
+            if (previous == null || previous.current().monsters().stream().noneMatch(m -> m.monsterId().equals(monster.id()))) {
+                var instance = new Schema2CombatState.MonsterInstance(monster.id(), monster.rule(), monster.hitPoints(), monster.dead(), monster.actions());
+                arrivals.put(monster.id(), new CampaignDomainEngine.MonsterArrival(instance, monster.prone()));
+            }
         } }
         var command = previous == null ? Schema2CombatState.Command.openScene(characters, monsters) : Schema2CombatState.Command.sceneRoster(characters, monsters);
         var result = new CampaignDomainEngine().executeScene(after.material().restore().projection(), records, previous,
                 UUID.fromString(campaign), scene, after.space().clock(Ref.scene(scene)).second(), operation,
-                command, instances, dice, retainedOperations);
+                command, arrivals, dice, retainedOperations);
         return applyScene(after, scene, result);
     }
     public static CampaignDomainData.State applyScene(CampaignDomainData.State before, UUID sceneId, CampaignDomainEngine.CombatResult result) {
@@ -281,9 +285,17 @@ public final class CampaignSpaceCommands {
             space = ordered(space.focus(), space.scenes(), clocks, space.monsters());
         }
         List<Monster> monsters = new ArrayList<>(space.monsters());
+        var combatants = result.history().current().combatants().stream()
+                .collect(java.util.stream.Collectors.toMap(Schema2CombatState.Combatant::characterId, actor -> actor));
         for (var instance : result.history().current().monsters()) {
             Monster old = monsters.stream().filter(m -> m.id().equals(instance.monsterId())).findFirst().orElseThrow(() -> CampaignJson.bad("Unknown campaign monster"));
-            if (old.hitPoints() != instance.hitPoints() || old.dead() != instance.dead() || !old.actions().equals(instance.actionUses())) { monsters.remove(old); monsters.add(new Monster(old.id(), old.name(), old.rule(), instance.hitPoints(), instance.dead(), instance.actionUses(), old.version() + 1)); }
+            boolean prone = combatants.get(instance.monsterId()).prone();
+            if (old.hitPoints() != instance.hitPoints() || old.dead() != instance.dead()
+                    || old.prone() != prone || !old.actions().equals(instance.actionUses())) {
+                monsters.remove(old);
+                monsters.add(new Monster(old.id(), old.name(), old.rule(), instance.hitPoints(), instance.dead(),
+                        prone, instance.actionUses(), old.version() + 1));
+            }
         }
         space = ordered(space.focus(), space.scenes(), space.clocks(), monsters);
         return new CampaignDomainData.State(before.material(), merge(before.characters(), result.characters()), combats, before.nodes(), positions, before.items(), before.roots(), before.manual(), before.participation(), space);

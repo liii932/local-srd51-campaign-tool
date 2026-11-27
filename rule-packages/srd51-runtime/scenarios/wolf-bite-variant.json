@@ -1,0 +1,5 @@
+{
+  "members": ["srd51_runtime@13", "srd51_characters@13", "srd51_magic@15", "dm_runtime_house_rules@25", "dm_runtime_wolf_variant@1"],
+  "driver": "BundledSrd51Scenarios",
+  "cases": ["wolf-bite-variant"]
+}

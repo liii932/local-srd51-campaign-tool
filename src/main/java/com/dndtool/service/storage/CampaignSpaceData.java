@@ -33,8 +33,8 @@ public final class CampaignSpaceData {
     public record Clock(Ref space, long second, long version) {
         public Clock { if (space == null || second < 0 || second > MAX_SECOND || version < 0) throw CampaignJson.bad("Invalid space clock"); }
     }
-    /** Monster health and charge survive departure; positions belong exclusively to Position. */
-    public record Monster(UUID id, String name, RuleIdentity rule, int hitPoints, boolean dead,
+    /** Health, action uses and posture survive scene transfers. Position owns the grid cell. */
+    public record Monster(UUID id, String name, RuleIdentity rule, int hitPoints, boolean dead, boolean prone,
                           List<MonsterActionUse> actions, long version) {
         public Monster {
             uuid(id); CampaignJson.name(name); Objects.requireNonNull(rule); actions = List.copyOf(actions);

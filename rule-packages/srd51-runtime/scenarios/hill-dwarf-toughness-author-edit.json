@@ -1,5 +1,5 @@
 {
-  "members": ["srd51_runtime@13", "srd51_characters@13", "srd51_magic@14", "dm_runtime_house_rules@25"],
+  "members": ["srd51_runtime@13", "srd51_characters@13", "srd51_magic@15", "dm_runtime_house_rules@25"],
   "driver": "BundledSrd51Scenarios",
   "cases": ["hill-dwarf-toughness-author-edit"]
 }

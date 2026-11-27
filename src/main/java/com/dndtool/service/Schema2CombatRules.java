@@ -78,7 +78,7 @@ public final class Schema2CombatRules {
     }
 
     Resolution place(ProductionSchema2Projection material, UUID operationId, UUID sceneId, UUID campaignId,
-            Map<UUID,Context> dependencies, Battle before, Command command, Map<UUID,MonsterInstance> arriving) {
+            Map<UUID,Context> dependencies, Battle before, Command command, Map<UUID,CampaignDomainEngine.MonsterArrival> arriving) {
         uuid(operationId); uuid(sceneId); uuid(campaignId);
         if (!placementCommand(command) || operationId.equals(campaignId) || sceneId.equals(campaignId)
                 || operationId.equals(sceneId) && command.kind() != Kind.OPEN_SCENE)
@@ -127,18 +127,22 @@ public final class Schema2CombatRules {
             if (!ids.add(id) || !cells.add(deployment.position()) || dependencies.containsKey(id))
                 throw invalid("S2_COMBAT_DEPLOYMENT");
             MonsterInstance instance = oldMonsters.get(id);
+            boolean arrivingProne = false;
             if (instance == null) {
-                instance = arriving.get(id);
+                var arrival = arriving.get(id);
+                if (arrival == null) throw invalid("S2_COMBAT_DEPLOYMENT");
+                instance = arrival.instance();
+                arrivingProne = arrival.prone();
                 arrived.add(id);
             }
             MonsterInstance initial = Schema2MonsterRules.initial(material, deployment);
-            if (instance == null || !id.equals(instance.monsterId()) || !deployment.monster().equals(instance.monster())
+            if (!id.equals(instance.monsterId()) || !deployment.monster().equals(instance.monster())
                     || instance.hitPoints() < 0 || instance.hitPoints() > initial.hitPoints() || instance.dead() != (instance.hitPoints() == 0)
                     || !initial.actionUses().stream().map(MonsterActionUse::action).toList()
                         .equals(instance.actionUses().stream().map(MonsterActionUse::action).toList()))
                 throw invalid("S2_COMBAT_DEPLOYMENT");
             monsters.add(instance);
-            actors.add(placedActor(oldActors.get(id), id, deployment.position(), deployment.side(), false));
+            actors.add(placedActor(oldActors.get(id), id, deployment.position(), deployment.side(), arrivingProne));
         }
         if (!arrived.equals(arriving.keySet()) || !dependencyIds.equals(dependencies.keySet())
                 || ids.size() > MAX_COMBATANTS || command.deployments().size() > Schema2CombatHistory.MAX_CHARACTER_MEMBERS)
@@ -554,7 +558,8 @@ public final class Schema2CombatRules {
     }
     private void prepareWorld(Prepared p) {
         Command c=p.command;Battle b=p.before;
-        if(c.actorId()==null||!p.roster.containsKey(c.actorId())||!c.deployments().isEmpty()||c.itemId()!=null||c.flowKey()!=null||c.leafKey()!=null||c.windowKey()!=null||c.opportunityKey()!=null||c.castInput()!=null||c.readyInput()!=null||c.readyKey()!=null||!c.monsterDeployments().isEmpty()||c.breathInput()!=null||c.monsterRestInput()!=null)throw invalid("S2_COMBAT_COMMAND");
+        boolean monsterStanding = c.kind() == Kind.STAND_UP && Schema2MonsterRules.isMonster(b, c.actorId());
+        if(c.actorId()==null||(!p.roster.containsKey(c.actorId()) && !monsterStanding)||!c.deployments().isEmpty()||c.itemId()!=null||c.flowKey()!=null||c.leafKey()!=null||c.windowKey()!=null||c.opportunityKey()!=null||c.castInput()!=null||c.readyInput()!=null||c.readyKey()!=null||!c.monsterDeployments().isEmpty()||c.breathInput()!=null||c.monsterRestInput()!=null)throw invalid("S2_COMBAT_COMMAND");
         boolean healthCommand=c.kind()==Kind.EXPLORATION_HEALTH,move=c.kind()==Kind.EXPLORATION_MOVE,reenter=c.kind()==Kind.REENTER_COMBAT;
         if((c.targetId()!=null)!=healthCommand||(c.healthInput()!=null)!=healthCommand||(c.zoneInput()!=null)!=(c.kind()==Kind.CREATE_ENVIRONMENT_ZONE)||(c.zoneKey()!=null)!=(c.kind()==Kind.END_ENVIRONMENT_ZONE)||(move?c.path().isEmpty():!c.path().isEmpty())||(!reenter&&!c.tieBreakOrder().isEmpty())||((c.seconds()!=0)!=(c.kind()==Kind.EXPLORATION_ADVANCE_TIME)))throw invalid("S2_COMBAT_COMMAND");
         if(c.kind()==Kind.CREATE_ENVIRONMENT_ZONE) {
@@ -572,9 +577,9 @@ public final class Schema2CombatRules {
                 if (combatant(b, c.actorId()).prone()) throw invalid("S2_COMBAT_ALREADY_PRONE");
             }
             case STAND_UP -> {
-                Context context = p.roster.get(c.actorId());
-                active(context);
-                if (!combatant(b, c.actorId()).prone() || speed(context) == 0) throw invalid("S2_COMBAT_CANNOT_STAND");
+                if (!Schema2MonsterRules.living(p.roster, b, c.actorId())) throw invalid("S2_COMBAT_ACTOR_INACTIVE");
+                if (!combatant(b, c.actorId()).prone() || speed(p.roster, b, c.actorId()) == 0)
+                    throw invalid("S2_COMBAT_CANNOT_STAND");
                 Schema2ExplorationRules.requireTimeSafe(p.roster, 6);
             }
             case EXPLORATION_HEALTH -> {Schema2ExplorationRules.prepareHealth(p.roster,b,c.targetId(),c.healthInput());if(b.flows().size()>=MAX_FLOWS)throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");}

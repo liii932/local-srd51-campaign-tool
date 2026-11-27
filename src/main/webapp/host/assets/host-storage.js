@@ -780,6 +780,21 @@
       ? ` · 剩余移动力 ${canResume ? (movement.drag.allowanceHalfFeet - movement.spentHalfFeet) / 2 : 0} 尺` : '';
     return `拖带移动 · ${personName(movement.actorId)} → ${personName(movement.drag.targetId)} · ${status}${reason} · 已走 ${movement.cursor}/${movement.path.length} 格 · 已用移动力 ${movement.spentHalfFeet / 2} 尺${budget}`;
   }
+  function onHitSaveResult(effect) {
+    const save = effect.savingThrow;
+    const label = `力量豁免 DC ${effect.difficultyClass}`;
+    if (effect.outcome === 'TARGET_DEAD') return `${label} · 目标已死亡，跳过豁免`;
+    const dice = [save.firstD20, save.secondD20].filter(die => die != null).join(' / ');
+    const mode = save.advantage && save.disadvantage ? '（优势与劣势抵消）' : save.advantage ? '（优势）' : save.disadvantage ? '（劣势）' : '';
+    const blessing = save.blessingD4 == null ? '' : `，祝福术 d4=${save.blessingD4}`;
+    const roll = save.mode === 'AUTO_FAILURE' ? '自动失败'
+      : `d20=${dice}${mode}，选用 ${effect.selectedD20}，属性修正 ${save.abilityModifier}，熟练 ${save.proficiencyBonus}${blessing}，总值 ${save.total}`;
+    const result = save.success ? '豁免成功' : '豁免失败';
+    const posture = {SAVE_SUCCEEDED: effect.alreadyProne ? '仍然倒地' : '保持站立',
+      PRONE_APPLIED: '目标倒地', ALREADY_PRONE: '目标已倒地',
+      CONDITION_IMMUNE: `免疫倒地（${ruleName(effect.immunitySource)}）`}[effect.outcome];
+    return [label, roll, result, posture].filter(Boolean).join(' · ');
+  }
   function monsterAttackResult(attack) {
     const evidence = attack.monsterAttack;
     const name = monsterAttackName(evidence.action), actor = personName(attack.actorId), target = personName(attack.targetId);
@@ -793,7 +808,8 @@
     const damageTypes = {PIERCING: '穿刺', FIRE: '火焰'};
     const damage = evidence.damageComponents.map(component =>
       `${damageTypes[component.damageType] || component.damageType} d${component.diceSides}=${component.dice.join(' / ')}，修正 ${component.modifier}，原值 ${component.rawDamage}，有效 ${component.effectiveDamage}`);
-    return `${title} · ${attack.critical ? '重击' : '命中'} · ${damage.join(' · ')} · 有效伤害合计 ${attack.damageAmount}`;
+    const result = `${title} · ${attack.critical ? '重击' : '命中'} · ${damage.join(' · ')} · 有效伤害合计 ${attack.damageAmount}`;
+    return evidence.onHit ? `${result} · ${onHitSaveResult(evidence.onHit)}` : result;
   }
   function combatAudit(event) {
     const before = event.before, after = event.resolution.after;
@@ -1096,10 +1112,13 @@
       ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT') : [];
     options(form.elements.kind, actions, kind => combatActions.get(kind));
     form.elements.kind.disabled = actions.length === 0;
-    if (battle?.status === 'EXPLORATION') options(form.elements.actorId,
-      battle.combatants.map(actor => actor.characterId).filter(id => roster().some(character => character.id === id)), personName);
-    const pending = battle?.flows.some(flow => flow.status === 'ACTIVE');
     const kind = form.elements.kind.value;
+    if (battle?.status === 'EXPLORATION') {
+      const occupants = battle.combatants.filter(actor => roster().some(character => character.id === actor.characterId)
+        || (kind === 'STAND_UP' && actor.prone && battle.monsters.some(monster => monster.monsterId === actor.characterId && !monster.dead)));
+      options(form.elements.actorId, occupants.map(actor => actor.characterId), personName);
+    }
+    const pending = battle?.flows.some(flow => flow.status === 'ACTIVE');
     const actor = battle?.combatants.find(actor => actor.characterId === form.elements.actorId.value);
     const replacement = replacementKinds.includes(kind), shove = kind === 'SHOVE_PUSH', drag = kind === 'DRAG_GRAPPLE';
     const escape = kind === 'ESCAPE_GRAPPLE', sequence = actor?.sequence;
@@ -1122,7 +1141,7 @@
       : drag ? (grapples.length ? '两条路径须逐格对应。被拖带者至少小两个体型级别时可按原速拖带，其余情况速度减半。' : '该行动者当前未擒抱其他生物。')
       : kind === 'SECOND_WIND' ? '仅已取得回气的战士可在本人回合使用；消耗一次回气，以附赠动作恢复 1d10＋战士等级的生命值。短休或长休完成后恢复次数。'
       : kind === 'DROP_PRONE' ? (battle.status === 'EXPLORATION' ? '角色可在探索中主动卧倒，不推进场景时钟。' : '角色可在本人回合主动卧倒，保留动作、反应与移动力。')
-      : kind === 'STAND_UP' ? (battle.status === 'EXPLORATION' ? '倒地角色在探索中起身会推进场景时钟 6 秒。' : '倒地角色在本人回合起身时，消耗等于当前速度一半的移动力。')
+      : kind === 'STAND_UP' ? (battle.status === 'EXPLORATION' ? '倒地生物在探索中起身会推进场景时钟 6 秒。' : '倒地生物在本人回合起身时，消耗等于当前速度一半的移动力。')
       : kind === 'MOVE' && actor?.prone ? '当前角色倒地，移动为匍匐，每格消耗 10 尺移动力。'
       : kind === 'EXPLORATION_MOVE' ? (actor?.prone ? '当前角色倒地，探索移动为匍匐，每格按 10 尺计入当前速度上限；每次推进场景时钟 6 秒。' : '探索移动每格按 5 尺计入当前速度上限；每次推进场景时钟 6 秒。')
       : battle.status === 'EXPLORATION' ? '当前为探索状态，可按角色状态卧倒、移动、起身、推进时间，或重新进入战斗。'

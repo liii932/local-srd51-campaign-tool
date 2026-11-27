@@ -398,6 +398,9 @@ class CampaignExtraAttackIntegrationTest {
             return member;
         }
         void startBattle(String name, List<Deployment> placements, Integer... initiative) {
+            startBattle(name, placements.getFirst().characterId(), placements, initiative);
+        }
+        void startBattle(String name, UUID initiator, List<Deployment> placements, Integer... initiative) {
             List<UUID> roster = placements.stream().map(Deployment::characterId).toList();
             UUID world = PlayerSpaceFixture.placeAtWorld(service, roster.toArray(UUID[]::new));
             UUID scene = subject("scene-create", input("name", name, "nodeId", world, "width", 10, "height", 10, "resolution", "RULES"));
@@ -410,7 +413,7 @@ class CampaignExtraAttackIntegrationTest {
             }
             enter.add("subjects", subjects);
             CampaignSpaceFixtures.command(service, "scene-enter", enter);
-            combat(Command.reenter(roster.getFirst(), roster), initiative);
+            combat(Command.reenter(initiator, roster), initiative);
             assertEquals(roster.getFirst(), battle().activeActor());
         }
         void leaveBattle(UUID fighter, UUID... opponents) {
