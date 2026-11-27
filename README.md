@@ -18,6 +18,7 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 - 角色结伴过沼泽等共同任务可用[团队属性检定](docs/rules/schema-2-character-foundations.md#团队属性检定)。每人各掷一次检定，标准包至少一半成功即全队成功，检定变体要求三分之二。
 - DM 可在智力（历史）检定中选择“辨认石工作品来历”。矮人的[石工知识](docs/rules/schema-2-character-foundations.md#石工知识)在标准包下提供双倍熟练加值。
 - 单职业战士 1 级正常取得[回气](docs/rules/schema-2-second-wind.md)，在本人战斗回合用附赠动作恢复 `1d10＋战士等级` HP，次数随标准短休或长休恢复；
+- 五级战士可在同一回合抓住对手、用第二击推倒，再拖带移动。目标可选择防守技能并在自己的回合挣脱。[近战控制玩法](docs/rules/schema-2-melee-control.md)
 - 单职业战士正常升到 5 级取得[额外攻击](docs/rules/schema-2-extra-attack.md)，自己回合的每个 Attack 动作可攻击两次，6 级保持；首击后的余数随完整文件保存恢复；
 - 单职业战士 3 级选择勇士后取得[精通重击](docs/rules/schema-2-improved-critical.md)，3–6 级已支持的近战武器攻击选中 19 或 20 时重击，普通攻击、借机攻击和 Ready 共用结算；
 - 由现有纯规则消费者执行已接入的成长/ASI/多职业、熟练、检定、装备、健康、休息与资源命令；
@@ -139,13 +140,13 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 ## 构建与测试
 
 从源码生成应用 WAR 可在仓库根目录运行 `mvn -DskipTests package`，产物为
-`target/dnd-tool-se-0.2.1.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
+`target/dnd-tool-se-0.3.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
 JUnit 用例，例如启动逻辑用 `mvn '-Dtest=StorageApplicationListenerTest' test`。
 
 可运行规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
 
 ```sh
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.2.1.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.3.0.war \
   --case weapon-damage rule-packages/srd51-runtime/scenarios/standard.json
 ```
 

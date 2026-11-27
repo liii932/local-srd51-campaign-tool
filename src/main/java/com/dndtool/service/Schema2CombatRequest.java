@@ -44,7 +44,7 @@ public record Schema2CombatRequest(UUID operationId, UUID combatId, UUID campaig
     private static String fingerprint(Schema2CombatRequest request) {
         try {
             var bytes=new ByteArrayOutputStream(); var out=new DataOutputStream(bytes);
-            text(out,"local-dnd/schema2-combat-command/3"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
+            text(out,"local-dnd/schema2-combat-command/4"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
             var binding=request.rules(); text(out,binding.canonicalProfile()); text(out,binding.compositionAlgorithm());
             out.writeInt(binding.members().size());
             for (var m:binding.members()) { text(out,m.moduleKey()); text(out,m.releaseVersion()); text(out,m.role().name()); text(out,m.rawZipSha256()); text(out,m.logicalSha256()); }
@@ -71,6 +71,18 @@ public record Schema2CombatRequest(UUID operationId, UUID combatId, UUID campaig
             out.writeInt(command.monsterDeployments().size());for(MonsterDeployment d:command.monsterDeployments()) {id(out,d.monsterId());ruleIdentity(out,d.monster());position(out,d.position());out.writeInt(d.side());}
             BreathInput breath=command.breathInput();out.writeBoolean(breath!=null);if(breath!=null) {entryIdentity(out,breath.action());out.writeInt(breath.direction());}
             MonsterRestInput rest=command.monsterRestInput();out.writeBoolean(rest!=null);if(rest!=null) {id(out,rest.restKey());text(out,rest.kind().name());}
+            MeleeInput melee = command.meleeInput(); out.writeBoolean(melee != null);
+            if (melee != null) {
+                id(out, melee.sequenceKey()); out.writeBoolean(melee.attackOrdinal() != null);
+                if (melee.attackOrdinal() != null) out.writeInt(melee.attackOrdinal());
+                id(out, melee.grappleKey()); text(out, Objects.toString(melee.hand(), ""));
+                text(out, Objects.toString(melee.skill(), "")); position(out, melee.destination());
+            }
+            DragInput drag = command.dragInput(); out.writeBoolean(drag != null);
+            if (drag != null) {
+                id(out, drag.grappleKey()); out.writeInt(drag.path().size());
+                for (Position step : drag.path()) position(out, step);
+            }
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException|NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
@@ -78,7 +90,7 @@ public record Schema2CombatRequest(UUID operationId, UUID combatId, UUID campaig
         out.writeBoolean(cast!=null);if(cast==null)return;
         ruleIdentity(out,cast.castingRule());ruleIdentity(out,cast.spell());out.writeInt(cast.targets().size());
         for(UUID target:cast.targets())id(out,target);id(out,cast.materialItemId());out.writeInt(cast.slotLevel());id(out,cast.targetCastFrameKey());
-        // Retain every pre-area request byte. The new branch has no legacy empty-target form.
+        // Only the area branch writes a direction. Targeted spell inputs already identify their targets.
         if(cast.coneDirection()!=null){text(out,"S2_SPELL_CONE_DIRECTION_V1");out.writeInt(cast.coneDirection());}
     }
     private static void entryIdentity(DataOutputStream out,com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity identity)throws IOException {

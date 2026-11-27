@@ -182,19 +182,22 @@ public final class PlayerCampaignProjection {
     private static String location(String location) { return switch (location) { case "MAIN_HAND" -> "主手"; case "OFF_HAND" -> "副手"; case "BOTH_HANDS" -> "双手"; case "WORN" -> "穿戴"; case "GROUND" -> "落地"; default -> "携带"; }; }
     private static void effect(JsonArray rows, String label) { JsonObject row = new JsonObject(); row.addProperty("label", label); rows.add(row); }
     private static JsonObject pending(CampaignDomainData.State state, Set<UUID> own) {
-        JsonObject result = new JsonObject(); boolean hasFlow = false, ownChoice = false, frozen = false;
+        JsonObject result = new JsonObject(); boolean hasFlow = false, ownChoice = false, ownDefense = false, frozen = false;
         var focus = state.space().focus().space();
         for (var history : state.combats()) {
             var battle = history.current(); var flow = battle.activeFlow();
             if (battle.status() == Schema2CombatState.Status.ENDED || flow == null || battle.combatants().stream().noneMatch(c -> own.contains(c.characterId()))) continue;
             if (!CampaignSpaceData.Ref.scene(battle.combatId()).equals(focus)) { frozen = true; continue; }
             hasFlow = true;
+            ownDefense |= battle.meleeControl().contests().stream().anyMatch(contest -> contest.outcome() == null
+                    && contest.frameKey().equals(flow.rootFrameKey()) && own.contains(contest.targetId()));
             ownChoice |= flow.windows().stream().filter(w -> w.status() == Schema2CombatState.WindowStatus.OPEN)
                     .flatMap(w -> w.opportunities().stream()).anyMatch(o -> o.status() == Schema2CombatState.OpportunityStatus.PENDING && Objects.equals(o.selectionFrameKey(), flow.leafFrameKey()) && own.contains(o.actorId()));
         }
+        ownChoice |= ownDefense;
         result.addProperty("active", hasFlow); result.addProperty("own", ownChoice); result.addProperty("frozen", frozen);
         result.addProperty("title", ownChoice ? "等待你的决定" : hasFlow ? "行动尚未结束" : frozen ? "后台行动已冻结" : "当前没有待决选择");
-        result.addProperty("description", ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "按当前可用选项继续；需要他人决定时请等待。" : frozen ? "主持人切回该空间后可继续原行动。" : "可用行动随当前回合与主持人许可更新。");
+        result.addProperty("description", ownDefense ? "选择力量（运动）或敏捷（杂技）进行防守。" : ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "按当前可用选项继续；需要他人决定时请等待。" : frozen ? "主持人切回该空间后可继续原行动。" : "可用行动随当前回合与主持人许可更新。");
         return result;
     }
     private static String actionLabel(String action) { return switch (action) { case "combat-command" -> "行动已记录"; case "character-command", "check-effects", "manual-check" -> "角色操作已记录"; default -> "状态已更新"; }; }

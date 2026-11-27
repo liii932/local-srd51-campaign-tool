@@ -40,6 +40,11 @@ import java.util.function.Consumer;
 import java.util.stream.IntStream;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
+import com.dndtool.service.Schema2CombatState.Battle;
+import com.dndtool.service.Schema2CombatState.ContestSkill;
+import com.dndtool.service.Schema2CombatState.HandSlot;
+import com.dndtool.service.Schema2CombatState.Kind;
+import com.dndtool.service.Schema2CombatState.MeleeInput;
 
 /** Authored expectations for the SRD 5.1 runtime combinations. */
 public final class BundledSrd51Scenarios {
@@ -60,6 +65,8 @@ public final class BundledSrd51Scenarios {
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
                 scenario("alternate-skill-enabled", BundledSrd51Scenarios::verifyAlternateSkillEnabled),
+                scenario("melee-control", checks -> checks.verifyMeleeControl(1)),
+                scenario("melee-control-variant", checks -> checks.verifyMeleeControl(2)),
                 scenario("contest-check", checks -> checks.verifyContestCheck(1, "INITIATOR_WINS")),
                 scenario("contest-check-variant", checks -> checks.verifyContestCheck(2, "UNCHANGED")),
                 scenario("group-check", checks -> checks.verifyGroupCheck(1, 2, 2, true)),
@@ -535,6 +542,63 @@ public final class BundledSrd51Scenarios {
         expectNumber(total, result.total());
         assertEquals(success, result.success());
         assertEquals(source, result.stonecunningRule());
+    }
+
+    private void verifyMeleeControl(int margin) {
+        UUID campaign = UUID.randomUUID(), scene = UUID.randomUUID();
+        UUID fighter = UUID.randomUUID(), guard = UUID.randomUUID();
+        var identity = Schema2PreparationIdentity.random();
+        var plan = rules.initialPlan(campaign, fighter, identity, "fighter", "acolyte");
+        var defenderPlan = rules.initialPlan(campaign, guard, identity, "fighter", "acolyte");
+        var growth = new Schema2CharacterProgressionRules();
+        var fighterState = growth.initial(rules.projection(), plan, UUID.randomUUID(),
+                rules.initialAbilities("fighter"), rules.initialChoices("fighter"));
+        for (int level = 2; level <= 5; level++) {
+            var choices = new GrowthChoices(level == 3 ? rules.rule("character.subclass", "subclass.champion") : null,
+                    level == 4 ? Map.of("ability.strength", 2) : Map.of(), null, Map.of());
+            fighterState = advanceFighter(growth, plan, fighterState, level, choices);
+        }
+        var defender = growth.initial(rules.projection(), defenderPlan, UUID.randomUUID(),
+                rules.initialAbilities("fighter"), rules.initialChoices("fighter"));
+        var roster = Map.of(fighter, new Schema2CombatRules.Context(rules.projection(), plan, fighterState),
+                guard, new Schema2CombatRules.Context(rules.projection(), defenderPlan, defender));
+        var combat = new Schema2CombatRules();
+        Battle battle = startBattle(combat, scene, campaign, roster, fighter, guard);
+        battle = turnAction(combat, scene, campaign, roster, battle, fighter, Kind.BEGIN_ATTACK);
+        var sequence = activeCombatant(battle).sequence();
+        expectNumber(2, sequence.limit());
+        for (int ordinal = 0; ordinal < 2; ordinal++) {
+            boolean first = ordinal == 0;
+            var attempt = new MeleeInput(sequence.sequenceKey(), ordinal, null, first ? HandSlot.MAIN_HAND : null, null, null);
+            battle = meleeStep(combat, roster, battle, Schema2CombatState.Command.melee(first ? Kind.GRAPPLE : Kind.SHOVE_PRONE,
+                    fighter, guard, null, null, attempt), List.of());
+            var flow = battle.activeFlow();
+            var skill = new MeleeInput(null, null, null, null, ContestSkill.ACROBATICS, null);
+            battle = meleeStep(combat, roster, battle, Schema2CombatState.Command.melee(Kind.CHOOSE_MELEE_DEFENSE,
+                    guard, null, flow.flowKey(), flow.leafFrameKey(), skill), first ? List.of(10, 14) : List.of(17, 4));
+            var contest = battle.meleeControl().contests().getLast();
+            expectNumber(first ? 10 : 17, contest.initiator().firstD20());
+            expectNumber(first ? 14 : 4, contest.responder().firstD20());
+            expectNumber(first ? 16 : 23, contest.initiator().total());
+            expectNumber(first ? 15 : 5, contest.responder().total());
+            expectNumber(margin, contest.minimumWinningMargin());
+            assertEquals(first && margin == 2 ? "UNCHANGED" : "INITIATOR_WINS", contest.outcome().name());
+            expectNumber(ordinal + 1, activeCombatant(battle).sequence().performed());
+            expectNumber(margin == 1 ? 1 : 0, battle.meleeControl().grapples().stream().filter(g -> g.active()).count());
+        }
+        assertTrue(battle.combatants().stream().anyMatch(c -> c.characterId().equals(guard) && c.prone()));
+    }
+
+    private static Battle meleeStep(Schema2CombatRules combat, Map<UUID, Schema2CombatRules.Context> roster,
+            Battle battle, Schema2CombatState.Command command, List<Integer> raw) {
+        var dice = new ArrayDeque<>(raw);
+        var result = combat.resolve(combat.preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(),
+                roster, battle, command), sides -> {
+            expectNumber(20, sides);
+            return dice.removeFirst();
+        });
+        assertTrue(dice.isEmpty());
+        return result.after();
     }
 
     private void verifyFighterExtraAttack() {

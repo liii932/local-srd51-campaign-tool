@@ -87,7 +87,7 @@ python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```bash
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.2.1.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.3.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -250,7 +250,7 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    源的一致性及 DRAFT 作者向量。以下为 Bash 示例，Windows 使用对应候选路径及本机 Python。
 
    ```bash
-   war=target/dnd-tool-se-0.2.1.war
+   war=target/dnd-tool-se-0.3.0.war
    scenarios=rule-packages/srd51-runtime/scenarios
    python3 rule-packages/srd51-runtime/build-bundles.py --check
    python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
@@ -411,7 +411,7 @@ ZIP 原始身份和 SQLite 冻结投影。纯规则、应用消费者和独立�
 生产代码或打包资源变化后，从候选对应源码的根目录运行。使用 Python 3.11+ 和环境中的 JDK 21+（`java`、`javac`、`jdeps`）。
 
 ```bash
-python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.2.1.war
+python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.3.0.war
 ```
 
 保存命令、退出码及 JSON 输出，记录字节数、SHA-256、全部 ZIP 条目数、应用类和嵌套 JAR 数。
@@ -844,3 +844,10 @@ node tools/storage/browser-prone.cjs
 
 真实应用测试验证 HP、费用、原骰、已执行前缀、完整文件和继续点。纯规则测试各自覆盖其判定，
 成品模组用独立场景核对实际规则及可见效果。实现范围和待采用机制见[领域接合](design/v2/domain-integration.md)。
+
+<a id="melee-control-verification"></a>
+## 近战控制验证
+
+用两个独立临时 SQLite 存储根分别创建标准战役和检定变体战役。定向用例 `CampaignMeleeControlIntegrationTest` 在五级战士的首击等待防守时保存、END、重开，再以原骰 10 和 14 得到 16 对 15。在确定边际胜负后再次保存重开，核对两侧原骰、修正和剩余一击。两份战役都实际执行第二击推倒。标准组继续验证受擒无法起身、挣脱平手及成功。`CampaignGrappleMovementIntegrationTest` 在抓者离开触及前保存并重开，核对双位置、剩余移动与原反应窗口，并在事务已写入位置后注入失败。抓者另用副手抓住原地的反应者。回滚后两人都仍受擒，抓者和被拖者停在原前缀。重试才提交后续格位、移动支出和副手越距释放，主手关系保留。再发同一请求只重放收据。`Schema2GrappleMovementRulesTest` 覆盖借机攻击使抓者失能后结束关系并保留前缀。沿用本指南的私有临时根要求。
+
+在同一份本次构建的 WAR 上运行[标准和变体作者场景](../rule-packages/srd51-runtime/scenarios/README.md#melee-control)。工作台使用本章的隔离启动器和全新存储根，然后运行 `node tools/storage/browser-grapple-shove.cjs --fresh-root "$storage_test_root"`。浏览器使用真实服务端骰点，核对战士在同一回合首击擒抱成功、第二击推倒成功，随即拖带仍然倒地的目标。检定未达到门槛时按实际结果消耗该击，可在后续回合重试。固定骰点的跨包对照由独立作者场景和 SQLite 用例验证。

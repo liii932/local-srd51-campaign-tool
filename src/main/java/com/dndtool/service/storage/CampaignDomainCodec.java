@@ -26,6 +26,7 @@ public final class CampaignDomainCodec {
         register("rule", Schema2CompositionKernel.class);
         register("material", ProductionSchema2Projection.class);
         register("character", Schema2CharacterRuntime.class);
+        type("check.RolledScore", com.dndtool.service.Schema2CharacterCheckRules.RolledScore.class);
         register("battle-history", Schema2CombatHistory.class);
         register("scene", Schema2CombatState.class);
         register("initial", Schema2InitialCharacterPlanService.class);

@@ -733,6 +733,54 @@
       return [`${personName(current.characterId)} 位置 (${previous.grid.x},${previous.grid.y}) → (${current.grid.x},${current.grid.y})`];
     });
   }
+  function meleeContestResult(contest) {
+    const participants = `${personName(contest.actorId)} → ${personName(contest.targetId)}`;
+    const title = `${meleeLabels[contest.kind]} · ${participants}`;
+    if (!contest.outcome) return `${title} · 等待选择防御检定`;
+    const outcome = {INITIATOR_WINS: '发起方获胜', RESPONDER_WINS: '应对方获胜', UNCHANGED: '局势不变'}[contest.outcome];
+    const attack = contest.attackOrdinal == null ? '' : ` · 已用第 ${contest.attackOrdinal + 1} 次攻击`;
+    const skill = meleeSkills[contest.selectedSkill], athletics = meleeSkills.ATHLETICS;
+    const escape = contest.kind === 'ESCAPE_GRAPPLE';
+    const describe = (score, label) => `${label} d20=${[score.firstD20, score.secondD20].filter(die => die != null).join(' / ')}，选用 ${score.selectedD20}，属性修正 ${score.abilityModifier}，熟练 ${score.proficiencyBonus}，总值 ${score.total}`;
+    const scores = contest.initiator && contest.responder
+      ? `；分差（发起方减应对方） ${contest.initiator.total - contest.responder.total} 点；${describe(contest.initiator, escape ? skill : athletics)}；${describe(contest.responder, escape ? athletics : skill)}` : '';
+    return `${title} · ${outcome}${attack} · 最小获胜分差 ${contest.minimumWinningMargin}${scores}`;
+  }
+  function dragResult(movement, canResume) {
+    const status = {COMPLETED: '完成', STOPPED: '停止'}[movement.status] || '待继续';
+    const stopReasons = {GRAPPLE_ENDED: '擒抱关系已结束', ACTOR_INACTIVE_OR_NO_MOVEMENT: '行动者无法继续移动',
+      POSITION_CHANGED: '双方位置已变化', SUFFIX_UNAVAILABLE: '余下路径无法执行'};
+    const reason = movement.stopReason ? `（${stopReasons[movement.stopReason] || movement.stopReason}）` : '';
+    const budget = movement.status === 'PENDING'
+      ? ` · 剩余移动力 ${canResume ? (movement.drag.allowanceHalfFeet - movement.spentHalfFeet) / 2 : 0} 尺` : '';
+    return `拖带移动 · ${personName(movement.actorId)} → ${personName(movement.drag.targetId)} · ${status}${reason} · 已走 ${movement.cursor}/${movement.path.length} 格 · 已用移动力 ${movement.spentHalfFeet / 2} 尺${budget}`;
+  }
+  function combatAudit(event) {
+    const before = event.before, after = event.resolution.after;
+    const previous = before?.meleeControl, current = after.meleeControl;
+    const details = [];
+    for (const contest of current?.contests || []) {
+      const prior = previous?.contests.find(entry => entry.contestKey === contest.contestKey);
+      if (!prior || prior.outcome !== contest.outcome) details.push(meleeContestResult(contest));
+    }
+    for (const grapple of current?.grapples || []) {
+      const prior = previous?.grapples.find(entry => entry.grappleKey === grapple.grappleKey);
+      if (grapple.endReason && !prior?.endReason) details.push(`${personName(grapple.grapplerId)} → ${personName(grapple.targetId)} · 擒抱结束（${grappleEndLabels[grapple.endReason]}）`);
+      else if (!prior) details.push(`${personName(grapple.grapplerId)} → ${personName(grapple.targetId)} · 确立擒抱`);
+    }
+    for (const fact of event.resolution.facts) {
+      if (fact.kind === 'SHOVED_PRONE') details.push(`${personName(fact.subjectId)} 倒地`);
+    }
+    for (const flow of after.flows) {
+      const earlier = before?.flows.find(old => old.flowKey === flow.flowKey);
+      for (const movement of flow.movements.filter(move => move.drag)) {
+        const prior = earlier?.movements.find(move => move.movementKey === movement.movementKey);
+        if (!prior || movement.cursor !== prior.cursor || movement.status !== prior.status)
+          details.push(dragResult(movement, liveGrapples(after).some(grapple => grapple.grappleKey === movement.drag.grappleKey)));
+      }
+    }
+    return details;
+  }
   function renderDomain(state) {
     refreshRuleChoices();
     renderSpaces(state);
@@ -740,6 +788,7 @@
     renderGroupCheckForm(state);
     renderContestCheckForm(state);
     const history = byId('storage-history'); history.replaceChildren();
+    const combatEvents = new Map((state.combats || []).flatMap(battle => battle.events.map(event => [event.operationId, event])));
     for (const root of state.roots || []) {
       if (root.kind === 'manual-check') {
         const audit = JSON.parse(root.after), result = audit.result, details = [`${root.sequence}. 自由卡检定 · ${personName(root.subjectId)} · ${result.success ? '成功' : '失败'}`];
@@ -780,6 +829,12 @@
       } else if (root.kind === 'scene-place') {
         text(history, 'li', [`${root.sequence}. DM 直接定位`, ...placementHistory(root)].join('；'));
       } else {
+        const combatEvent = combatEvents.get(root.operationId);
+        const audit = combatEvent ? combatAudit(combatEvent) : [];
+        if (audit.length) {
+          text(history, 'li', [`${root.sequence}. ${audit[0]}`, ...audit.slice(1), ...placementHistory(root)].join('；'));
+          continue;
+        }
         const event = roster().find(character => character.id === root.subjectId)?.history?.events?.find(event => event.operationId === root.operationId);
         const recovery = arcaneRecoveryResult(event);
         const check = event?.checkResult ? describeCheckResult(event) : '';
@@ -816,10 +871,19 @@
       NOTE: '便笺', NODE_CREATED: '建立地点', NODE_LINKED: '连接地点', POSITION: '调整位置', ITEM: '物品记录', COMBAT: '战斗行动'})[kind] || kind;
   }
   const battleFor = id => domain()?.combats?.find(history => history.current.combatId === id)?.current;
+  const meleeLabels = {GRAPPLE: '擒抱', SHOVE_PRONE: '推倒', SHOVE_PUSH: '推开 5 尺', ESCAPE_GRAPPLE: '挣脱擒抱'};
+  const meleeSkills = {ATHLETICS: '力量（运动）', ACROBATICS: '敏捷（杂技）'};
+  const grappleEndLabels = {RELEASED: '主动释放', ESCAPED: '挣脱', GRAPPLER_INCAPACITATED: '擒抱者失能',
+    TARGET_DIED: '受擒者死亡', OUT_OF_REACH: '超出触及范围', DEPARTED: '离开场景'};
+  const replacementKinds = ['GRAPPLE', 'SHOVE_PRONE', 'SHOVE_PUSH'];
+  const liveGrapples = battle => (battle?.meleeControl?.grapples || []).filter(grapple => !grapple.endReason);
+  const meleeInput = values => ({type: 'scene.MeleeInput', sequenceKey: null, attackOrdinal: null, grappleKey: null,
+    hand: null, skill: null, destination: null, ...values});
   function baseCombat(kind, actorId = null) {
     return {type: 'scene.Command', kind, actorId, targetId: null, itemId: null, path: [], deployments: [], tieBreakOrder: [],
       flowKey: null, leafKey: null, windowKey: null, opportunityKey: null, castInput: null, readyInput: null, readyKey: null,
-      zoneInput: null, zoneKey: null, healthInput: null, seconds: '0', monsterDeployments: [], breathInput: null, monsterRestInput: null};
+      zoneInput: null, zoneKey: null, healthInput: null, seconds: '0', monsterDeployments: [], breathInput: null,
+      monsterRestInput: null, meleeInput: null, dragInput: null};
   }
   function sendCombat(battle, command, expected = focusToken()) {
     if (!battle || battle.combatId !== focusedBattle()?.combatId || expected.generation !== focusToken().generation) {
@@ -830,6 +894,21 @@
   function pendingButton(parent, label, battle, command) {
     const expected = focusToken(), button = text(parent, 'button', label);
     button.type = 'button'; button.addEventListener('click', () => sendCombat(battle, command, expected));
+  }
+  function renderGrapples(box, battle, executing) {
+    const flow = battle.flows.find(candidate => candidate.status === 'ACTIVE');
+    for (const grapple of liveGrapples(battle)) {
+      const row = document.createElement('div'); row.className = 'actions grapple-status';
+      text(row, 'span', `${personName(grapple.grapplerId)} → ${personName(grapple.targetId)} · 擒抱中 · ${locationName(grapple.hand)}`);
+      if (executing && battle.status === 'ACTIVE') pendingButton(row, '释放擒抱（无需动作）', battle,
+        {...baseCombat('RELEASE_GRAPPLE', grapple.grapplerId), flowKey: flow?.flowKey || null, leafKey: flow?.leafFrameKey || null,
+          meleeInput: meleeInput({grappleKey: grapple.grappleKey})});
+      box.append(row);
+    }
+    const contest = battle.meleeControl?.contests.findLast(entry => entry.outcome);
+    if (contest) text(box, 'p', meleeContestResult(contest), 'melee-contest-result');
+    const drag = battle.flows.flatMap(flow => flow.movements).findLast(movement => movement.drag);
+    if (drag) text(box, 'p', dragResult(drag, liveGrapples(battle).some(grapple => grapple.grappleKey === drag.drag.grappleKey)), 'drag-result');
   }
   function renderCombat(state) {
     const combats = state.combats || [], summary = byId('domain-combat-summary'), pending = byId('domain-pending'); summary.replaceChildren(); pending.replaceChildren();
@@ -843,10 +922,12 @@
       const executing = battle.combatId === activeBattle?.combatId;
       text(box, 'h3', `${spaceName({kind: 'SCENE', id: battle.combatId})} · ${battleStatus(battle.status)} · ${executing ? '焦点' : '后台'}`);
       if (active && executing && battle.status === 'ACTIVE') text(box, 'p', `第 ${battle.round} 轮 · 当前 ${personName(active)}`);
-      table(box, ['参与者', '格位', '阵营', '姿态', '动作', '反应', '攻击动作'], battle.combatants.map(actor => [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
-        actor.prone ? '倒地' : '站立',
+      const grabbed = new Set(liveGrapples(battle).map(grapple => grapple.targetId));
+      table(box, ['参与者', '格位', '阵营', '姿态', '移动力已用', '动作', '反应', '攻击动作'], battle.combatants.map(actor => [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
+        (actor.prone ? '倒地' : '站立') + (grabbed.has(actor.characterId) ? ' · 受擒（速度 0）' : ''), `${actor.movementSpentHalfFeet / 2} 尺`,
         actor.actionAvailable ? '可用' : '已用', actor.reactionAvailable ? '可用' : '已用',
         actor.sequence ? `已攻击 ${actor.sequence.performed}/${actor.sequence.limit} · 剩余 ${actor.sequence.limit - actor.sequence.performed - actor.sequence.forfeited}${actor.sequence.forfeited ? ` · 已放弃 ${actor.sequence.forfeited}` : ''}` : '未开始']));
+      renderGrapples(box, battle, executing);
       for (const effect of battle.ongoingEffects || []) text(box, 'p', `效果：${ruleName(effect.spell || effect.rule)} · ${effect.status === 'ACTIVE' ? '生效' : '已结束'}`);
       for (const zone of battle.environmentZones || []) if (!zone.endedOperationId) text(box, 'p', `环境区域：${ruleName(zone.rule)} · 中心 ${zone.center.x}, ${zone.center.y}`);
       for (const monster of battle.monsters || []) text(box, 'p', `${ruleName(monster.monster)} · 生命值 ${monster.hitPoints}${monster.dead ? ' · 已死亡' : ''}`);
@@ -875,6 +956,22 @@
       for (const flow of (battle.flows || []).filter(flow => flow.status === 'ACTIVE')) {
         const panel = document.createElement('article'); panel.className = 'card';
         const leaf = flow.frames.find(frame => frame.frameKey === flow.leafFrameKey);
+        if (leaf?.kind === 'DOMAIN_CHOICE') {
+          const contest = battle.meleeControl?.contests.find(entry => entry.choiceKey === leaf.ownerKey);
+          if (contest) {
+            text(panel, 'h4', `${meleeLabels[contest.kind]} · ${personName(contest.targetId)} 选择防御检定`);
+            text(panel, 'p', `结算后使用第 ${contest.attackOrdinal + 1} 次攻击。`);
+            if (executing) {
+              const row = document.createElement('div'); row.className = 'actions';
+              for (const [skill, label] of Object.entries(meleeSkills)) pendingButton(row, label, battle,
+                {...baseCombat('CHOOSE_MELEE_DEFENSE', contest.targetId), flowKey: flow.flowKey, leafKey: leaf.frameKey,
+                  meleeInput: meleeInput({skill})});
+              panel.append(row);
+            } else text(panel, 'p', '后台冻结。切换执行焦点后再继续。');
+            pending.append(panel);
+            continue;
+          }
+        }
         const actorId = flow.attacks?.find(attack => attack.frameKey === leaf?.frameKey)?.actorId
           || flow.casts?.find(cast => cast.frameKey === leaf?.frameKey)?.actorId
           || flow.movements?.find(movement => movement.movementKey === leaf?.ownerKey)?.actorId
@@ -930,6 +1027,11 @@
     refreshCombatForm();
   }
   const combatActions = new Map(Array.from(byId('domain-combat').elements.kind.options, option => [option.value, option.textContent]));
+  function shoveDestination(actor, target) {
+    if (!actor || !target || actor === target) return null;
+    const start = actor.position, end = target.position;
+    return {type: 'scene.Position', x: String(end.x + Math.sign(end.x - start.x)), y: String(end.y + Math.sign(end.y - start.y))};
+  }
   function refreshCombatForm() {
     const form = byId('domain-combat'), battle = battleFor(form.elements.combatId.value);
     const exploration = ['DROP_PRONE', 'STAND_UP', 'EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
@@ -940,13 +1042,27 @@
     if (battle?.status === 'EXPLORATION') options(form.elements.actorId,
       battle.combatants.map(actor => actor.characterId).filter(id => roster().some(character => character.id === id)), personName);
     const pending = battle?.flows.some(flow => flow.status === 'ACTIVE');
-    form.querySelector('button').disabled = actions.length === 0 || pending;
     const kind = form.elements.kind.value;
     const actor = battle?.combatants.find(actor => actor.characterId === form.elements.actorId.value);
+    const replacement = replacementKinds.includes(kind), shove = kind === 'SHOVE_PUSH', drag = kind === 'DRAG_GRAPPLE';
+    const escape = kind === 'ESCAPE_GRAPPLE', sequence = actor?.sequence;
+    const target = battle?.combatants.find(actor => actor.characterId === form.elements.targetId.value);
+    const destination = shove ? shoveDestination(actor, target) : null;
+    const grapples = liveGrapples(battle).filter(grapple => (drag ? grapple.grapplerId : grapple.targetId) === actor?.characterId);
+    options(form.elements.grappleKey, grapples.map(grapple => grapple.grappleKey), id => {
+      const grapple = grapples.find(entry => entry.grappleKey === id);
+      return `${personName(drag ? grapple.targetId : grapple.grapplerId)} · ${locationName(grapple.hand)}`;
+    });
+    form.querySelector('button').disabled = actions.length === 0 || pending
+      || (replacement && (!sequence || sequence.closed)) || ((drag || escape) && !grapples.length);
     byId('domain-combat-note').textContent = pending ? '请先在上方处理反应或继续结算，再进行下一次行动。'
       : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
-      : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列，再选择“攻击”、目标与已装备武器。'
+      : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列。每次攻击可使用武器，或改为擒抱或推撞。'
       : kind === 'ATTACK' ? '每次消耗当前序列的一次攻击；两击之间可合法移动或更换目标，也可放弃剩余攻击。'
+      : replacement && (!sequence || sequence.closed) ? '请先开始攻击动作，再使用一次剩余攻击擒抱或推撞。'
+      : replacement ? `本次替代第 ${sequence.performed + 1} 次攻击。目标须选择防御检定。${destination ? `推开目的格为 (${destination.x},${destination.y})。` : ''}`
+      : escape ? (grapples.length ? '选择要挣脱的擒抱关系及检定。尝试会消耗一次动作。' : '该行动者当前未被擒抱。')
+      : drag ? (grapples.length ? '两条路径须逐格对应。被拖带者至少小两个体型级别时可按原速拖带，其余情况速度减半。' : '该行动者当前未擒抱其他生物。')
       : kind === 'SECOND_WIND' ? '仅已取得回气的战士可在本人回合使用；消耗一次回气，以附赠动作恢复 1d10＋战士等级的生命值。短休或长休完成后恢复次数。'
       : kind === 'DROP_PRONE' ? (battle.status === 'EXPLORATION' ? '角色可在探索中主动卧倒，不推进场景时钟。' : '角色可在本人回合主动卧倒，保留动作、反应与移动力。')
       : kind === 'STAND_UP' ? (battle.status === 'EXPLORATION' ? '倒地角色在探索中起身会推进场景时钟 6 秒。' : '倒地角色在本人回合起身时，消耗等于当前速度一半的移动力。')
@@ -954,10 +1070,12 @@
       : kind === 'EXPLORATION_MOVE' ? (actor?.prone ? '当前角色倒地，探索移动为匍匐，每格按 10 尺计入当前速度上限；每次推进场景时钟 6 秒。' : '探索移动每格按 5 尺计入当前速度上限；每次推进场景时钟 6 秒。')
       : battle.status === 'EXPLORATION' ? '当前为探索状态，可按角色状态卧倒、移动、起身、推进时间，或重新进入战斗。'
       : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';
-    for (const name of ['targetId', 'itemId', 'x', 'y', 'path', 'seconds']) {
+    const movement = ['MOVE', 'EXPLORATION_MOVE'].includes(kind) || drag;
+    const visibleFields = {targetId: kind === 'ATTACK' || replacement, itemId: kind === 'ATTACK', hand: kind === 'GRAPPLE',
+      grappleKey: drag || escape, escapeSkill: escape, x: movement, y: movement, path: movement, dragPath: drag,
+      seconds: kind === 'EXPLORATION_ADVANCE_TIME'};
+    for (const [name, visible] of Object.entries(visibleFields)) {
       const input = form.elements[name];
-      const visible = ['targetId', 'itemId'].includes(name) ? kind === 'ATTACK'
-        : ['x', 'y', 'path'].includes(name) ? ['MOVE', 'EXPLORATION_MOVE'].includes(kind) : kind === 'EXPLORATION_ADVANCE_TIME';
       input.closest('label').hidden = !visible;
       input.disabled = !visible;
     }
@@ -1693,12 +1811,30 @@
   byId('domain-combat').addEventListener('submit', event => {
     event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)), battle = battleFor(values.combatId);
     if (!battle) { message('请先开始战斗。'); return; }
-    const value = baseCombat(values.kind, values.actorId);
+    const drag = values.kind === 'DRAG_GRAPPLE';
+    const value = baseCombat(drag ? 'MOVE' : values.kind, values.actorId);
     if (values.kind === 'ATTACK') { value.targetId = values.targetId || null; value.itemId = values.itemId || null; }
-    if (['MOVE', 'EXPLORATION_MOVE'].includes(values.kind)) {
+    if (replacementKinds.includes(values.kind)) {
+      const actor = battle.combatants.find(actor => actor.characterId === values.actorId);
+      const target = battle.combatants.find(actor => actor.characterId === values.targetId);
+      if (!actor?.sequence || actor.sequence.closed || !target || actor === target) {
+        message('请选择当前攻击序列中的其他目标。'); return;
+      }
+      value.targetId = target.characterId;
+      value.meleeInput = meleeInput({sequenceKey: actor.sequence.sequenceKey, attackOrdinal: String(actor.sequence.performed),
+        hand: values.kind === 'GRAPPLE' ? values.hand : null, destination: values.kind === 'SHOVE_PUSH' ? shoveDestination(actor, target) : null});
+    }
+    if (values.kind === 'ESCAPE_GRAPPLE') value.meleeInput = meleeInput({grappleKey: values.grappleKey, skill: values.escapeSkill});
+    if (['MOVE', 'EXPLORATION_MOVE'].includes(value.kind)) {
       try {
         const cells = values.path.trim() ? readGridPath(values.path) : [{x: values.x, y: values.y}];
         value.path = cells.map(cell => ({type: 'scene.Position', ...cell}));
+        if (drag) {
+          const origin = battle.combatants.find(actor => actor.characterId === values.actorId).position;
+          const paired = values.dragPath.trim() ? readGridPath(values.dragPath)
+            : [{x: String(origin.x), y: String(origin.y)}, ...cells.slice(0, -1)];
+          value.dragInput = {type: 'scene.DragInput', grappleKey: values.grappleKey, path: paired.map(cell => ({type: 'scene.Position', ...cell}))};
+        }
       } catch (failure) { message(failure.message); return; }
     }
     if (values.kind === 'EXPLORATION_ADVANCE_TIME') value.seconds = values.seconds;
@@ -1800,6 +1936,7 @@
   });
   for (const select of document.querySelectorAll('.combat-choice')) select.addEventListener('change', refreshCombatActors);
   byId('domain-combat').elements.kind.addEventListener('change', refreshCombatForm);
+  byId('domain-combat').elements.targetId.addEventListener('change', refreshCombatForm);
   byId('storage-create-rules').addEventListener('change', refreshCreateButton);
   byId('storage-create').elements.name.addEventListener('input', refreshCreateButton);
   byId('storage-create').addEventListener('submit', event => {

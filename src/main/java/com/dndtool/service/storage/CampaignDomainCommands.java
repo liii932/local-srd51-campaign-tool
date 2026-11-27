@@ -5,6 +5,7 @@ import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.CampaignDomainEngine;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2CombatState;
+import com.dndtool.service.Schema2MeleeControlRules;
 import com.google.gson.*;
 import java.util.*;
 import java.util.function.IntUnaryOperator;
@@ -221,15 +222,35 @@ public final class CampaignDomainCommands {
                     .filter(ready -> ready.readyKey().equals(command.readyKey()) && ready.actorId().equals(command.actorId()))
                     .map(ready -> ready.input().path()).findFirst().orElse(List.of());
         }
-        for (var cell : path) {
-            CampaignSpaceCommands.checkCell(scene, cell);
-            if (state.positions().stream().anyMatch(p -> p.space().equals(ref) && !p.characterId().equals(command.actorId()) && Objects.equals(p.grid(), cell))) throw new StorageException("SCENE_CELL_OCCUPIED", "The complete scene occupancy blocks this path");
+        var movers = new HashSet<UUID>();
+        movers.add(command.actorId());
+        var drag = command.dragInput();
+        if (drag != null) {
+            var battle = CampaignSpaceCommands.currentBattle(state).current();
+            var relation = Schema2MeleeControlRules.activeGrapple(battle, command.actorId(), drag.grappleKey());
+            if (relation != null) movers.add(relation.targetId());
+            checkScenePath(state, scene, ref, movers, drag.path());
+        }
+        checkScenePath(state, scene, ref, movers, path);
+        if (command.kind() == Schema2CombatState.Kind.SHOVE_PUSH && command.meleeInput() != null
+                && command.meleeInput().destination() != null) {
+            checkScenePath(state, scene, ref, Set.of(), List.of(command.meleeInput().destination()));
         }
         boolean untyped = state.positions().stream().filter(p -> p.space().equals(ref)).anyMatch(p -> state.manual().characters().stream().anyMatch(c -> c.id().equals(p.characterId())));
         if (untyped && (command.kind() == Schema2CombatState.Kind.MONSTER_BREATH || command.castInput() != null && command.castInput().coneDirection() != null))
             throw new StorageException("SCENE_RULE_FACTS_REQUIRED", "Use DM adjudication for an area action involving untyped scene participants");
         if (command.zoneInput() != null) CampaignSpaceCommands.checkCell(scene, command.zoneInput().center());
     }
+    private static void checkScenePath(State state, CampaignSpaceData.Scene scene, CampaignSpaceData.Ref ref,
+            Set<UUID> movers, List<Schema2CombatState.Position> path) {
+        for (var cell : path) {
+            CampaignSpaceCommands.checkCell(scene, cell);
+            if (state.positions().stream().anyMatch(p -> p.space().equals(ref)
+                    && !movers.contains(p.characterId()) && cell.equals(p.grid())))
+                throw new StorageException("SCENE_CELL_OCCUPIED", "The complete scene occupancy blocks this path");
+        }
+    }
+
     private static void owner(State state,UUID id){
         var manual=state.manual().characters().stream().filter(c->c.id().equals(id)).findFirst();
         if(manual.isPresent()){if(!manual.get().current().active())throw new StorageException("CHARACTER_INACTIVE","Restore the free character card first");return;}

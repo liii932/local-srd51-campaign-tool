@@ -45,9 +45,21 @@ public final class PlayerCandidateFactory {
                 .filter(c -> combatants.contains(c.id()) && CampaignSpaceCommands.focused(domain, c.id()))
                 .forEach(c -> roster.put(c.id(), new Schema2CombatRules.Context(material, c.initial(), c.history().current(), sceneSecond)));
         var factory = new BattleChoices(result, domain, battle, roster);
+        factory.relationChoices(own, visible);
         if (battle.activeFlow() != null) {
             Flow flow = battle.activeFlow(); Frame leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
             Window window = flow.windows().stream().filter(w -> Objects.equals(w.windowKey(), leaf.windowKey())).findFirst().orElse(null);
+            if (leaf.kind() == FrameKind.DOMAIN_CHOICE) {
+                var contest = battle.meleeControl().contests().stream().filter(c -> leaf.ownerKey().equals(c.choiceKey()))
+                        .findFirst().orElseThrow();
+                if (!own.contains(contest.targetId())) return List.copyOf(result);
+                for (ContestSkill skill : ContestSkill.values()) {
+                    factory.add(Command.melee(Kind.CHOOSE_MELEE_DEFENSE, contest.targetId(), null,
+                            flow.flowKey(), leaf.frameKey(), new MeleeInput(null, null, null, null, skill, null)),
+                            skill == ContestSkill.ATHLETICS ? "用力量（运动）防守" : "用敏捷（杂技）防守");
+                }
+                return List.copyOf(result);
+            }
             if (window != null && window.status() == WindowStatus.OPEN) {
                 var opportunity = window.opportunities().stream().filter(o -> o.status() == OpportunityStatus.PENDING && Objects.equals(o.selectionFrameKey(), leaf.frameKey())).findFirst().orElse(null);
                 if (opportunity != null && own.contains(opportunity.actorId())) {
@@ -79,6 +91,7 @@ public final class PlayerCandidateFactory {
                 for (UUID target : visible) if (!target.equals(actor) && roster.containsKey(target))
                     for (var item : roster.get(actor).character().equipment())
                         factory.add(Command.attack(actor, target, item.itemId()), "攻击 " + PlayerCampaignProjection.characterName(domain, target) + " · " + PlayerCampaignProjection.ruleName(domain, item.item()));
+                factory.attackReplacements(actor, visible);
                 factory.moves(actor); factory.spells(actor, visible);
             } else if (battle.status() == Status.EXPLORATION) {
                 if (CampaignParticipationCommands.permitted(domain, actor, "EXPLORATION_MOVE")) {
@@ -173,6 +186,50 @@ public final class PlayerCandidateFactory {
             PlayerCandidateFactory.add(result, budget.stepCostFeet() == 10 ? "规划探索匍匐路线" : "规划探索移动路线",
                     actor, "combat-command", combatInput(), route);
         }
+        void relationChoices(Set<UUID> own, Set<UUID> visible) {
+            int hiddenSources = 0;
+            var flow = battle.activeFlow();
+            for (var relation : battle.meleeControl().grapples()) {
+                if (!relation.active()) continue;
+                if (own.contains(relation.grapplerId())) {
+                    add(Command.melee(Kind.RELEASE_GRAPPLE, relation.grapplerId(), null,
+                            flow == null ? null : flow.flowKey(), flow == null ? null : flow.leafFrameKey(),
+                            new MeleeInput(null, null, relation.grappleKey(), null, null, null)),
+                            "释放" + locationLabel(relation.hand().name()) + "抓住的目标");
+                }
+                if (flow == null && own.contains(relation.targetId()) && relation.targetId().equals(battle.activeActor())) {
+                    String source = visible.contains(relation.grapplerId())
+                            ? PlayerCampaignProjection.characterName(domain, relation.grapplerId())
+                            : "未共享的抓者 " + (++hiddenSources);
+                    for (ContestSkill skill : ContestSkill.values())
+                        add(Command.melee(Kind.ESCAPE_GRAPPLE, relation.targetId(), null, null, null,
+                                new MeleeInput(null, null, relation.grappleKey(), null, skill, null)),
+                                (skill == ContestSkill.ATHLETICS ? "用力量（运动）挣脱" : "用敏捷（杂技）挣脱") + " · " + source);
+                }
+            }
+        }
+
+        void attackReplacements(UUID actor, Set<UUID> visible) {
+            var attacker = battle.combatants().stream().filter(c -> actor.equals(c.characterId())).findFirst().orElseThrow();
+            var sequence = attacker.sequence();
+            if (sequence == null || sequence.closed()) return;
+            for (var target : battle.combatants()) {
+                UUID id = target.characterId();
+                if (id.equals(actor) || !visible.contains(id) || !roster.containsKey(id)
+                        || attacker.position().distanceFeet(target.position()) != 5) continue;
+                String name = PlayerCampaignProjection.characterName(domain, id);
+                for (HandSlot hand : HandSlot.values()) {
+                    add(Command.melee(Kind.GRAPPLE, actor, id, null, null, new MeleeInput(sequence.sequenceKey(),
+                            sequence.performed(), null, hand, null, null)), locationLabel(hand.name()) + "擒抱 " + name);
+                }
+                add(Command.melee(Kind.SHOVE_PRONE, actor, id, null, null, new MeleeInput(sequence.sequenceKey(),
+                        sequence.performed(), null, null, null, null)), "推倒 " + name);
+                Position destination = Schema2MeleeControlRules.pushDestination(attacker.position(), target.position());
+                add(Command.melee(Kind.SHOVE_PUSH, actor, id, null, null, new MeleeInput(sequence.sequenceKey(),
+                        sequence.performed(), null, null, null, destination)), "推开 " + name);
+            }
+        }
+
         void moves(UUID actor) {
             var combatant = battle.combatants().stream().filter(c -> c.characterId().equals(actor)).findFirst().orElse(null); if (combatant == null) return;
             String movement = combatant.prone() ? "匍匐" : "移动";
@@ -181,6 +238,12 @@ public final class PlayerCandidateFactory {
                 if (Math.abs(x) > 10000 || Math.abs(y) > 10000) continue;
                 List<Position> path = List.of(new Position(x, y));
                 add(Command.move(actor, path), "向" + DIRECTIONS[i] + movement + "一格");
+                for (var held : battle.meleeControl().grapples()) {
+                    if (held.active() && held.grapplerId().equals(actor)) {
+                        var drag = new DragInput(held.grappleKey(), List.of(combatant.position()));
+                        add(Command.move(actor, path, drag), "向" + DIRECTIONS[i] + "拖带" + locationLabel(held.hand().name()) + "目标一格");
+                    }
+                }
             }
         }
         void spells(UUID actor, Set<UUID> visible) {

@@ -25,7 +25,12 @@ final class Schema2CombatStateValidator {
             }
             Set<UUID> ordered=new HashSet<>();for(int i=0;i<b.initiative().size();i++) {Initiative v=b.initiative().get(i);check(actors.contains(v.characterId())&&ordered.add(v.characterId())&&v.ordinal()==i&&v.d20()>=1&&v.d20()<=20&&v.dexterityModifier()>=-5&&v.dexterityModifier()<=10&&v.total()==v.d20()+v.dexterityModifier()&&(i==0||b.initiative().get(i-1).total()>=v.total()));}
             Map<UUID,Frame> allFrames=new HashMap<>();Map<UUID,CastAttempt> allCasts=new HashMap<>();Map<UUID,TriggerFact> triggers=new HashMap<>();int active=0;
-            for(TriggerFact t:b.triggerFacts()) {id(t.triggerKey());check(keys.add(t.triggerKey())&&triggers.put(t.triggerKey(),t)==null&&reference(actors,t.subjectId(),false)&&(t.targetId()==null||reference(actors,t.targetId(),false))&&t.ordinal()>=0&&t.ordinal()<64&&t.kind()!=null);}
+            Map<UUID,List<TriggerFact>> movementTriggers=new HashMap<>();
+            for(TriggerFact t:b.triggerFacts()) {
+                id(t.triggerKey());check(keys.add(t.triggerKey())&&triggers.put(t.triggerKey(),t)==null&&reference(actors,t.subjectId(),false)&&(t.targetId()==null||reference(actors,t.targetId(),false))&&t.ordinal()>=0&&t.ordinal()<64&&t.kind()!=null);
+                if (Set.of(TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE,TriggerKind.CREATURE_ENTER_CELL_AFTER).contains(t.kind()))
+                    movementTriggers.computeIfAbsent(t.sourceFrameKey(),ignored->new ArrayList<>()).add(t);
+            }
             for(Flow f:b.flows()) {
                 boolean live=f.status()==FlowStatus.ACTIVE;
                 id(f.flowKey());check(keys.add(f.flowKey())&&!f.frames().isEmpty()&&f.frames().size()<=1024&&f.windows().size()<=1024);Map<UUID,Frame> frames=new HashMap<>();
@@ -52,7 +57,14 @@ final class Schema2CombatStateValidator {
                     if(f.status()==FlowStatus.COMPLETED)check(w.status()==WindowStatus.CONSUMED);
                 }
                 for(Frame v:f.frames())if(v.windowKey()!=null)check(windows.contains(v.windowKey()));
-                Set<UUID> movementKeys=new HashSet<>();for(Movement m:f.movements()) {id(m.movementKey());check(movementKeys.add(m.movementKey())&&reference(actors,m.actorId(),live)&&m.path().size()>=1&&m.path().size()<=64&&m.cursor()>=0&&m.cursor()<=m.path().size()&&m.spent()==m.cursor()*5&&m.status()!=null&&m.readied()==(m.allowanceFeet()>0)&&m.allowanceFeet()<=120&&f.frames().stream().anyMatch(v->v.kind()==FrameKind.MOVEMENT&&v.ownerKey().equals(m.movementKey())));if(m.status()==MovementStatus.COMPLETED)check(m.cursor()==m.path().size()&&m.stopReason()==null);else if(m.status()==MovementStatus.PENDING)check(m.stopReason()==null);else check(m.stopReason()!=null);}
+                Set<UUID> movementKeys=new HashSet<>();
+                for(Movement movement:f.movements()) {
+                    id(movement.movementKey());
+                    check(movementKeys.add(movement.movementKey()));
+                    validateMovement(b,movement,frames.get(movement.movementKey()),actors,live,
+                            movementTriggers.getOrDefault(movement.movementKey(),List.of()));
+                }
+                for (Frame frame:f.frames()) if (frame.kind()==FrameKind.MOVEMENT) check(movementKeys.contains(frame.ownerKey()));
                 for(AttackAttempt a:f.attacks()) {
                     check(a.sequenceKey()==null ? a.attackOrdinal()==0 : !a.opportunityAttack()&&a.attackOrdinal()>=0&&a.attackOrdinal()<2);
                     check(frames.containsKey(a.frameKey())&&frames.get(a.frameKey()).kind()==FrameKind.ATTACK&&reference(actors,a.actorId(),live)&&reference(actors,a.targetId(),live)&&!a.actorId().equals(a.targetId())&&a.itemId()!=null&&a.firstD20()>=1&&a.firstD20()<=20&&a.selectedD20()>=1&&a.selectedD20()<=20&&(a.secondD20()==null||a.secondD20()>=1&&a.secondD20()<=20)&&a.status()!=null&&a.armorClass()>0&&a.finalArmorClass()>0&&a.damageAmount()>=0&&a.damageDice().size()<=40&&a.damageDice().stream().allMatch(d->d>=1&&d<=12)&&validBless(a.blessingEffectKey(),a.blessingD4()));
@@ -65,6 +77,7 @@ final class Schema2CombatStateValidator {
                 for(ReadyRelease r:f.readyReleases())check(frames.containsKey(r.frameKey())&&frames.get(r.frameKey()).kind()==FrameKind.READY_RELEASE&&triggers.containsKey(r.triggerKey())&&r.completed()==(r.outcome()!=null)&&r.completed()==(frames.get(r.frameKey()).status()==FrameStatus.TERMINAL));
             }
             validateAttackSequences(b);
+            Schema2MeleeControlRules.validate(b);
             validateMonstersAndBatches(b,actors,allFrames,keys);
             check(active<=1&&(b.status()!=Status.ENDED||active==0));
             for(TriggerFact t:triggers.values())check(allFrames.containsKey(t.sourceFrameKey()));
@@ -94,19 +107,79 @@ final class Schema2CombatStateValidator {
             if(b.status()==Status.ENDED)check(b.concentrationHolders().isEmpty()&&b.shields().stream().noneMatch(e->e.status()==EffectStatus.ACTIVE)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING));
         } catch(NullPointerException|NoSuchElementException malformed) {throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");}
     }
+    private static void validateMovement(Battle battle, Movement movement, Frame frame, Set<UUID> actors, boolean live,
+                                         List<TriggerFact> movementTriggers) {
+        check(frame!=null&&frame.kind()==FrameKind.MOVEMENT&&frame.ownerKey().equals(movement.movementKey())
+                &&reference(actors,movement.actorId(),live)&&movement.origin()!=null&&movement.path().size()>=1&&movement.path().size()<=64
+                &&movement.cursor()>=0&&movement.cursor()<=movement.path().size()&&movement.spent()==movement.cursor()*5
+                &&movement.spentHalfFeet()>=2*movement.spent()&&movement.spentHalfFeet()<=4*movement.spent()
+                &&movement.spentHalfFeet()%10==0&&movement.status()!=null&&movement.readied()==(movement.allowanceFeet()>0)
+                &&movement.allowanceFeet()>=0&&movement.allowanceFeet()<=120);
+        if (movement.readied()) check(movement.spentHalfFeet()<=movement.allowanceFeet()*2);
+        if (movement.status()==MovementStatus.COMPLETED)
+            check(frame.status()==FrameStatus.TERMINAL&&movement.cursor()==movement.path().size()&&movement.stopReason()==null);
+        else if (movement.status()==MovementStatus.PENDING) check(live&&frame.status()!=FrameStatus.TERMINAL&&movement.stopReason()==null);
+        else check(movement.stopReason()!=null&&(live||frame.status()==FrameStatus.TERMINAL));
+
+        Position origin=movement.origin();
+        for (Position next:movement.path()) {
+            check(origin.distanceFeet(next)==5);
+            origin=next;
+        }
+        DragPlan drag=movement.drag();
+        if (drag==null) return;
+        check(!movement.readied()&&frame.invocation()==Invocation.ROOT&&drag.origin()!=null
+                &&reference(actors,drag.targetId(),live)&&!movement.actorId().equals(drag.targetId())
+                &&drag.path().size()==movement.path().size()&&drag.allowanceHalfFeet()>=10*drag.path().size()
+                &&drag.allowanceHalfFeet()>=movement.spentHalfFeet()&&drag.allowanceHalfFeet()<=480);
+        GrappleRelation relation=battle.meleeControl().grapples().stream().filter(g->g.grappleKey().equals(drag.grappleKey()))
+                .findFirst().orElseThrow();
+        check(relation.grapplerId().equals(movement.actorId())&&relation.targetId().equals(drag.targetId())
+                &&movement.origin().distanceFeet(drag.origin())>0&&movement.origin().distanceFeet(drag.origin())<=relation.reachFeet());
+        origin=movement.origin();
+        Position targetOrigin=drag.origin();
+        for (int i=0;i<movement.path().size();i++) {
+            Position next=movement.path().get(i), targetNext=drag.path().get(i);
+            check(Schema2ActionFlowRules.validDragStep(origin,next,targetOrigin,targetNext,relation.reachFeet()));
+            origin=next;
+            targetOrigin=targetNext;
+        }
+        Set<Integer> departures=new HashSet<>(), moverEntries=new HashSet<>(), targetEntries=new HashSet<>();
+        for (TriggerFact trigger:movementTriggers) {
+            int segment=trigger.ordinal();
+            check(segment<movement.path().size());
+            if (trigger.kind()==TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE) {
+                check(segment<=movement.cursor()&&departures.add(segment)&&trigger.subjectId().equals(movement.actorId())
+                        &&drag.targetId().equals(trigger.targetId())&&movement.path().get(segment).equals(trigger.position()));
+            } else {
+                check(trigger.kind()==TriggerKind.CREATURE_ENTER_CELL_AFTER&&segment<movement.cursor()&&trigger.targetId()==null);
+                if (trigger.subjectId().equals(movement.actorId()))
+                    check(moverEntries.add(segment)&&movement.path().get(segment).equals(trigger.position()));
+                else check(trigger.subjectId().equals(drag.targetId())&&targetEntries.add(segment)
+                        &&drag.path().get(segment).equals(trigger.position()));
+            }
+        }
+        check(departures.containsAll(moverEntries)&&moverEntries.equals(targetEntries)&&moverEntries.size()==movement.cursor());
+    }
+
     private static void validateAttackSequences(Battle battle) {
+        record Ordinal(UUID actorId, int ordinal, boolean completed) { }
         for (Combatant actor : battle.combatants()) {
             AttackSequence sequence = actor.sequence();
             if (sequence == null) continue;
-            List<AttackAttempt> attempts = battle.flows().stream().flatMap(flow -> flow.attacks().stream())
+            List<Ordinal> attempts = new ArrayList<>(battle.flows().stream().flatMap(flow -> flow.attacks().stream())
                     .filter(attack -> sequence.sequenceKey().equals(attack.sequenceKey()))
-                    .sorted(Comparator.comparingInt(AttackAttempt::attackOrdinal)).toList();
+                    .map(attack -> new Ordinal(attack.actorId(),attack.attackOrdinal(),attack.status()==AttackStatus.RESOLVED)).toList());
+            for (MeleeContest contest:battle.meleeControl().contests())
+                if (sequence.sequenceKey().equals(contest.sequenceKey()))
+                    attempts.add(new Ordinal(contest.actorId(),contest.attackOrdinal(),contest.outcome()!=null));
+            attempts.sort(Comparator.comparingInt(Ordinal::ordinal));
             check(attempts.size() <= sequence.limit());
             int completed = 0;
             for (int ordinal = 0; ordinal < attempts.size(); ordinal++) {
-                AttackAttempt attack = attempts.get(ordinal);
-                check(attack.actorId().equals(actor.characterId()) && attack.attackOrdinal() == ordinal);
-                if (attack.status() == AttackStatus.RESOLVED) completed++;
+                Ordinal attack = attempts.get(ordinal);
+                check(attack.actorId().equals(actor.characterId()) && attack.ordinal() == ordinal);
+                if (attack.completed()) completed++;
                 else check(!sequence.closed() && ordinal == sequence.performed() && ordinal == attempts.size() - 1);
             }
             check(completed == sequence.performed() && attempts.size() - completed <= 1);

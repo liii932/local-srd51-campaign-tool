@@ -281,7 +281,7 @@ class CampaignExtraAttackIntegrationTest {
         return input;
     }
 
-    private static final class Fixture implements AutoCloseable {
+    static final class Fixture implements AutoCloseable {
         final CampaignStorageService service;
         final ArrayDeque<Integer> dice = new ArrayDeque<>();
         Boundary failure;
@@ -473,7 +473,7 @@ class CampaignExtraAttackIntegrationTest {
             assertEquals(reason, failure.getMessage());
             assertEquals(before, access());
         }
-        private JsonObject combatInput(Command command) {
+        JsonObject combatInput(Command command) {
             var battle = battle();
             var input = input("combatId", battle.combatId(), "combatVersion", battle.version());
             input.add("command", CampaignDomainCodec.toJson(command));
