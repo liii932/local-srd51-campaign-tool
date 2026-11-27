@@ -204,7 +204,7 @@ phase, ordinal)`，一次边只消费一次；保存、重新求值、请求重�
 
 ## 当前采用范围
 
-SQLite `campaign-spaces-3` 以 `CampaignSpaceData` 维护锚点、焦点、空间时钟和稳定怪物事实，
+SQLite `campaign-spaces-3` 以 `CampaignSpaceData` 维护锚点、焦点、空间时钟和稳定怪物事实（身份、HP、死亡、姿态及动作额度），
 以 `CampaignDomainData.Position` 保存唯一安置。`CampaignSpaceCommands` 核验焦点代次、落位、
 有向路线、目标占位及适用的交接义务，并在同一根提交安置、时钟和场景变更。
 [空间命令](../../../src/main/java/com/dndtool/service/storage/CampaignSpaceCommands.java)

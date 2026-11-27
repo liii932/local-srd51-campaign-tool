@@ -544,5 +544,43 @@
       "source_page": 398,
       "mode": "BLOCKED_METADATA"
     }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.wolf"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "bite"
+    },
+    "action_profile": {
+      "display_name": "Bite",
+      "description": "One creature within 5 feet. +4 to hit. On a hit, 2d4 + 2 piercing damage and a Strength saving throw to avoid falling prone.",
+      "source_page": 393,
+      "mode": "MELEE_ATTACK_V1",
+      "mechanism": "MONSTER_MELEE_ATTACK_V1",
+      "attack_profile": {
+        "hit_bonus": 4,
+        "reach_feet": 5,
+        "damage": [
+          {
+            "damage_type": "PIERCING",
+            "dice_count": 2,
+            "dice_sides": 4,
+            "modifier": 2
+          }
+        ],
+        "on_hit": {
+          "ability_key": "ability.strength",
+          "dc": 11,
+          "fail_outcome": "PRONE"
+        }
+      }
+    }
   }
 ]

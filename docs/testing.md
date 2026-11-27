@@ -87,7 +87,7 @@ python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```bash
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.4.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.5.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -250,7 +250,7 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    源的一致性及 DRAFT 作者向量。以下为 Bash 示例，Windows 使用对应候选路径及本机 Python。
 
    ```bash
-   war=target/dnd-tool-se-0.4.0.war
+   war=target/dnd-tool-se-0.5.0.war
    scenarios=rule-packages/srd51-runtime/scenarios
    python3 rule-packages/srd51-runtime/build-bundles.py --check
    python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
@@ -411,7 +411,7 @@ ZIP 原始身份和 SQLite 冻结投影。纯规则、应用消费者和独立�
 生产代码或打包资源变化后，从候选对应源码的根目录运行。使用 Python 3.11+ 和环境中的 JDK 21+（`java`、`javac`、`jdeps`）。
 
 ```bash
-python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.4.0.war
+python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.5.0.war
 ```
 
 保存命令、退出码及 JSON 输出，记录字节数、SHA-256、全部 ZIP 条目数、应用类和嵌套 JAR 数。
@@ -858,3 +858,18 @@ node tools/storage/browser-prone.cjs
 - 在同一候选 WAR 上运行[标准和作者变体场景](../rule-packages/srd51-runtime/scenarios/README.md#monster-melee)，核对准确模组版本、命中结果、各分量骰及实际 HP。
 - `CampaignMonsterAttackIntegrationTest` 使用独立的临时 SQLite 战役。普通啮咬只花动作。借机攻击前保存、结束并重开后，分别验证放弃、非致命命中后继续拖带、抓者失能后在已付费位置解除擒抱。重发请求返回原收据。替换单分量原骰并重算归档摘要时，打开应失败，当前战役保持可用。按本指南的私有临时根要求运行。
 - 用隔离启动器新建空存储根后，在工作台运行 `node tools/storage/browser-monster-attack.cjs --fresh-root "$storage_test_root"`。脚本使用真实服务端骰点，检查怪物攻击选择、离开前的反应、重开后的原停点以及战役记录。
+
+### 狼啮咬的命中后豁免
+
+- 在同一候选 WAR 上运行标准 `wolf-bite` 和作者 `wolf-bite-variant`。两只敌对狼固定穿刺原骰 2、3，目标 HP 从 11 到 4。力量豁免原骰 10 加 1，标准 DC 11 保持站立，家规 DC 12 倒地。另跑地狱犬近战和吐息，以覆盖共用的命中与豁免入口。[独立作者命令](../rule-packages/srd51-runtime/scenarios/README.md#wolf-bite)
+- 用 `CampaignWolfBiteIntegrationTest` 在私有临时根建战役，从真实命令保存、结束再打开完整文件。分别验证护盾术将 16 对 AC 13 的命中改为对 AC 18 未中、狼借机咬倒后保留拖带前缀与关系、重新宣告合法一格，以及活怪物离场返回后仍能起身。对晚写故障比较整个战役快照和原操作收据，对重试比较同一份原骰与花费。
+- 用本章隔离启动器和全新私有存储根运行 `node tools/storage/browser-wolf-bite.cjs --fresh-root "$storage_test_root"`。在工作台与战役记录核对最终命中、力量豁免明细、姿态和重开后的实际后续行动。浏览器使用真实随机数，两包的固定原骰对照由独立作者场景与 SQLite 测试负责。
+
+
+要在 SQLite 验收中使用和作者场景完全相同的制品，先按[狼的作者场景](../rule-packages/srd51-runtime/scenarios/README.md#wolf-bite)构建作者 ZIP。下列两个测试属性须同时提供。测试核对 WAR 内的四个标准原包、规则身份清单与导入后的冻结成员，家规战役再导入给定的原 ZIP。
+
+```bash
+mvn -Dtest=CampaignWolfBiteIntegrationTest \
+  -Ddnd.test.wolfWar="$war" \
+  -Ddnd.test.wolfVariant="$candidate_modules/dm-runtime-wolf-variant.zip" test
+```

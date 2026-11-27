@@ -245,6 +245,7 @@ public final class Schema2CompositionKernel {
     public static final int MONSTER_ATTACK_MAX_DAMAGE_DICE = 10;
     public static final Set<Integer> MONSTER_ATTACK_DIE_SIDES = Set.of(4, 6, 8, 10, 12);
     public static final Set<Integer> MONSTER_ATTACK_REACH_FEET = Set.of(5, 10);
+    public static final int MONSTER_ON_HIT_SAVE_MIN_DC = 1, MONSTER_ON_HIT_SAVE_MAX_DC = 30;
     public record MonsterAttackDamage(DamageType damageType, int diceCount, int diceSides, int modifier) {
         public MonsterAttackDamage {
             if (damageType == null || diceCount < 1 || diceCount > MONSTER_ATTACK_MAX_DAMAGE_DICE
@@ -253,7 +254,16 @@ public final class Schema2CompositionKernel {
                 throw new IllegalArgumentException("Invalid monster attack damage");
         }
     }
-    public record MonsterAttackProfile(int hitBonus, int reachFeet, List<MonsterAttackDamage> damage) {
+    public record MonsterOnHitSave(int dc) {
+        public MonsterOnHitSave {
+            if (dc < MONSTER_ON_HIT_SAVE_MIN_DC || dc > MONSTER_ON_HIT_SAVE_MAX_DC)
+                throw new IllegalArgumentException("Invalid monster on-hit save DC");
+        }
+        public String abilityKey() { return "ability.strength"; }
+        public String failOutcome() { return "PRONE"; }
+    }
+    public record MonsterAttackProfile(int hitBonus, int reachFeet, List<MonsterAttackDamage> damage,
+            MonsterOnHitSave onHit) {
         public MonsterAttackProfile {
             if (hitBonus < MONSTER_ATTACK_MIN_BONUS || hitBonus > MONSTER_ATTACK_MAX_BONUS
                     || !MONSTER_ATTACK_REACH_FEET.contains(reachFeet) || damage == null || damage.isEmpty()

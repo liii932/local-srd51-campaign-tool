@@ -144,6 +144,11 @@ final class Schema2MonsterRules {
     static int effectiveDamage(Map<UUID,Context> roster,Battle b,UUID target,DamageType type,boolean attack,int amount) {
         return Schema2SaveDamageRules.damage(amount,false,damageDefenses(roster,b,target,type,attack));
     }
+    static RuleIdentity proneImmunitySource(Map<UUID, Context> roster, Battle battle, UUID target) {
+        if (!isMonster(battle, target)) return null;
+        RuleIdentity monster = instance(battle, target).monster();
+        return definition(roster, monster).statBlock().conditionImmunities().contains("prone") ? monster : null;
+    }
     static List<DefenseContribution> damageDefenses(Map<UUID,Context> roster, Battle battle, UUID target,
             DamageType type, boolean nonmagicalAttack) {
         if (!isMonster(battle,target)) return List.of();

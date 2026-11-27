@@ -173,7 +173,12 @@ public final class CampaignDomainValidation {
             if (!actual.equals(expected)) throw CampaignJson.bad("Rule scene roster is incomplete");
             for (var m : battle.monsters()) {
                 var canonical = state.space().monsters().stream().filter(v -> v.id().equals(m.monsterId())).findFirst().orElseThrow(() -> CampaignJson.bad("Unknown battle monster"));
-                if (!canonical.rule().equals(m.monster()) || canonical.hitPoints() != m.hitPoints() || canonical.dead() != m.dead() || !canonical.actions().equals(m.actionUses())) throw CampaignJson.bad("Monster facts differ from their campaign owner");
+                var actor = battle.combatants().stream().filter(c -> c.characterId().equals(m.monsterId())).findFirst()
+                        .orElseThrow(() -> CampaignJson.bad("Missing battle monster posture"));
+                if (!canonical.rule().equals(m.monster()) || canonical.hitPoints() != m.hitPoints()
+                        || canonical.dead() != m.dead() || canonical.prone() != actor.prone()
+                        || !canonical.actions().equals(m.actionUses()))
+                    throw CampaignJson.bad("Monster facts differ from their campaign owner");
             }
         }
         for (var scene : state.space().scenes()) if (scene.resolution().equals("RULES") && !actualScenes.contains(scene.id())) throw CampaignJson.bad("Rule scene lacks process history");

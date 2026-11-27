@@ -2,6 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackDamage;
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackProfile;
+import com.dndtool.module.composition.Schema2CompositionKernel.MonsterOnHitSave;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_MAX_BONUS;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_MIN_BONUS;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_REACH_FEET;
@@ -187,12 +188,15 @@ final class Schema2CombatStateValidator {
         if (source.hitBonus() < MONSTER_ATTACK_MIN_BONUS || source.hitBonus() > MONSTER_ATTACK_MAX_BONUS
                 || !MONSTER_ATTACK_REACH_FEET.contains(source.reachFeet())) return false;
         boolean settled = attack.hit() && attack.status() == AttackStatus.RESOLVED;
-        if (!settled) return source.damageComponents().isEmpty() && attack.damageAmount() == 0;
+        if (!settled) return source.damageComponents().isEmpty() && attack.damageAmount() == 0 && source.onHit() == null;
+        var onHit = source.onHit();
+        if (onHit != null && !validMonsterOnHit(onHit)) return false;
         var profile = new ArrayList<MonsterAttackDamage>();
         try {
             for (var component : source.damageComponents())
                 profile.add(new MonsterAttackDamage(component.damageType(), component.diceCount(), component.diceSides(), component.modifier()));
-            new MonsterAttackProfile(source.hitBonus(), source.reachFeet(), profile);
+            new MonsterAttackProfile(source.hitBonus(), source.reachFeet(), profile,
+                    onHit == null ? null : new MonsterOnHitSave(onHit.difficultyClass()));
         } catch (IllegalArgumentException invalidProfile) {
             return false;
         }
@@ -207,6 +211,19 @@ final class Schema2CombatStateValidator {
             damage += component.effectiveDamage();
         }
         return damage == attack.damageAmount();
+    }
+
+    private static boolean validMonsterOnHit(MonsterAttackOnHitEvidence evidence) {
+        BatchCheck save = evidence.savingThrow();
+        if (evidence.immunitySource() != null && !"adventure.monster".equals(evidence.immunitySource().ruleType()))
+            return false;
+        if (evidence.outcome() != MonsterAttackOnHitEvidence.resolveOutcome(save, evidence.alreadyProne(), evidence.immunitySource()))
+            return false;
+        if (save == null) return evidence.selectedD20() == null;
+        return save.targetOrdinal() == 0 && Schema2ActionFlowRules.MONSTER_HIT_STR.equals(save.purpose())
+                && "ability.strength".equals(save.abilityKey()) && save.difficultyClass() == evidence.difficultyClass()
+                && Schema2SavingThrowRules.validResult(save)
+                && Objects.equals(Schema2SavingThrowRules.selectedD20(save), evidence.selectedD20());
     }
 
     private static void validateAttackSequences(Battle battle) {

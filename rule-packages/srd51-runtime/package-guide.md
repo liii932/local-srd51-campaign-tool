@@ -21,7 +21,7 @@ application that supports the saved mechanisms.
 | --- | --- | --- | --- |
 | `srd51_runtime` version `13` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
 | `srd51_characters` version `13` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `14` | extension | `srd51_runtime=13`, `srd51_characters=13` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `srd51_magic` version `15` | extension | `srd51_runtime=13`, `srd51_characters=13` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
 | `dm_runtime_house_rules` version `25` | extension | `srd51_runtime=13` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
@@ -145,9 +145,16 @@ of the target. Fire Breath uses a 15-foot cone, a DC 12 Dexterity save and
 6d6 fire damage, halved on success. Recharge is d6 on 5–6 at turn start and
 resets on rests. Mummy and Commoner actions remain catalog metadata.
 
-The separate `dm-runtime-monster-variant` author example replaces the full
-Bite profile after the standard combination. Its guide describes the
-independent verification values.
+Wolf has Pack Tactics and Keen Hearing and Smell. Its Bite uses a +4 melee
+attack at 5 feet, deals 2d4 + 2 piercing damage on a hit and calls for a DC 11
+Strength saving throw to avoid becoming prone. Its `attack_profile.on_hit` is
+optional and accepts only `ability_key: "ability.strength"`, an integer `dc`
+from 1 to 30 and `fail_outcome: "PRONE"`.
+
+The `dm-runtime-monster-variant` and `dm-runtime-wolf-variant` author examples
+replace the full Bite profile for Hell Hound or Wolf after the standard
+combination. The Wolf example changes the saving throw DC to 12. Both have
+independent author scenarios.
 
 The DM extension's fixed direct damage/healing/temporary-HP profiles are
 project-authored examples, not SRD spells or items. Its antimagic area is an

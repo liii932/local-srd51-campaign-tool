@@ -58,10 +58,10 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 | 检定与健康 | `character-command`、`check-effects`、`manual-check`。角色基础规则、`CampaignCheckEffects`、`CampaignManualCommands` | 原骰与选骰或被动分数依据、DC、修正、成功状态、效果计划、HP/临时 HP/死亡及版本进入角色与根历史 | 自由卡支持属性、技能、豁免及 MANUAL，分支可按序调整自由卡 HP、授予模板或临时物品、定位并记录消息。DM 按冻结规则执行规则卡的主动或被动属性、技能及工具检定，每个分支可对一个合格规则角色使用冻结健康效果、变更一个已有简单物品的数量、定位并记录消息 | 两分支、目标和版本核对先于检定与任何取骰，选中分支后果和根/子历史共同提交。精确能力差异见下方[支持边界](#支持边界和设计修订) |
 | 地图、场景与焦点 | `node-create`、`node-link`、`position`、`focus-set`、`scene-*`、`space-move`、`travel`；`CampaignSpaceCommands` | `scenes_world` 的世界节点、唯一安置、场景、焦点和各空间钟 | 自建节点与路线取代固定酒馆地图。首次安置、沿路线旅行、逐格移动及进出场使用各自命令。DM 裁定场景允许直接定位已入场的规则角色或自由卡 | 错锚点、占位、版本与焦点代次、后台冻结、源空间计时和跨文件恢复。三维区域及跨空间被动因果待采用 |
 | 战斗与动作 | combat-command；`CampaignDomainEngine`、`Schema2CombatRules` | `combat_scene` 完整当前/历史，`actions_frame` 为核验投影；角色 HP/资源仍属角色 | 先攻、回合、攻击、移动、OA、Ready、窗口/机会/父子帧与继续点完整保存 | OPEN/CLOSED 窗口保存恢复；支付/原骰只一次；跨角色后果共同提交 |
-| 倒地姿态与爬行 | `combat-command/DROP_PRONE/MOVE/EXPLORATION_MOVE/STAND_UP/READY_MOVE`；战斗、探索与动作继续 owner | 复用 `Combatant.prone`、半尺战斗成本、物理路径游标和探索速度预检，无第二份状态 | 完整文件保留姿态、已走前缀、反应支付及未决继续点；原包/结构不变，B 类应用能力 | [有限倒地合同](../../rules/schema-2-prone.md)；ACTIVE/Ready 爬行及失能停止保持；探索卧倒零耗时，爬行按当前速度限额，移动/起身各六秒并保留旧战斗预算，逐格区域与末尾到期同事务；战斗交接/END 重开不清姿态，起身前不能离场；战斗推倒由[近战控制](../../rules/schema-2-melee-control.md)产生 |
+| 倒地姿态与爬行 | `combat-command/DROP_PRONE/MOVE/EXPLORATION_MOVE/STAND_UP/READY_MOVE`；战斗、探索与动作继续 owner | 场景以 `Combatant.prone` 计算起身和爬行，按半尺记录战斗花费，并保留逐格路径和探索速度预检。怪物姿态与战役空间聚合在同一事务内同步 | 完整文件保留姿态、已走前缀、反应支付及未决继续点。主动卧倒、起身与爬行为 B 类应用能力 | [有限倒地合同](../../rules/schema-2-prone.md)；ACTIVE/Ready 爬行及失能停止保持；探索卧倒零耗时，爬行按当前速度限额，移动/起身各六秒并保留旧战斗预算，逐格区域与末尾到期同事务；战斗交接/END 重开不清姿态，活着的倒地规则角色起身前不能离场。怪物姿态随实例转移，可在规则场景起身。战斗推倒由[近战控制](../../rules/schema-2-melee-control.md)产生 |
 | 施法与法术书 | 角色 `character-command` 法术书/准备/恢复；场景 `combat-command` 施法/反应 | 法术书归角色、`spellcasting_book` 投影；施法尝试、成本、目标和原骰归场景动作历史 | 五个已支持法术机制使用同一规则、装备、资源与继续流 | 生命领域 Bless/Cure Wounds，单职业法师 Shield/Counterspell/Burning Hands。其余法师目录法术限学习/准备元数据，施放请求拒绝 |
 | 持续效果与环境 | 场景专注、环境、探索/战斗交接 | 场景效果、专注持有、压制、期限及历史；`effects_instance` 核验投影 | 保存 SHADOWED、已结束但仍被引用的实例及继续义务 | 专注、到期、独立压制原因、恢复后无重复贡献或结束回调。抗魔区域是 DM 家规，Antimagic Field 法术待采用 |
-| 怪物与共享伤害 | `monster-create`、空间转移、场景吐息/充能/休息 | 战役怪物身份、HP 与动作额度由空间聚合保管，场景保存结算前后事实与共享伤害批次 | 共享原骰、目标证明、逐目标豁免和伤害包、已消费动作及休息保留 | 已掷未 APPLY 保存恢复；多目标 HP/专注同根提交。地狱犬的[啮咬](../../rules/schema-2-monster-attacks.md)共用普通/反应攻击流程，分别保留穿刺和火焰原骰，吐息保留共享火焰骰 |
+| 怪物与共享伤害 | `monster-create`、空间转移、场景吐息/充能/休息 | 战役怪物身份、HP、姿态与动作额度由空间聚合保管，场景保存结算前后事实与共享伤害批次 | 共享原骰、目标证明、逐目标豁免和伤害包、已消费动作及休息保留 | 已掷未 APPLY 保存恢复；多目标 HP/专注同根提交。地狱犬的[啮咬](../../rules/schema-2-monster-attacks.md)共用普通/反应攻击流程，分别保留穿刺和火焰原骰，吐息保留共享火焰骰。狼啮咬保留真实力量豁免、命中后裁定及怪物转场姿态 |
 | 历史、消息与重试 | 所有命令及 `note`；`CampaignDomainValidation` 和各领域历史验证 | `history_runtime_root` 连续根、角色和场景完整子事件；`core_command` 保存运行本地接受收据 | 按原请求与保留骰序列纯核对各历史前缀；文件保存全部根和子事实，直接装载现状 | `note` 承接 v1 记录说明用途，同键同意图返回原事实。错版本、异意图、坏邻接、孤儿和重排拒绝 |
 | 玩家参与 | `/api/host/storage/players/*`、可选 HTTPS `/player` 和 `/api/player/*`。`PlayerServlet`、`HostPlayerServlet`、`PlayerBoundaryFilter` | `participation_state` 和参与关系投影，`Root.actor` 归因，`CampaignAdjudicationCommands` 保存规则卡属性检定的有界裁定，`core_player_control` 保存私有授权 | 完整文件保留成员、控制、共享、许可和业务归因。原库显式恢复并重新开放后可凭有效设备绑定换新会话，显式领用写连接。文件重开须再批准设备 | 逐人裁剪/候选、实际操作者、暂停/撤权、单写、原收据查证和 TLS 隔离。自由卡可分配和查看，直接操作待采用。HTTPS 默认关闭，真实 LAN 设备信任单独验收 |
 
@@ -72,7 +72,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@13`、`srd51_characters@13`、`srd51_magic@14`，第四个成员分别为
+`srd51_runtime@13`、`srd51_characters@13`、`srd51_magic@15`，第四个成员分别为
 `dm_runtime_house_rules@25` 与 `dm_runtime_house_rules@26`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和

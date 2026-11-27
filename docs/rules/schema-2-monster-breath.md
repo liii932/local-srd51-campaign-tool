@@ -6,7 +6,7 @@
 SQLite 场景通过 `CampaignDomainEngine`、`Schema2MonsterRules` 和 `Schema2SaveDamageRules`
 接入冻结的怪物部署、充能与动作。地狱犬吐息采用 `SAVE_DAMAGE_BATCH_V1` /
 `HELL_HOUND_FIRE_BREATH_V1`。Mummy 的火易伤和 Hell Hound 的火免疫参与真实目标结算。
-地狱犬 Bite 开放[近战攻击与借机攻击](schema-2-monster-attacks.md)。木乃伊的 Multiattack、Rotting Fist 和 Dreadful Glare 保留为元数据。
+地狱犬和狼的 Bite 都可用于普通近战和借机攻击。狼最终命中后让目标做力量豁免，失败倒地。木乃伊的 Multiattack、Rotting Fist 和 Dreadful Glare 保留为元数据。[怪物近战与借机攻击](schema-2-monster-attacks.md)
 [战斗](schema-2-combat.md)与[多目标目标合同](../design/v2/multi-target-save-damage.md)
 分别给出当前动作边界和更广的后续接口。
 
@@ -70,12 +70,10 @@ Perception 和 Pack Tactics 攻击骰，与本次 OTHER_DELIVERY 吐息／DEX／
 
 ## 实际命令与唯一继续点
 
-`START` 通过封闭 `MonsterDeployment` 绑定怪物业务 UUID、准确最终规则身份、格坐标及阵营。
-角色保留原 prepared run/snapshot，怪物引用该场景相同的规则组合；不得跨战役或用角色
-身份冒充怪物。位置、先攻、回合及动作／反应仍归场景 owner，怪物 HP 和 action-use 归
-场景中的唯一 `MonsterInstance`，不写入角色健康表或复制第二份怪物当前状态。
-真实服务仍要求 2—16 个 prepared 角色，加入怪物后场景总数不超过 64；不开放纯怪物或
-零／单角色服务入口。当前只接纳 SMALL／MEDIUM 点格怪物，其他体型在部署前拒绝。
+`MonsterDeployment` 绑定战役怪物的 UUID、冻结规则身份、格坐标及阵营。SQLite 工作台可用一名规则角色和一只敌对怪物开战。每个场景最多容纳 16 名规则角色，计入怪物后最多 64 个参与者。当前运行支持小型和中型怪物，各占一个五尺方格。
+
+场景管理先攻、回合和动作／反应。战役怪物记录保管 HP、死亡、姿态和动作额度。它们与场景中的 `MonsterInstance` 和参与者姿态在同一事务内核对。怪物离场或再入场时以同一 UUID 交接这些事实。[战役空间与场景](../design/v2/world-and-scene-spaces.md)
+
 作者 HP 字段的词法上界为100000，仍须满足生命骰平均值等约束；当前运行额外要求
 HP≤65535。显式 monster save bonus
 减相应属性修正必须恰等于其 CR 推导 PB：CR0—4 为2、5—8 为3、9—12 为4、13—16 为5、

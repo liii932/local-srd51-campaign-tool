@@ -15,6 +15,7 @@ import static com.dndtool.service.Schema2CombatState.*;
 final class Schema2ActionFlowRules {
     private static final String MOVEMENT_INTERRUPTED = "ACTOR_INACTIVE_OR_NO_MOVEMENT";
     private static final String DRAG_ENDED = "GRAPPLE_ENDED";
+    static final String MONSTER_HIT_STR = "MONSTER_HIT_STR";
     interface Roller { int draw(String purpose,UUID subject,int sides); }
     private final Schema2CombatRules combat;
     private final Schema2SpellRules spells=new Schema2SpellRules();
@@ -31,6 +32,11 @@ final class Schema2ActionFlowRules {
             Schema2SaveDamageRules.prepareSpell(roster,b,cast.actorId(),new CastInput(cast.castingRule(),cast.spell(),List.of(),null,cast.slotLevel(),null,cast.coneDirection()));
         if(continuation(c.kind())) {
             Flow f=b.activeFlow(); require(f!=null&&f.flowKey().equals(c.flowKey())&&Objects.equals(f.leafFrameKey(),c.leafKey()),"ACTION_FLOW_TARGET_MISMATCH");
+            for (AttackAttempt attack : f.attacks()) {
+                if (attack.monsterAttack() == null || attack.status() != AttackStatus.HIT_PENDING_DAMAGE) continue;
+                var profile = Schema2MonsterRules.meleeAttack(roster, b, attack.actorId(), attack.monsterAttack().action());
+                prepareMonsterOnHit(roster, b, attack.targetId(), profile.onHit());
+            }
             Frame leaf=frame(f,c.leafKey());Window w=window(f,c.windowKey());
             require(Objects.equals(leaf.windowKey(),w.windowKey()),"ACTION_FLOW_TARGET_MISMATCH");
             if(c.kind()==Kind.CONTINUE_FLOW||c.kind()==Kind.CONTINUE_MOVEMENT) {
@@ -117,6 +123,13 @@ final class Schema2ActionFlowRules {
         prepareTargetHealth(roster, battle, target);
         Context context = roster.get(target);
         if (context != null) equipment.derive(context.material(), context.character());
+        prepareMonsterOnHit(roster, battle, target, profile.onHit());
+    }
+    private static void prepareMonsterOnHit(Map<UUID, Context> roster, Battle battle, UUID target, MonsterOnHitSave onHit) {
+        if (onHit != null) Schema2SavingThrowRules.prepare(roster, battle, creatureRef(roster, target), onHit.abilityKey());
+    }
+    private static CreatureRef creatureRef(Map<UUID, Context> roster, UUID target) {
+        return new CreatureRef(roster.containsKey(target) ? CreatureKind.CHARACTER : CreatureKind.MONSTER, target);
     }
     private static DragPlan dragPlan(Battle battle, Command command) {
         DragInput input = command.dragInput();
@@ -131,8 +144,10 @@ final class Schema2ActionFlowRules {
         // Every potentially reacting monster needs a complete reach and attack reader before any path prefix.
         for (MonsterInstance monster : b.monsters()) {
             Combatant candidate = actor(b, monster.monsterId());
-            if (!monster.dead() && candidate.side() != a.side() && candidate.reactionAvailable())
-                Schema2MonsterRules.opportunityAttacks(roster, monster);
+            if (!monster.dead() && candidate.side() != a.side() && candidate.reactionAvailable()) {
+                for (MonsterActionEntry entry : Schema2MonsterRules.opportunityAttacks(roster, monster))
+                    prepareMonsterOnHit(roster, b, source, entry.actionProfile().attackProfile().onHit());
+            }
         }
         require(!path.isEmpty()&&path.size()<=64,"S2_COMBAT_PATH");
         int speed = combat.speed(roster,b,source);
@@ -445,7 +460,7 @@ final class Schema2ActionFlowRules {
         void beginMonsterAttack(UUID subject, UUID target, EntryIdentity action, UUID parent, Invocation invocation) {
             var profile = Schema2MonsterRules.meleeAttack(roster,b,subject,action);
             var allies = Schema2MonsterRules.packTacticsAllies(roster,b,subject,target);
-            var evidence = new MonsterAttackEvidence(action,profile.hitBonus(),profile.reachFeet(),allies,List.of());
+            var evidence = new MonsterAttackEvidence(action,profile.hitBonus(),profile.reachFeet(),allies,List.of(),null);
             rollAttack(subject,target,null,null,parent,invocation,invocation==Invocation.REACTION,0,0,false,evidence);
         }
         void rollAttack(UUID subject, UUID target, UUID item, AttackSequence sequence, UUID parent, Invocation invocation,
@@ -490,7 +505,10 @@ final class Schema2ActionFlowRules {
             boolean criticalRoll=a.selectedD20()>=criticalMinimum(a.actorId(),monster);
             boolean hit=attackHits(a.selectedD20(),criticalRoll,attackBonus(a.abilityModifier(),a.proficiencyBonus(),a.blessingD4(),monster),ac);
             boolean critical=hit&&(criticalRoll||targetHp(a.targetId())==0&&Schema2ActionFlowRules.actor(b,a.actorId()).position().distanceFeet(Schema2ActionFlowRules.actor(b,a.targetId()).position())<=5);
-            List<Integer> damage=new ArrayList<>();int amount=0;
+            List<Integer> damage = new ArrayList<>();
+            List<AttackDamageComponent> components = List.of();
+            MonsterOnHitSave onHit = null;
+            int amount = 0;
             if(hit) {
                 if (monster == null) {
                     var profile=combat.weapon(roster.get(a.actorId()),a.itemId());
@@ -498,15 +516,12 @@ final class Schema2ActionFlowRules {
                     amount=Math.max(0,damage.stream().mapToInt(Integer::intValue).sum()+a.abilityModifier());
                     amount=Schema2MonsterRules.effectiveDamage(roster,b,a.targetId(),profile.damageType(),true,amount);
                 } else {
-                    var components = monsterDamage(a, monster, critical);
+                    var profile = Schema2MonsterRules.meleeAttack(roster, b, a.actorId(), monster.action());
+                    components = monsterDamage(a, profile, critical);
                     amount = components.stream().mapToInt(AttackDamageComponent::effectiveDamage).sum();
-                    monster = new MonsterAttackEvidence(monster.action(),monster.hitBonus(),monster.reachFeet(),
-                            monster.packTacticsAllies(),components);
+                    onHit = profile.onHit();
                 }
             }
-            attack(new AttackAttempt(a.frameKey(),a.actorId(),a.targetId(),a.itemId(),a.sequenceKey(),a.attackOrdinal(),a.opportunityAttack(),
-                    a.firstD20(),a.secondD20(),a.selectedD20(),a.abilityModifier(),a.proficiencyBonus(),a.armorClass(),a.advantage(),
-                    a.disadvantage(),critical,hit,damage,amount,a.blessingEffectKey(),a.blessingD4(),AttackStatus.RESOLVED,a.initialHit(),ac,monster));
             if(amount>0) {
                 if(dest==null)b=Schema2MonsterRules.damage(b,a.targetId(),amount);
                 else {
@@ -515,11 +530,37 @@ final class Schema2ActionFlowRules {
                 }
                 if(targetHp(a.targetId())==0) {Combatant t=Schema2ActionFlowRules.actor(b,a.targetId());actor(new Combatant(t.characterId(),t.position(),t.side(),false,t.reactionAvailable(),t.movementSpentHalfFeet(),t.movementBonus(),t.disengaged(),t.dodging(),t.sequence(),true));}
             }
+            if (monster != null) {
+                var onHitResult = onHit == null ? null : resolveMonsterOnHit(a.targetId(), onHit);
+                monster = new MonsterAttackEvidence(monster.action(), monster.hitBonus(), monster.reachFeet(),
+                        monster.packTacticsAllies(), components, onHitResult);
+            }
+            attack(new AttackAttempt(a.frameKey(),a.actorId(),a.targetId(),a.itemId(),a.sequenceKey(),a.attackOrdinal(),a.opportunityAttack(),
+                    a.firstD20(),a.secondD20(),a.selectedD20(),a.abilityModifier(),a.proficiencyBonus(),a.armorClass(),a.advantage(),
+                    a.disadvantage(),critical,hit,damage,amount,a.blessingEffectKey(),a.blessingD4(),AttackStatus.RESOLVED,a.initialHit(),ac,monster));
             if(a.sequenceKey()!=null) {Combatant actor=Schema2ActionFlowRules.actor(b,a.actorId());AttackSequence s=actor.sequence();int performed=s.performed()+1;actor(new Combatant(actor.characterId(),actor.position(),actor.side(),actor.actionAvailable(),actor.reactionAvailable(),actor.movementSpentHalfFeet(),actor.movementBonus(),actor.disengaged(),actor.dodging(),new AttackSequence(s.sequenceKey(),s.limit(),performed,s.forfeited(),performed+s.forfeited()==s.limit()),actor.prone()));}
             afterAttack(id, null);
         }
-        private List<AttackDamageComponent> monsterDamage(AttackAttempt attack, MonsterAttackEvidence evidence, boolean critical) {
-            var profile = Schema2MonsterRules.meleeAttack(roster,b,attack.actorId(),evidence.action());
+        private MonsterAttackOnHitEvidence resolveMonsterOnHit(UUID target, MonsterOnHitSave onHit) {
+            Combatant defender = Schema2ActionFlowRules.actor(b, target);
+            Context context = roster.get(target);
+            boolean dead = context == null ? Schema2MonsterRules.instance(b, target).dead() : context.character().health().dead();
+            RuleIdentity immunity = Schema2MonsterRules.proneImmunitySource(roster, b, target);
+            BatchCheck savingThrow = null;
+            Integer selectedD20 = null;
+            if (!dead) {
+                var basis = Schema2SavingThrowRules.prepare(roster, snapshot(), creatureRef(roster, target), onHit.abilityKey());
+                savingThrow = Schema2SavingThrowRules.resolve(basis, 0, MONSTER_HIT_STR, target, onHit.dc(), dice);
+                selectedD20 = Schema2SavingThrowRules.selectedD20(savingThrow);
+            }
+            var outcome = MonsterAttackOnHitEvidence.resolveOutcome(savingThrow, defender.prone(), immunity);
+            if (outcome == OnHitOutcome.PRONE_APPLIED)
+                actor(new Combatant(defender.characterId(), defender.position(), defender.side(), defender.actionAvailable(),
+                        defender.reactionAvailable(), defender.movementSpentHalfFeet(), defender.movementBonus(),
+                        defender.disengaged(), defender.dodging(), defender.sequence(), true));
+            return new MonsterAttackOnHitEvidence(onHit.dc(), savingThrow, selectedD20, defender.prone(), immunity, outcome);
+        }
+        private List<AttackDamageComponent> monsterDamage(AttackAttempt attack, MonsterAttackProfile profile, boolean critical) {
             List<AttackDamageComponent> components = new ArrayList<>();
             for (MonsterAttackDamage spec : profile.damage()) {
                 List<Integer> rolls = new ArrayList<>();

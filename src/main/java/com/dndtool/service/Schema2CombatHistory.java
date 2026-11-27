@@ -276,19 +276,45 @@ public final class Schema2CombatHistory {
             if (attack.status() == AttackStatus.RESOLVED && (old == null || old.status() != AttackStatus.RESOLVED)) {
                 for (var component : attack.monsterAttack().damageComponents()) for (int die : component.dice())
                     expectedRolls.add(new Roll("MONSTER_ATTACK_DAMAGE_" + component.damageType(), attack.actorId(), component.diceSides(), die));
+                HealthChange damage = null;
                 if (event.dependencies().stream().anyMatch(dep -> dep.characterId().equals(attack.targetId()))) {
                     var applied = event.resolution().healthChanges().stream().filter(change -> change.frameKey().equals(attack.frameKey())
                             && change.characterId().equals(attack.targetId()) && change.resource() == null && !change.healing()).toList();
                     require(applied.size() == (attack.damageAmount() > 0 ? 1 : 0));
-                    if (!applied.isEmpty()) require(applied.getFirst().damageAmount() == attack.damageAmount()
-                            && applied.getFirst().critical() == attack.critical());
+                    if (!applied.isEmpty()) {
+                        damage = applied.getFirst();
+                        require(damage.damageAmount() == attack.damageAmount() && damage.critical() == attack.critical());
+                    }
                 }
+                if (attack.monsterAttack().onHit() != null)
+                    validateMonsterOnHitTransition(event, attack, damage, expectedRolls);
             }
         }
         require(prior.isEmpty() && created == (command.monsterAttackInput() == null ? 0 : 1));
         var actualRolls = event.resolution().rolls().stream().filter(r -> r.purpose().startsWith("MONSTER_ATTACK_DAMAGE_")
+                || r.purpose().startsWith(Schema2ActionFlowRules.MONSTER_HIT_STR + "_")
                 || monsterAttackers.contains(r.subjectId()) && Set.of("ATTACK_D20", "ATTACK_D20_SECOND").contains(r.purpose())).toList();
         require(expectedRolls.equals(actualRolls));
+    }
+
+    private static void validateMonsterOnHitTransition(Event event, AttackAttempt attack, HealthChange damage,
+            List<Roll> expectedRolls) {
+        UUID target = attack.targetId();
+        var evidence = attack.monsterAttack().onHit();
+        var monster = event.after().monsters().stream().filter(m -> m.monsterId().equals(target)).findFirst().orElse(null);
+        boolean dead = monster == null ? damage != null && damage.after().health().dead() : monster.dead();
+        boolean droppedToZero = attack.damageAmount() > 0
+                && (monster == null ? damage != null && damage.after().hitPoints() == 0 : monster.hitPoints() == 0);
+        boolean alreadyProne = member(event.before(), target).prone() || droppedToZero;
+        require(dead == (evidence.outcome() == OnHitOutcome.TARGET_DEAD) && alreadyProne == evidence.alreadyProne());
+        require(evidence.immunitySource() == null || monster != null && monster.monster().equals(evidence.immunitySource()));
+        require(member(event.after(), target).prone() == (alreadyProne || evidence.outcome() == OnHitOutcome.PRONE_APPLIED));
+        BatchCheck save = evidence.savingThrow();
+        if (save == null || save.mode() == CheckMode.AUTO_FAILURE) return;
+        String purpose = Schema2ActionFlowRules.MONSTER_HIT_STR;
+        expectedRolls.add(new Roll(purpose + "_D20", target, 20, save.firstD20()));
+        if (save.secondD20() != null) expectedRolls.add(new Roll(purpose + "_SECOND_D20", target, 20, save.secondD20()));
+        if (save.blessingD4() != null) expectedRolls.add(new Roll(purpose + "_BLESS_D4", target, 4, save.blessingD4()));
     }
 
     private static void validateExtendedTransition(Event event) {
@@ -603,16 +629,8 @@ public final class Schema2CombatHistory {
         var targets=batch.targetProof().targets();require(batch.packets().size()==targets.size()&&batch.checks().size()>=targets.size()&&batch.checks().size()<=2*targets.size());
         for(var c:batch.checks()) {
             require(c.targetOrdinal()>=0&&c.targetOrdinal()<targets.size()&&Set.of(batch.spellSource()==null?"BREATH_DEX":"SPELL_DEX","CONCENTRATION_CON").contains(c.purpose())
-                    &&c.abilityKey().equals(c.purpose().equals("CONCENTRATION_CON")?"ability.constitution":"ability.dexterity")&&c.mode()!=null
-                    &&c.abilityModifier()>=-5&&c.abilityModifier()<=10&&c.proficiencyBonus()>=0&&c.proficiencyBonus()<=6&&c.difficultyClass()>=0&&c.difficultyClass()<=32767
-                    &&(c.blessingEffectKey()==null?c.blessingD4()==null:c.blessingD4()!=null&&c.blessingD4()>=1&&c.blessingD4()<=4));
-            if(c.mode()==CheckMode.AUTO_FAILURE)require(c.firstD20()==null&&c.secondD20()==null&&!c.success());
-            else {
-                require(c.firstD20()!=null&&c.firstD20()>=1&&c.firstD20()<=20&&((c.advantage()!=c.disadvantage())==(c.secondD20()!=null)));
-                if(c.secondD20()!=null)require(c.secondD20()>=1&&c.secondD20()<=20);
-                int selected=c.secondD20()==null?c.firstD20():c.advantage()?Math.max(c.firstD20(),c.secondD20()):Math.min(c.firstD20(),c.secondD20());
-                require(c.total()==selected+c.abilityModifier()+c.proficiencyBonus()+(c.blessingD4()==null?0:c.blessingD4())&&c.success()==(c.total()>=c.difficultyClass()));
-            }
+                    &&c.abilityKey().equals(c.purpose().equals("CONCENTRATION_CON")?"ability.constitution":"ability.dexterity")
+                    &&Schema2SavingThrowRules.validResult(c));
         }
         for(int i=0;i<targets.size();i++) {
             var p=batch.packets().get(i);require(p.targetOrdinal()==i&&p.packetKey()!=null&&packetKeys.add(p.packetKey())&&p.sharedRollKey().equals(batch.sharedRoll().rollKey())
@@ -687,6 +705,7 @@ public final class Schema2CombatHistory {
                     count += 1L + monster.packTacticsAllies().size();
                     for (var component : monster.damageComponents())
                         count += 1L + component.dice().size() + component.defenses().size();
+                    if (monster.onHit() != null) count += monster.onHit().savingThrow() == null ? 1 : 2;
                 }
             }
             for (CastAttempt cast : flow.casts()) count += 1L + cast.targets().size() + cast.healingDice().size();

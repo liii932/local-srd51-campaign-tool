@@ -88,7 +88,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 |---|---|
 | `srd51_runtime@13` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
 | `srd51_characters@13` | extension，直接依赖 `srd51_runtime@13`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
-| `srd51_magic@14` | extension，直接依赖前两包 |
+| `srd51_magic@15` | extension，直接依赖前两包 |
 | `dm_runtime_house_rules@25` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@13` |
 | `dm_runtime_house_rules@26` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@13` |
 
@@ -105,7 +105,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 或局部键合并外部内容。新建与文件打开按绑定的原包重组。标准组合使用应用随附字节，自定义组合使用本机接受的原包。打开时逐项比对全部冻结材料。
 最多两份上下文缓存以完整不可变材料为键，损坏规则行或链不能借相同摘要绕过校验。
 改变成员、版本或规则解释必须新建战役，不在历史上热改规则。
-冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V3`；读取时拒绝不匹配的解释标识和缺失字段。
+冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V4`；读取时拒绝不匹配的解释标识和缺失字段。
 数据来源、许可、确定性构建和完整限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
 
 Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级。`character-create` 默认用
@@ -136,7 +136,7 @@ Grappler 仅保留阻断元数据，不允许在当前 SQLite 运行中获得；
 
 施法只支持 Bless、Cure Wounds、Shield、Counterspell 和 Burning Hands 的有界算法；
 其余 Wizard 法术只可作为学习/准备元数据。多施法职业共享槽不得由独立资源拼凑。
-地狱犬的火焰吐息使用独立充能。啮咬读取战役冻结的近战动作条目，普通动作或反应各自扣费，窗口、触及、盟友、原骰和分量伤害随场景保存。[怪物攻击合同](rules/schema-2-monster-attacks.md)
+地狱犬的火焰吐息使用独立充能。啮咬读取战役冻结的近战动作条目，普通动作或反应各自扣费，窗口、触及、盟友、原骰和分量伤害随场景保存。狼啮咬还保留力量豁免证据、倒地裁定和免疫来源；怪物的姿态随战役实例离场再返。[怪物攻击合同](rules/schema-2-monster-attacks.md)
 DM 抗魔区域及固定直接生命效果是显式家规，不称作 SRD 法术或物品。
 
 规则角色无需额外特性即可在本人 ACTIVE 回合或 EXPLORATION [主动卧倒、爬行和起身](rules/schema-2-prone.md)。
@@ -146,7 +146,7 @@ Host 与获准玩家入口共用预检；Ready 爬行、OA 暂停及原路径后
 逐格核对区域后，整段末尾推进六秒并处理到期；探索起身也推进六秒。旧移动、Dash 增益、动作和反应余额保持，
 不产生新回合；六秒活动是应用边界，不是 SRD 起身成本。END_COMBAT、重新进入战斗与完整文件 END 重开均保留姿态；
 尚未死亡的倒地规则角色起身前不能离场或关闭场景，零 HP 者需先治疗。
-本能力更新应用，不修改原包版本、准确依赖或活动战役的冻结组合。
+怪物在规则场景起身时同步更新战役实例。规则角色主动卧倒、爬行和起身使用应用内建规则。
 
 ## 结构、所有者与事务
 

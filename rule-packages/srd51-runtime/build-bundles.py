@@ -9,7 +9,7 @@ import zipfile
 
 PACKAGES = ("srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules",
             "dm-runtime-check-variant")
-AUTHOR_CANDIDATES = ("dm-runtime-monster-variant",)
+AUTHOR_CANDIDATES = ("dm-runtime-monster-variant", "dm-runtime-wolf-variant")
 EXISTING_GUIDE_PACKAGES = ("srd51-runtime", "srd51-characters", "dm-runtime-house-rules")
 
 

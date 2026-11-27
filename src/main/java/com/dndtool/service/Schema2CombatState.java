@@ -32,6 +32,7 @@ public final class Schema2CombatState {
         CREATURE_ENTER_CELL_AFTER, ATTACK_COMPLETED, CAST_COMPLETED, MONSTER_ACTION_COMPLETED }
     public enum CastStatus { PENDING, HELD, RESOLVED, COUNTERED, INTERRUPTED }
     public enum AttackStatus { HIT_PENDING_DAMAGE, RESOLVED }
+    public enum OnHitOutcome { SAVE_SUCCEEDED, PRONE_APPLIED, ALREADY_PRONE, CONDITION_IMMUNE, TARGET_DEAD }
     public enum ReadyResponseKind { ATTACK, MOVE, SPELL }
     public enum ReadyStatus { PREPARING, ARMED, RELEASED, EXPIRED, LOST }
     public enum ConcentrationKind { BLESS_EFFECT, READY_SPELL }
@@ -357,10 +358,19 @@ public final class Schema2CombatState {
         public AttackAttempt { damageDice = List.copyOf(damageDice); }
     }
     public record MonsterAttackEvidence(EntryIdentity action, int hitBonus, int reachFeet, List<UUID> packTacticsAllies,
-            List<AttackDamageComponent> damageComponents) {
+            List<AttackDamageComponent> damageComponents, MonsterAttackOnHitEvidence onHit) {
         public MonsterAttackEvidence {
             packTacticsAllies = List.copyOf(packTacticsAllies);
             damageComponents = List.copyOf(damageComponents);
+        }
+    }
+    public record MonsterAttackOnHitEvidence(int difficultyClass, BatchCheck savingThrow, Integer selectedD20,
+            boolean alreadyProne, RuleIdentity immunitySource, OnHitOutcome outcome) {
+        static OnHitOutcome resolveOutcome(BatchCheck savingThrow, boolean alreadyProne, RuleIdentity immunitySource) {
+            if (savingThrow == null) return OnHitOutcome.TARGET_DEAD;
+            if (savingThrow.success()) return OnHitOutcome.SAVE_SUCCEEDED;
+            if (immunitySource != null) return OnHitOutcome.CONDITION_IMMUNE;
+            return alreadyProne ? OnHitOutcome.ALREADY_PRONE : OnHitOutcome.PRONE_APPLIED;
         }
     }
     public record AttackDamageComponent(DamageType damageType, int diceCount, int diceSides, int modifier,
