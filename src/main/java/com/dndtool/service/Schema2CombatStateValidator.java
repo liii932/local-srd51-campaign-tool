@@ -1,5 +1,10 @@
 package com.dndtool.service;
 
+import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackDamage;
+import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackProfile;
+import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_MAX_BONUS;
+import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_MIN_BONUS;
+import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_REACH_FEET;
 import java.util.*;
 import static com.dndtool.service.Schema2CombatState.*;
 
@@ -47,7 +52,7 @@ final class Schema2CombatStateValidator {
                     Set<UUID> candidates=new HashSet<>();int pending=0;
                     for(int j=0;j<w.opportunities().size();j++) {
                         Opportunity o=w.opportunities().get(j);id(o.opportunityKey());check(keys.add(o.opportunityKey())&&reference(actors,o.actorId(),live)&&candidates.add(o.actorId())&&o.priority()==j&&!o.options().isEmpty()&&new HashSet<>(o.options()).size()==o.options().size());
-                        for(ReactionOption option:o.options()) {check(option.kind()!=null);if(option.kind()==ReactionKind.OPPORTUNITY_ATTACK)check(option.itemId()!=null&&option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0&&option.readyKey()==null);else if(option.kind()==ReactionKind.READY_RELEASE)check(option.readyKey()!=null&&option.itemId()==null&&option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0);else check(option.itemId()==null&&option.readyKey()==null&&option.castingRule()!=null&&option.spell()!=null&&option.slotLevel()>=1&&option.slotLevel()<=9);}
+                        for(ReactionOption option:o.options()) {check(option.kind()!=null);if(option.kind()!=ReactionKind.OPPORTUNITY_ATTACK)check(option.monsterAttack()==null);if(option.kind()==ReactionKind.OPPORTUNITY_ATTACK)check(((option.itemId()!=null) != (option.monsterAttack()!=null)) && (option.monsterAttack()==null || Schema2CombatHistory.validAction(option.monsterAttack())) &&option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0&&option.readyKey()==null);else if(option.kind()==ReactionKind.READY_RELEASE)check(option.readyKey()!=null&&option.itemId()==null&&option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0);else check(option.itemId()==null&&option.readyKey()==null&&option.castingRule()!=null&&option.spell()!=null&&option.slotLevel()>=1&&option.slotLevel()<=9);}
                         if(o.status()==OpportunityStatus.PENDING) {pending++;check(o.childFrameKey()==null&&o.reason()==null);}
                         else if(o.status()==OpportunityStatus.COMPLETED||o.status()==OpportunityStatus.DECLARED) {Frame child=frames.get(o.childFrameKey());check(child!=null&&child.invocation()==Invocation.REACTION&&Objects.equals(child.parentFrameKey(),o.selectionFrameKey())&&(o.status()==OpportunityStatus.COMPLETED)==(child.status()==FrameStatus.TERMINAL)&&o.reason()==null);}
                         else check(o.childFrameKey()==null&&o.reason()!=null);
@@ -67,7 +72,7 @@ final class Schema2CombatStateValidator {
                 for (Frame frame:f.frames()) if (frame.kind()==FrameKind.MOVEMENT) check(movementKeys.contains(frame.ownerKey()));
                 for(AttackAttempt a:f.attacks()) {
                     check(a.sequenceKey()==null ? a.attackOrdinal()==0 : !a.opportunityAttack()&&a.attackOrdinal()>=0&&a.attackOrdinal()<2);
-                    check(frames.containsKey(a.frameKey())&&frames.get(a.frameKey()).kind()==FrameKind.ATTACK&&reference(actors,a.actorId(),live)&&reference(actors,a.targetId(),live)&&!a.actorId().equals(a.targetId())&&a.itemId()!=null&&a.firstD20()>=1&&a.firstD20()<=20&&a.selectedD20()>=1&&a.selectedD20()<=20&&(a.secondD20()==null||a.secondD20()>=1&&a.secondD20()<=20)&&a.status()!=null&&a.armorClass()>0&&a.finalArmorClass()>0&&a.damageAmount()>=0&&a.damageDice().size()<=40&&a.damageDice().stream().allMatch(d->d>=1&&d<=12)&&validBless(a.blessingEffectKey(),a.blessingD4()));
+                    check(frames.containsKey(a.frameKey())&&frames.get(a.frameKey()).kind()==FrameKind.ATTACK&&reference(actors,a.actorId(),live)&&reference(actors,a.targetId(),live)&&!a.actorId().equals(a.targetId())&&validAttackSource(a)&&a.firstD20()>=1&&a.firstD20()<=20&&a.selectedD20()>=1&&a.selectedD20()<=20&&(a.secondD20()==null||a.secondD20()>=1&&a.secondD20()<=20)&&a.status()!=null&&a.armorClass()>0&&a.finalArmorClass()>0&&a.damageAmount()>=0&&a.damageDice().size()<=40&&a.damageDice().stream().allMatch(d->d>=1&&d<=12)&&validBless(a.blessingEffectKey(),a.blessingD4()));
                     if(a.status()==AttackStatus.HIT_PENDING_DAMAGE)check(a.initialHit()&&a.hit()&&a.damageDice().isEmpty()&&a.damageAmount()==0&&frames.get(a.frameKey()).status()!=FrameStatus.TERMINAL);
                     if(!a.hit())check(a.damageDice().isEmpty()&&a.damageAmount()==0);
                 }
@@ -160,6 +165,48 @@ final class Schema2CombatStateValidator {
             }
         }
         check(departures.containsAll(moverEntries)&&moverEntries.equals(targetEntries)&&moverEntries.size()==movement.cursor());
+    }
+
+    static boolean validAttackSource(AttackAttempt attack) {
+        var source = attack.monsterAttack();
+        if (source == null) return attack.itemId() != null;
+        if (attack.itemId() != null || attack.sequenceKey() != null || attack.attackOrdinal() != 0
+                || !attack.damageDice().isEmpty() || attack.abilityModifier() != 0 || attack.proficiencyBonus() != 0
+                || !Schema2CombatHistory.validAction(source.action()) || source.packTacticsAllies().size() > 63
+                || new HashSet<>(source.packTacticsAllies()).size() != source.packTacticsAllies().size()
+                || source.packTacticsAllies().contains(attack.actorId()) || source.packTacticsAllies().contains(attack.targetId())
+                || !source.packTacticsAllies().isEmpty() && !attack.advantage()) return false;
+        if ((attack.secondD20() != null) != (attack.advantage() != attack.disadvantage())) return false;
+        int selected = attack.firstD20();
+        if (attack.secondD20() != null) selected = attack.advantage()
+                ? Math.max(selected, attack.secondD20()) : Math.min(selected, attack.secondD20());
+        if (selected != attack.selectedD20()) return false;
+        int total = selected + source.hitBonus() + (attack.blessingD4() == null ? 0 : attack.blessingD4());
+        if (attack.initialHit() != (selected == 20 || selected != 1 && total >= attack.armorClass())
+                || attack.hit() != (selected == 20 || selected != 1 && total >= attack.finalArmorClass())) return false;
+        if (source.hitBonus() < MONSTER_ATTACK_MIN_BONUS || source.hitBonus() > MONSTER_ATTACK_MAX_BONUS
+                || !MONSTER_ATTACK_REACH_FEET.contains(source.reachFeet())) return false;
+        boolean settled = attack.hit() && attack.status() == AttackStatus.RESOLVED;
+        if (!settled) return source.damageComponents().isEmpty() && attack.damageAmount() == 0;
+        var profile = new ArrayList<MonsterAttackDamage>();
+        try {
+            for (var component : source.damageComponents())
+                profile.add(new MonsterAttackDamage(component.damageType(), component.diceCount(), component.diceSides(), component.modifier()));
+            new MonsterAttackProfile(source.hitBonus(), source.reachFeet(), profile);
+        } catch (IllegalArgumentException invalidProfile) {
+            return false;
+        }
+        int damage = 0;
+        for (var component : source.damageComponents()) {
+            if (component.dice().size() != component.diceCount() * (attack.critical() ? 2 : 1)
+                    || component.dice().stream().anyMatch(d -> d < 1 || d > component.diceSides())
+                    || component.rawDamage() != Math.max(0, component.dice().stream().mapToInt(Integer::intValue).sum() + component.modifier())
+                    || component.defenses().stream().anyMatch(d -> d.source() == null || !Set.of("IMMUNITY", "RESISTANCE", "VULNERABILITY").contains(d.kind()))
+                    || new HashSet<>(component.defenses()).size() != component.defenses().size()
+                    || component.effectiveDamage() != Schema2SaveDamageRules.damage(component.rawDamage(), false, component.defenses())) return false;
+            damage += component.effectiveDamage();
+        }
+        return damage == attack.damageAmount();
     }
 
     private static void validateAttackSequences(Battle battle) {

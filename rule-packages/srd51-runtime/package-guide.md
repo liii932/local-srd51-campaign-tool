@@ -21,7 +21,7 @@ application that supports the saved mechanisms.
 | --- | --- | --- | --- |
 | `srd51_runtime` version `13` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
 | `srd51_characters` version `13` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `13` | extension | `srd51_runtime=13`, `srd51_characters=13` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `srd51_magic` version `14` | extension | `srd51_runtime=13`, `srd51_characters=13` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
 | `dm_runtime_house_rules` version `25` | extension | `srd51_runtime=13` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
@@ -138,10 +138,16 @@ learning, preparation, ranks 1–3 and actual short-rest Arcane Recovery use the
 real consumers. Other cataloged Wizard spells are **metadata only**, usable for
 book learning/preparation but rejected by casting consumers.
 
-Hell Hound Fire Breath uses a 15-foot cone, DC 12 Dexterity save and 6d6 fire
-damage, half on success; recharge is d6 on 5–6 at turn start and resets on
-rests. Mummy defenses and the Common-speaking commoner are selected exact
-stat blocks. All other monster actions are explicitly blocked metadata.
+Hell Hound Bite uses a +5 melee attack at 5 feet and deals 1d8 + 3 piercing
+plus 2d6 fire on a hit. Its typed attack profile also supplies the hound's
+opportunity attack. Pack Tactics uses a non-incapacitated ally within 5 feet
+of the target. Fire Breath uses a 15-foot cone, a DC 12 Dexterity save and
+6d6 fire damage, halved on success. Recharge is d6 on 5–6 at turn start and
+resets on rests. Mummy and Commoner actions remain catalog metadata.
+
+The separate `dm-runtime-monster-variant` author example replaces the full
+Bite profile after the standard combination. Its guide describes the
+independent verification values.
 
 The DM extension's fixed direct damage/healing/temporary-HP profiles are
 project-authored examples, not SRD spells or items. Its antimagic area is an

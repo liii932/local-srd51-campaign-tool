@@ -75,7 +75,7 @@ public final class Schema2CombatHistory {
                 require(!change.healing() || !change.critical() && !change.deathSave() && !change.timeAdvance());
                 require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
             }
-            validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);
+            validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);validateMonsterAttackTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
             for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
             for(CombatFact f:e.resolution().facts())require(token(f.kind())&&(f.reason()==null||token(f.reason())));
@@ -183,9 +183,20 @@ public final class Schema2CombatHistory {
             Frame root=frames.get(f.rootFrameKey());require(root!=null&&root.parentFrameKey()==null);require(f.status()==FlowStatus.ACTIVE?frames.containsKey(f.leafFrameKey()):f.leafFrameKey()==null);
             for(Frame r:f.frames()) {Set<UUID> chain=new HashSet<>();Frame cursor=r;while(cursor.parentFrameKey()!=null) {require(chain.add(cursor.frameKey())&&chain.size()<=32);cursor=frames.get(cursor.parentFrameKey());require(cursor!=null);}require(cursor.frameKey().equals(f.rootFrameKey()));}
             Set<UUID> windows=new HashSet<>();for(Window w:f.windows()) {uuid(w.windowKey());require(keys.add(w.windowKey())&&windows.add(w.windowKey())&&frames.containsKey(w.ownerFrameKey())&&w.checkpointOrdinal()>=0&&w.checkpointOrdinal()<64&&w.boundaryIndex()>=0&&w.boundaryIndex()<64&&w.opportunities().size()<=128);Set<UUID>actors=new HashSet<>();
-                for(int i=0;i<w.opportunities().size();i++) {Opportunity o=w.opportunities().get(i);uuid(o.opportunityKey());require(keys.add(o.opportunityKey())&&actors.add(o.actorId())&&members.contains(o.actorId())&&o.priority()==i&&o.options().size()>=1&&o.options().size()<=32&&new HashSet<>(o.options()).size()==o.options().size()&&(o.selectionFrameKey()==null?o.status()==OpportunityStatus.PENDING:frames.containsKey(o.selectionFrameKey()))&&(o.attackFrameKey()==null||frames.containsKey(o.attackFrameKey()))&&(o.reason()==null||token(o.reason())));for(ReactionOption option:o.options())validateOption(option);}}
+                for(int i=0;i<w.opportunities().size();i++) {Opportunity o=w.opportunities().get(i);uuid(o.opportunityKey());require(keys.add(o.opportunityKey())&&actors.add(o.actorId())&&members.contains(o.actorId())&&o.priority()==i&&o.options().size()>=1&&o.options().size()<=32&&new HashSet<>(o.options()).size()==o.options().size()&&(o.selectionFrameKey()==null?o.status()==OpportunityStatus.PENDING:frames.containsKey(o.selectionFrameKey()))&&(o.attackFrameKey()==null||frames.containsKey(o.attackFrameKey()))&&(o.reason()==null||token(o.reason())));for(ReactionOption option:o.options()) {
+                    validateOption(option);
+                    if(option.kind()==ReactionKind.OPPORTUNITY_ATTACK)
+                        require(option.monsterAttack()==null ? knownCharacters.contains(o.actorId())
+                                : option.monsterAttack().rule().equals(knownMonsters.get(o.actorId())));
+                }}}
             for(Movement m:f.movements()) {uuid(m.movementKey());require(members.contains(m.actorId())&&m.path().size()>=1&&m.path().size()<=64&&m.cursor()>=0&&m.cursor()<=m.path().size()&&m.spent()>=0&&m.status()!=null&&(m.stopReason()==null||token(m.stopReason())));}
             for(AttackAttempt t:f.attacks())require(frames.containsKey(t.frameKey())&&members.contains(t.actorId())&&members.contains(t.targetId())&&!t.actorId().equals(t.targetId())&&t.firstD20()>=1&&t.firstD20()<=20&&(t.secondD20()==null||t.secondD20()>=1&&t.secondD20()<=20)&&t.selectedD20()>=1&&t.selectedD20()<=20&&t.damageDice().size()<=40&&t.damageDice().stream().allMatch(v->v!=null&&v>=1&&v<=12)&&t.damageAmount()>=0&&validBlessing(t.blessingEffectKey(),t.blessingD4()));
+            for (AttackAttempt attack : f.attacks()) {
+                var source = knownMonsters.get(attack.actorId());
+                require(source == null ? attack.itemId() != null && attack.monsterAttack() == null
+                        : attack.monsterAttack() != null && source.equals(attack.monsterAttack().action().rule()));
+                require(Schema2CombatStateValidator.validAttackSource(attack));
+            }
             Set<UUID> castFrames=new HashSet<>();
             for(CastAttempt cast:f.casts()) {
                 require(frames.containsKey(cast.frameKey()) && frames.get(cast.frameKey()).kind()==FrameKind.CAST && castFrames.add(cast.frameKey()) && members.contains(cast.actorId())
@@ -218,6 +229,68 @@ public final class Schema2CombatHistory {
         for (MeleeContest contest : b.meleeControl().contests())
             require(knownCharacters.contains(contest.actorId()) && knownCharacters.contains(contest.targetId()));
     }
+    private static void validateMonsterAttackTransition(Event event) {
+        Map<UUID, AttackAttempt> prior = new HashMap<>();
+        if (event.before() != null) for (Flow flow : event.before().flows())
+            for (AttackAttempt attack : flow.attacks())
+                if (attack.monsterAttack() != null) prior.put(attack.frameKey(), attack);
+        int created = 0;
+        List<Roll> expectedRolls = new ArrayList<>();
+        Set<UUID> monsterAttackers = new HashSet<>();
+        Command command = event.command();
+        for (Flow flow : event.after().flows()) for (AttackAttempt attack : flow.attacks()) {
+            if (attack.monsterAttack() == null) continue;
+            monsterAttackers.add(attack.actorId());
+            AttackAttempt old = prior.remove(attack.frameKey());
+            if (old == null) {
+                created++;
+                expectedRolls.add(new Roll("ATTACK_D20", attack.actorId(), 20, attack.firstD20()));
+                if (attack.secondD20() != null) expectedRolls.add(new Roll("ATTACK_D20_SECOND", attack.actorId(), 20, attack.secondD20()));
+                require(command.monsterAttackInput() != null && attack.actorId().equals(command.actorId())
+                        && attack.monsterAttack().action().equals(command.monsterAttackInput().action())
+                        && attack.opportunityAttack() == (command.kind() == Kind.DECLARE_OPPORTUNITY_ATTACK));
+                if (attack.opportunityAttack()) {
+                    Window window = event.before().activeFlow().windows().stream()
+                            .filter(w -> w.windowKey().equals(command.windowKey())).findFirst().orElseThrow(Schema2CombatHistory::corrupt);
+                    require(window.trigger().kind() == TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE
+                            && window.trigger().subjectId().equals(attack.targetId())
+                            && member(event.before(), attack.actorId()).reactionAvailable()
+                            && !member(event.after(), attack.actorId()).reactionAvailable());
+                } else {
+                    require(attack.targetId().equals(command.targetId()) && event.before().activeActor().equals(attack.actorId())
+                            && member(event.before(), attack.actorId()).actionAvailable()
+                            && !member(event.after(), attack.actorId()).actionAvailable());
+                }
+            } else if (old.status() == AttackStatus.RESOLVED) {
+                require(old.equals(attack));
+            } else {
+                require(old.actorId().equals(attack.actorId()) && old.targetId().equals(attack.targetId())
+                        && old.monsterAttack().action().equals(attack.monsterAttack().action())
+                        && old.monsterAttack().hitBonus() == attack.monsterAttack().hitBonus()
+                        && old.monsterAttack().reachFeet() == attack.monsterAttack().reachFeet()
+                        && old.monsterAttack().packTacticsAllies().equals(attack.monsterAttack().packTacticsAllies())
+                        && old.advantage() == attack.advantage() && old.disadvantage() == attack.disadvantage()
+                        && old.initialHit() == attack.initialHit() && old.firstD20() == attack.firstD20()
+                        && Objects.equals(old.secondD20(), attack.secondD20()) && old.selectedD20() == attack.selectedD20());
+            }
+            if (attack.status() == AttackStatus.RESOLVED && (old == null || old.status() != AttackStatus.RESOLVED)) {
+                for (var component : attack.monsterAttack().damageComponents()) for (int die : component.dice())
+                    expectedRolls.add(new Roll("MONSTER_ATTACK_DAMAGE_" + component.damageType(), attack.actorId(), component.diceSides(), die));
+                if (event.dependencies().stream().anyMatch(dep -> dep.characterId().equals(attack.targetId()))) {
+                    var applied = event.resolution().healthChanges().stream().filter(change -> change.frameKey().equals(attack.frameKey())
+                            && change.characterId().equals(attack.targetId()) && change.resource() == null && !change.healing()).toList();
+                    require(applied.size() == (attack.damageAmount() > 0 ? 1 : 0));
+                    if (!applied.isEmpty()) require(applied.getFirst().damageAmount() == attack.damageAmount()
+                            && applied.getFirst().critical() == attack.critical());
+                }
+            }
+        }
+        require(prior.isEmpty() && created == (command.monsterAttackInput() == null ? 0 : 1));
+        var actualRolls = event.resolution().rolls().stream().filter(r -> r.purpose().startsWith("MONSTER_ATTACK_DAMAGE_")
+                || monsterAttackers.contains(r.subjectId()) && Set.of("ATTACK_D20", "ATTACK_D20_SECOND").contains(r.purpose())).toList();
+        require(expectedRolls.equals(actualRolls));
+    }
+
     private static void validateExtendedTransition(Event event) {
         Battle before=event.before(),after=event.after();Map<UUID,EnvironmentZone> zones=new HashMap<>();Map<UUID,SuppressionCause> causes=new HashMap<>();
         if(before!=null) {for(var z:before.environmentZones())zones.put(z.zoneKey(),z);for(var c:before.suppressionCauses())causes.put(c.causeKey(),c);}
@@ -393,6 +466,19 @@ public final class Schema2CombatHistory {
         if(b.status()==Status.ENDED)require(holders.isEmpty()&&b.activeFlow()==null&&b.ongoingEffects().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.shields().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)&&b.environmentZones().stream().allMatch(z->z.endedOperationId()!=null)&&b.suppressionCauses().stream().allMatch(c->c.releasedOperationId()!=null));
     }
     private static void validateCommand(Command c) {
+        if (c.monsterAttackInput() != null) {
+            var action = c.monsterAttackInput().action();
+            require(validAction(action) && c.actorId() != null);
+            if (c.kind() == Kind.MONSTER_ATTACK) {
+                require(c.targetId() != null && Command.monsterAttack(c.actorId(), c.targetId(), action).equals(c));
+                return;
+            }
+            require(c.kind() == Kind.DECLARE_OPPORTUNITY_ATTACK && c.flowKey() != null && c.leafKey() != null
+                    && c.windowKey() != null && c.opportunityKey() != null
+                    && Command.monsterOpportunityAttack(c.actorId(), action, c.flowKey(), c.leafKey(), c.windowKey(), c.opportunityKey()).equals(c));
+            return;
+        }
+        require(c.kind() != Kind.MONSTER_ATTACK);
         if (Schema2MeleeControlRules.handles(c.kind())) {
             try {
                 Schema2MeleeControlRules.validateCommand(c);
@@ -444,9 +530,13 @@ public final class Schema2CombatHistory {
         require((input.spell()!=null)==(input.responseKind()==ReadyResponseKind.SPELL));if(input.spell()!=null) {validateCastInput(input.spell());require(input.spell().coneDirection()==null);}
     }
     private static void validateOption(ReactionOption option) {
-        require(option!=null&&option.kind()!=null);
+        require(option!=null&&option.kind()!=null && (option.kind()==ReactionKind.OPPORTUNITY_ATTACK || option.monsterAttack()==null));
         switch(option.kind()) {
-            case OPPORTUNITY_ATTACK -> {uuid(option.itemId());require(option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0&&option.readyKey()==null);}
+            case OPPORTUNITY_ATTACK -> {
+                require((option.itemId() != null) != (option.monsterAttack() != null));
+                if (option.itemId() != null) uuid(option.itemId());
+                else require(validAction(option.monsterAttack()));
+                require(option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0&&option.readyKey()==null);}
             case SHIELD,COUNTERSPELL -> {require(option.itemId()==null&&castingType(option.castingRule())&&ruleType(option.spell(),"adventure.spell")&&option.slotLevel()>=1&&option.slotLevel()<=9&&option.readyKey()==null);}
             case READY_RELEASE -> {uuid(option.readyKey());require(option.itemId()==null&&option.castingRule()==null&&option.spell()==null&&option.slotLevel()==0);}
         }
@@ -547,7 +637,7 @@ public final class Schema2CombatHistory {
         }
     }
     private static boolean validRule(RuleIdentity r,String type) {return r!=null&&type.equals(r.ruleType())&&r.moduleKey()!=null&&r.ruleKey()!=null&&r.moduleKey().matches("[a-z][a-z0-9_]{0,63}")&&r.ruleKey().matches("[a-z][a-z0-9_.]{0,127}");}
-    private static boolean validAction(EntryIdentity e) {return e!=null&&validRule(e.rule(),"adventure.monster")&&"actions".equals(e.collectionKey())&&e.moduleKey()!=null&&e.entryKey()!=null&&e.moduleKey().matches("[a-z][a-z0-9_]{0,63}")&&e.entryKey().matches("[a-z][a-z0-9_]{0,63}");}
+    static boolean validAction(EntryIdentity e) {return e!=null&&validRule(e.rule(),"adventure.monster")&&"actions".equals(e.collectionKey())&&e.moduleKey()!=null&&e.entryKey()!=null&&e.moduleKey().matches("[a-z][a-z0-9_]{0,63}")&&e.entryKey().matches("[a-z][a-z0-9_]{0,63}");}
 
 
     private static long historyFactCount(History history) {
@@ -590,7 +680,15 @@ public final class Schema2CombatHistory {
                 count += 1L + movement.path().size();
                 if (movement.drag() != null) count += 1L + movement.drag().path().size();
             }
-            for (AttackAttempt attack : flow.attacks()) count += 1L + attack.damageDice().size();
+            for (AttackAttempt attack : flow.attacks()) {
+                count += 1L + attack.damageDice().size();
+                var monster = attack.monsterAttack();
+                if (monster != null) {
+                    count += 1L + monster.packTacticsAllies().size();
+                    for (var component : monster.damageComponents())
+                        count += 1L + component.dice().size() + component.defenses().size();
+                }
+            }
             for (CastAttempt cast : flow.casts()) count += 1L + cast.targets().size() + cast.healingDice().size();
         }
         for (MonsterInstance monster : state.monsters()) count += 1L + monster.actionUses().size();

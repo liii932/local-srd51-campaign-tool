@@ -88,7 +88,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 |---|---|
 | `srd51_runtime@13` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
 | `srd51_characters@13` | extension，直接依赖 `srd51_runtime@13`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
-| `srd51_magic@13` | extension，直接依赖前两包 |
+| `srd51_magic@14` | extension，直接依赖前两包 |
 | `dm_runtime_house_rules@25` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@13` |
 | `dm_runtime_house_rules@26` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@13` |
 
@@ -136,7 +136,7 @@ Grappler 仅保留阻断元数据，不允许在当前 SQLite 运行中获得；
 
 施法只支持 Bless、Cure Wounds、Shield、Counterspell 和 Burning Hands 的有界算法；
 其余 Wizard 法术只可作为学习/准备元数据。多施法职业共享槽不得由独立资源拼凑。
-Hell Hound Fire Breath 是唯一可执行怪物动作，其他动作明确为 metadata。
+地狱犬的火焰吐息使用独立充能。啮咬读取战役冻结的近战动作条目，普通动作或反应各自扣费，窗口、触及、盟友、原骰和分量伤害随场景保存。[怪物攻击合同](rules/schema-2-monster-attacks.md)
 DM 抗魔区域及固定直接生命效果是显式家规，不称作 SRD 法术或物品。
 
 规则角色无需额外特性即可在本人 ACTIVE 回合或 EXPLORATION [主动卧倒、爬行和起身](rules/schema-2-prone.md)。

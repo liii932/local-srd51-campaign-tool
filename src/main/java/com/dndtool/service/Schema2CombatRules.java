@@ -263,6 +263,15 @@ public final class Schema2CombatRules {
 
     private void validateCommand(Command command) {
         for(UUID id:Arrays.asList(command.actorId(),command.targetId(),command.itemId(),command.flowKey(),command.leafKey(),command.windowKey(),command.opportunityKey(),command.readyKey(),command.zoneKey()))if(id!=null)uuid(id);
+        MonsterAttackInput monsterAttack = command.monsterAttackInput();
+        if (command.kind() == Kind.MONSTER_ATTACK) {
+            if (monsterAttack == null || command.actorId() == null || command.targetId() == null
+                    || !command.equals(Command.monsterAttack(command.actorId(), command.targetId(), monsterAttack.action())))
+                throw invalid("S2_MONSTER_ATTACK_COMMAND");
+        } else if (monsterAttack != null && (command.kind() != Kind.DECLARE_OPPORTUNITY_ATTACK || command.actorId() == null
+                || !command.equals(Command.monsterOpportunityAttack(command.actorId(), monsterAttack.action(),
+                        command.flowKey(), command.leafKey(), command.windowKey(), command.opportunityKey()))))
+            throw invalid("S2_MONSTER_ATTACK_COMMAND");
         if (Schema2MeleeControlRules.handles(command.kind())) {
             Schema2MeleeControlRules.validateCommand(command);
             return;

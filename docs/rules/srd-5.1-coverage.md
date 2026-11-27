@@ -50,7 +50,7 @@ runtime support.
 | <a id="rest"></a>休息/时间 | [标准休息](schema-2-character-rest.md) | `Schema2CharacterRestRules`；`CampaignArcaneRecoveryIntegrationTest`、`CampaignSecondWindIntegrationTest`。场景时钟见战斗和施法。 |
 | <a id="combat"></a>战斗/动作 | [战斗作者](schema-2-combat-authoring.md)、[战斗](schema-2-combat.md)、[动作继续协议](../design/v2/action-continuation-protocol.md) | `CampaignDomainEngine`、`Schema2CombatRules`、`Schema2ActionFlowRules`、`Schema2CombatTimeRules`；`CampaignDomainsCombatIntegrationTest`、`Schema2CombatRulesTest`。 |
 | <a id="spells"></a>施法/效果/探索 | [施法作者](schema-2-spell-authoring.md)、[有限施法](schema-2-spells.md)、[施法扩展目标](../design/v2/spellcasting-extension-contract.md)、[持续效果协议](../design/v2/ongoing-effect-protocol.md) | `Schema2SpellRules`、`Schema2WizardSpellbookRules`、`Schema2OngoingEffectRules`、`Schema2ExplorationRules`；`Schema2WizardSpellbookRulesTest`、`Schema2ExplorationRulesTest`、`CampaignDomainsCombatIntegrationTest`。 |
-| <a id="monsters"></a>怪物/共享伤害 | [有限怪物](schema-2-monster-breath.md)、[多目标伤害合同](../design/v2/multi-target-save-damage.md) | `Schema2MonsterRules`、`Schema2MonsterRestRules`、`Schema2SaveDamageRules`；`Schema2MonsterBreathRulesTest`、`CampaignMonsterSpaceIntegrationTest`、`CampaignDomainsCombatIntegrationTest`。 |
+| <a id="monsters"></a>怪物/共享伤害 | [有限怪物](schema-2-monster-breath.md)、[近战与借机攻击](schema-2-monster-attacks.md)、[多目标伤害合同](../design/v2/multi-target-save-damage.md) | `Schema2MonsterRules`、`Schema2MonsterRestRules`、`Schema2SaveDamageRules`。定向验证见 `Schema2MonsterAttackRulesTest`、`CampaignMonsterAttackIntegrationTest`、`Schema2MonsterBreathRulesTest`、`CampaignMonsterSpaceIntegrationTest`、`CampaignDomainsCombatIntegrationTest`。 |
 
 ## 角色构筑、种族、背景与成长
 
@@ -159,7 +159,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | Ready（[93—94](../references/srd-5.1/pages/page-093.md)） | 有限 attack/move/spell 及封闭完成事实触发、reaction、持能量专注 | 局部闭环；不解释任意自然语言触发，不开放其他物体/能力响应；新触发须有真实 producer 与恢复闭包 | [施法](#spells)、[动作流](#combat) |
 | Use an Object、拾取/重新装备、临时行动（[91](../references/srd-5.1/pages/page-091.md)、[94](../references/srd-5.1/pages/page-094.md)） | 战斗掉地已保存；使用/拾取未接入 | 缺免费交互与 action 区分、目标距离/手位、物品使用成本/效果/归属和类型化临时行动结果 | [基础](#foundation)、[战斗](#combat) |
 | Grapple/Shove/escape（[95—96](../references/srd-5.1/pages/page-095.md)） | 本人 Attack 替代一击、目标选技能、冻结分差、关系、推开或倒地、挣脱和释放 | 限活动场景单格中型规则角色。拖带两端位置与抓者花费共同提交，等待选技能、余击和反应可保存重开 | [近战控制](schema-2-melee-control.md) |
-| 移动/OA/倒地姿态（[91—95](../references/srd-5.1/pages/page-091.md)） | 平面相邻未占格步行、主动卧倒、双倍成本爬行、ACTIVE 精确半速起身；探索卧倒零耗时、移动/起身各六秒并保留旧战斗预算；Ready 爬行、PC 武器 OA 逐段暂停和完整文件恢复 | ACTIVE/Ready 与有限探索规则角色局部闭环，探索爬行每段按当前速度限额；缺怪物主动姿态/OA、穿越/挤压/地形、teleport/其他强制移动；敌对可反应怪物使相关 PC 移动保守拒绝 | [倒地合同](schema-2-prone.md)、[战斗](#combat)、[怪物](#monsters) |
+| 移动/OA/倒地姿态（[91—95](../references/srd-5.1/pages/page-091.md)） | 平面相邻未占格步行、主动卧倒、双倍成本爬行、ACTIVE 精确半速起身；探索卧倒零耗时、移动/起身各六秒并保留旧战斗预算；Ready 爬行、角色武器或受支持的怪物近战 OA 逐段暂停和完整文件恢复 | ACTIVE/Ready 与有限探索规则角色局部闭环，探索爬行每段按当前速度限额；缺怪物主动姿态、穿越/挤压/地形、teleport/其他强制移动；含未解释攻击来源的敌对可反应怪物使相关移动保守拒绝 | [倒地合同](schema-2-prone.md)、[战斗](#combat)、[怪物](#monsters) |
 | 体型空间、触及、掩护/遮挡、区域（[92](../references/srd-5.1/pages/page-092.md)、[96](../references/srd-5.1/pages/page-096.md)、[102—103](../references/srd-5.1/pages/page-102.md)） | 单点格、正常可见、无遮挡；有限锥形和固定半径区域 | 局部目标证明；缺大体积/三维/障碍、半/四分之三/全掩护、所有区域形状与完整战外 roster；点格政策不代表通用 SRD 空间引擎 | [战斗](#combat)、[怪物](#monsters)、[施法](#spells) |
 | 伤害类型、抗性/易伤/免疫、共享伤害（[96—97](../references/srd-5.1/pages/page-096.md)） | 有限吐息共享骰及准确怪物防御/适用 gate；PC 来源不通用 | 局部闭环；缺角色防御 producer、多分量及一般物理/魔法/攻击门限、伤害后反应如 Uncanny Dodge、Evasion/Legendary Resistance | [怪物](#monsters)；共享核不能授予所有伤害机制 |
 | 治疗/temp HP/零 HP/稳定/死亡/即死（[97—99](../references/srd-5.1/pages/page-097.md)） | 真实有限健康、回合死亡豁免、稳定期限、掉物/倒地；怪物有限零 HP 死亡政策 | 局部闭环；缺医疗动作稳定、非致命击倒、复活、最大 HP 变化和特性替代后果；治疗不自动起身/捡物 | [健康](#foundation)、[战斗](#combat)、[怪物](#monsters) |
@@ -219,13 +219,13 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 |---|---|---|---|
 | 属性块/CR/XP/类型/感官/语言（[254—258](../references/srd-5.1/pages/page-254.md)、[261—357](../references/srd-5.1/pages/page-261.md)、[366—403](../references/srd-5.1/pages/page-366.md)） | 有限类型化 stat_block 协议、Hell Hound/Mummy 验证实例；不代表所有 SRD 属性块已收录 | 有限实例局部闭环；缺全目录逐项映射、更多体型/运动、感官/语言/telepathy 执行；显式 save bonus 不能再叠 PB/属性 | [怪物](#monsters) |
 | 部署/位置/先攻/HP/死亡（[254—259](../references/srd-5.1/pages/page-254.md)） | SMALL/MEDIUM 点格、有限真实 roster、怪物回合和零 HP 死亡 | 局部闭环；缺大体型、纯怪物场景、完整战外生物 roster、击败/俘获/战利品与 XP 奖励 | [怪物](#monsters)、[战斗](#combat) |
-| 普通近战/远程、天然武器、Multiattack（[259](../references/srd-5.1/pages/page-259.md)） | Bite/Rotting Fist/Multiattack 等 BLOCKED_METADATA | 未建执行闭环；须接准确攻击加值/触及/目标/骰分量、序列限制、命中附加效果、OA/reaction producer；PC 武器攻击不能自动覆盖怪物 | [怪物](#monsters) |
-| Hell Hound Fire Breath / Recharge（[321—322](../references/srd-5.1/pages/page-321.md)） | 唯一有限可执行怪物动作，15 尺点锥、DEX12、共享 6d6、半伤、recharge5—6 | 完整目标证明/共享骰/分阶段健康与专注、真实回合 recharge 和怪物休息局部闭环；不泛化任意吐息或区域 | [怪物](#monsters) |
+| 普通近战/远程、天然武器、Multiattack（[259](../references/srd-5.1/pages/page-259.md)） | [地狱犬近战啮咬](schema-2-monster-attacks.md)，按冻结加值、触及、单目标和各伤害分量执行普通或借机攻击 | 远程、Multiattack、Rotting Fist 的附加效果与其他未分类攻击仍待接入 | [怪物](#monsters) |
+| Hell Hound Fire Breath / Recharge（[321—322](../references/srd-5.1/pages/page-321.md)） | 有限吐息动作，15 尺点锥、DEX12、共享 6d6、半伤、recharge5—6 | 完整目标证明/共享骰/分阶段健康与专注、真实回合 recharge 和怪物休息局部闭环；不泛化任意吐息或区域 | [怪物](#monsters) |
 | 其他 save 动作：凝视/恐惧/疾病毒素/死亡（[259](../references/srd-5.1/pages/page-259.md)及各属性块） | 元数据或原文；例如 Dreadful Glare/Rotting Fist 未执行 | 缺可见/距离/目标类型、豁免与重复、免疫期限、状态/最大 HP/疾病/诅咒及死亡后继，不能只登记 damage_profile | [怪物](#monsters)、条件/健康 owner 待接 |
 | 怪物防御/被动：抗性、易伤、免疫、条件免疫（[257](../references/srd-5.1/pages/page-257.md)） | Hell Hound FIRE 免疫/Mummy FIRE 易伤、NONMAGICAL_ATTACKS gate 真实消费 | 局部闭环；缺所有防御来源/适用属性/魔法武器判定、Legendary Resistance、Magic Resistance、Evasion/特殊减伤、条件免疫的真实 producer | [怪物](#monsters) |
-| 感知、Pack Tactics 与其他 traits（[257—259](../references/srd-5.1/pages/page-257.md)及各属性块） | 有限 scope 能证明 hearing/smell 感知或 Pack Tactics 对当前吐息无贡献；不执行其本族 | 未建其执行闭环；缺感知/相邻盟友攻击贡献、再生/回避/反伤/死亡爆发等每个被动；UNSUPPORTED 必须在根预检拒绝 | [怪物](#monsters)；“与本动作无关”不是被动已经实现 |
+| 感知、Pack Tactics 与其他 traits（[257—259](../references/srd-5.1/pages/page-257.md)及各属性块） | Pack Tactics 按目标五尺内未失能盟友给怪物攻击提供优势。攻击记录保留适用盟友。吐息使用豁免 | 感知、再生、回避、反伤和死亡爆发等被动仍缺执行机制。未知特性在根预检拒绝 | [怪物](#monsters) |
 | Innate Spellcasting/Spellcasting/Psionics（[258—259](../references/srd-5.1/pages/page-258.md)） | 属性块说明不是施法授权 | 缺已知/每日次数/slot、能力/DC/组件例外、怪物动作经济、法术效果及跨场景恢复；PC Wizard profile 不能用于怪物 | [怪物](#monsters)、[施法](#spells) |
-| 附赠/反应、Parry/OA/反制等（[259](../references/srd-5.1/pages/page-259.md)及各属性块） | 怪物 reaction 状态可存；无怪物攻击/OA 可执行 producer | 缺各触发/候选/代价/伤害前后窗口、继续与恢复；遇可能 OA 的敌对怪物相关移动须拒绝，不能静默跳过 | [怪物](#monsters)、[动作流](#combat) |
+| 附赠/反应、Parry/OA/反制等（[259](../references/srd-5.1/pages/page-259.md)及各属性块） | 有限近战动作可在敌人主动离开前使用一次怪物反应。候选、决定和伤害随完整文件保存 | 其他反应、Parry 和未知攻击的触及与后果仍待接入 | [怪物](#monsters)、[动作流](#combat) |
 | 使用次数/短长休/充能恢复（[259](../references/srd-5.1/pages/page-259.md)） | 吐息 turn-start recharge、显式怪物短/长休恢复局部 | 缺其他每日/次数/随机/受条件恢复、怪物治疗与生命骰、不同资源来源；怪物休息不授予 PC 休息收益 | [怪物](#monsters) |
 | 传奇动作/传奇抗性（[260](../references/srd-5.1/pages/page-260.md)及各传奇属性块） | 原文；未接入 | 缺他人回合结束触发、逐选项成本、本人回合重置/突袭失能 gate；传奇抗性须在失败后由真实有限选择改结果并扣次数 | [动作流](#combat)须新增真实 owner，不复用普通 reaction 余额 |
 | 巢穴动作/区域效应（[260](../references/srd-5.1/pages/page-260.md)及实际具有该段落的内容） | 原文通用结构；无消费者 | 只按 SRD 实际收录条目建内容，不补商业书选项；缺 initiative20 败同值、失能/突袭 gate、区域生命周期/死亡后消散及恢复 | 场景/时间/效果 owner 待接 |
@@ -250,7 +250,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 |---|---|---|
 | 其余法术位特殊恢复 | 角色服务、休息规则、法术书规则及角色仓储 | 以已接入的有限 Arcane Recovery 为基础，扩展其余准确恢复来源；Natural Recovery 等仍须自己的资格、休息/日界、位阶选择和原事实恢复，不能借同类算法自动开放。 |
 | 范围法术的其余完整语义 | 战斗服务、施法规则、共享伤害规则、场景仓储 | 以有限 Burning Hands 为基础，分别接通点燃对象、Sculpt 选择、抗魔区域、Ready 持有及探索施放的真实 owner；每个新法术仍须自己的授权、成本、目标/伤害参数、反应与恢复闭环。 |
-| 普通生物攻击与怪物 OA | 战斗规则/服务、怪物规则、动作流及装备/健康事实 | 建怪物攻击 profile、Multiattack 边界和真实 reach/reaction，PC MOVE/Ready move 不再因缺失 OA producer 被迫拒绝；逐动作保留伤害与后继。 |
+| 普通生物攻击与怪物 OA | 战斗规则/服务、怪物规则、动作流及装备/健康事实 | 已接入有限近战 profile 和真实逐步 OA；余下工作包括远程、Multiattack 及命中附带效果。 |
 | 通用 save/对抗与 Grapple/Shove | 检定规则、战斗规则/服务、角色/场景仓储 | 实现通用豁免。战斗中的对抗还须接入目标选择、Attack 替代额度、体型与手位、抓取移动及失能解除；专长只在其真实关系具备后采用。 |
 | 条件 producer 与贡献 | 持续效果、健康、战斗/检定、施法 owner | 先按逐状态表闭合一个真实 producer、免疫、叠加/期限及所有受影响消费者，再扩展内容；不能用通用条件名称集合代替语义。 |
 | 角色防御与伤害后反应 | 成长/来源、效果 owner、共享伤害与动作流 | 明确来源与 gate、同一 APPLY/CON cut、失败后有界选择、资源一次消费；Protection from Energy、Cutting Words、Evasion 等分别接入。 |

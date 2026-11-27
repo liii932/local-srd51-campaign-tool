@@ -9,6 +9,8 @@ import zipfile
 
 PACKAGES = ("srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules",
             "dm-runtime-check-variant")
+AUTHOR_CANDIDATES = ("dm-runtime-monster-variant",)
+EXISTING_GUIDE_PACKAGES = ("srd51-runtime", "srd51-characters", "dm-runtime-house-rules")
 
 
 def archive(directory: Path, notice: bytes, guide: bytes) -> bytes:
@@ -39,8 +41,10 @@ def main() -> None:
     args = parser.parse_args()
     selected = args.packages or PACKAGES
     for name in selected:
-        if name not in PACKAGES:
+        if name not in PACKAGES + AUTHOR_CANDIDATES:
             parser.error(f"Unknown package: {name}")
+        if name in AUTHOR_CANDIDATES and args.output_dir is None:
+            parser.error(f"{name} is an author candidate. Supply --output-dir.")
     source = Path(__file__).resolve().parent
     output = args.output_dir or source.parent.parent / "src/main/resources/storage/rules"
     notice = (source / "notice.md").read_bytes()
@@ -50,7 +54,8 @@ def main() -> None:
         directory = source / name
         guide = directory / "package-guide.md"
         if not guide.is_file():
-            guide = source / "package-guide.md"
+            # Keep unchanged releases reproducible with the guide they originally shipped.
+            guide = source / ("base-package-guide.md" if name in EXISTING_GUIDE_PACKAGES else "package-guide.md")
         expected = archive(directory, notice, guide.read_bytes())
         target = output / (name + ".zip")
         if target.is_file() and target.read_bytes() == expected:

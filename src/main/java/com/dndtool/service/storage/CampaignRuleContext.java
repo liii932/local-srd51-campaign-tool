@@ -177,12 +177,16 @@ public final class CampaignRuleContext {
 
     public record FieldOverride(String field, String moduleKey, String releaseVersion,
                                 String collection, String entryKey) { }
+    public record MonsterAttackChoice(EntryIdentity action, String name) { }
     public record CatalogEntry(String moduleKey, String type, String key, String name, boolean enabled,
                                boolean executable, String description, String abilityKey, String category,
                                Boolean allowAlternateSkillAbility,
                                RuleIdentity parentRace, boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
-                               List<FieldOverride> overrides) {
-        public CatalogEntry { overrides = List.copyOf(overrides); }
+                               List<FieldOverride> overrides, List<MonsterAttackChoice> monsterAttacks) {
+        public CatalogEntry {
+            overrides = List.copyOf(overrides);
+            monsterAttacks = List.copyOf(monsterAttacks);
+        }
     }
     public record Metadata(String displayName, String scope, String interpretation, Schema2RulesBinding binding,
                            List<CatalogEntry> catalog, List<String> limitations) {
@@ -211,6 +215,13 @@ public final class CampaignRuleContext {
                 .filter(FinalRule::enabled).filter(FinalFeature.class::isInstance).map(FinalFeature.class::cast)
                 .filter(row -> FIGHTER_SECOND_WIND_ALGORITHM.equals(row.definition().executionAlgorithm()))
                 .map(row -> fighterSecondWindResource(row.definition().owner())).collect(Collectors.toUnmodifiableSet());
+        Map<RuleIdentity, List<MonsterAttackChoice>> monsterAttacks = new LinkedHashMap<>();
+        for (FinalEntry row : projection.projection().entries()) {
+            if (row.enabled() && row.entry() instanceof MonsterActionEntry action
+                    && action.actionProfile().mode() == MonsterActionMode.MELEE_ATTACK_V1)
+                monsterAttacks.computeIfAbsent(action.identity().rule(), ignored -> new ArrayList<>())
+                        .add(new MonsterAttackChoice(action.identity(), action.actionProfile().displayName()));
+        }
         List<CatalogEntry> catalog = new ArrayList<>();
         for (FinalRule row : projection.projection().rules()) {
             Definition definition = row.definition();
@@ -239,7 +250,8 @@ public final class CampaignRuleContext {
                     definition instanceof CheckDefinition check ? check.allowAlternateSkillAbility() : null,
                     definition instanceof CharacterSourceDefinition source ? source.parentRace() : null,
                     creationChoice, spellbookChoice, directResourceSpend,
-                    overrides.getOrDefault(row.identity(), List.of())));
+                    overrides.getOrDefault(row.identity(), List.of()),
+                    executable ? monsterAttacks.getOrDefault(row.identity(), List.of()) : List.of()));
         }
         return new Metadata("SRD 5.1 finite current-application rules", "FINITE_APPLICATION_SCHEMA_2",
                 interpretation(), binding, catalog, List.of(
@@ -251,7 +263,7 @@ public final class CampaignRuleContext {
                     "Unimplemented fighter features, Evocation Savant and Sculpt Spells remain catalog-only OPTION metadata and are not acquired; Grappler is blocked acquisition metadata.",
                     "Only Bless, Cure Wounds, Shield, Counterspell and Burning Hands have bounded casting consumers; other spells are metadata.",
                     "Multiclass growth acquisition does not authorize combined-caster slot semantics or unsupported multiclass casting.",
-                    "Only Hell Hound Fire Breath executes as a monster action; the antimagic area and direct vital effects are explicit DM house rules."));
+                    "Hell Hound Bite and Fire Breath execute as monster actions; the antimagic area and direct vital effects are explicit DM house rules."));
     }
 
     private static String description(Definition value) {
