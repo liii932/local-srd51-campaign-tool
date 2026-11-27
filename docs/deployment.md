@@ -5,7 +5,7 @@
 
 ## 1. 构建候选
 
-使用发行制品 `dnd-tool-se-0.2.1.war`，或在仓库根从源码生成 `target/dnd-tool-se-0.2.1.war`。
+使用发行制品 `dnd-tool-se-0.2.1.war`，或在仓库根从源码生成 `target/dnd-tool-se-0.3.0.war`。
 按[测试指南](testing.md)选取受影响的应用测试和模组检查。应用结果可复用时，或本次只改规则包时，
 运行 `mvn -DskipTests package`。旧输出可能影响候选时，在打包命令中加入 `clean`。
 

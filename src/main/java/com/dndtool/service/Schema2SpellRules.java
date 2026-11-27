@@ -110,9 +110,7 @@ public final class Schema2SpellRules {
             throw invalid("S2_SPELL_SLOT_UNAVAILABLE");
         if (caster.hitPoints()==0 || caster.health().dead()) throw invalid("S2_COMBAT_ACTOR_INACTIVE");
         if (new Schema2CharacterEquipmentRules().derive(context.material(),caster).castingForbidden()) throw invalid("S2_SPELL_ARMOR");
-        boolean free=caster.equipment().stream().noneMatch(i -> i.location().equals("BOTH_HANDS"))
-                && (caster.equipment().stream().noneMatch(i -> i.location().equals("MAIN_HAND"))
-                    || caster.equipment().stream().noneMatch(i -> i.location().equals("OFF_HAND")));
+        boolean free = anyHandFree(battle, caster);
         if (bless) {
             if (input.materialItemId()==null || caster.equipment().stream().noneMatch(i -> i.itemId().equals(input.materialItemId())
                     && i.item().equals(profile.materialItem()) && Set.of("MAIN_HAND","OFF_HAND").contains(i.location())))
@@ -155,10 +153,11 @@ public final class Schema2SpellRules {
         if(resources.size()!=1 || resources.getFirst().unlimited() || resources.getFirst().current()<1)throw invalid("S2_SPELL_SLOT_UNAVAILABLE");
         if(caster.hitPoints()==0 || caster.health().dead())throw invalid("S2_COMBAT_ACTOR_INACTIVE");
         if(new Schema2CharacterEquipmentRules().derive(context.material(),caster).castingForbidden())throw invalid("S2_SPELL_ARMOR");
-        boolean free=caster.equipment().stream().noneMatch(i->i.location().equals("BOTH_HANDS")) && (caster.equipment().stream().noneMatch(i->i.location().equals("MAIN_HAND"))||caster.equipment().stream().noneMatch(i->i.location().equals("OFF_HAND")));
+        boolean free = anyHandFree(battle, caster);
         if(!free || input.materialItemId()!=null)throw invalid("S2_SPELL_COMPONENT");
         if(burning) {
-            if(caster.equipment().stream().anyMatch(i->Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(i.location())))throw invalid("S2_SPELL_COMPONENT");
+            if (!Schema2MeleeControlRules.handFree(battle, caster, HandSlot.MAIN_HAND)
+                    || !Schema2MeleeControlRules.handFree(battle, caster, HandSlot.OFF_HAND)) throw invalid("S2_SPELL_COMPONENT");
             if(input.coneDirection()==null || !input.targets().isEmpty() || input.targetCastFrameKey()!=null)throw invalid("S2_SPELL_TARGET");
             requireEvocationScope(context);
             Schema2SaveDamageRules.prepareSpell(roster,battle,actor,input);
@@ -171,6 +170,11 @@ public final class Schema2SpellRules {
         }
         if(caster.version()>=Schema2CharacterRuntime.MAX_EVENTS-1)throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
         return new Prepared(input.castingRule(),resource,profile.abilityKey(),spells.getFirst().definition(),input,caster,0,false);
+    }
+
+    private static boolean anyHandFree(Battle battle, State caster) {
+        return Schema2MeleeControlRules.handFree(battle, caster, HandSlot.MAIN_HAND)
+                || Schema2MeleeControlRules.handFree(battle, caster, HandSlot.OFF_HAND);
     }
     static RuleIdentity slotResource(WizardSpellcastingDefinition p,int level) {
         return switch(level) {case 1->p.slotResource();case 2->p.rank2SlotResource();case 3->p.rank3SlotResource();default->throw invalid("S2_SPELL_SLOT_UNAVAILABLE");};
@@ -228,10 +232,10 @@ public final class Schema2SpellRules {
             effects.add(e);
         }
         List<ReadyPreparation> ready=b.readyPreparations().stream().map(r->holder.kind()==ConcentrationKind.READY_SPELL && r.readyKey().equals(holder.sourceKey()) && Set.of(ReadyStatus.PREPARING,ReadyStatus.ARMED).contains(r.status())?new ReadyPreparation(r.readyKey(),r.actorId(),r.declaredTurnNumber(),r.expiresAtTurnNumber(),r.input(),ReadyStatus.LOST,r.heldCastFrameKey(),reason):r).toList();
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,ready,b.triggerFacts(),b.shields(),b.concentrationHolders().stream().filter(h->!h.actorId().equals(caster)).toList(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,ready,b.triggerFacts(),b.shields(),b.concentrationHolders().stream().filter(h->!h.actorId().equals(caster)).toList(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests(),b.meleeControl());
     }
     public static Battle withEffects(Battle b,List<OngoingEffect> effects) {
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests(),b.meleeControl());
     }
     private static Combatant member(Battle b,UUID id) {return b.combatants().stream().filter(c -> c.characterId().equals(id)).findFirst().orElseThrow(() -> invalid("S2_SPELL_TARGET"));}
     private static IllegalArgumentException invalid(String code) {return new IllegalArgumentException(code);}

@@ -394,12 +394,13 @@ Shield 的 magic missile 分支另登记 `SPELL_TARGETED_BEFORE_DAMAGE`，无需
 其真实法术和免伤 consumer 未完成时，此分支保持关闭。
 
 <a id="grapple-attempt"></a>
-### 擒抱替代、挣脱与释放
+### 擒抱、推撞、挣脱与释放
+
+当前 SQLite 采用单格中型规则角色的[近战控制合同](../../rules/schema-2-melee-control.md)。擒抱和两种推撞均可替代一击。防守技能选定后，两方在同一次结算中掷骰，按战役冻结的最小获胜分差判断。下文涉及逐方掷后贡献选择和更一般空间的部分属于设计目标。
 
 `AttackSequence` 的有效额度由同一 Attack action 的真实来源和 Extra Attack 决定；
 该 Fighter 5 级序列额度为 2。owner 保留 `sequence_key,combat,turn,action_spend_ref,
-granted,performed,pending_attempt_ref` 和各已消费 ordinal。真实序列的下一 ordinal
-只接受 `WEAPON_ATTACK` 或 `GRAPPLE_REPLACEMENT` 之一。机会攻击、Ready 的单击许可、
+granted,performed,pending_attempt_ref` 和各已消费 ordinal。每个 ordinal 可用于一次武器攻击、擒抱、推倒或推开。机会攻击、Ready 的单击许可、
 怪物 Multiattack 或法术攻击不因拥有序列字段而得到此替代额度。
 
 1. 擒抱在当前序列、合法 actor/target、同空间、触及、目标至多大一级、准确空手位和全部
@@ -411,14 +412,14 @@ granted,performed,pending_attempt_ref` 和各已消费 ordinal。真实序列的
    reach_and_size_proof`。目标必须用 `DOMAIN_CHOICE` 选择
    `STR_ATHLETICS/DEX_ACROBATICS`，发起方固定 STR(Athletics)；选技能无额外骰或成本。
    双方按先发起方后应对方执行各自的 `CONTEST_SIDE`，待双方完成才公布比较。
-3. 发起方 total 严格大于对方才写关系 `grapple_key,grappler,target,hand_slot,
+3. 发起方 total 领先达到冻结门槛（标准为 1）才写关系 `grapple_key,grappler,target,hand_slot,
    originating_contest,reach_basis,status,ended_reason`，持续效果/条件 owner 产生唯一
    来源的 Grappled 及 `UNTIL_GRAPPLE_END` 终止依据。它占用原手位，效果使受擒者
    speed 为零且不能受速度加值。平局或失败维持原关系，零新条件。已有同一来源/目标的
    活跃关系禁止重复创建；不同有效擒抱来源独立，结束一条不会清除其他来源。
-4. `ESCAPE_GRAPPLE` 为受擒者自己合法 action，需绑定准确活动关系并接受一次 action
-   spend；受擒者选同样的两项技能，对方固定 STR(Athletics)。比较高者胜，只有挣脱方
-   获胜才结束准确关系。平局/失败保持关系并保留已用 action；逃脱前被规则结束时记
+4. 推倒和推开共用擒抱的触及、体型、目标选择防守及分差规则。发起方胜出后，推倒设置目标的倒地姿态，推开令目标向远离发起者的方向移动五尺。强制位移若使任一擒抱关系超出触及，同次结算结束该关系并释放手位。
+5. `ESCAPE_GRAPPLE` 为受擒者自己合法 action，需绑定准确活动关系并接受一次 action
+   spend；受擒者选同样的两项技能，对方固定 STR(Athletics)。挣脱方领先达到战役冻结门槛才结束指定关系。其余结果保持关系并保留已用 action；逃脱前被规则结束时记
    `RELATION_ALREADY_ENDED`，既有成本保留、未做检定不补骰。
 
 主动 `RELEASE_GRAPPLE` 仅由擒抱者获授权控制者发出，指定准确关系、版本、焦点，若有
@@ -430,7 +431,7 @@ granted,performed,pending_attempt_ref` 和各已消费 ordinal。真实序列的
 转为单人新路线。此写门例外只允许该真实释放及其确定后果，预检必须覆盖后继失效和
 收束，未知后果在原分支接纳门关闭。擒抱者失能/死亡、有效主体移除或权威位置使对象超出
 触及均由对应领域边界在同一事务结束该关系，不收第二笔释放成本。原文依据见
-[擒抱](../../semantics/srd-5.1/combat.md#srd51-core-grappling)和
+[擒抱](../../semantics/srd-5.1/combat.md#srd51-core-grappling)、[推撞](../../semantics/srd-5.1/combat.md#srd51-core-shoving)和
 [Grappled](../../semantics/srd-5.1/conditions.md#srd51-condition-grappled)。
 
 ### 移动、机会攻击和 Ready move

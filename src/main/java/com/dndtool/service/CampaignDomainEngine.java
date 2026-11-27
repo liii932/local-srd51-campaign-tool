@@ -452,6 +452,10 @@ public final class CampaignDomainEngine {
                 closeEvents+=(int)before.monsterRests().stream().filter(r->r.status()==MonsterRestStatus.ACTIVE).count();
                 closeEvents+=(int)before.concentrationHolders().stream().map(ConcentrationHolder::actorId).distinct().count();
                 closeEvents+=(int)before.environmentZones().stream().filter(z->z.endedOperationId()==null).count();
+                closeEvents += (int) before.meleeControl().grapples().stream().filter(GrappleRelation::active).count();
+                if (command.kind() == Kind.RELEASE_GRAPPLE) closeEvents--;
+                if (command.kind() == Kind.GRAPPLE || before.meleeControl().contests().stream()
+                        .anyMatch(contest -> contest.kind() == Kind.GRAPPLE && contest.outcome() == null)) closeEvents++;
                 if(before.shields().stream().anyMatch(e->e.status()==EffectStatus.ACTIVE)
                         || before.readyPreparations().stream().anyMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING))closeEvents+=histories.size();
             }

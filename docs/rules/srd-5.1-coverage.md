@@ -72,7 +72,7 @@ SRD 页码均指 PDF 原文页；相邻页可能含续表。数据列中的“�
 | 属性生成、一级创建、描述/阵营、起始财富（[3](../references/srd-5.1/pages/page-003.md)、[56](../references/srd-5.1/pages/page-056.md)、[58—62](../references/srd-5.1/pages/page-058.md)） | 旧创建 profile；schema 2 标准数组 | 标准数组有限排列；不提供掷属性/购点或完整财富创建 | 各自局部；不互通补全 | [创建/成长](#growth)；缺统一完整初始角色、种族修正、财富/装备候选及相关来源快照。 |
 | 升级、职业/子职业、ASI、专长获得、多职业前提（[56—58](../references/srd-5.1/pages/page-056.md)、[75](../references/srd-5.1/pages/page-075.md)） | 有限类型化逐级声明、前提、选项 | 有限选择并自动算 HP/PB/混合生命骰；专长效果仍阻断 | 成长局部闭环 | [成长](#growth)；不得跳过到期 OPTION 义务；缺所有职业效果消费者、XP 奖励/升级工作流与完整战役初始化。 |
 | 多职业施法、Pact Magic、同名职业能力合并（[57—58](../references/srd-5.1/pages/page-057.md)） | [V018 目录](multiclass-spell-slots-v2.md)记录职业贡献 | 现行施法 profile 支持有限单职业入口 | 施法合并未闭合 | [成长](#growth)、[施法](#spells)；缺逐来源已知/准备、共享位与 Pact 分池、仪式/焦点、Extra Attack/Unarmored Defense 等合并语义。 |
-| Grappler 专长效果（[75](../references/srd-5.1/pages/page-075.md)） | 前提与获得可记录，效果 BLOCKED | 未接入 | 获得局部；效果未建 | [成长](#growth)；须接擒抱关系、对被擒目标攻击优势、pin 动作与双方 restrained，不能按一般 ASI 获得计为完成。 |
+| Grappler 专长效果（[75](../references/srd-5.1/pages/page-075.md)） | 前提与获得可记录，效果 BLOCKED | 未接入 | 获得局部；效果未建 | [成长](#growth)；战斗已能记录[擒抱关系](schema-2-melee-control.md)，专长仍缺对被擒目标的攻击优势、pin 动作与双方 restrained。 |
 
 职业表逐行区分“资源获得/容量/恢复”与“使用能力”。下列“资源协议”指旧目录已有相应资源声明、
 schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准确 SRD 内容的作者包、来源、镜像与业务路径已逐项采用。
@@ -102,7 +102,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 优势/劣势与自然骰（[76—77](../references/srd-5.1/pages/page-076.md)、[94](../references/srd-5.1/pages/page-094.md)） | 普通检定、有限攻击/先攻/豁免按实际范围自动合并；原骰保存 | 局部闭环；自然 1/20 只适用于对应类型，新增贡献须证明来源与时机 | [基础](#foundation)、[战斗](#combat)、[怪物](#monsters) |
 | 普通豁免（[83](../references/srd-5.1/pages/page-083.md)） | 当前真实 save 入口限吐息 DEX、伤害后专注 CON、死亡豁免及既有特定分支 | 未有通用六属性 save 命令；缺各效果 DC/属性/自动失败/完整贡献与对应事件，不能拿能力检定替代 | [怪物](#monsters)、[施法](#spells) |
 | 团队属性检定（[79](../references/srd-5.1/pages/page-079.md)） | DM 在焦点世界节点选择规则角色，共享属性或技能与 DC，按各人条件分别掷骰。标准包至少一半成功即全队成功，家规可覆盖该比例 | 一个根记录全部角色原骰对应关系、所需与实际成功人数及选中消息，完整文件恢复后可继续检定 | [团队检定](schema-2-character-foundations.md#团队属性检定)、[冻结字段](schema-2-foundation-authoring.md#团队成功比例) |
-| 对抗检定（[77](../references/srd-5.1/pages/page-077.md)） | DM 在焦点世界节点选择两名规则角色，双方各用适合其行动的属性或技能，比较总值。标准领先 1 分即胜，检定变体需领先 2 分，差距不足保持现状 | 根记录保存双方原骰、修正、总值和共同裁定。完整文件重开可回看并继续对抗。战斗动作中的擒抱、推撞另需目标、额度与状态规则 | [对抗检定](schema-2-character-foundations.md#对抗检定)、[字段](schema-2-foundation-authoring.md#对抗最小获胜分差) |
+| 对抗检定（[77](../references/srd-5.1/pages/page-077.md)） | DM 在焦点世界节点选择两名规则角色，双方各用适合其行动的属性或技能，比较总值。标准领先 1 分即胜，检定变体需领先 2 分，差距不足保持现状 | 根记录保存双方原骰、修正、总值和共同裁定。完整文件重开可回看并继续对抗。战斗对抗的目标、额度与状态见[近战控制](schema-2-melee-control.md) | [对抗检定](schema-2-character-foundations.md#对抗检定)、[字段](schema-2-foundation-authoring.md#对抗最小获胜分差) |
 | 共同工作（[79](../references/srd-5.1/pages/page-079.md)） | 原文；尚待接通 | 须核验协助者能否独立尝试、合作是否有效并将优势用于主检定 | [基础](#foundation) |
 | 被动检定、感知/隐藏关系（[78—79](../references/srd-5.1/pages/page-078.md)、[94](../references/srd-5.1/pages/page-094.md)） | 规则角色可对 DM 指定的 DC 执行[被动检定](schema-2-character-foundations.md#被动检定)。标准 10 + 适用修正，优势 +5、劣势 −5。基础分与幅度可由规则包覆盖；直接检定、分支后果和完整文件重开共用冻结规则 | 怪物被动察觉仍是元数据。自动隐蔽与发现、观察者和目标的感官与场景条件待接入 | [基础](#foundation)、[怪物](#monsters) |
 | 专精、半熟练、最低值、重掷/骰后替换（[12—14](../references/srd-5.1/pages/page-012.md)、[39—40](../references/srd-5.1/pages/page-039.md)） | 旧特性元数据；未接通 | 缺贡献去重/取整、原骰→重掷/替换关系、触发窗口、资源一次消费；Lucky/Reliable Talent/Indomitable 不因有 d20 工具而完成 | [成长](#growth)、[动作流](#combat) |
@@ -150,7 +150,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | action/bonus action/reaction、回合重置（[90—91](../references/srd-5.1/pages/page-090.md)） | 普通 action、reaction、移动预算和已接反应自动；战士有限两击共付一次 action；未提供通用 bonus action 消费者 | 局部闭环；缺每个 bonus producer、额外 action、其他额外攻击来源、每回合施法限制及其时序，不可仅添加额度字段 | [战斗](#combat)、[施法](#spells) |
 | 普通近战 Attack、命中/暴击/伤害（[93—97](../references/srd-5.1/pages/page-093.md)） | 普通手持近战 profile、单击结算；Attack 序列按冻结规则与真实授予为一次或两次；真实属性/熟练/AC、原骰及健康 | 局部闭环；缺非致命击倒、徒手/天然武器及其他属性/多个伤害分量/特性修正；每种新 profile 须完整来源 | [战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md) |
 | 远程/投掷/双持（[93—95](../references/srd-5.1/pages/page-093.md)） | 未接入 | 缺射程与贴身劣势、遮蔽/弹药/投掷、附赠攻击手位和伤害规则；不能循环调用普通 ATTACK 绕过成本 | [战斗](#combat)当前明确边界 |
-| Extra Attack（[25](../references/srd-5.1/pages/page-025.md)） | 单职业战士 5–6 级本人 Attack 两击；两击间移动、反应、换目标和放弃；完整文件保留原骰与序列进度 | 机会攻击和当前 Ready 响应仍为单击；更高等级、其他职业及多职业合并未接入；不代表擒抱轨迹实现 | [有限额外攻击合同](schema-2-extra-attack.md)、[真实链路验证](../testing.md#extra-attack-verification) |
+| Extra Attack（[25](../references/srd-5.1/pages/page-025.md)） | 单职业战士 5–6 级本人 Attack 两击；两击间移动、反应、换目标和放弃；完整文件保留原骰与序列进度 | 机会攻击和当前 Ready 响应仍为单击；更高等级、其他职业及多职业合并未接入 | [有限额外攻击合同](schema-2-extra-attack.md)、[真实链路验证](../testing.md#extra-attack-verification) |
 | Second Wind（[24](../references/srd-5.1/pages/page-024.md)） | 单职业战士 1–6 级真实一级授予，本人回合附赠动作治疗，原骰/资源/HP 同根；标准短长休恢复 | SQLite 完整文件及 Host/有限玩家候选接合；多职业或战斗外执行未采用，不代表通用附赠动作完成 | [有限回气合同](schema-2-second-wind.md)、[真实链路验证](../testing.md#second-wind-verification) |
 | Improved Critical（[25](../references/srd-5.1/pages/page-025.md)） | 单职业勇士 3–6 级正常取得，近战普通/OA/Ready 选中 19/20 重击，固定修正不加倍 | 反应暂停及原骰/授予/伤害随完整文件恢复；远程、投掷、多职业和 Superior Critical 未接入 | [有限精通重击合同](schema-2-improved-critical.md)、[真实链路验证](../testing.md#improved-critical-verification) |
 | Dash/Disengage/Dodge（[93](../references/srd-5.1/pages/page-093.md)） | 已接 action 成本及速度/本回合 OA 免除/攻击和 DEX save 贡献 | 局部闭环；新增失能、不可见、速度为零或特殊动作来源须消费真实贡献 | [战斗](#combat)、[怪物](#monsters) |
@@ -158,8 +158,8 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | Hide/Search（[93—94](../references/srd-5.1/pages/page-093.md)） | 未接入；普通技能检定不足 | 缺隐藏关系/可被感知资格、主动搜索目标与被动值、观察者专属结果、失去隐藏和攻击影响 | 空间/感知/检定 owner 须共同接合 |
 | Ready（[93—94](../references/srd-5.1/pages/page-093.md)） | 有限 attack/move/spell 及封闭完成事实触发、reaction、持能量专注 | 局部闭环；不解释任意自然语言触发，不开放其他物体/能力响应；新触发须有真实 producer 与恢复闭包 | [施法](#spells)、[动作流](#combat) |
 | Use an Object、拾取/重新装备、临时行动（[91](../references/srd-5.1/pages/page-091.md)、[94](../references/srd-5.1/pages/page-094.md)） | 战斗掉地已保存；使用/拾取未接入 | 缺免费交互与 action 区分、目标距离/手位、物品使用成本/效果/归属和类型化临时行动结果 | [基础](#foundation)、[战斗](#combat) |
-| Grapple/Shove/escape（[95—96](../references/srd-5.1/pages/page-095.md)） | 未接入 | 缺 Attack 内替代额度、手位/体型/触及、Athletics 对抗候选、平手、抓取者关系、拖拽/脱离/失能终止、push/prone 后果 | 对抗/位置/条件须同根事件，不借普通 damage 模拟 |
-| 移动/OA/倒地姿态（[91—95](../references/srd-5.1/pages/page-091.md)） | 平面相邻未占格步行、主动卧倒、双倍成本爬行、ACTIVE 精确半速起身；探索卧倒零耗时、移动/起身各六秒并保留旧战斗预算；Ready 爬行、PC 武器 OA 逐段暂停和完整文件恢复 | ACTIVE/Ready 与有限探索规则角色局部闭环，探索爬行每段按当前速度限额；缺怪物主动姿态/OA、穿越/挤压/地形、teleport/强制移动；敌对可反应怪物使相关 PC 移动保守拒绝 | [倒地合同](schema-2-prone.md)、[战斗](#combat)、[怪物](#monsters) |
+| Grapple/Shove/escape（[95—96](../references/srd-5.1/pages/page-095.md)） | 本人 Attack 替代一击、目标选技能、冻结分差、关系、推开或倒地、挣脱和释放 | 限活动场景单格中型规则角色。拖带两端位置与抓者花费共同提交，等待选技能、余击和反应可保存重开 | [近战控制](schema-2-melee-control.md) |
+| 移动/OA/倒地姿态（[91—95](../references/srd-5.1/pages/page-091.md)） | 平面相邻未占格步行、主动卧倒、双倍成本爬行、ACTIVE 精确半速起身；探索卧倒零耗时、移动/起身各六秒并保留旧战斗预算；Ready 爬行、PC 武器 OA 逐段暂停和完整文件恢复 | ACTIVE/Ready 与有限探索规则角色局部闭环，探索爬行每段按当前速度限额；缺怪物主动姿态/OA、穿越/挤压/地形、teleport/其他强制移动；敌对可反应怪物使相关 PC 移动保守拒绝 | [倒地合同](schema-2-prone.md)、[战斗](#combat)、[怪物](#monsters) |
 | 体型空间、触及、掩护/遮挡、区域（[92](../references/srd-5.1/pages/page-092.md)、[96](../references/srd-5.1/pages/page-096.md)、[102—103](../references/srd-5.1/pages/page-102.md)） | 单点格、正常可见、无遮挡；有限锥形和固定半径区域 | 局部目标证明；缺大体积/三维/障碍、半/四分之三/全掩护、所有区域形状与完整战外 roster；点格政策不代表通用 SRD 空间引擎 | [战斗](#combat)、[怪物](#monsters)、[施法](#spells) |
 | 伤害类型、抗性/易伤/免疫、共享伤害（[96—97](../references/srd-5.1/pages/page-096.md)） | 有限吐息共享骰及准确怪物防御/适用 gate；PC 来源不通用 | 局部闭环；缺角色防御 producer、多分量及一般物理/魔法/攻击门限、伤害后反应如 Uncanny Dodge、Evasion/Legendary Resistance | [怪物](#monsters)；共享核不能授予所有伤害机制 |
 | 治疗/temp HP/零 HP/稳定/死亡/即死（[97—99](../references/srd-5.1/pages/page-097.md)） | 真实有限健康、回合死亡豁免、稳定期限、掉物/倒地；怪物有限零 HP 死亡政策 | 局部闭环；缺医疗动作稳定、非致命击倒、复活、最大 HP 变化和特性替代后果；治疗不自动起身/捡物 | [健康](#foundation)、[战斗](#combat)、[怪物](#monsters) |
@@ -169,13 +169,13 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 
 | 状态与原文 | 当前实际范围 | 仍缺的具体合同/执行/恢复责任 |
 |---|---|---|
-| Prone（[359](../references/srd-5.1/pages/page-359.md)） | 零 HP 或主动卧倒、攻击优劣势、ACTIVE/Ready 爬行、ACTIVE 半速起身；探索卧倒/爬行/独立六秒起身及完整文件姿态恢复；[有限合同](schema-2-prone.md) | 推撞等其他 producer、怪物主动姿态、一般条件来源/期限/解除关系尚未接入。 |
+| Prone（[359](../references/srd-5.1/pages/page-359.md)） | 零 HP、主动卧倒或推倒、攻击优劣势、ACTIVE/Ready 爬行、ACTIVE 半速起身；探索卧倒/爬行/独立六秒起身及完整文件姿态恢复；[有限合同](schema-2-prone.md) | 其他 producer、怪物主动姿态、一般条件来源/期限/解除关系尚未接入。 |
 | Unconscious / Incapacitated（[358—359](../references/srd-5.1/pages/page-358.md)） | 零 HP 健康及战斗动作阻断/掉物/近距暴击/适用自动失败、专注强制结束局部 | 法术/条件外部施加、非 HP 昏迷/失能来源、重叠/到期、感知与所有 STR/DEX save 消费者未完整建立。 |
 | Blinded（[358](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺视觉检定自动失败、可视施法/发现资格、双向攻击优势劣势、来源/期限/免疫。 |
 | Deafened（[358](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺听觉检定自动失败、感知触发与来源/期限/免疫。 |
 | Charmed（[358](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺准确 charmer 身份、有害目标禁止、社交优势、来源/解除与怪物免疫消费。 |
 | Frightened（[358](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺恐惧来源/视线、攻击与检定劣势、靠近禁止、重复豁免与解除。 |
-| Grappled（[358](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺抓取关系、速度为零、reach/强制移动/抓取者失能解除及移动因果。 |
+| Grappled（[358](../references/srd-5.1/pages/page-358.md)） | [规则角色的擒抱关系](schema-2-melee-control.md)、速度零、占手、挣脱/释放、越距或失能解除 | 怪物特殊肢体、非标准触及和多格占位未接入。 |
 | Invisible（[358—359](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺特殊感官与重遮蔽、仍可定位/被发现、双向攻击贡献、隐藏及施法可见性。 |
 | Paralyzed（[358—359](../references/srd-5.1/pages/page-358.md)） | 未接入 | 缺失能、不可移动/说话、STR/DEX 自动失败、受击优势及五尺暴击、来源/期限。 |
 | Petrified（[359](../references/srd-5.1/pages/page-359.md)） | 未接入 | 缺形态/重量/携物、感知/行动限制、STR/DEX 自动失败、全伤抗性、毒病免疫及暂停而非治愈。 |

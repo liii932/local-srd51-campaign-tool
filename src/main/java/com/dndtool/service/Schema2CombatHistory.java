@@ -75,7 +75,7 @@ public final class Schema2CombatHistory {
                 require(!change.healing() || !change.critical() && !change.deathSave() && !change.timeAdvance());
                 require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
             }
-            validateCastResults(e);validateExtendedTransition(e);
+            validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
             for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
             for(CombatFact f:e.resolution().facts())require(token(f.kind())&&(f.reason()==null||token(f.reason())));
@@ -210,6 +210,13 @@ public final class Schema2CombatHistory {
             }
         }
         validateExtendedState(b,members);
+        try {
+            Schema2MeleeControlRules.validate(b);
+        } catch (IllegalArgumentException malformed) {
+            throw corrupt();
+        }
+        for (MeleeContest contest : b.meleeControl().contests())
+            require(knownCharacters.contains(contest.actorId()) && knownCharacters.contains(contest.targetId()));
     }
     private static void validateExtendedTransition(Event event) {
         Battle before=event.before(),after=event.after();Map<UUID,EnvironmentZone> zones=new HashMap<>();Map<UUID,SuppressionCause> causes=new HashMap<>();
@@ -230,6 +237,131 @@ public final class Schema2CombatHistory {
                 if(old.status()==EffectStatus.ENDED)require(old.equals(next));}
         }
     }
+
+    private static void validateMeleeTransition(Event event) {
+        MeleeControl before = event.before() == null ? MeleeControl.EMPTY : event.before().meleeControl();
+        MeleeControl after = event.after().meleeControl();
+        Command command = event.command();
+        Kind kind = command.kind();
+        boolean startsContest = Schema2MeleeControlRules.replacesAttack(kind) || kind == Kind.ESCAPE_GRAPPLE;
+        boolean selectsSkill = kind == Kind.CHOOSE_MELEE_DEFENSE;
+        int retained = before.contests().size();
+        require(after.contests().size() == retained + (startsContest ? 1 : 0));
+        MeleeContest resolved = null;
+        for (int i = 0; i < retained; i++) {
+            MeleeContest old = before.contests().get(i), next = after.contests().get(i);
+            if (!old.equals(next)) {
+                require(selectsSkill && resolved == null && old.outcome() == null && sameContestIntent(old, next)
+                        && next.outcome() != null && command.actorId().equals(old.targetId())
+                        && command.meleeInput().skill() == next.selectedSkill()
+                        && event.before().activeFlow() != null && event.before().activeFlow().rootFrameKey().equals(old.frameKey())
+                        && Objects.equals(command.flowKey(), event.before().activeFlow().flowKey())
+                        && Objects.equals(command.leafKey(), event.before().activeFlow().leafFrameKey()));
+                resolved = next;
+            }
+        }
+        if (selectsSkill) require(resolved != null);
+
+        if (startsContest) {
+            MeleeContest contest = after.contests().getLast();
+            require(event.before() != null && event.before().status() == Status.ACTIVE && event.before().activeFlow() == null
+                    && contest.turnNumber() == event.before().turnNumber() && command.actorId().equals(event.before().activeActor())
+                    && contest.actorId().equals(command.actorId()) && contest.kind() == kind
+                    && contest.contestKey().equals(Schema2CombatRules.key(event.operationId(), "melee-contest"))
+                    && contest.frameKey().equals(Schema2CombatRules.key(event.operationId(), "melee-contest-frame")));
+            Combatant actor = member(event.before(), contest.actorId()), target = member(event.before(), contest.targetId());
+            require(actor.position().equals(contest.actorPosition()) && target.position().equals(contest.targetPosition()));
+            if (kind == Kind.ESCAPE_GRAPPLE) {
+                require(contest.outcome() != null && contest.selectedSkill() == command.meleeInput().skill()
+                        && contest.grappleKey().equals(command.meleeInput().grappleKey())
+                        && before.grapples().stream().anyMatch(relation -> relation.active()
+                            && relation.grappleKey().equals(contest.grappleKey()))
+                        && actor.actionAvailable() && !member(event.after(), contest.actorId()).actionAvailable());
+                resolved = contest;
+            } else {
+                var input = command.meleeInput();
+                require(contest.outcome() == null && contest.targetId().equals(command.targetId())
+                        && contest.sequenceKey().equals(input.sequenceKey()) && contest.attackOrdinal().equals(input.attackOrdinal())
+                        && contest.choiceKey().equals(Schema2CombatRules.key(event.operationId(), "melee-choice"))
+                        && contest.hand() == input.hand() && Objects.equals(contest.destination(), input.destination()));
+                require(kind != Kind.GRAPPLE || contest.grappleKey().equals(Schema2CombatRules.key(event.operationId(), "grapple")));
+                require(actor.sequence() != null && !actor.sequence().closed() && actor.sequence().sequenceKey().equals(contest.sequenceKey())
+                        && actor.sequence().performed() == contest.attackOrdinal()
+                        && event.before().combatants().equals(event.after().combatants()));
+            }
+        }
+
+        if (Schema2MeleeControlRules.handles(kind)) {
+            List<Roll> recorded = new ArrayList<>();
+            if (resolved != null) {
+                auditRolls(recorded, "MELEE_CONTEST_INITIATOR", resolved.actorId(), resolved.initiator());
+                auditRolls(recorded, "MELEE_CONTEST_RESPONDER", resolved.targetId(), resolved.responder());
+            }
+            require(recorded.equals(event.resolution().rolls()) && event.resolution().healthChanges().isEmpty());
+        }
+        if (resolved != null && selectsSkill) {
+            AttackSequence predecessor = member(event.before(), resolved.actorId()).sequence();
+            AttackSequence successor = member(event.after(), resolved.actorId()).sequence();
+            require(predecessor != null && successor != null && predecessor.sequenceKey().equals(resolved.sequenceKey())
+                    && predecessor.performed() == resolved.attackOrdinal() && successor.sequenceKey().equals(predecessor.sequenceKey())
+                    && successor.limit() == predecessor.limit() && successor.performed() == predecessor.performed() + 1
+                    && successor.forfeited() == predecessor.forfeited());
+            Combatant target = member(event.after(), resolved.targetId());
+            boolean won = resolved.outcome() == Schema2CharacterCheckRules.ContestOutcome.INITIATOR_WINS;
+            if (resolved.kind() == Kind.SHOVE_PRONE && won) require(target.prone());
+            if (resolved.kind() == Kind.SHOVE_PUSH)
+                require(target.position().equals(won ? resolved.destination() : resolved.targetPosition())
+                        && target.movementSpentHalfFeet() == member(event.before(), resolved.targetId()).movementSpentHalfFeet());
+        }
+
+        boolean established = resolved != null && resolved.kind() == Kind.GRAPPLE
+                && resolved.outcome() == Schema2CharacterCheckRules.ContestOutcome.INITIATOR_WINS;
+        require(after.grapples().size() == before.grapples().size() + (established ? 1 : 0));
+        if (established) require(after.grapples().getLast().originatingContest().equals(resolved.contestKey())
+                && after.grapples().getLast().active());
+        boolean released = false;
+        for (int i = 0; i < before.grapples().size(); i++) {
+            GrappleRelation old = before.grapples().get(i), next = after.grapples().get(i);
+            if (old.equals(next)) continue;
+            require(old.active() && !next.active() && next.endedOperationId().equals(event.operationId())
+                    && next.grappleKey().equals(old.grappleKey()) && next.grapplerId().equals(old.grapplerId())
+                    && next.targetId().equals(old.targetId()) && next.hand() == old.hand()
+                    && next.reachFeet() == old.reachFeet() && next.originatingContest().equals(old.originatingContest()));
+            if (next.endReason() == GrappleEndReason.RELEASED) {
+                require(!released && kind == Kind.RELEASE_GRAPPLE && command.actorId().equals(old.grapplerId())
+                        && command.meleeInput().grappleKey().equals(old.grappleKey()));
+                released = true;
+            }
+            if (next.endReason() == GrappleEndReason.ESCAPED)
+                require(kind == Kind.ESCAPE_GRAPPLE && resolved != null
+                        && resolved.outcome() == Schema2CharacterCheckRules.ContestOutcome.INITIATOR_WINS
+                        && resolved.grappleKey().equals(old.grappleKey()));
+        }
+        require(released == (kind == Kind.RELEASE_GRAPPLE));
+    }
+
+    private static Combatant member(Battle battle, UUID id) {
+        return battle.combatants().stream().filter(actor -> actor.characterId().equals(id)).findFirst()
+                .orElseThrow(Schema2CombatHistory::corrupt);
+    }
+
+    private static boolean sameContestIntent(MeleeContest old, MeleeContest next) {
+        return old.contestKey().equals(next.contestKey()) && old.frameKey().equals(next.frameKey())
+                && old.choiceKey().equals(next.choiceKey()) && old.kind() == next.kind() && old.actorId().equals(next.actorId())
+                && old.targetId().equals(next.targetId()) && old.turnNumber() == next.turnNumber()
+                && old.sequenceKey().equals(next.sequenceKey()) && old.attackOrdinal().equals(next.attackOrdinal())
+                && Objects.equals(old.grappleKey(), next.grappleKey()) && old.hand() == next.hand()
+                && old.actorPosition().equals(next.actorPosition()) && old.targetPosition().equals(next.targetPosition())
+                && old.actorSize() == next.actorSize() && old.targetSize() == next.targetSize()
+                && Objects.equals(old.destination(), next.destination()) && old.checkRule().equals(next.checkRule())
+                && old.minimumWinningMargin() == next.minimumWinningMargin();
+    }
+
+    private static void auditRolls(List<Roll> rolls, String purpose, UUID id, Schema2CharacterCheckRules.RolledScore score) {
+        rolls.add(new Roll(purpose, id, 20, score.firstD20()));
+        if (score.secondD20() != null) rolls.add(new Roll(purpose + "_SECOND", id, 20, score.secondD20()));
+    }
+
     private static void validateExtendedState(Battle b,List<UUID> members) {
         require(b.readyPreparations().size()<=128&&b.triggerFacts().size()<=1024&&b.shields().size()<=128&&b.concentrationHolders().size()<=members.size()&&b.environmentZones().size()<=16&&b.suppressionCauses().size()<=512);
         Map<UUID,ReadyPreparation> readies=new HashMap<>();Map<UUID,TriggerFact> triggers=new HashMap<>();Map<UUID,EnvironmentZone> zones=new HashMap<>();
@@ -261,6 +393,16 @@ public final class Schema2CombatHistory {
         if(b.status()==Status.ENDED)require(holders.isEmpty()&&b.activeFlow()==null&&b.ongoingEffects().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.shields().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)&&b.environmentZones().stream().allMatch(z->z.endedOperationId()!=null)&&b.suppressionCauses().stream().allMatch(c->c.releasedOperationId()!=null));
     }
     private static void validateCommand(Command c) {
+        if (Schema2MeleeControlRules.handles(c.kind())) {
+            try {
+                Schema2MeleeControlRules.validateCommand(c);
+            } catch (IllegalArgumentException malformed) {
+                throw corrupt();
+            }
+            return;
+        }
+        require(c.meleeInput() == null && (c.dragInput() == null || c.kind() == Kind.MOVE
+                && c.dragInput().path().size() == c.path().size()));
         if (Schema2CombatRules.placementCommand(c)) {
             Command expected = c.kind()==Kind.OPEN_SCENE ? Command.openScene(c.deployments(), c.monsterDeployments())
                     : c.kind()==Kind.SET_SCENE_ROSTER ? Command.sceneRoster(c.deployments(), c.monsterDeployments())
@@ -424,6 +566,8 @@ public final class Schema2CombatHistory {
         if (command.healthInput() != null) count++;
         if (command.breathInput() != null) count++;
         if (command.monsterRestInput() != null) count++;
+        if (command.meleeInput() != null) count++;
+        if (command.dragInput() != null) count += 1L + command.dragInput().path().size();
         if (event.before() != null) count += stateFactCount(event.before());
         return count + stateFactCount(event.after());
     }
@@ -432,6 +576,8 @@ public final class Schema2CombatHistory {
         long count = 1L + state.combatants().size() + state.initiative().size() + state.triggerFacts().size()
                 + state.shields().size() + state.concentrationHolders().size() + state.environmentZones().size()
                 + state.suppressionCauses().size() + state.monsterRests().size();
+        count += state.meleeControl().grapples().size();
+        for (MeleeContest contest : state.meleeControl().contests()) count += contest.outcome() == null ? 1 : 3;
         for (OngoingEffect effect : state.ongoingEffects()) count += 1L + effect.targets().size();
         for (ReadyPreparation ready : state.readyPreparations()) count += 1L + readyInputFactCount(ready.input());
         for (Flow flow : state.flows()) {
@@ -440,7 +586,10 @@ public final class Schema2CombatHistory {
                 count += window.trigger() == null ? 1 : 2;
                 for (Opportunity opportunity : window.opportunities()) count += 1L + opportunity.options().size();
             }
-            for (Movement movement : flow.movements()) count += 1L + movement.path().size();
+            for (Movement movement : flow.movements()) {
+                count += 1L + movement.path().size();
+                if (movement.drag() != null) count += 1L + movement.drag().path().size();
+            }
             for (AttackAttempt attack : flow.attacks()) count += 1L + attack.damageDice().size();
             for (CastAttempt cast : flow.casts()) count += 1L + cast.targets().size() + cast.healingDice().size();
         }

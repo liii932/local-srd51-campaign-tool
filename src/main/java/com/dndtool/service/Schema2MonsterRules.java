@@ -72,7 +72,7 @@ final class Schema2MonsterRules {
         return Math.floorDiv(score-10,2);
     }
     static Battle with(Battle b,List<MonsterInstance> monsters,List<SaveDamageBatch> batches) {
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),monsters,batches,b.monsterRests());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),monsters,batches,b.monsterRests(),b.meleeControl());
     }
     static Battle replace(Battle b,MonsterInstance monster) {return with(b,b.monsters().stream().map(m->m.monsterId().equals(monster.monsterId())?monster:m).toList(),b.saveDamageBatches());}
     static Battle damage(Battle b,UUID id,int amount) {

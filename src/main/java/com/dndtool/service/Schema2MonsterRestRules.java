@@ -56,6 +56,6 @@ final class Schema2MonsterRestRules {
     }
     private static MonsterRest rest(Battle b,Command c) {return b.monsterRests().stream().filter(r->r.restKey().equals(c.monsterRestInput().restKey())&&r.monsterId().equals(c.actorId())&&r.kind()==c.monsterRestInput().kind()&&r.status()==MonsterRestStatus.ACTIVE).findFirst().orElseThrow(()->invalid("S2_MONSTER_REST_COMMAND"));}
     private static int duration(MonsterRestKind kind) {return kind==MonsterRestKind.SHORT?3600:28800;}
-    private static Battle withRests(Battle b,List<MonsterRest> rests) {return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),rests);}
+    private static Battle withRests(Battle b,List<MonsterRest> rests) {return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),rests,b.meleeControl());}
     private static UUID key(UUID operation,String role) {UUID v=UUID.nameUUIDFromBytes((operation+":"+role).getBytes(StandardCharsets.UTF_8));return new UUID((v.getMostSignificantBits()&~0xf000L)|0x4000L,v.getLeastSignificantBits());}
 }

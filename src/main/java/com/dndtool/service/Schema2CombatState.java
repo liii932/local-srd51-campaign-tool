@@ -11,16 +11,17 @@ public final class Schema2CombatState {
     private Schema2CombatState() { }
     public enum Status { ACTIVE, EXPLORATION, ENDED }
     public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, DROP_PRONE, STAND_UP, SECOND_WIND, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
+        GRAPPLE, SHOVE_PRONE, SHOVE_PUSH, CHOOSE_MELEE_DEFENSE, ESCAPE_GRAPPLE, RELEASE_GRAPPLE,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
         ADVANCE_WINDOW, CONTINUE_MOVEMENT, CONTINUE_FLOW, CAST, READY_ATTACK, READY_MOVE, READY_SPELL,
         CREATE_ENVIRONMENT_ZONE, END_ENVIRONMENT_ZONE, EXPLORATION_HEALTH, EXPLORATION_ADVANCE_TIME, EXPLORATION_MOVE, REENTER_COMBAT, CLOSE_SCENE, END_CONCENTRATION, END_COMBAT }
     public enum FlowStatus { ACTIVE, COMPLETED }
-    public enum FrameKind { SAVE_DAMAGE, MOVEMENT, ATTACK, CAST, READY_RELEASE, HEALTH, SAVING_THROW, REACTION_SELECTION }
+    public enum FrameKind { SAVE_DAMAGE, MOVEMENT, ATTACK, CAST, READY_RELEASE, HEALTH, SAVING_THROW, REACTION_SELECTION, GRAPPLE_CONTEST, DOMAIN_CHOICE }
     public enum Invocation { ROOT, REACTION, CONTINUATION }
-    public enum FrameStatus { RUNNABLE, WAITING_WINDOW, WAITING_CHILD, PENDING, DECIDED, TERMINAL }
+    public enum FrameStatus { RUNNABLE, WAITING_WINDOW, WAITING_CHILD, WAITING_CHOICE, PENDING, DECIDED, TERMINAL }
     public enum Stage { SAVE_DAMAGE_ROLLED, SAVE_DAMAGE_COMPLETED, MOVEMENT_LEAVE_REACH_BEFORE, MOVEMENT_CONTINUE, ATTACK_HIT_BEFORE_DAMAGE,
         ATTACK_RESOLVED, CAST_BEFORE_COMPLETION, CAST_RESOLVED, READY_TRIGGER_AFTER, READY_RELEASE_RESOLVED,
-        SAVING_THROW_RESOLVED, HEALTH_RESOLVED, MOVEMENT_COMPLETED, MOVEMENT_STOPPED }
+        SAVING_THROW_RESOLVED, HEALTH_RESOLVED, MOVEMENT_COMPLETED, MOVEMENT_STOPPED, MELEE_CONTROL_CHOICE, MELEE_CONTROL_RESOLVED }
     public enum WindowStatus { OPEN, CLOSED, CONSUMED }
     public enum OpportunityStatus { PENDING, PASSED, DECLARED, COMPLETED, INELIGIBLE }
     public enum MovementStatus { PENDING, COMPLETED, STOPPED }
@@ -48,7 +49,11 @@ public final class Schema2CombatState {
             List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey,
             UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey,
             ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
-            List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput) {
+            List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput,
+            MeleeInput meleeInput, DragInput dragInput) {
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds, List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput) {
+            this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,monsterDeployments,breathInput,monsterRestInput,null,null);
+        }
         public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds, List<MonsterDeployment> monsterDeployments, BreathInput breathInput) {
             this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,monsterDeployments,breathInput,null);
         }
@@ -101,6 +106,14 @@ public final class Schema2CombatState {
         public static Command action(Kind kind, UUID actor) { return new Command(kind,actor,null,null,List.of(),List.of(),List.of(),null,null,null,null); }
         public static Command attack(UUID actor, UUID target, UUID item) { return new Command(Kind.ATTACK,actor,target,item,List.of(),List.of(),List.of(),null,null,null,null); }
         public static Command move(UUID actor, List<Position> path) { return new Command(Kind.MOVE,actor,null,null,path,List.of(),List.of(),null,null,null,null); }
+        public static Command move(UUID actor, List<Position> path, DragInput drag) {
+            return new Command(Kind.MOVE,actor,null,null,path,List.of(),List.of(),null,null,null,null,
+                    null,null,null,null,null,null,0,List.of(),null,null,null,drag);
+        }
+        public static Command melee(Kind kind, UUID actor, UUID target, UUID flow, UUID leaf, MeleeInput input) {
+            return new Command(kind,actor,target,null,List.of(),List.of(),List.of(),flow,leaf,null,null,
+                    null,null,null,null,null,null,0,List.of(),null,null,input,null);
+        }
         public static Command reaction(Kind kind, UUID actor, UUID item, UUID flow, UUID leaf, UUID window, UUID opportunity) {
             return new Command(kind,actor,null,item,List.of(),List.of(),List.of(),flow,leaf,window,opportunity);
         }
@@ -231,14 +244,62 @@ public final class Schema2CombatState {
     }
     /** Spent records physical feet traveled. The combatant tracks turn movement cost in half-feet. */
     public record Movement(UUID movementKey, UUID actorId, Position origin, List<Position> path,
-            int cursor, int spent, MovementStatus status, String stopReason, boolean readied, int allowanceFeet) {
+            int cursor, int spent, MovementStatus status, String stopReason, boolean readied, int allowanceFeet,
+            DragPlan drag, int spentHalfFeet) {
+        public Movement(UUID movementKey, UUID actorId, Position origin, List<Position> path,
+                int cursor, int spent, MovementStatus status, String stopReason, boolean readied, int allowanceFeet) {
+            this(movementKey, actorId, origin, path, cursor, spent, status, stopReason, readied, allowanceFeet, null, 2 * spent);
+        }
         public Movement(UUID movementKey, UUID actorId, Position origin, List<Position> path,
                 int cursor, int spent, MovementStatus status, String stopReason) {
             this(movementKey,actorId,origin,path,cursor,spent,status,stopReason,false,0);
         }
         public Movement { path = List.copyOf(path); }
         Movement stopped(String reason) {
-            return new Movement(movementKey, actorId, origin, path, cursor, spent, MovementStatus.STOPPED, reason, readied, allowanceFeet);
+            return new Movement(movementKey, actorId, origin, path, cursor, spent, MovementStatus.STOPPED, reason,
+                    readied, allowanceFeet, drag, spentHalfFeet);
+        }
+    }
+    public record DragInput(UUID grappleKey, List<Position> path) {
+        public DragInput {
+            uuid(grappleKey);
+            if (path == null || path.isEmpty() || path.size() > 64) throw invalid("S2_COMBAT_PATH");
+            path = List.copyOf(path);
+        }
+    }
+    public record DragPlan(UUID grappleKey, UUID targetId, Position origin, List<Position> path, int allowanceHalfFeet) {
+        public DragPlan { path = List.copyOf(path); }
+    }
+    public enum CreatureSize { TINY, SMALL, MEDIUM, LARGE, HUGE, GARGANTUAN }
+    public enum HandSlot { MAIN_HAND, OFF_HAND }
+    public enum ContestSkill {
+        ATHLETICS("ability.strength", "proficiency.skill.athletics"),
+        ACROBATICS("ability.dexterity", "proficiency.skill.acrobatics");
+
+        private final String abilityKey;
+        private final String ruleKey;
+        ContestSkill(String abilityKey, String ruleKey) { this.abilityKey = abilityKey; this.ruleKey = ruleKey; }
+        public String abilityKey() { return abilityKey; }
+        public String ruleKey() { return ruleKey; }
+    }
+    public enum GrappleEndReason { RELEASED, ESCAPED, GRAPPLER_INCAPACITATED, TARGET_DIED, OUT_OF_REACH, DEPARTED }
+    public record MeleeInput(UUID sequenceKey, Integer attackOrdinal, UUID grappleKey, HandSlot hand,
+            ContestSkill skill, Position destination) { }
+    public record GrappleRelation(UUID grappleKey, UUID grapplerId, UUID targetId, HandSlot hand, int reachFeet,
+            UUID originatingContest, GrappleEndReason endReason, UUID endedOperationId) {
+        public boolean active() { return endReason == null; }
+    }
+    public record MeleeContest(UUID contestKey, UUID frameKey, UUID choiceKey, Kind kind, UUID actorId, UUID targetId,
+            long turnNumber, UUID sequenceKey, Integer attackOrdinal, UUID grappleKey, HandSlot hand,
+            Position actorPosition, Position targetPosition, CreatureSize actorSize, CreatureSize targetSize,
+            Position destination, RuleIdentity checkRule, int minimumWinningMargin, ContestSkill selectedSkill,
+            Schema2CharacterCheckRules.RolledScore initiator, Schema2CharacterCheckRules.RolledScore responder,
+            Schema2CharacterCheckRules.ContestOutcome outcome) { }
+    public record MeleeControl(List<MeleeContest> contests, List<GrappleRelation> grapples) {
+        public static final MeleeControl EMPTY = new MeleeControl(List.of(), List.of());
+        public MeleeControl {
+            contests = List.copyOf(contests);
+            grapples = List.copyOf(grapples);
         }
     }
     public record AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
@@ -349,7 +410,13 @@ public final class Schema2CombatState {
             List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects,
             List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields,
             List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones,
-            List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches, List<MonsterRest> monsterRests) {
+            List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches, List<MonsterRest> monsterRests,
+            MeleeControl meleeControl) {
+        public Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status, int round, long turnNumber, int activeOrdinal, long version, List<Combatant> combatants, List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects, List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields, List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones, List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches, List<MonsterRest> monsterRests) {
+            this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,
+                    ongoingEffects,readyPreparations,triggerFacts,shields,concentrationHolders,environmentZones,suppressionCauses,
+                    monsters,saveDamageBatches,monsterRests,MeleeControl.EMPTY);
+        }
         public Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status, int round, long turnNumber, int activeOrdinal, long version, List<Combatant> combatants, List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects, List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields, List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones, List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches) {
             this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,ongoingEffects,readyPreparations,triggerFacts,shields,concentrationHolders,environmentZones,suppressionCauses,monsters,saveDamageBatches,List.of());
         }
@@ -366,7 +433,7 @@ public final class Schema2CombatState {
                 List<Initiative> initiative, List<Flow> flows) {
             this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,List.of());
         }
-        public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses);monsters=List.copyOf(monsters);saveDamageBatches=List.copyOf(saveDamageBatches);monsterRests=List.copyOf(monsterRests); }
+        public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses);monsters=List.copyOf(monsters);saveDamageBatches=List.copyOf(saveDamageBatches);monsterRests=List.copyOf(monsterRests); if (meleeControl == null) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID"); }
         public UUID activeActor() { return initiative.isEmpty() ? null : initiative.get(activeOrdinal).characterId(); }
         public Flow activeFlow() { return flows.stream().filter(f -> f.status() == FlowStatus.ACTIVE).findFirst().orElse(null); }
     }

@@ -2,7 +2,7 @@
 
 SRD 5.1 的战士从职业 5 级起，在自己回合执行 Attack 动作时可攻击两次。SRD 在职业
 11、20 级还会增加次数。当前应用支持单职业战士 1–6 级，其中 5–6 级的额外攻击接入
-现有近战武器流程。SRD 的更高等级、其他职业的额外攻击和多职业规则属于独立范围。
+现有近战武器和[擒抱、推撞替代一击](schema-2-melee-control.md)流程。SRD 的更高等级、其他职业的额外攻击和多职业规则属于独立范围。
 [SRD 第 25 页](../references/srd-5.1/pages/page-025.md) ·
 [战士语义](../semantics/srd-5.1/classes-fighter-monk.md#srd51-class-fighter-extra-attack)
 

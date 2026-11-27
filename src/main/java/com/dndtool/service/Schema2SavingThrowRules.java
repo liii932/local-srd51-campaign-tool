@@ -29,7 +29,9 @@ final class Schema2SavingThrowRules {
         Schema2FeatureSupport.requireSupportedFeatures(c.material(), c.character(), "S2_CHECK_EFFECT_UNSUPPORTED");
         int mod=Math.floorDiv(c.character().abilities().get(ability)-10,2);var derived=new Schema2CharacterEquipmentRules().derive(c.material(),c.character());
         var bless=Schema2SpellRules.blessing(battle,subject.creatureId());
-        return new Basis(ability,mod,proficiency(c,ability),dex&&actor.dodging()&&c.character().hitPoints()>0&&new Schema2CombatRules().speed(c)>0,
+        boolean dodge=dex&&actor.dodging()&&c.character().hitPoints()>0
+                &&new Schema2CombatRules().speed(roster,battle,subject.creatureId())>0;
+        return new Basis(ability,mod,proficiency(c,ability),dodge,
                 (dex||ability.equals("ability.strength"))&&derived.physicalCheckDisadvantage(),dex&&c.character().hitPoints()==0,bless==null?null:bless.effectKey());
     }
     static BatchCheck resolve(Basis basis,int ordinal,String purpose,UUID subject,int dc,Schema2ActionFlowRules.Roller dice) {

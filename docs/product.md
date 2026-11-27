@@ -49,6 +49,8 @@ Wizard 到 5 级；成长、子职业身份、ASI、多职业前提/熟练、HP/
 其余未接入的 Fighter 特性与 Evocation Savant/Sculpt Spells 是可查的 `OPTION` 元数据，不自动获得；
 Wizard Spellcasting、Arcane Recovery 与一级 Life profile 则由真实消费者拥有。
 
+规则角色可在活动战斗中用本人 Attack 的一击擒抱或推撞，受擒者可用动作挣脱。两次攻击之间和拖带的反应停点均可保存重开。[近战控制](rules/schema-2-melee-control.md)
+
 普通检定、装备实例/护甲限制、伤害/治疗、临时 HP、死亡豁免、先攻/回合、近战攻击、移动、
 机会攻击和反应/继续保存实际骰点及完整状态。规则角色可在本人战斗回合
 [主动卧倒、双倍成本爬行和半速起身](rules/schema-2-prone.md)，Ready 移动使用自己的反应移动上限；
