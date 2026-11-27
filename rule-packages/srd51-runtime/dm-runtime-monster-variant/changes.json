@@ -1,0 +1,43 @@
+[
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.hell_hound"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "bite"
+    },
+    "field": "action_profile",
+    "value": {
+      "display_name": "Bite",
+      "description": "One creature within 10 feet. +7 to hit. On a hit, 2d8 + 4 piercing damage and 1d6 + 1 fire damage.",
+      "source_page": 322,
+      "mode": "MELEE_ATTACK_V1",
+      "mechanism": "MONSTER_MELEE_ATTACK_V1",
+      "attack_profile": {
+        "hit_bonus": 7,
+        "reach_feet": 10,
+        "damage": [
+          {
+            "damage_type": "PIERCING",
+            "dice_count": 2,
+            "dice_sides": 8,
+            "modifier": 4
+          },
+          {
+            "damage_type": "FIRE",
+            "dice_count": 1,
+            "dice_sides": 6,
+            "modifier": 1
+          }
+        ]
+      }
+    }
+  }
+]

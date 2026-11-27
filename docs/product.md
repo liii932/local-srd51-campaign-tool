@@ -58,7 +58,7 @@ Wizard Spellcasting、Arcane Recovery 与一级 Life profile 则由真实消费�
 姿态、路径前缀、已付成本和反应窗口随完整文件恢复。生命领域支持 Bless/Cure Wounds；单职业 Wizard
 支持 Shield/Counterspell/Burning Hands、真实法术书、学习/准备和短休奥术回想。其余目录法术
 只提供学习/准备元数据，不能施放。多施法职业的共享位数不在现有 casting 消费者支持范围。
-有限怪物支持 Hell Hound 吐息、充能及所列防御；其他动作保留阻断元数据。抗魔区域是明确
+地狱犬支持吐息、充能，以及[普通啮咬与借机攻击](rules/schema-2-monster-attacks.md)。Pack Tactics 可改变实际攻击选骰。木乃伊的近战和多重攻击仍保留为目录数据。抗魔区域是明确
 DM 家规，不能称作已实现 Antimagic Field。规则来源及详细限制见
 [有限包指南](../rule-packages/srd51-runtime/package-guide.md)。
 

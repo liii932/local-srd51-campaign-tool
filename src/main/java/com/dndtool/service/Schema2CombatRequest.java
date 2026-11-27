@@ -44,7 +44,7 @@ public record Schema2CombatRequest(UUID operationId, UUID combatId, UUID campaig
     private static String fingerprint(Schema2CombatRequest request) {
         try {
             var bytes=new ByteArrayOutputStream(); var out=new DataOutputStream(bytes);
-            text(out,"local-dnd/schema2-combat-command/4"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
+            text(out,"local-dnd/schema2-combat-command/5"); id(out,request.operationId()); id(out,request.combatId()); id(out,request.campaignId());
             var binding=request.rules(); text(out,binding.canonicalProfile()); text(out,binding.compositionAlgorithm());
             out.writeInt(binding.members().size());
             for (var m:binding.members()) { text(out,m.moduleKey()); text(out,m.releaseVersion()); text(out,m.role().name()); text(out,m.rawZipSha256()); text(out,m.logicalSha256()); }
@@ -83,6 +83,9 @@ public record Schema2CombatRequest(UUID operationId, UUID combatId, UUID campaig
                 id(out, drag.grappleKey()); out.writeInt(drag.path().size());
                 for (Position step : drag.path()) position(out, step);
             }
+            MonsterAttackInput monsterAttack = command.monsterAttackInput();
+            out.writeBoolean(monsterAttack != null);
+            if (monsterAttack != null) entryIdentity(out, monsterAttack.action());
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException|NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }

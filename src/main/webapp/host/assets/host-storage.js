@@ -206,6 +206,13 @@
     const rule = typeof value === 'string' ? ruleFromValue(value) : value;
     return rule ? {type: 'rule.RuleIdentity', moduleKey: rule.moduleKey, ruleType: rule.ruleType || rule.type, ruleKey: rule.ruleKey || rule.key} : null;
   }
+  const typedEntry = entry => ({type: 'rule.EntryIdentity', rule: typedRule(entry.rule),
+    moduleKey: entry.moduleKey, collectionKey: entry.collectionKey, entryKey: entry.entryKey});
+  const monsterAttacks = identity => identity ? ruleFromValue(ruleValue(identity))?.monsterAttacks || [] : [];
+  const monsterAttackName = action => monsterAttacks(action.rule)
+    .find(choice => choice.action.entryKey === action.entryKey && choice.action.collectionKey === action.collectionKey
+      && choice.action.moduleKey === action.moduleKey)?.name || action.entryKey;
+  const monsterAttackInput = action => ({type: 'scene.MonsterAttackInput', action: typedEntry(action)});
   function ruleName(identity) {
     if (!identity) return '无';
     const found = catalog().find(rule => rule.moduleKey === identity.moduleKey && (rule.type || rule.ruleType) === identity.ruleType && (rule.key || rule.ruleKey) === identity.ruleKey);
@@ -317,15 +324,33 @@
         const item = items.find(item => item.id === id); return `${item.name} × ${item.quantity}`;
       });
       if (form.id === 'domain-profile' && character) { form.elements.name.value = character.name; form.elements.kind.value = character.kind; form.elements.active.checked = character.active; }
-      if (form.elements.combatId) {
-        const battle = battleFor(form.elements.combatId.value), monster = battle?.monsters?.find(monster => monster.monsterId === form.elements.actorId?.value);
-        for (const select of form.querySelectorAll('.breath-choice')) options(select, (monster?.actionUses || []).map((_, index) => String(index)), value => {
-          const action = monster.actionUses[Number(value)]; return `${action.action.entryKey}${action.available ? ' · 可用' : ' · 已用'}`;
-        });
-      }
+      if (form.id === 'domain-monster') refreshMonsterForm(form);
     }
     refreshCheckBranches();
     refreshArcaneRecovery();
+  }
+  function refreshMonsterForm(form) {
+    const battle = battleFor(form.elements.combatId.value);
+    const monster = battle?.monsters.find(monster => monster.monsterId === form.elements.actorId.value);
+    const attacks = monsterAttacks(monster?.monster);
+    const breath = monster?.actionUses || [];
+    options(form.elements.attackAction, attacks.map((_, index) => String(index)), value => attacks[Number(value)].name);
+    options(form.elements.breathAction, breath.map((_, index) => String(index)), value => {
+      const action = breath[Number(value)];
+      return `${action.action.entryKey}${action.available ? ' · 可用' : ' · 已用'}`;
+    });
+    options(form.elements.targetId, (battle?.combatants || []).map(actor => actor.characterId)
+      .filter(id => id !== monster?.monsterId), personName);
+    const kind = form.elements.kind.value;
+    const attack = kind === 'MONSTER_ATTACK', exhale = kind === 'MONSTER_BREATH';
+    const fields = {attackAction: attack, targetId: attack, breathAction: exhale, direction: exhale, restKind: !attack && !exhale};
+    for (const [name, visible] of Object.entries(fields)) {
+      const input = form.elements[name];
+      input.closest('label').hidden = !visible;
+      input.disabled = !visible;
+    }
+    form.querySelector('button').disabled = !monster || battle.flows.some(flow => flow.status === 'ACTIVE')
+      || (attack && !attacks.length) || (exhale && !breath.length);
   }
   function refreshArcaneRecovery() {
     const form = byId('domain-rest'), character = selectedCharacter(form), current = character?.state;
@@ -755,6 +780,21 @@
       ? ` · 剩余移动力 ${canResume ? (movement.drag.allowanceHalfFeet - movement.spentHalfFeet) / 2 : 0} 尺` : '';
     return `拖带移动 · ${personName(movement.actorId)} → ${personName(movement.drag.targetId)} · ${status}${reason} · 已走 ${movement.cursor}/${movement.path.length} 格 · 已用移动力 ${movement.spentHalfFeet / 2} 尺${budget}`;
   }
+  function monsterAttackResult(attack) {
+    const evidence = attack.monsterAttack;
+    const name = monsterAttackName(evidence.action), actor = personName(attack.actorId), target = personName(attack.targetId);
+    const kind = attack.opportunityAttack ? '借机攻击' : '近战攻击';
+    const dice = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
+    const roll = `d20=${dice}，选用 ${attack.selectedD20}，命中修正 ${evidence.hitBonus}，总值 ${attack.selectedD20 + evidence.hitBonus}，护甲等级 ${attack.finalArmorClass}`;
+    const pack = evidence.packTacticsAllies.length ? ` · 集群战术（${evidence.packTacticsAllies.map(personName).join('、')}）` : '';
+    const title = `${actor} → ${target} · ${kind} · ${name} · ${roll}${pack}`;
+    if (attack.status !== 'RESOLVED') return `${title} · 等待结算`;
+    if (!attack.hit) return `${title} · 未命中`;
+    const damageTypes = {PIERCING: '穿刺', FIRE: '火焰'};
+    const damage = evidence.damageComponents.map(component =>
+      `${damageTypes[component.damageType] || component.damageType} d${component.diceSides}=${component.dice.join(' / ')}，修正 ${component.modifier}，原值 ${component.rawDamage}，有效 ${component.effectiveDamage}`);
+    return `${title} · ${attack.critical ? '重击' : '命中'} · ${damage.join(' · ')} · 有效伤害合计 ${attack.damageAmount}`;
+  }
   function combatAudit(event) {
     const before = event.before, after = event.resolution.after;
     const previous = before?.meleeControl, current = after.meleeControl;
@@ -773,6 +813,10 @@
     }
     for (const flow of after.flows) {
       const earlier = before?.flows.find(old => old.flowKey === flow.flowKey);
+      for (const attack of flow.attacks.filter(attack => attack.monsterAttack)) {
+        const prior = earlier?.attacks.find(previous => previous.frameKey === attack.frameKey);
+        if (!prior || prior.status !== attack.status) details.push(monsterAttackResult(attack));
+      }
       for (const movement of flow.movements.filter(move => move.drag)) {
         const prior = earlier?.movements.find(move => move.movementKey === movement.movementKey);
         if (!prior || movement.cursor !== prior.cursor || movement.status !== prior.status)
@@ -883,7 +927,7 @@
     return {type: 'scene.Command', kind, actorId, targetId: null, itemId: null, path: [], deployments: [], tieBreakOrder: [],
       flowKey: null, leafKey: null, windowKey: null, opportunityKey: null, castInput: null, readyInput: null, readyKey: null,
       zoneInput: null, zoneKey: null, healthInput: null, seconds: '0', monsterDeployments: [], breathInput: null,
-      monsterRestInput: null, meleeInput: null, dragInput: null};
+      monsterRestInput: null, meleeInput: null, dragInput: null, monsterAttackInput: null};
   }
   function sendCombat(battle, command, expected = focusToken()) {
     if (!battle || battle.combatId !== focusedBattle()?.combatId || expected.generation !== focusToken().generation) {
@@ -931,6 +975,8 @@
       for (const effect of battle.ongoingEffects || []) text(box, 'p', `效果：${ruleName(effect.spell || effect.rule)} · ${effect.status === 'ACTIVE' ? '生效' : '已结束'}`);
       for (const zone of battle.environmentZones || []) if (!zone.endedOperationId) text(box, 'p', `环境区域：${ruleName(zone.rule)} · 中心 ${zone.center.x}, ${zone.center.y}`);
       for (const monster of battle.monsters || []) text(box, 'p', `${ruleName(monster.monster)} · 生命值 ${monster.hitPoints}${monster.dead ? ' · 已死亡' : ''}`);
+      const monsterAttack = battle.flows.flatMap(flow => flow.attacks).findLast(attack => attack.monsterAttack);
+      if (monsterAttack) text(box, 'p', monsterAttackResult(monsterAttack), 'monster-attack-result');
       const recentCast = battle.flows.flatMap(flow => flow.casts).findLast(cast => cast.status === 'RESOLVED');
       if (recentCast) {
         const caster = roster().find(character => character.id === recentCast.actorId);
@@ -990,7 +1036,18 @@
             if (!executing) continue;
             pendingButton(row, '放弃反应', battle, base);
             for (const choice of opportunity.options || []) {
-              if (choice.kind === 'OPPORTUNITY_ATTACK') pendingButton(row, `借机攻击 · ${ruleName(roster().find(character => character.id === opportunity.actorId)?.state.equipment.find(item => item.itemId === choice.itemId)?.item)}`, battle, {...base, kind: 'DECLARE_OPPORTUNITY_ATTACK', itemId: choice.itemId});
+              if (choice.kind === 'OPPORTUNITY_ATTACK') {
+                const reaction = {...base, kind: 'DECLARE_OPPORTUNITY_ATTACK'};
+                if (choice.monsterAttack) {
+                  pendingButton(row, `借机攻击 · ${monsterAttackName(choice.monsterAttack)}`, battle, {
+                    ...reaction, monsterAttackInput: monsterAttackInput(choice.monsterAttack)
+                  });
+                } else {
+                  const weapon = roster().find(character => character.id === opportunity.actorId)
+                    ?.state.equipment.find(item => item.itemId === choice.itemId)?.item;
+                  pendingButton(row, `借机攻击 · ${ruleName(weapon)}`, battle, {...reaction, itemId: choice.itemId});
+                }
+              }
               else if (choice.kind === 'READY_RELEASE') pendingButton(row, '释放预备动作', battle, {...base, kind: 'RELEASE_READY', readyKey: choice.readyKey});
               else if (['SHIELD', 'COUNTERSPELL'].includes(choice.kind)) pendingButton(row, ruleName(choice.spell), battle, {...base,
                 kind: choice.kind === 'SHIELD' ? 'DECLARE_SHIELD' : 'DECLARE_COUNTERSPELL', castInput: {type: 'scene.CastInput', castingRule: typedRule(choice.castingRule), spell: typedRule(choice.spell),
@@ -1854,11 +1911,15 @@
     const monster = battle?.monsters.find(monster => monster.monsterId === values.actorId);
     if (!battle || !monster) { message('请选择当前场景中的怪物。'); return; }
     const value = baseCombat(values.kind, values.actorId);
-    if (values.kind === 'MONSTER_BREATH') {
+    if (values.kind === 'MONSTER_ATTACK') {
+      const action = monsterAttacks(monster.monster)[Number(values.attackAction)]?.action;
+      if (!action || !values.targetId) { message('请选择可执行的怪物攻击和目标。'); return; }
+      value.targetId = values.targetId;
+      value.monsterAttackInput = monsterAttackInput(action);
+    } else if (values.kind === 'MONSTER_BREATH') {
       const entry = monster.actionUses[Number(values.breathAction)]?.action;
       if (!entry) { message('所选怪物没有可执行吐息。'); return; }
-      value.breathInput = {type: 'scene.BreathInput', direction: values.direction, action: {type: 'rule.EntryIdentity', rule: typedRule(entry.rule),
-        moduleKey: entry.moduleKey, collectionKey: entry.collectionKey, entryKey: entry.entryKey}};
+      value.breathInput = {type: 'scene.BreathInput', direction: values.direction, action: typedEntry(entry)};
     } else {
       const rest = battle.monsterRests.find(rest => rest.monsterId === values.actorId && rest.status === 'ACTIVE');
       value.monsterRestInput = {type: 'scene.MonsterRestInput', restKey: values.kind === 'COMPLETE_MONSTER_REST' ? rest?.restKey || null : null,
@@ -1936,6 +1997,8 @@
   });
   for (const select of document.querySelectorAll('.combat-choice')) select.addEventListener('change', refreshCombatActors);
   byId('domain-combat').elements.kind.addEventListener('change', refreshCombatForm);
+  const monsterForm = byId('domain-monster');
+  monsterForm.elements.kind.addEventListener('change', () => refreshMonsterForm(monsterForm));
   byId('domain-combat').elements.targetId.addEventListener('change', refreshCombatForm);
   byId('storage-create-rules').addEventListener('change', refreshCreateButton);
   byId('storage-create').elements.name.addEventListener('input', refreshCreateButton);

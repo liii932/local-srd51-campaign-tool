@@ -4,9 +4,9 @@
 
 
 SQLite 场景通过 `CampaignDomainEngine`、`Schema2MonsterRules` 和 `Schema2SaveDamageRules`
-接入冻结的怪物部署、充能与动作。当前可执行怪物动作限 `SAVE_DAMAGE_BATCH_V1` /
+接入冻结的怪物部署、充能与动作。地狱犬吐息采用 `SAVE_DAMAGE_BATCH_V1` /
 `HELL_HOUND_FIRE_BREATH_V1`。Mummy 的火易伤和 Hell Hound 的火免疫参与真实目标结算。
-Bite、Multiattack、Rotting Fist 和 Dreadful Glare 保留为元数据。
+地狱犬 Bite 开放[近战攻击与借机攻击](schema-2-monster-attacks.md)。木乃伊的 Multiattack、Rotting Fist 和 Dreadful Glare 保留为元数据。
 [战斗](schema-2-combat.md)与[多目标目标合同](../design/v2/multi-target-save-damage.md)
 分别给出当前动作边界和更广的后续接口。
 
@@ -50,9 +50,10 @@ Perception 和 Pack Tactics 攻击骰，与本次 OTHER_DELIVERY 吐息／DEX／
 | `action_profile` 分支 | 完整字段与含义 |
 |---|---|
 | `BLOCKED_METADATA` | 仅 `display_name`、`description`、`source_page`、`mode`；禁止可执行参数，不生成 action、roll 或健康结果。 |
+| `MELEE_ATTACK_V1` | 读取准确 `mechanism` 和有界 `attack_profile`，实际字段和范围见[近战合同](schema-2-monster-attacks.md)。 |
 | `SAVE_DAMAGE_BATCH_V1` | 上述字段加准确 `mechanism`、`save_policy`、`damage_profile`、`area`、`recharge`；每组均完整，不接受不同机制的字段拼接。 |
 
-唯一已登记参数为：
+火焰吐息的参数如下。
 
 | 原子 | 准确值 |
 |---|---|
@@ -138,11 +139,7 @@ DEX 使用真实目标修正、实际 save 熟练和当前有效 Bless；不把�
 FIXED 成长授予；相同属性按完整来源去重后只加一次 PB，不能从职业显示名硬编码。
 只有已经接入且可证明的条件与贡献进入本切片，Evasion、Legendary Resistance、任意
 反伤、特殊减伤或其他未知消费者仍阻断。
-闪避只在当前速度大于零且其余真实条件满足时为 DEX 提供优势。当前没有怪物 OA 的可执行
-攻击／reach producer；场景中有存活、敌对且 reaction 可用的怪物时，PC MOVE 及 Ready
-move 的声明／释放在首 RNG 前以 `S2_MONSTER_REACTION_UNSUPPORTED` 保守拒绝，不能省略
-可能的怪物机会攻击。友方或已死怪物不构成该威胁；怪物自己的移动、攻击与 Ready 根仍以
-`S2_MONSTER_ACTION_UNSUPPORTED` 拒绝，Bite 元数据不能补出这些机制。
+闪避只在当前速度大于零且其余真实条件满足时为 DEX 提供优势。怪物的借机攻击按已冻结的近战动作触及检查离开步段。已部署、存活且可能响应的敌对怪物若含无法解释的攻击来源，相关移动在接纳前拒绝。怪物自主移动和 Ready 仍在后续范围。
 
 共享六骰总值 R 对每目标只引用一次。失败取 R，成功先 `floor(R/2)`，再其他已支持修正、
 抗性向下取半、易伤乘二；免疫得到零。同种防御重复不重复计算，抗性与易伤并存按顺序执行。

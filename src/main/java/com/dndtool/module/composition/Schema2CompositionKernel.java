@@ -221,7 +221,7 @@ public final class Schema2CompositionKernel {
     public record MonsterSkillBonus(String skillKey, int bonus) { }
     public enum MonsterDefenseQualifier { ALL, NONMAGICAL_ATTACKS }
     public record MonsterDamageDefense(MonsterDefenseKind kind, DamageType damageType, MonsterDefenseQualifier qualifier) { }
-    /** Language and trait text is stat-block metadata, never an executable grant or handler. */
+    /** Trait scopes are closed inputs. Display text supplies no runtime behavior. */
     public record MonsterLanguage(String name, boolean understands, boolean speaks) { }
     public enum MonsterTraitScope { PERCEPTION_HEARING_SMELL_ONLY, ATTACK_ROLL_PACK_TACTICS_ONLY, UNSUPPORTED }
     public record MonsterTrait(String key, MonsterTraitScope scope, String displayName, String description) { }
@@ -239,14 +239,37 @@ public final class Schema2CompositionKernel {
     }
     public record MonsterDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             MonsterStatBlock statBlock, String authorNote) implements Definition { }
-    public enum MonsterActionMode { BLOCKED_METADATA, SAVE_DAMAGE_BATCH_V1 }
+    public enum MonsterActionMode { BLOCKED_METADATA, SAVE_DAMAGE_BATCH_V1, MELEE_ATTACK_V1 }
+    public static final String MONSTER_MELEE_ATTACK_MECHANISM = "MONSTER_MELEE_ATTACK_V1";
+    public static final int MONSTER_ATTACK_MIN_BONUS = -10, MONSTER_ATTACK_MAX_BONUS = 20;
+    public static final int MONSTER_ATTACK_MAX_DAMAGE_DICE = 10;
+    public static final Set<Integer> MONSTER_ATTACK_DIE_SIDES = Set.of(4, 6, 8, 10, 12);
+    public static final Set<Integer> MONSTER_ATTACK_REACH_FEET = Set.of(5, 10);
+    public record MonsterAttackDamage(DamageType damageType, int diceCount, int diceSides, int modifier) {
+        public MonsterAttackDamage {
+            if (damageType == null || diceCount < 1 || diceCount > MONSTER_ATTACK_MAX_DAMAGE_DICE
+                    || !MONSTER_ATTACK_DIE_SIDES.contains(diceSides)
+                    || modifier < MONSTER_ATTACK_MIN_BONUS || modifier > MONSTER_ATTACK_MAX_BONUS)
+                throw new IllegalArgumentException("Invalid monster attack damage");
+        }
+    }
+    public record MonsterAttackProfile(int hitBonus, int reachFeet, List<MonsterAttackDamage> damage) {
+        public MonsterAttackProfile {
+            if (hitBonus < MONSTER_ATTACK_MIN_BONUS || hitBonus > MONSTER_ATTACK_MAX_BONUS
+                    || !MONSTER_ATTACK_REACH_FEET.contains(reachFeet) || damage == null || damage.isEmpty()
+                    || damage.size() > 2 || damage.stream().anyMatch(Objects::isNull)
+                    || damage.size() != damage.stream().map(MonsterAttackDamage::damageType).distinct().count())
+                throw new IllegalArgumentException("Invalid monster attack profile");
+            damage = List.copyOf(damage);
+        }
+    }
     public record MonsterSavePolicy(String abilityKey, String dcMode, int dc, String failOutcome, String successOutcome) { }
     public record MonsterDamageProfile(int diceCount, int diceSides, DamageType damageType, String delivery, String abilityModifier) { }
     public record MonsterArea(String shape, int lengthFeet, String originPolicy) { }
     public record MonsterRecharge(int diceSides, int minimumRoll, boolean turnStart, boolean shortRest, boolean longRest) { }
     public record MonsterActionProfile(String displayName, String description, int sourcePage, MonsterActionMode mode,
             String mechanism, MonsterSavePolicy savePolicy, MonsterDamageProfile damageProfile,
-            MonsterArea area, MonsterRecharge recharge) { }
+            MonsterArea area, MonsterRecharge recharge, MonsterAttackProfile attackProfile) { }
     public sealed interface GrowthGrantSpec permits FixedGrowthGrant, ChoiceGrowthGrant { }
     public record FixedGrowthGrant(RuleIdentity target) implements GrowthGrantSpec { }
     public record ChoiceGrowthGrant(RuleIdentity candidates, int count) implements GrowthGrantSpec { }

@@ -82,7 +82,7 @@ START 遇到已经零 HP 但仍持物的非战斗状态明确拒绝；本入口�
 
 施法资格、组件、共享法术位、Wizard 法术书、Bless／Shield 贡献、专注、同名覆盖、独立压制、
 Ready 及探索持续见[施法合同](schema-2-spells.md)。怪物吐息与其适用防御见
-[有限怪物合同](schema-2-monster-breath.md)；战士 5–6 级 Extra Attack 按[独立能力合同](schema-2-extra-attack.md)接合。
+[有限怪物合同](schema-2-monster-breath.md)。怪物近战与 OA 共享攻击、Shield 和伤害结算，来源和分量证据见[怪物近战](schema-2-monster-attacks.md)。战士 5–6 级 Extra Attack 按[独立能力合同](schema-2-extra-attack.md)接合。
 勇士 3–6 级 Improved Critical 由同一武器消费者用于普通、OA 和 Ready 单击，
 反应后用原选骰重验；19 的自动命中解释与准确授予门见[精通重击合同](schema-2-improved-critical.md)。
 SQLite 的[一级回气](schema-2-second-wind.md)在无未决流时同根完成资源扣减与治疗，

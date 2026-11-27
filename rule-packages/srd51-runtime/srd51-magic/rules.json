@@ -486,7 +486,7 @@
         }
       ]
     },
-    "author_note": "Only Hell Hound Fire Breath is executable. The other action descriptions are metadata, never an attack or condition-effect implementation."
+    "author_note": "Bite uses the bounded ordinary monster melee attack. Fire Breath uses the separate rechargeable save-damage action."
   },
   {
     "identity": {
@@ -580,7 +580,7 @@
       "experience_points": 700,
       "traits": []
     },
-    "author_note": "Only Hell Hound Fire Breath is executable. The other action descriptions are metadata, never an attack or condition-effect implementation."
+    "author_note": "Mummy action descriptions are metadata. Its damage defenses apply in supported damage paths."
   },
   {
     "identity": {
@@ -632,6 +632,6 @@
       "experience_points": 10,
       "traits": []
     },
-    "author_note": "Only Hell Hound Fire Breath is executable. The other action descriptions are metadata, never an attack or condition-effect implementation."
+    "author_note": "The Commoner Club action is catalog metadata."
   }
 ]

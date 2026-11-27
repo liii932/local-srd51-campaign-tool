@@ -394,9 +394,28 @@
     },
     "action_profile": {
       "display_name": "Bite",
-      "description": "Metadata only: +5 melee attack, reach 5 feet; 1d8+3 piercing and 2d6 fire damage.",
+      "description": "One creature within 5 feet. +5 to hit. On a hit, 1d8 + 3 piercing damage and 2d6 fire damage.",
       "source_page": 322,
-      "mode": "BLOCKED_METADATA"
+      "mode": "MELEE_ATTACK_V1",
+      "mechanism": "MONSTER_MELEE_ATTACK_V1",
+      "attack_profile": {
+        "hit_bonus": 5,
+        "reach_feet": 5,
+        "damage": [
+          {
+            "damage_type": "PIERCING",
+            "dice_count": 1,
+            "dice_sides": 8,
+            "modifier": 3
+          },
+          {
+            "damage_type": "FIRE",
+            "dice_count": 2,
+            "dice_sides": 6,
+            "modifier": 0
+          }
+        ]
+      }
     }
   },
   {

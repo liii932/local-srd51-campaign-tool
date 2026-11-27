@@ -2,6 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
+import com.dndtool.module.composition.Schema2CompositionKernel.DamageType;
 import com.dndtool.service.Schema2CharacterRuntime.HealthResult;
 import com.dndtool.service.Schema2CharacterRuntime.State;
 import java.util.*;
@@ -10,7 +11,7 @@ import java.util.*;
 public final class Schema2CombatState {
     private Schema2CombatState() { }
     public enum Status { ACTIVE, EXPLORATION, ENDED }
-    public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, DROP_PRONE, STAND_UP, SECOND_WIND, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
+    public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, MONSTER_ATTACK, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, DROP_PRONE, STAND_UP, SECOND_WIND, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
         GRAPPLE, SHOVE_PRONE, SHOVE_PUSH, CHOOSE_MELEE_DEFENSE, ESCAPE_GRAPPLE, RELEASE_GRAPPLE,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
         ADVANCE_WINDOW, CONTINUE_MOVEMENT, CONTINUE_FLOW, CAST, READY_ATTACK, READY_MOVE, READY_SPELL,
@@ -50,7 +51,17 @@ public final class Schema2CombatState {
             UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey,
             ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
             List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput,
-            MeleeInput meleeInput, DragInput dragInput) {
+            MeleeInput meleeInput, DragInput dragInput, MonsterAttackInput monsterAttackInput) {
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments,
+                List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput,
+                ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey,
+                com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
+                List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput,
+                MeleeInput meleeInput, DragInput dragInput) {
+            this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,
+                    readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,monsterDeployments,breathInput,monsterRestInput,
+                    meleeInput,dragInput,null);
+        }
         public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds, List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput) {
             this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,monsterDeployments,breathInput,monsterRestInput,null,null);
         }
@@ -105,6 +116,10 @@ public final class Schema2CombatState {
         }
         public static Command action(Kind kind, UUID actor) { return new Command(kind,actor,null,null,List.of(),List.of(),List.of(),null,null,null,null); }
         public static Command attack(UUID actor, UUID target, UUID item) { return new Command(Kind.ATTACK,actor,target,item,List.of(),List.of(),List.of(),null,null,null,null); }
+        public static Command monsterAttack(UUID actor, UUID target, EntryIdentity action) {
+            return new Command(Kind.MONSTER_ATTACK,actor,target,null,List.of(),List.of(),List.of(),null,null,null,null,
+                    null,null,null,null,null,null,0,List.of(),null,null,null,null,new MonsterAttackInput(action));
+        }
         public static Command move(UUID actor, List<Position> path) { return new Command(Kind.MOVE,actor,null,null,path,List.of(),List.of(),null,null,null,null); }
         public static Command move(UUID actor, List<Position> path, DragInput drag) {
             return new Command(Kind.MOVE,actor,null,null,path,List.of(),List.of(),null,null,null,null,
@@ -116,6 +131,10 @@ public final class Schema2CombatState {
         }
         public static Command reaction(Kind kind, UUID actor, UUID item, UUID flow, UUID leaf, UUID window, UUID opportunity) {
             return new Command(kind,actor,null,item,List.of(),List.of(),List.of(),flow,leaf,window,opportunity);
+        }
+        public static Command monsterOpportunityAttack(UUID actor, EntryIdentity action, UUID flow, UUID leaf, UUID window, UUID opportunity) {
+            return new Command(Kind.DECLARE_OPPORTUNITY_ATTACK,actor,null,null,List.of(),List.of(),List.of(),flow,leaf,window,
+                    opportunity,null,null,null,null,null,null,0,List.of(),null,null,null,null,new MonsterAttackInput(action));
         }
         public static Command continuation(UUID actor, UUID flow, UUID leaf, UUID window) {
             return new Command(Kind.CONTINUE_MOVEMENT,actor,null,null,List.of(),List.of(),List.of(),flow,leaf,window,null);
@@ -201,7 +220,11 @@ public final class Schema2CombatState {
     public record TriggerFact(UUID triggerKey, TriggerKind kind, UUID sourceFrameKey, UUID subjectId,
             UUID targetId, Position position, int ordinal) { }
     public record ReactionOption(ReactionKind kind, UUID itemId, RuleIdentity castingRule,
-            RuleIdentity spell, int slotLevel, UUID readyKey) { }
+            RuleIdentity spell, int slotLevel, UUID readyKey, EntryIdentity monsterAttack) {
+        public ReactionOption(ReactionKind kind, UUID itemId, RuleIdentity castingRule, RuleIdentity spell, int slotLevel, UUID readyKey) {
+            this(kind,itemId,castingRule,spell,slotLevel,readyKey,null);
+        }
+    }
     public record ShieldEffect(UUID effectKey, UUID castFrameKey, UUID actorId, long startedTurnNumber,
             long expiresAtTurnNumber, EffectStatus status, String endReason) { }
     public record ConcentrationHolder(UUID actorId, ConcentrationKind kind, UUID sourceKey) { }
@@ -231,7 +254,7 @@ public final class Schema2CombatState {
     public record Opportunity(UUID opportunityKey, UUID actorId, int priority, List<ReactionOption> options,
             OpportunityStatus status, UUID selectionFrameKey, UUID childFrameKey, String reason) {
         public Opportunity { options = List.copyOf(options); }
-        public List<UUID> allowedItems() { return options.stream().filter(o->o.kind()==ReactionKind.OPPORTUNITY_ATTACK).map(ReactionOption::itemId).toList(); }
+        public List<UUID> allowedItems() { return options.stream().filter(o->o.kind()==ReactionKind.OPPORTUNITY_ATTACK&&o.itemId()!=null).map(ReactionOption::itemId).toList(); }
         public UUID attackFrameKey() { return childFrameKey; }
     }
     public record Window(UUID windowKey, UUID ownerFrameKey, int checkpointOrdinal, int boundaryIndex,
@@ -306,7 +329,17 @@ public final class Schema2CombatState {
             UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
             int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
             boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
-            UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass) {
+            UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
+            MonsterAttackEvidence monsterAttack) {
+        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
+                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
+                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
+                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
+                UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass) {
+            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,selectedD20,
+                    abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,damageAmount,
+                    blessingEffectKey,blessingD4,status,initialHit,finalArmorClass,null);
+        }
         public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
                 UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
                 int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
@@ -322,6 +355,20 @@ public final class Schema2CombatState {
                     selectedD20,abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,damageAmount,null,null);
         }
         public AttackAttempt { damageDice = List.copyOf(damageDice); }
+    }
+    public record MonsterAttackEvidence(EntryIdentity action, int hitBonus, int reachFeet, List<UUID> packTacticsAllies,
+            List<AttackDamageComponent> damageComponents) {
+        public MonsterAttackEvidence {
+            packTacticsAllies = List.copyOf(packTacticsAllies);
+            damageComponents = List.copyOf(damageComponents);
+        }
+    }
+    public record AttackDamageComponent(DamageType damageType, int diceCount, int diceSides, int modifier,
+            List<Integer> dice, int rawDamage, int effectiveDamage, List<DefenseContribution> defenses) {
+        public AttackDamageComponent {
+            dice = List.copyOf(dice);
+            defenses = List.copyOf(defenses);
+        }
     }
     public record Flow(UUID flowKey, UUID rootFrameKey, UUID leafFrameKey, FlowStatus status,
             List<Frame> frames, List<Window> windows, List<Movement> movements, List<AttackAttempt> attacks,
@@ -358,6 +405,11 @@ public final class Schema2CombatState {
     /** Direction is one of the eight server enumerated compass cones, clockwise from east. */
     public record BreathInput(EntryIdentity action, int direction) {
         public BreathInput { if(!validMonsterActionIdentity(action))throw invalid("S2_BREATH_COMMAND");if(direction<0||direction>7)throw invalid("S2_BREATH_AREA"); }
+    }
+    public record MonsterAttackInput(EntryIdentity action) {
+        public MonsterAttackInput {
+            if (!validMonsterActionIdentity(action)) throw invalid("S2_MONSTER_ATTACK_COMMAND");
+        }
     }
     public record MonsterActionUse(EntryIdentity action, boolean available) { }
     /** The sole mutable health owner for this finite monster domain; monsters die at zero HP. */

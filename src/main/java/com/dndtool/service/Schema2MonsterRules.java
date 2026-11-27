@@ -28,11 +28,70 @@ final class Schema2MonsterRules {
         for(var defense:block.damageDefenses())if(defense.qualifier()!=MonsterDefenseQualifier.ALL&&defense.qualifier()!=MonsterDefenseQualifier.NONMAGICAL_ATTACKS)throw invalid("S2_MONSTER_RULE_UNSUPPORTED");
     }
     static MonsterActionProfile action(Map<UUID,Context> roster,EntryIdentity identity) {
-        var entries=material(roster).projection().entries().stream().filter(FinalEntry::enabled)
+        return validateAction(actionEntry(material(roster), identity).actionProfile());
+    }
+    private static MonsterActionEntry actionEntry(ProductionSchema2Projection material, EntryIdentity identity) {
+        var entries=material.projection().entries().stream().filter(FinalEntry::enabled)
                 .map(FinalEntry::entry).filter(MonsterActionEntry.class::isInstance).map(MonsterActionEntry.class::cast)
                 .filter(e->e.identity().equals(identity)).toList();
         if(entries.size()!=1||!identity.collectionKey().equals("actions"))throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
-        return validateAction(entries.getFirst().actionProfile());
+        return entries.getFirst();
+    }
+    static MonsterAttackProfile meleeAttack(Map<UUID, Context> roster, Battle battle, UUID source, EntryIdentity action) {
+        MonsterInstance monster = instance(battle, source);
+        if (!monster.monster().equals(action.rule())) throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
+        var material = material(roster);
+        return validateMeleeAction(actionEntry(material, action).actionProfile(), definition(material, monster.monster()).statBlock());
+    }
+    private static MonsterAttackProfile validateMeleeAction(MonsterActionProfile profile, MonsterStatBlock block) {
+        if (profile.mode() != MonsterActionMode.MELEE_ATTACK_V1
+                || !MONSTER_MELEE_ATTACK_MECHANISM.equals(profile.mechanism()) || profile.attackProfile() == null)
+            throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
+        if (block.traits().stream().anyMatch(trait -> switch (trait.scope()) {
+            case ATTACK_ROLL_PACK_TACTICS_ONLY -> !trait.key().equals("pack_tactics");
+            case PERCEPTION_HEARING_SMELL_ONLY -> false;
+            default -> true;
+        })) throw invalid("S2_MONSTER_TRAIT_UNSUPPORTED");
+        return profile.attackProfile();
+    }
+    private static List<MonsterActionEntry> actions(ProductionSchema2Projection material, RuleIdentity monster) {
+        return material.projection().entries().stream().filter(FinalEntry::enabled).map(FinalEntry::entry)
+                .filter(MonsterActionEntry.class::isInstance).map(MonsterActionEntry.class::cast)
+                .filter(entry -> entry.identity().rule().equals(monster)).toList();
+    }
+    static List<MonsterActionEntry> opportunityAttacks(Map<UUID, Context> roster, MonsterInstance monster) {
+        var material = material(roster);
+        List<MonsterActionEntry> melee = new ArrayList<>();
+        var block = definition(material, monster.monster()).statBlock();
+        for (MonsterActionEntry entry : actions(material, monster.monster())) {
+            switch (entry.actionProfile().mode()) {
+                case MELEE_ATTACK_V1 -> {
+                    validateMeleeAction(entry.actionProfile(), block);
+                    melee.add(entry);
+                }
+                case SAVE_DAMAGE_BATCH_V1 -> validateAction(entry.actionProfile());
+                case BLOCKED_METADATA -> throw invalid("S2_MONSTER_REACTION_UNSUPPORTED");
+            }
+        }
+        if (melee.isEmpty()) throw invalid("S2_MONSTER_REACTION_UNSUPPORTED");
+        return melee;
+    }
+    static List<UUID> packTacticsAllies(Map<UUID, Context> roster, Battle battle, UUID source, UUID target) {
+        MonsterInstance monster = instance(battle, source);
+        var block = definition(roster, monster.monster()).statBlock();
+        if (block.traits().stream().noneMatch(trait -> trait.scope() == MonsterTraitScope.ATTACK_ROLL_PACK_TACTICS_ONLY))
+            return List.of();
+        Combatant attacker = Schema2CombatRules.combatant(battle, source);
+        Position position = Schema2CombatRules.combatant(battle, target).position();
+        return battle.initiative().stream().map(Initiative::characterId).filter(id -> !source.equals(id))
+                .map(id -> Schema2CombatRules.combatant(battle, id))
+                .filter(ally -> ally.side() == attacker.side() && ally.position().distanceFeet(position) <= 5
+                        && living(roster, battle, ally.characterId()))
+                .map(Combatant::characterId).toList();
+    }
+    static boolean living(Map<UUID, Context> roster, Battle battle, UUID id) {
+        Context context = roster.get(id);
+        return context == null ? !instance(battle, id).dead() : context.character().hitPoints() > 0 && !context.character().health().dead();
     }
     private static MonsterActionProfile validateAction(MonsterActionProfile p) {
         if(p.mode()!=MonsterActionMode.SAVE_DAMAGE_BATCH_V1||!Objects.equals(p.mechanism(),"HELL_HOUND_FIRE_BREATH_V1")
@@ -46,6 +105,9 @@ final class Schema2MonsterRules {
         for (FinalRule row : material.projection().rules()) if (row instanceof FinalMonster monster && monster.enabled()) {
             validateScope(monster.definition().statBlock());
             initialActions(material, monster.identity());
+            for (MonsterActionEntry entry : actions(material, monster.identity()))
+                if (entry.actionProfile().mode() == MonsterActionMode.MELEE_ATTACK_V1)
+                    validateMeleeAction(entry.actionProfile(), monster.definition().statBlock());
         }
     }
     static MonsterInstance initial(Map<UUID,Context> roster,MonsterDeployment deployment) {
@@ -80,8 +142,16 @@ final class Schema2MonsterRules {
         return replace(b,new MonsterInstance(id,old.monster(),hp,hp==0,old.actionUses()));
     }
     static int effectiveDamage(Map<UUID,Context> roster,Battle b,UUID target,DamageType type,boolean attack,int amount) {
-        if(!isMonster(b,target))return amount;var monster=instance(b,target);var defenses=definition(roster,monster.monster()).statBlock().damageDefenses().stream().filter(d->d.damageType()==type&&(d.qualifier()==MonsterDefenseQualifier.ALL||attack&&d.qualifier()==MonsterDefenseQualifier.NONMAGICAL_ATTACKS)).map(d->new DefenseContribution(monster.monster(),d.kind().name())).toList();
-        return Schema2SaveDamageRules.damage(amount,false,defenses);
+        return Schema2SaveDamageRules.damage(amount,false,damageDefenses(roster,b,target,type,attack));
+    }
+    static List<DefenseContribution> damageDefenses(Map<UUID,Context> roster, Battle battle, UUID target,
+            DamageType type, boolean nonmagicalAttack) {
+        if (!isMonster(battle,target)) return List.of();
+        var monster = instance(battle,target);
+        return definition(roster,monster.monster()).statBlock().damageDefenses().stream()
+                .filter(defense -> defense.damageType() == type && (defense.qualifier() == MonsterDefenseQualifier.ALL
+                        || nonmagicalAttack && defense.qualifier() == MonsterDefenseQualifier.NONMAGICAL_ATTACKS))
+                .map(defense -> new DefenseContribution(monster.monster(),defense.kind().name())).distinct().toList();
     }
     static void validate(Map<UUID,Context> roster,Battle b) {
         Set<UUID> ids=new HashSet<>(roster.keySet());

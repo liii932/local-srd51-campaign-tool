@@ -1,6 +1,6 @@
 {
   "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-check-variant"],
-  "members": ["srd51_runtime@13", "srd51_characters@13", "srd51_magic@13", "dm_runtime_house_rules@26"],
+  "members": ["srd51_runtime@13", "srd51_characters@13", "srd51_magic@14", "dm_runtime_house_rules@26"],
   "driver": "BundledSrd51Scenarios",
   "cases": ["initial-character", "skill-check", "alternate-skill-enabled", "passive-check-variant", "contest-check-variant", "melee-control-variant", "group-check-variant", "fixed-damage", "stonecunning-variant"],
   "character": {

@@ -19,7 +19,7 @@
 | 战斗与动作 | 先攻回合、攻击、移动、OA、Ready、反应继续 | 场景、角色、规则和所属空间的动作流 | 焦点空间推进，受影响角色共同提交，全部未决窗口直接恢复 |
 | 施法 | 书籍、准备、位数及已支持法术 | 角色资源/装备、动作、规则 | Bless/Cure Wounds/Shield/Counterspell/Burning Hands 的实际支持边界 |
 | 持续效果 | 专注、到期、叠加与抗魔压制 | 效果实例、时钟、场景和动作 | 无贡献与结束但被引用实例也保存，不重触发回调 |
-| 怪物 | 实例、吐息、充能、怪物休息 | 战役怪物事实、场景安置、规则与共享伤害 | 多目标豁免、共享原骰、充能恢复与完整历史 |
+| 怪物 | 实例、普通与借机攻击、吐息、充能、怪物休息 | 战役怪物事实、场景安置、攻击、反应与共享伤害 | 单目标各分量原骰、离开前暂停、多目标豁免、共享原骰、充能恢复与完整历史 |
 | 历史与消息 | 审计、便笺、输入结果与因果查询 | 单一战役根序号与领域子历史 | 连续序号、唯一因果、坏文件拒绝；不只导出当前值 |
 | 文件生命周期 | 创建/打开/保存/结束/重开/导入/导出/恢复/删除 | 私有库、完整文件、运行收据 | P0—P3查证、初始化中断、精确清理、未知文件保护 |
 | 玩家参与 | 受邀加入、审批、分配、共享、有限动作和重连 | 参与聚合、根归因、运行私有设备控制 | 逐人裁剪、单写、撤权、恢复及新运行审批。见[玩家参与](player-participation.md) |
@@ -61,7 +61,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 | 倒地姿态与爬行 | `combat-command/DROP_PRONE/MOVE/EXPLORATION_MOVE/STAND_UP/READY_MOVE`；战斗、探索与动作继续 owner | 复用 `Combatant.prone`、半尺战斗成本、物理路径游标和探索速度预检，无第二份状态 | 完整文件保留姿态、已走前缀、反应支付及未决继续点；原包/结构不变，B 类应用能力 | [有限倒地合同](../../rules/schema-2-prone.md)；ACTIVE/Ready 爬行及失能停止保持；探索卧倒零耗时，爬行按当前速度限额，移动/起身各六秒并保留旧战斗预算，逐格区域与末尾到期同事务；战斗交接/END 重开不清姿态，起身前不能离场；战斗推倒由[近战控制](../../rules/schema-2-melee-control.md)产生 |
 | 施法与法术书 | 角色 `character-command` 法术书/准备/恢复；场景 `combat-command` 施法/反应 | 法术书归角色、`spellcasting_book` 投影；施法尝试、成本、目标和原骰归场景动作历史 | 五个已支持法术机制使用同一规则、装备、资源与继续流 | 生命领域 Bless/Cure Wounds，单职业法师 Shield/Counterspell/Burning Hands。其余法师目录法术限学习/准备元数据，施放请求拒绝 |
 | 持续效果与环境 | 场景专注、环境、探索/战斗交接 | 场景效果、专注持有、压制、期限及历史；`effects_instance` 核验投影 | 保存 SHADOWED、已结束但仍被引用的实例及继续义务 | 专注、到期、独立压制原因、恢复后无重复贡献或结束回调。抗魔区域是 DM 家规，Antimagic Field 法术待采用 |
-| 怪物与共享伤害 | `monster-create`、空间转移、场景吐息/充能/休息 | 战役怪物身份、HP 与动作额度由空间聚合保管，场景保存结算前后事实与共享伤害批次 | 共享原骰、目标证明、逐目标豁免和伤害包、已消费动作及休息保留 | 已掷未 APPLY 保存恢复；多目标 HP/专注同根提交。Hell Hound Fire Breath 是当前唯一可执行怪物动作，其余动作为阻断元数据 |
+| 怪物与共享伤害 | `monster-create`、空间转移、场景吐息/充能/休息 | 战役怪物身份、HP 与动作额度由空间聚合保管，场景保存结算前后事实与共享伤害批次 | 共享原骰、目标证明、逐目标豁免和伤害包、已消费动作及休息保留 | 已掷未 APPLY 保存恢复；多目标 HP/专注同根提交。地狱犬的[啮咬](../../rules/schema-2-monster-attacks.md)共用普通/反应攻击流程，分别保留穿刺和火焰原骰，吐息保留共享火焰骰 |
 | 历史、消息与重试 | 所有命令及 `note`；`CampaignDomainValidation` 和各领域历史验证 | `history_runtime_root` 连续根、角色和场景完整子事件；`core_command` 保存运行本地接受收据 | 按原请求与保留骰序列纯核对各历史前缀；文件保存全部根和子事实，直接装载现状 | `note` 承接 v1 记录说明用途，同键同意图返回原事实。错版本、异意图、坏邻接、孤儿和重排拒绝 |
 | 玩家参与 | `/api/host/storage/players/*`、可选 HTTPS `/player` 和 `/api/player/*`。`PlayerServlet`、`HostPlayerServlet`、`PlayerBoundaryFilter` | `participation_state` 和参与关系投影，`Root.actor` 归因，`CampaignAdjudicationCommands` 保存规则卡属性检定的有界裁定，`core_player_control` 保存私有授权 | 完整文件保留成员、控制、共享、许可和业务归因。原库显式恢复并重新开放后可凭有效设备绑定换新会话，显式领用写连接。文件重开须再批准设备 | 逐人裁剪/候选、实际操作者、暂停/撤权、单写、原收据查证和 TLS 隔离。自由卡可分配和查看，直接操作待采用。HTTPS 默认关闭，真实 LAN 设备信任单独验收 |
 
@@ -72,7 +72,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@13`、`srd51_characters@13`、`srd51_magic@13`，第四个成员分别为
+`srd51_runtime@13`、`srd51_characters@13`、`srd51_magic@14`，第四个成员分别为
 `dm_runtime_house_rules@25` 与 `dm_runtime_house_rules@26`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和
@@ -98,6 +98,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 | 空间闭环 | `CampaignSpacesIntegrationTest`、`CampaignSpaceTimeBoundaryTest`；`tools/storage/browser-spaces.cjs` | DM 旅行、混合占位、两个待继续场景、旧焦点零 RNG、FINAL 重开及只继续原后缀 |
 | 战斗与姿态 | `CampaignDomainsCombatIntegrationTest`、`CampaignExtraAttackIntegrationTest`、`CampaignSecondWindIntegrationTest`、`CampaignImprovedCriticalIntegrationTest`、`CampaignProneIntegrationTest` | 真实成长授予、成本及原骰、未决 OA/Shield/爬行续作及跨角色回滚。保存后每段已付成本只出现一次 |
 | 施法、效果与怪物 | `CampaignDomainsCombatIntegrationTest`、`CampaignMonsterSpaceIntegrationTest`、`CampaignImprovedCriticalIntegrationTest`；Cure Wounds 见 `tools/storage/browser-combat-smoke.cjs`。反应/Ready 法术和压制的共享规则另见 `Schema2ReactionSpellRulesTest`、`Schema2ReadySpellRulesTest`、`Schema2OngoingEffectRulesTest` | SQLite 路径核对 Bless 位数与专注、吐息共享原骰及未结算跨文件恢复、HP 与动作额度跨场景、Shield 防御及 Burning Hands 实际后果。共享规则夹具只证明各自规则行为 |
+| 怪物近战与借机攻击 | `CampaignMonsterAttackIntegrationTest`、`Schema2MonsterAttackRulesTest` 和 `tools/storage/browser-monster-attack.cjs` | 普通攻击消耗动作，宣告借机攻击消耗反应，放弃则保留反应。重开保留双位置、移动游标、攻击原骰及两类伤害，抓者失能时解除擒抱并停止剩余拖带。 |
 | 完整文件和恢复 | `CampaignCodecTest`、`CampaignFileVectorTest`、`CampaignDomainRecoveryTest` | 严格字节/字段向量、初始化中断、已提交响应丢失、导入初始事实不可改写 |
 | 文件系统生命周期 | `CampaignStorageServiceTest`、`CampaignStorageLifecycleTest`、`CampaignPreparationTest`、`CampaignStorageCrashTest`、`CampaignWindowsFilesystemTest` | P0—P3、准备前缀、原意图续作、未知材料保护、根/运行独占、NTFS ACL/reparse、导入/下载/删除/精确放弃；Windows 进程中断与断电保证分开 |
 | 资源与休息 | `CampaignArcaneRecoveryIntegrationTest`、`CampaignSecondWindIntegrationTest`、`CampaignSpaceTimeBoundaryTest`；共享规则见 `Schema2ArcaneRecoveryRulesTest` | 真实短休或长休的资格、位数/预算/法术书、每日使用、个人累计经历时间、幂等与故障回滚。完整文件保留资源事实、根/子历史与使用日 |
