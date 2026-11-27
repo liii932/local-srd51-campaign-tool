@@ -86,13 +86,13 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 
 | 包 | 角色与直接依赖 |
 |---|---|
-| `srd51_runtime@12` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
-| `srd51_characters@12` | extension，直接依赖 `srd51_runtime@12`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
-| `srd51_magic@12` | extension，直接依赖前两包 |
-| `dm_runtime_house_rules@23` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@12` |
-| `dm_runtime_house_rules@24` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@12` 与 `srd51_characters@12` |
+| `srd51_runtime@13` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
+| `srd51_characters@13` | extension，直接依赖 `srd51_runtime@13`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
+| `srd51_magic@13` | extension，直接依赖前两包 |
+| `dm_runtime_house_rules@25` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@13` |
+| `dm_runtime_house_rules@26` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@13` |
 
-标准组合选择家规 @23，变体选择 @24。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
+标准组合选择家规 @25，变体选择 @26。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
 同一变体把石工知识从双倍熟练改为三倍、固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
 一个专属包缺失或与清单不符时，依赖它的内置组合返回 `BUNDLED_RULES_UNAVAILABLE`。三个共享包中任一损坏会影响两组。
@@ -113,6 +113,8 @@ Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级�
 侍僧背景另选精灵语和侏儒语；创建时按本战役目录重验这些选择并保存准确种族来源与授予。
 在矮人模板下，可选 `subraceKey: "subrace.hill_dwarf"`。请求同时提供对应的 `raceKey`。省略亚种时使用普通种族模板。服务器核对父种族和启用的亚种来源，完整保存选取的身份。山丘矮人的[强韧贡献](rules/schema-2-character-statistics.md#山丘矮人强韧)由战役冻结材料供建卡、升级和重开共用。
 在 DM 工作台打开“检定”，把结算方式设为“被动检定”，可直接读取属性、技能或工具的被动分数，或预设成功与失败后果。标准组合基础分为 10、优势或劣势调整幅度为 5，随附变体分别为 12、3。角色卡和战役记录显示实际分数、DC 与成败。保存、结束并打开同一文件后，可以继续使用同一组合执行新的被动或掷骰检定。[规则与示例](rules/schema-2-character-foundations.md#被动检定)
+
+同一焦点世界节点的两名规则角色可发起[对抗检定](rules/schema-2-character-foundations.md#对抗检定)。DM 分别指定发起方和应对方的检定。历史记录保留双方身份、原骰、选骰、修正与总值，完整文件重开后按冻结分差验证裁定。
 
 在执行焦点的世界节点安置至少两名规则角色后，DM 可进行[团队属性检定](rules/schema-2-character-foundations.md#团队属性检定)。勾选同行角色并指定共同 DC；战役记录展示各人原骰、所需和实际成功人数以及全队结果。保存并结束后，重开文件仍可在同一节点继续检定。
 

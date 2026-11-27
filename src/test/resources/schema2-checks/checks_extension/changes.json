@@ -98,5 +98,16 @@
       "numerator": 2,
       "denominator": 3
     }
+  },
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "checks_base",
+      "rule_type": "adventure.check",
+      "rule_key": "check.srd2014"
+    },
+    "field": "contest_minimum_winning_margin",
+    "value": 2
   }
 ]

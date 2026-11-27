@@ -53,6 +53,10 @@ mvn '-Dtest=CampaignCheckEffectsTest' test
 
 石工知识的独立作者场景对照标准双倍、家规三倍和普通历史检定。应用侧用 `CampaignStonecunningIntegrationTest` 核验实际角色、检定后果、重试及完整文件重开。[运行场景](../rule-packages/srd51-runtime/scenarios/README.md#验证矮人石工知识)
 
+### 对抗检定验证
+
+用 `CampaignContestCheckIntegrationTest` 分别创建标准和家规 SQLite 战役。让发起方取得 16、应对方取得 15，标准包判发起方胜，家规保持现状。保存、结束、重开后，从历史取回双方原骰及原裁定，再发起一次对抗。另验平分、应对方胜、过期请求、幂等及写入失败的回滚。独立作者场景使用同一个 WAR 验证两种发行组合的分差字段、双方实际原骰和裁定。[作者场景](../rule-packages/srd51-runtime/scenarios/README.md#验证对抗检定)
+
 ### 团队属性检定验证
 
 `CampaignGroupCheckIntegrationTest` 使用隔离的 SQLite 战役核对标准与家规的四人平分结果、保存、结束、重开及下一次团队检定。两组独立作者场景使用同一份 WAR，分别执行 `group-check` 和 `group-check-variant`，核对冻结比例、每人原骰、成功人数和对应分支。[运行场景](../rule-packages/srd51-runtime/scenarios/README.md#验证团队属性检定)
@@ -255,10 +259,10 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    ```
 
    自定义规则另从 WAR 外提供一份受支持的准确候选 ZIP。可在仓库外复制随附 `check-variant` 原包的
-   条目，将 `author-package.json` 的 `release_version` 改为 `"25"`，将 `rules.json` 中
+   条目，将 `author-package.json` 的 `release_version` 改为 `"27"`，将 `rules.json` 中
    `vital_effect.dm_damage` 的 `modifier` 改为 `2`，更新包内 `README.md` 后将这些文件打包在 ZIP
-   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@25`
-   原字节及摘要。随附 `check-variant` 按 `@24`、固定伤害 `3` 的独立场景验证。自定义组合前三包
+   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@27`
+   原字节及摘要。随附 `check-variant` 按 `@26`、固定伤害 `3` 的独立场景验证。自定义组合前三包
    使用标准包，第四包使用这份外部候选。
 
    通过工作台的本机规则库执行外部原包上传（`POST /api/host/storage/rule-import`），从随附列表导入

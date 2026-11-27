@@ -40,6 +40,7 @@ public final class Schema2CompositionKernel {
             "proficiency.skill.history");
     public static final int MIN_PASSIVE_BASE_SCORE = 1, MAX_PASSIVE_BASE_SCORE = 20;
     public static final int MIN_PASSIVE_ADVANTAGE_ADJUSTMENT = 0, MAX_PASSIVE_ADVANTAGE_ADJUSTMENT = 10;
+    public static final int MIN_CONTEST_WINNING_MARGIN = 1, MAX_CONTEST_WINNING_MARGIN = 3;
     private static final String STONECUNNING_TYPE = "character.stonecunning";
     private static final int MAX_SUBRACE_HIT_POINT_BONUS = 5;
     private static final int MAX_GROUP_SUCCESS_DENOMINATOR = 10;
@@ -75,6 +76,7 @@ public final class Schema2CompositionKernel {
         SKILL("skill"), PROFICIENCY_MULTIPLIER("proficiency_multiplier"),
         ALLOW_ALTERNATE_SKILL_ABILITY("allow_alternate_skill_ability"), PASSIVE_BASE_SCORE("passive_base_score"),
         PASSIVE_ADVANTAGE_ADJUSTMENT("passive_advantage_adjustment"), GROUP_SUCCESS_THRESHOLD("group_success_threshold"),
+        CONTEST_MINIMUM_WINNING_MARGIN("contest_minimum_winning_margin"),
         DICE_COUNT("dice_count"), DICE_SIDES("dice_sides"), MODIFIER("modifier"), DAMAGE_TYPE("damage_type"), ITEM("item"), ABILITY_POLICY("ability_policy"), REACH_FEET("reach_feet"), WALK_SPEED_FEET("walk_speed_feet"),
         HEAVY_ARMOR_SPEED_POLICY("heavy_armor_speed_policy"), HEAVY_ARMOR_SPEED_PENALTY_FEET("heavy_armor_speed_penalty_feet"), REQUIRED_SUBCLASS("required_subclass"), REQUIRED_FEATURE("required_feature"), SLOT_RESOURCE("slot_resource"), BLESS("bless"), CURE_WOUNDS("cure_wounds"), MATERIAL_ITEM("material_item"), RANK2_SLOT_RESOURCE("rank2_slot_resource"), RANK3_SLOT_RESOURCE("rank3_slot_resource"), SPELL("spell"), ENABLED("enabled");
         private final String key;
@@ -164,7 +166,7 @@ public final class Schema2CompositionKernel {
     public record CheckDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             String algorithm, boolean allowAlternateSkillAbility, int passiveBaseScore,
             int passiveAdvantageAdjustment, GroupSuccessThreshold groupSuccessThreshold,
-            String authorNote) implements Definition {
+            int contestMinimumWinningMargin, String authorNote) implements Definition {
         public int groupSuccessNumerator() { return groupSuccessThreshold.numerator(); }
         public int groupSuccessDenominator() { return groupSuccessThreshold.denominator(); }
     }
@@ -1466,7 +1468,7 @@ public final class Schema2CompositionKernel {
             case "character.proficiency" -> Set.of("category");
             case "adventure.rest" -> Set.of("algorithm");
             case "adventure.check" -> Set.of("algorithm", "allow_alternate_skill_ability",
-                    "passive_base_score", "passive_advantage_adjustment", "group_success_threshold");
+                    "passive_base_score", "passive_advantage_adjustment", "group_success_threshold", "contest_minimum_winning_margin");
             default -> Set.of("category", "minimum_enabled_members");
         });
         var row = shape(input, required, identity.ruleType().equals("character.proficiency")
@@ -1487,7 +1489,9 @@ public final class Schema2CompositionKernel {
                     integer(row.get("passive_base_score"), MIN_PASSIVE_BASE_SCORE, MAX_PASSIVE_BASE_SCORE, source.child("passive_base_score")),
                     integer(row.get("passive_advantage_adjustment"), MIN_PASSIVE_ADVANTAGE_ADJUSTMENT,
                             MAX_PASSIVE_ADVANTAGE_ADJUSTMENT, source.child("passive_advantage_adjustment")),
-                    groupSuccessThreshold(row.get("group_success_threshold"), source.child("group_success_threshold")), note);
+                    groupSuccessThreshold(row.get("group_success_threshold"), source.child("group_success_threshold")),
+                    integer(row.get("contest_minimum_winning_margin"), MIN_CONTEST_WINNING_MARGIN,
+                            MAX_CONTEST_WINNING_MARGIN, source.child("contest_minimum_winning_margin")), note);
         if (identity.ruleType().equals("character.subclass")) return new SubclassDefinition(identity, name, description, page,
                 typedReference(row.get("owner_class"), "character.class", source.child("owner_class")),
                 integer(row.get("selection_level"), 1, 20, source.child("selection_level")), note);
@@ -1762,6 +1766,8 @@ public final class Schema2CompositionKernel {
             case PASSIVE_ADVANTAGE_ADJUSTMENT -> new IntegerValue(integer(value, MIN_PASSIVE_ADVANTAGE_ADJUSTMENT,
                     MAX_PASSIVE_ADVANTAGE_ADJUSTMENT, source.child("value")));
             case GROUP_SUCCESS_THRESHOLD -> groupSuccessThreshold(value, source.child("value"));
+            case CONTEST_MINIMUM_WINNING_MARGIN -> new IntegerValue(integer(value, MIN_CONTEST_WINNING_MARGIN,
+                    MAX_CONTEST_WINNING_MARGIN, source.child("value")));
             case HANDS -> new IntegerValue(integer(value, 0, 2, source.child("value")));
             case DICE_COUNT -> new IntegerValue(integer(value, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 1 : 0, ((RuleIdentity)target).ruleType().equals("equipment.weapon_attack") ? 4 : 20, source.child("value")));
             case DICE_SIDES -> { if (((RuleIdentity)target).ruleType().equals("equipment.weapon_attack")) yield new IntegerValue(weaponDie(value,source.child("value"))); int sides = integer(value, 0, 12, source.child("value")); if (!Set.of(0,4,6,8,10,12).contains(sides)) throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported vital die", source); yield new IntegerValue(sides); }
@@ -2581,7 +2587,8 @@ public final class Schema2CompositionKernel {
         if (type.equals("adventure.vital_effect")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.KIND, Field.DICE_COUNT, Field.DICE_SIDES, Field.MODIFIER, Field.DAMAGE_TYPE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.check")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
                 Field.ALGORITHM, Field.ALLOW_ALTERNATE_SKILL_ABILITY, Field.PASSIVE_BASE_SCORE,
-                Field.PASSIVE_ADVANTAGE_ADJUSTMENT, Field.GROUP_SUCCESS_THRESHOLD, Field.AUTHOR_NOTE);
+                Field.PASSIVE_ADVANTAGE_ADJUSTMENT, Field.GROUP_SUCCESS_THRESHOLD,
+                Field.CONTEST_MINIMUM_WINNING_MARGIN, Field.AUTHOR_NOTE);
         if (type.equals("adventure.rest") || type.equals("adventure.health") || type.equals("adventure.combat")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (sourceType(type)) return type.equals("character.subrace")
                 ? List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.PARENT_RACE, Field.AUTHOR_NOTE)
@@ -2874,6 +2881,7 @@ public final class Schema2CompositionKernel {
             result.put("passive_advantage_adjustment", check.passiveAdvantageAdjustment());
             if (check.groupSuccessThreshold() != null)
                 result.put("group_success_threshold", valueJson(check.groupSuccessThreshold()));
+            result.put("contest_minimum_winning_margin", check.contestMinimumWinningMargin());
         } else if (value instanceof RestDefinition rest) {
             result.put("description", rest.description()); result.put("source_page", rest.sourcePage()); result.put("algorithm", rest.algorithm());
         } else result.put("minimum_enabled_members", value instanceof LanguageSetDefinition set

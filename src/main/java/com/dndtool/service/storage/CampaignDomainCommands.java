@@ -120,6 +120,11 @@ public final class CampaignDomainCommands {
                 subject = result.subjectId();
                 newText = CampaignDomainCodec.text(result.audit());
             }
+            case CampaignContestCheck.ACTION -> {
+                var audit = CampaignContestCheck.resolve(before, context, input, dice);
+                subject = before.space().focus().space().id();
+                newText = CampaignDomainCodec.text(audit);
+            }
             case "combat-command" -> {
                 CampaignJson.fields(input, "combatId", "combatVersion", "command");
                 var command = CampaignDomainCodec.fromJson(input.get("command"), Schema2CombatState.Command.class);

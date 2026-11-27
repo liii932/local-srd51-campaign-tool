@@ -184,7 +184,31 @@
           <button>结算团队检定</button>
           <div id="group-check-result" aria-live="polite"></div>
         </form>
-      </div></section>
+      </div>
+        <form id="domain-contest-check"><h3>对抗检定</h3>
+          <p id="contest-check-location" role="status"></p>
+          <label>检定规则<select name="rule" data-rules="adventure.check" required></select></label>
+          <label>裁定说明<input name="adjudication" required></label>
+          <div class="columns">
+            <fieldset data-contest-side="initiator"><legend>发起方</legend>
+              <label>角色<select name="characterId" data-placeholder="请选择角色" required></select></label>
+              <label>检定类型<select name="kind"><option value="ABILITY">属性检定</option><option value="SKILL">技能检定</option></select></label>
+              <label hidden>技能<select name="proficiency" disabled></select></label>
+              <label>检定属性<select name="ability" class="ability-choice" required></select><small hidden></small></label>
+              <label>掷骰裁定<select name="rollMode"><option value="NORMAL">正常</option><option value="ADVANTAGE">优势</option><option value="DISADVANTAGE">劣势</option><option value="BOTH">优势与劣势</option></select></label>
+            </fieldset>
+            <fieldset data-contest-side="responder"><legend>应对方</legend>
+              <label>角色<select name="characterId" data-placeholder="请选择角色" required></select></label>
+              <label>检定类型<select name="kind"><option value="ABILITY">属性检定</option><option value="SKILL">技能检定</option></select></label>
+              <label hidden>技能<select name="proficiency" disabled></select></label>
+              <label>检定属性<select name="ability" class="ability-choice" required></select><small hidden></small></label>
+              <label>掷骰裁定<select name="rollMode"><option value="NORMAL">正常</option><option value="ADVANTAGE">优势</option><option value="DISADVANTAGE">劣势</option><option value="BOTH">优势与劣势</option></select></label>
+            </fieldset>
+          </div>
+          <button disabled>结算对抗检定</button>
+          <div id="contest-check-result" aria-live="polite"></div>
+        </form>
+      </section>
       <section data-panel="magic" hidden><div class="columns">
         <form id="domain-health"><h3>健康与定额效果</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>健康规则<select name="rule" data-rules="adventure.health" required></select></label><label>操作<select name="kind"><option value="HEALTH_EFFECT_RESOLVED">应用健康效果</option><option value="DEATH_SAVE_RESOLVED">死亡豁免</option></select></label><label>效果<select name="effect" data-rules="adventure.vital_effect" required></select></label><label>临时生命值冲突<select name="temporaryChoice"><option value="">无冲突</option><option value="REPLACE">使用新值</option><option value="KEEP">保留旧值</option></select></label><label>裁定说明<input name="adjudication" value="DM 健康裁定" required maxlength="160"></label><button>应用健康操作</button></form>
         <form id="domain-spellbook"><h3>法术书与准备</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>施法规则<select name="castingRule" data-rules="character.wizard_spellcasting" required></select></label><label>操作<select name="kind"><option value="SPELLBOOK_INITIALIZED">建立 1 级法术书（6 个）</option><option value="SPELLBOOK_ADVANCED">升级学习（2 个）</option><option value="SPELLBOOK_PREPARED">长休后准备法术</option></select></label><label>本次学习<select name="learned" data-rules="adventure.spell" multiple size="6"></select></label><label>准备法术<select name="prepared" data-rules="adventure.spell" multiple size="6"></select></label><button>确认法术选择</button></form>

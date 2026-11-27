@@ -198,18 +198,22 @@ public final class Schema2CharacterRuntime {
         }
 
         public CheckInput {
-            boolean valid = validRule(rule, "adventure.check") && kind != null && abilityKey != null && ABILITIES.contains(abilityKey)
+            boolean valid = validCheckSelection(rule, kind, abilityKey, proficiency)
                     && difficultyClass >= 0 && difficultyClass <= 30 && validAdjudication(adjudication);
-            if (valid) valid = switch (kind) {
-                case "ABILITY" -> proficiency == null;
-                case "SKILL" -> validRule(proficiency, "character.proficiency");
-                case "TOOL" -> validRule(proficiency, "character.tool") && validPrefix(proficiency.ruleKey(), "tool");
-                default -> false;
-            };
             if (!valid || !(GENERAL.equals(subject) || STONEWORK_ORIGIN.equals(subject) && kind.equals("SKILL")
                     && abilityKey.equals("ability.intelligence") && STONECUNNING_HISTORY.equals(proficiency)))
                 throw new IllegalArgumentException("S2_CHARACTER_CHECK_INPUT");
         }
+    }
+
+    static boolean validCheckSelection(RuleIdentity rule, String kind, String ability, RuleIdentity proficiency) {
+        return validRule(rule, "adventure.check") && kind != null && ability != null && ABILITIES.contains(ability)
+                && switch (kind) {
+                    case "ABILITY" -> proficiency == null;
+                    case "SKILL" -> validRule(proficiency, "character.proficiency");
+                    case "TOOL" -> validRule(proficiency, "character.tool") && validPrefix(proficiency.ruleKey(), "tool");
+                    default -> false;
+                };
     }
 
     public record CheckResult(Integer firstD20, Integer secondD20, Integer selectedD20, int abilityModifier,
@@ -253,9 +257,9 @@ public final class Schema2CharacterRuntime {
         private static boolean validD20(Integer value) { return value != null && value >= 1 && value <= 20; }
     }
 
-    static int ordinaryCheckProficiency(State state, CheckInput input) {
-        return input.proficiency() != null && state.proficiencies().stream()
-                .anyMatch(fact -> fact.target().equals(input.proficiency())) ? state.proficiencyBonus() : 0;
+    static int ordinaryCheckProficiency(State state, RuleIdentity proficiency) {
+        return proficiency != null && state.proficiencies().stream()
+                .anyMatch(fact -> fact.target().equals(proficiency)) ? state.proficiencyBonus() : 0;
     }
 
     public record EquipmentInput(UUID itemId, RuleIdentity item, String location, String adjudication) {
@@ -497,7 +501,7 @@ public final class Schema2CharacterRuntime {
                             ? Math.max(result.firstD20(), result.secondD20()) : Math.min(result.firstD20(), result.secondD20());
                     require(result.selectedD20() == selected);
                 }
-                require(result.stonecunningRule() == null ? result.proficiencyBonus() == ordinaryCheckProficiency(before, input)
+                require(result.stonecunningRule() == null ? result.proficiencyBonus() == ordinaryCheckProficiency(before, input.proficiency())
                         : input.subject().equals(CheckInput.STONEWORK_ORIGIN));
                 require(result.abilityModifier() == Math.floorDiv(before.abilities().get(input.abilityKey()) - 10, 2)
                         && result.baseProficiencyBonus() == before.proficiencyBonus() && result.success() == (result.total() >= input.difficultyClass()));

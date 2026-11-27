@@ -5,7 +5,6 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
-import java.math.BigDecimal;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -28,14 +27,16 @@ class Schema2CheckCompositionTest {
         assertEquals(3, check.definition().passiveAdvantageAdjustment());
         assertEquals(2, check.definition().groupSuccessNumerator());
         assertEquals(3, check.definition().groupSuccessDenominator());
-        assertEquals(10, material.projection().chains().size());
+        assertEquals(2, check.definition().contestMinimumWinningMargin());
+        assertEquals(11, material.projection().chains().size());
         var groupThreshold = groupThresholdChain(material);
         assertEquals(List.of(new GroupSuccessThreshold(1, 2), new GroupSuccessThreshold(2, 3)),
                 groupThreshold.steps().stream().map(step -> step.after().value()).toList());
         assertEquals(List.of("checks_base", "checks_extension"), groupThreshold.steps().stream()
                 .map(step -> step.provider().moduleKey()).toList());
-        assertPassiveChain(material, Field.PASSIVE_BASE_SCORE, 10, 12);
-        assertPassiveChain(material, Field.PASSIVE_ADVANTAGE_ADJUSTMENT, 5, 3);
+        assertIntegerChain(material, Field.PASSIVE_BASE_SCORE, 10, 12);
+        assertIntegerChain(material, Field.PASSIVE_ADVANTAGE_ADJUSTMENT, 5, 3);
+        assertIntegerChain(material, Field.CONTEST_MINIMUM_WINNING_MARGIN, 1, 2);
         var alternate = material.projection().chains().stream()
                 .filter(c -> c.field() == Field.ALLOW_ALTERNATE_SKILL_ABILITY).findFirst().orElseThrow();
         assertEquals(List.of(false, true), alternate.steps().stream()
@@ -108,7 +109,7 @@ class Schema2CheckCompositionTest {
         var forged = new FinalCheck(new CheckDefinition(definition.identity(), definition.displayName(),
                 definition.description(), definition.sourcePage(), definition.algorithm(), false,
                 definition.passiveBaseScore(), definition.passiveAdvantageAdjustment(),
-                definition.groupSuccessThreshold(), definition.authorNote()), check.enabled());
+                definition.groupSuccessThreshold(), definition.contestMinimumWinningMargin(), definition.authorNote()), check.enabled());
         assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
                 material.members(), List.of(forged), material.projection().entries(), material.projection().chains()));
 
@@ -118,9 +119,10 @@ class Schema2CheckCompositionTest {
                 material.members(), material.projection().rules(), material.projection().entries(), incomplete));
     }
 
-    @Test void passiveParametersRequireExactBoundedIntegersInBothDefinitionsAndOverrides() {
+    @Test void checkParametersRequireExactBoundedIntegersInBothDefinitionsAndOverrides() {
         var limits = Map.of(Field.PASSIVE_BASE_SCORE, List.of(1, 20),
-                Field.PASSIVE_ADVANTAGE_ADJUSTMENT, List.of(0, 10));
+                Field.PASSIVE_ADVANTAGE_ADJUSTMENT, List.of(0, 10),
+                Field.CONTEST_MINIMUM_WINNING_MARGIN, List.of(1, 3));
         for (var entry : limits.entrySet()) {
             String field = entry.getKey().key();
             int min = entry.getValue().getFirst(), max = entry.getValue().getLast();
@@ -129,7 +131,7 @@ class Schema2CheckCompositionTest {
                 Schema2GrantFixtures.edit(files, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).addProperty(field, bound));
                 Schema2GrantFixtures.edit(files, 1, "changes.json", root -> override(root, field).addProperty("value", bound));
                 var material = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
-                assertPassiveChain(material, entry.getKey(), bound, bound);
+                assertIntegerChain(material, entry.getKey(), bound, bound);
             }
 
             var missing = Schema2CheckFixtures.packages();
@@ -137,8 +139,9 @@ class Schema2CheckCompositionTest {
             assertEquals("S2_SHAPE", assertThrows(Schema2Exception.class,
                     () -> Schema2GrantFixtures.artifacts(missing)).diagnostic().code());
 
-            for (var invalid : List.of(new JsonPrimitive(min - 1), new JsonPrimitive(max + 1), new JsonPrimitive("10"),
-                    new JsonPrimitive(true), new JsonPrimitive(10.0), new JsonPrimitive(new BigDecimal("1E+1")), JsonNull.INSTANCE)) {
+            for (var invalid : List.of(new JsonPrimitive(min - 1), new JsonPrimitive(max + 1),
+                    new JsonPrimitive(Integer.toString(min)), new JsonPrimitive(true), new JsonPrimitive((double) min),
+                    JsonParser.parseString(min + "e0"), JsonNull.INSTANCE)) {
                 var original = Schema2CheckFixtures.packages();
                 Schema2GrantFixtures.edit(original, 0, "rules.json", root -> Schema2GrantFixtures.row(root, 0).add(field, invalid));
                 assertThrows(Schema2Exception.class, () -> Schema2GrantFixtures.artifacts(original));
@@ -217,7 +220,8 @@ class Schema2CheckCompositionTest {
         var forged = new FinalCheck(new CheckDefinition(definition.identity(), definition.displayName(),
                 definition.description(), definition.sourcePage(), definition.algorithm(),
                 definition.allowAlternateSkillAbility(), definition.passiveBaseScore(),
-                definition.passiveAdvantageAdjustment(), new GroupSuccessThreshold(1, 2), definition.authorNote()), true);
+                definition.passiveAdvantageAdjustment(), new GroupSuccessThreshold(1, 2),
+                definition.contestMinimumWinningMargin(), definition.authorNote()), true);
         assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
                 material.members(), List.of(forged), material.projection().entries(), material.projection().chains()));
 
@@ -272,21 +276,40 @@ class Schema2CheckCompositionTest {
                 .filter(chain -> chain.field() == Field.GROUP_SUCCESS_THRESHOLD).findFirst().orElseThrow();
     }
 
-    @Test void validFinalPassiveScoreCannotMaskOutOfRangeOriginalStoredValue() {
+    @Test void validFinalIntegerParametersCannotMaskAnOutOfRangeOriginalStoredValue() {
         var material = Schema2CheckFixtures.projection();
         var invalid = new FieldState(StateKind.PRESENT, new IntegerValue(0));
-        var chains = material.projection().chains().stream().map(chain -> {
-            if (chain.field() != Field.PASSIVE_BASE_SCORE) return chain;
-            var original = chain.steps().getFirst();
-            var changed = chain.steps().getLast();
-            return new FieldChain(chain.target(), chain.field(), List.of(
-                    new ChainStep(original.op(), original.before(), invalid, original.provider(),
-                            original.loadIndex(), original.authorLocation(), original.origin()),
-                    new ChainStep(changed.op(), invalid, changed.after(), changed.provider(),
-                            changed.loadIndex(), changed.authorLocation(), changed.origin())));
-        }).toList();
+        for (var field : List.of(Field.PASSIVE_BASE_SCORE, Field.CONTEST_MINIMUM_WINNING_MARGIN)) {
+            var chains = material.projection().chains().stream().map(chain -> {
+                if (chain.field() != field) return chain;
+                var original = chain.steps().getFirst();
+                var changed = chain.steps().getLast();
+                return new FieldChain(chain.target(), chain.field(), List.of(
+                        new ChainStep(original.op(), original.before(), invalid, original.provider(),
+                                original.loadIndex(), original.authorLocation(), original.origin()),
+                        new ChainStep(changed.op(), invalid, changed.after(), changed.provider(),
+                                changed.loadIndex(), changed.authorLocation(), changed.origin())));
+            }).toList();
+            assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                    material.members(), material.projection().rules(), material.projection().entries(), chains));
+        }
+    }
+
+    @Test void storedContestMarginMustMatchItsCompleteChain() {
+        var material = Schema2CheckFixtures.projection();
+        var check = assertInstanceOf(FinalCheck.class, material.projection().rules().getFirst());
+        var definition = check.definition();
+        var forged = new FinalCheck(new CheckDefinition(definition.identity(), definition.displayName(),
+                definition.description(), definition.sourcePage(), definition.algorithm(),
+                definition.allowAlternateSkillAbility(), definition.passiveBaseScore(), definition.passiveAdvantageAdjustment(),
+                definition.groupSuccessThreshold(), 3, definition.authorNote()), true);
         assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
-                material.members(), material.projection().rules(), material.projection().entries(), chains));
+                material.members(), List.of(forged), material.projection().entries(), material.projection().chains()));
+
+        var incomplete = material.projection().chains().stream()
+                .filter(chain -> chain.field() != Field.CONTEST_MINIMUM_WINNING_MARGIN).toList();
+        assertThrows(Schema2Exception.class, () -> ProductionSchema2Projection.restore(
+                material.members(), material.projection().rules(), material.projection().entries(), incomplete));
     }
 
     private static JsonObject override(JsonElement root, String field) {
@@ -295,7 +318,7 @@ class Schema2CheckCompositionTest {
                 .findFirst().orElseThrow();
     }
 
-    private static void assertPassiveChain(ProductionSchema2Projection material, Field field, int original, int overridden) {
+    private static void assertIntegerChain(ProductionSchema2Projection material, Field field, int original, int overridden) {
         var chain = material.projection().chains().stream().filter(c -> c.field() == field).findFirst().orElseThrow();
         assertEquals(List.of(original, overridden), chain.steps().stream().map(step -> ((IntegerValue) step.after().value()).value()).toList());
         assertEquals(List.of("checks_base", "checks_extension"), chain.steps().stream().map(step -> step.provider().moduleKey()).toList());

@@ -1,8 +1,8 @@
 # Finite DM check variant
 
-The `dm_runtime_house_rules` version `24` extension is the fourth member of
+The `dm_runtime_house_rules` version `26` extension is the fourth member of
 the bundled check variant. The first three members are
-`srd51_runtime=12`, `srd51_characters=12` and `srd51_magic=12`, in that order.
+`srd51_runtime=13`, `srd51_characters=13` and `srd51_magic=13`, in that order.
 
 This variant enables `allow_alternate_skill_ability` on the check definition.
 Athletics defaults to Wisdom. The DM can choose a different ability for one
@@ -16,6 +16,7 @@ both or neither apply.
 
 The variant sets `group_success_threshold` to `{"numerator": 2, "denominator": 3}`.
 At least two thirds of a group must succeed on their individual checks.
+The variant sets `contest_minimum_winning_margin` to 2, so an opposed check with a lead of 1 leaves the situation unchanged.
 
 The variant grants Gnomish in the custom artisan
 background, uses three times the proficiency bonus for Dwarf Stonecunning,

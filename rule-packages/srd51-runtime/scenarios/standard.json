@@ -1,12 +1,13 @@
 {
   "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules"],
-  "members": ["srd51_runtime@12", "srd51_characters@12", "srd51_magic@12", "dm_runtime_house_rules@23"],
+  "members": ["srd51_runtime@13", "srd51_characters@13", "srd51_magic@13", "dm_runtime_house_rules@25"],
   "driver": "BundledSrd51Scenarios",
   "cases": [
     "initial-character",
     "skill-check",
     "alternate-skill-disabled",
     "passive-check",
+    "contest-check",
     "group-check",
     "fixed-damage",
     "class-templates",

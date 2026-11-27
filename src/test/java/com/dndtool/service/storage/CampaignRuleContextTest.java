@@ -1,9 +1,11 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
+import com.dndtool.module.composition.Schema2CompositionKernel.CheckDefinition;
 import com.dndtool.module.composition.Schema2CompositionKernel.Field;
 import com.dndtool.module.composition.Schema2CompositionKernel.FinalCheck;
 import com.dndtool.module.composition.Schema2CompositionKernel.GroupSuccessThreshold;
+import com.dndtool.module.composition.Schema2CompositionKernel.IntegerValue;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2PreparationIdentity;
 import java.util.ArrayList;
@@ -52,12 +54,14 @@ class CampaignRuleContextTest {
                         "proficiency_grants", "trade_language")));
     }
 
-    @Test void restoresTheGroupSuccessThresholdAndItsCompleteSourceChainFromPortableMaterial() {
+    @Test void restoresCheckParametersAndTheirCompleteSourcesFromPortableMaterial() {
         var standard = material(BundledCampaignRules.STANDARD).restore();
         var saved = material(BundledCampaignRules.CHECK_VARIANT);
         var variant = CampaignDomainCodec.decode(CampaignDomainCodec.encode(saved), Material.class).restore();
-        assertEquals(new GroupSuccessThreshold(1, 2), groupThreshold(standard));
-        assertEquals(new GroupSuccessThreshold(2, 3), groupThreshold(variant));
+        assertEquals(new GroupSuccessThreshold(1, 2), checkDefinition(standard).groupSuccessThreshold());
+        assertEquals(new GroupSuccessThreshold(2, 3), checkDefinition(variant).groupSuccessThreshold());
+        assertEquals(1, checkDefinition(standard).contestMinimumWinningMargin());
+        assertEquals(2, checkDefinition(variant).contestMinimumWinningMargin());
         var chain = variant.projection().projection().chains().stream()
                 .filter(row -> row.target().equals(variant.checkRule()) && row.field() == Field.GROUP_SUCCESS_THRESHOLD)
                 .findFirst().orElseThrow();
@@ -65,12 +69,19 @@ class CampaignRuleContextTest {
                 chain.steps().stream().map(step -> step.provider().moduleKey()).toList());
         assertEquals(List.of(new GroupSuccessThreshold(1, 2), new GroupSuccessThreshold(2, 3)),
                 chain.steps().stream().map(step -> step.after().value()).toList());
+        var contest = variant.projection().projection().chains().stream()
+                .filter(row -> row.target().equals(variant.checkRule()) && row.field() == Field.CONTEST_MINIMUM_WINNING_MARGIN)
+                .findFirst().orElseThrow();
+        assertEquals(List.of(BundledCampaignRules.CHARACTER_MODULE, BundledCampaignRules.HOUSE_RULE_MODULE),
+                contest.steps().stream().map(step -> step.provider().moduleKey()).toList());
+        assertEquals(List.of(new IntegerValue(1), new IntegerValue(2)),
+                contest.steps().stream().map(step -> step.after().value()).toList());
     }
 
-    private static GroupSuccessThreshold groupThreshold(CampaignRuleContext context) {
+    private static CheckDefinition checkDefinition(CampaignRuleContext context) {
         return context.projection().projection().rules().stream().filter(FinalCheck.class::isInstance)
                 .map(FinalCheck.class::cast).filter(rule -> rule.identity().equals(context.checkRule()))
-                .findFirst().orElseThrow().definition().groupSuccessThreshold();
+                .findFirst().orElseThrow().definition();
     }
 
     @Test void initialPlanKeepsItsPortableTagsAndFieldsOnSameVersionReopen() {

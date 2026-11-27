@@ -19,13 +19,13 @@ application that supports the saved mechanisms.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `12` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
-| `srd51_characters` version `12` | extension | `srd51_runtime=12` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive and group checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `12` | extension | `srd51_runtime=12`, `srd51_characters=12` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
-| `dm_runtime_house_rules` version `23` | extension | `srd51_runtime=12` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `13` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
+| `srd51_characters` version `13` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `13` | extension | `srd51_runtime=13`, `srd51_characters=13` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `dm_runtime_house_rules` version `25` | extension | `srd51_runtime=13` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `24` as its
+first three members and selects `dm_runtime_house_rules` version `26` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -91,6 +91,12 @@ is at least the participant count multiplied by the numerator. The required
 `1 <= numerator <= denominator <= 10`. Standard rules require at least half
 of participants to succeed. The bundled check variant requires at least two
 thirds. Authors override the whole threshold in one `set_field` operation.
+
+An opposed check (SRD p. 77) compares the two participants' totals. The
+`contest_minimum_winning_margin` check field requires an integer from 1 through 3.
+A participant wins if their total exceeds the other total by at least that
+margin. The prior situation continues when neither reaches the margin. The
+standard requires a lead of 1. The bundled check variant requires 2.
 
 Dwarf and Hill Dwarf can apply Stonecunning when the DM identifies a supported
 Intelligence (History) check about the origin of stonework. The standard

@@ -78,6 +78,7 @@ final class Schema2CheckTestFixture {
             threshold.addProperty("numerator", 1);
             threshold.addProperty("denominator", 2);
             check.add("group_success_threshold", threshold);
+            check.addProperty("contest_minimum_winning_margin", 1);
             definitions.add(check);
         }
         var tool = definition(TOOL, 70); tool.addProperty("category", "ARTISAN"); definitions.add(tool);
