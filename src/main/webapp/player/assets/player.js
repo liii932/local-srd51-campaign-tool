@@ -201,6 +201,7 @@
       listSection(content, '资源', card.resources, item => `${item.label || item.name || '资源'} ${item.unlimited ? '不限次数' : `${item.current ?? '—'} / ${item.maximum ?? '—'}`}`);
       listSection(content, '当前效果', card.effects, item => typeof item === 'string' ? item : item.label || item.name || '当前效果');
       listSection(content, '熟练', card.proficiencies, item => typeof item === 'string' ? item : item.label || item.name || '熟练');
+      if (card.expertise?.length) listSection(content, '专精', card.expertise, item => `${item.name}（熟练贡献 +${item.proficiencyContribution}）`);
       listSection(content, '特性与专长', card.features, item => String(item));
       listSection(content, '已准备法术', card.spellbook?.prepared, item => String(item));
       listSection(content, '已知戏法', card.knownCantrips, item =>

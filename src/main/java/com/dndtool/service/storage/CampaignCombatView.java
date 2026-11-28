@@ -11,6 +11,7 @@ import com.dndtool.service.Schema2CombatState.Cover;
 import com.dndtool.service.Schema2CombatState.Kind;
 import com.dndtool.service.Schema2CombatState.Status;
 import com.dndtool.service.Schema2ObservationRules;
+import com.dndtool.service.Schema2FeatureSupport;
 import com.google.gson.JsonObject;
 import java.util.*;
 
@@ -75,6 +76,33 @@ final class CampaignCombatView {
         } catch (IllegalArgumentException unavailable) {
             return false;
         }
+    }
+
+    static List<Kind> cunningActions(Map<UUID, Schema2CombatRules.Context> roster, Battle battle) {
+        if (!mayOfferCunningActions(roster, battle)) return List.of();
+        var rules = new Schema2CombatRules();
+        return List.of(Kind.CUNNING_DASH, Kind.CUNNING_DISENGAGE, Kind.CUNNING_HIDE).stream().filter(kind -> {
+            try {
+                rules.preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(), roster,
+                        battle, Command.action(kind, battle.activeActor()));
+                return true;
+            } catch (IllegalArgumentException unavailable) { return false; }
+        }).toList();
+    }
+
+    static boolean mayOfferCunningActions(Map<UUID, Schema2CombatRules.Context> roster, Battle battle) {
+        if (battle.status() != Status.ACTIVE || battle.activeFlow() != null) return false;
+        UUID id = battle.activeActor();
+        var context = roster.get(id);
+        if (context == null) return false;
+        var character = context.character();
+        if (!"class.rogue".equals(character.characterClass().ruleKey()) || character.level() < 2
+                || character.hitPoints() == 0 || character.health().dead() || battle.surprised(id)) return false;
+        if (battle.combatants().stream().noneMatch(actor -> actor.characterId().equals(id) && actor.bonusActionsRemaining() > 0))
+            return false;
+        try {
+            return Schema2FeatureSupport.hasCunningAction(context.material(), character);
+        } catch (IllegalArgumentException unavailable) { return false; }
     }
 
     static List<CantripChoice> cantripChoices(Map<UUID, Schema2CombatRules.Context> roster, Battle battle,

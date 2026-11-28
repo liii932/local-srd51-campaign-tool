@@ -699,6 +699,7 @@ public final class CampaignStorageService implements AutoCloseable {
             var current = c.history().current(); JsonObject card = new JsonObject();
             card.addProperty("id", c.id().toString()); card.addProperty("name", c.name()); card.addProperty("kind", c.kind()); card.addProperty("active", c.active());
             card.addProperty("version", Long.toString(current.version())); card.addProperty("level", current.level());
+            card.add("expertise", PlayerCampaignProjection.expertise(state, material.projection(), current));
             card.addProperty("hitPoints", current.hitPoints()); card.addProperty("maximumHitPoints", current.maximumHitPoints());
             try {
                 card.addProperty("armorClass", equipment.derive(material.projection(), current).armorClass());
@@ -722,6 +723,7 @@ public final class CampaignStorageService implements AutoCloseable {
                 view.add("weaponTargets", json.toJsonTree(CampaignCombatView.weaponTargets(battle)));
                 if (CampaignSpaceData.Ref.scene(battle.combatId()).equals(state.space().focus().space())) {
                     view.addProperty("actionSurgeAvailable", CampaignCombatView.actionSurgeAvailable(roster, battle));
+                    view.add("cunningActions", json.toJsonTree(CampaignCombatView.cunningActions(roster, battle)));
                     Set<UUID> participants = new HashSet<>();
                     battle.combatants().forEach(actor -> participants.add(actor.characterId()));
                     view.add("cantripChoices", json.toJsonTree(CampaignCombatView.cantripChoices(roster, battle, participants)));

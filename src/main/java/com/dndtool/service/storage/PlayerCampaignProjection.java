@@ -3,6 +3,8 @@ package com.dndtool.service.storage;
 import com.dndtool.service.Schema2CharacterRuntime;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
+import com.dndtool.module.composition.ProductionSchema2Projection;
+import com.dndtool.service.Schema2CharacterCheckRules;
 import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CombatHistory;
 import com.dndtool.service.Schema2CombatRules;
@@ -267,6 +269,16 @@ public final class PlayerCampaignProjection {
     static String ruleName(CampaignDomainData.State state, RuleIdentity rule) {
         return state.material().rules().stream().filter(r -> r.identity().equals(rule)).map(r -> r.definition().displayName()).findFirst().orElse("未知规则");
     }
+    static JsonArray expertise(CampaignDomainData.State domain, ProductionSchema2Projection material, Schema2CharacterRuntime.State state) {
+        JsonArray entries = new JsonArray();
+        for (var target : state.expertise()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", ruleName(domain, target));
+            entry.addProperty("proficiencyContribution", Schema2CharacterCheckRules.checkProficiencyBonus(material, state, target));
+            entries.add(entry);
+        }
+        return entries;
+    }
     private static JsonObject base(UUID id, String name, String kind, long hp, long maximum, int level) {
         JsonObject card = new JsonObject(); card.addProperty("id", id.toString()); card.addProperty("name", name); card.addProperty("kind", kind);
         card.addProperty("currentHp", hp); card.addProperty("maximumHp", maximum); card.addProperty("level", level); return card;
@@ -298,6 +310,7 @@ public final class PlayerCampaignProjection {
         for (var item : state.equipment()) { JsonObject row = new JsonObject(); row.addProperty("name", ruleName(domain, item.item())); row.addProperty("quantity", 1); row.addProperty("location", location(item.location())); equipment.add(row); }
         card.add("equipment", equipment);
         JsonArray proficiencies = new JsonArray(); state.proficiencies().forEach(p -> proficiencies.add(ruleName(domain, p.target()))); card.add("proficiencies", proficiencies);
+        card.add("expertise", expertise(domain, material, state));
         JsonArray features = new JsonArray(); state.features().forEach(f -> features.add(ruleName(domain, f.feature()))); state.feats().forEach(f -> features.add(ruleName(domain, f.feat()))); card.add("features", features);
         if (!state.knownCantrips().isEmpty()) {
             JsonArray known = new JsonArray();

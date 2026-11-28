@@ -472,7 +472,9 @@ public final class Schema2CombatRules {
                 if (command.kind() == Kind.BEGIN_ATTACK && actor.sequence() != null && !actor.sequence().closed()) throw invalid("S2_COMBAT_SEQUENCE_ACTIVE");
                 if (command.kind() == Kind.BEGIN_ATTACK) attackAllowance(p.roster.get(actor.characterId()));
             }
-            case HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE -> {
+            case CUNNING_DASH, CUNNING_DISENGAGE -> requireCunningAction(p, actor);
+            case HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE, CUNNING_HIDE -> {
+                if (command.kind() == Kind.CUNNING_HIDE) requireCunningAction(p, actor);
                 if (p.before.observation().checks().stream().anyMatch(check -> check.operationId().equals(p.operationId)))
                     throw invalid("S2_COMBAT_OPERATION_CONFLICT");
                 Schema2ObservationRules.prepare(p.roster, p.before, actor, command.kind());
@@ -620,19 +622,23 @@ public final class Schema2CombatRules {
                             .toList();
                     battle=copy(battle,Status.EXPLORATION,battle.round(),battle.turnNumber(),battle.activeOrdinal(),actors,battle.flows());
                 }
-                case DASH, DISENGAGE, DODGE, BEGIN_ATTACK -> {
-                    AttackSequence sequence = p.command.kind() == Kind.BEGIN_ATTACK
+                case DASH, DISENGAGE, DODGE, BEGIN_ATTACK, CUNNING_DASH, CUNNING_DISENGAGE -> {
+                    Kind kind = p.command.kind();
+                    Combatant paid = kind == Kind.CUNNING_DASH || kind == Kind.CUNNING_DISENGAGE
+                            ? actor.spendBonusAction() : actor.spendAction();
+                    AttackSequence sequence = kind == Kind.BEGIN_ATTACK
                             ? new AttackSequence(key(p.operationId,"sequence"),attackAllowance(p.roster.get(actor.characterId())),0,0,false)
                             : actor.sequence();
-                    battle = replaceActor(battle,new Combatant(actor.characterId(), actor.position(), actor.side(),
-                            actor.actionsRemaining() - 1, actor.bonusActionsRemaining(), actor.reactionAvailable(), actor.movementSpentHalfFeet(),
-                            actor.movementBonus() + (p.command.kind() == Kind.DASH ? speed(p.roster,battle,actor.characterId()) : 0),
-                            actor.disengaged() || p.command.kind() == Kind.DISENGAGE,
-                            actor.dodging() || p.command.kind() == Kind.DODGE && speed(p.roster,battle,actor.characterId()) > 0,
-                            sequence,actor.prone(),actor.actionSurged()));
+                    int dashBonus = kind == Kind.DASH || kind == Kind.CUNNING_DASH
+                            ? speed(p.roster, battle, actor.characterId()) : 0;
+                    battle = replaceActor(battle, new Combatant(paid.characterId(), paid.position(), paid.side(),
+                            paid.actionsRemaining(), paid.bonusActionsRemaining(), paid.reactionAvailable(), paid.movementSpentHalfFeet(),
+                            paid.movementBonus() + dashBonus, paid.disengaged() || kind == Kind.DISENGAGE || kind == Kind.CUNNING_DISENGAGE,
+                            paid.dodging() || kind == Kind.DODGE && speed(p.roster, battle, actor.characterId()) > 0,
+                            sequence, paid.prone(), paid.actionSurged()));
                 }
                 case END_CONCENTRATION -> battle=Schema2SpellRules.end(battle,p.command.actorId(),"VOLUNTARY",facts);
-                case HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE -> {
+                case HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE, CUNNING_HIDE -> {
                     var plan = Schema2ObservationRules.prepare(p.roster, battle, actor, p.command.kind());
                     battle = Schema2ObservationRules.resolve(battle, actor, p.command.kind(),
                             p.operationId, plan, (purpose, id) -> dice.draw(purpose, id, 20));
@@ -659,7 +665,7 @@ public final class Schema2CombatRules {
                 default -> Schema2ObservationRules.checkAction(kind) ? p.operationId : p.combatId;
             };
             String reason = switch (kind) {
-                case SECOND_WIND, NIMBLE_HIDE, NIMBLE_DISENGAGE -> "BONUS_ACTION";
+                case SECOND_WIND, NIMBLE_HIDE, NIMBLE_DISENGAGE, CUNNING_DASH, CUNNING_DISENGAGE, CUNNING_HIDE -> "BONUS_ACTION";
                 case ACTION_SURGE -> "EXTRA_ACTION";
                 default -> null;
             };
@@ -670,6 +676,14 @@ public final class Schema2CombatRules {
         var reconciliation=Schema2OngoingEffectRules.reconcile(battle,p.operationId);facts.addAll(reconciliation.facts());battle=Schema2OngoingEffectRules.withCauses(battle,reconciliation.causes());
         validateState(battle);
         return new Resolution(battle,changes,dice.actual,facts);
+    }
+
+    private static void requireCunningAction(Prepared prepared, Combatant actor) {
+        if (prepared.before.surprised(actor.characterId())) throw invalid("S2_COMBAT_ACTOR_SURPRISED");
+        Context context = prepared.roster.get(actor.characterId());
+        if (context == null || !Schema2FeatureSupport.hasCunningAction(context.material(), context.character()))
+            throw invalid("S2_CUNNING_ACTION_UNAVAILABLE");
+        if (actor.bonusActionsRemaining() == 0) throw invalid("S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
     }
 
     private RuleIdentity secondWindResource(Context context) {

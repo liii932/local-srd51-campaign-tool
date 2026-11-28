@@ -32,6 +32,9 @@ public final class Schema2CompositionKernel {
     public static final String FIGHTER_SECOND_WIND_ALGORITHM = "SRD_2014_FIGHTER_SECOND_WIND_V1";
     public static final String FIGHTER_DEFENSE_ALGORITHM = "SRD_2014_FIGHTER_DEFENSE_V1";
     public static final String FIGHTER_ACTION_SURGE_ALGORITHM = "SRD_2014_FIGHTER_ACTION_SURGE_V1";
+    public static final String ROGUE_EXPERTISE_ALGORITHM = "SRD_2014_ROGUE_EXPERTISE_V1";
+    public static final String ROGUE_CUNNING_ACTION_ALGORITHM = "SRD_2014_ROGUE_CUNNING_ACTION_V1";
+    public static final String ROGUE_THIEVES_TOOLS_KEY = "tool.thieves_tools";
     public static final String WALKING_SPEED_ALGORITHM = "SRD_2014_WALKING_SPEED_V1";
     public static final String HEAVY_ARMOR_MOVEMENT_ALGORITHM = "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1";
     public static final String SUBRACE_HIT_POINTS_ALGORITHM = "SRD_2014_SUBRACE_HIT_POINTS_V1";
@@ -56,6 +59,7 @@ public final class Schema2CompositionKernel {
     private static final int MAX_RUNTIME_RULES = 256, MAX_RUNTIME_ENTRIES = 512;
     private static final int MAX_RUNTIME_CHAINS = 3072, MAX_RUNTIME_STEPS = 4096;
     public static final int MAX_AUTHOR_FILES = 16;
+    private static final int MAX_AUTHOR_DEFINITIONS = 80;
     public static final int MAX_HEADER_BYTES = 16384;
     public static final int MAX_FILE_BYTES = 65536;
     public static final int MAX_PACKAGE_BYTES = 1048576;
@@ -699,7 +703,7 @@ public final class Schema2CompositionKernel {
                             pointer = pointer.substring(0, pointer.length() - suffix.length());
                         }
                         if (HEADER_PATH.equals(location.path()) || !storedArrayElement(pointer,
-                                chain.target() instanceof RuleIdentity ? 64 : 128))
+                                chain.target() instanceof RuleIdentity ? MAX_AUTHOR_DEFINITIONS : 128))
                             throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid proficiency declaration location", source);
                         Location declarationLocation = new Location(location.moduleKey(), location.releaseVersion(), location.rawZipSha256(), location.path(), pointer, null);
                         Location previousLocation = sourceDeclarations.putIfAbsent(chain.target(), declarationLocation);
@@ -856,7 +860,7 @@ public final class Schema2CompositionKernel {
                 throw fail("S2_STORED_INVALID", Stage.FINAL, "Invalid original stored declaration", source);
             }
         }
-        for (int i = 0; i < members.size(); i++) if (definitionCounts[i] > 64 || entryCounts[i] > 128 || changeCounts[i] > 256)
+        for (int i = 0; i < members.size(); i++) if (definitionCounts[i] > MAX_AUTHOR_DEFINITIONS || entryCounts[i] > 128 || changeCounts[i] > 256)
             throw fail("S2_STORED_INVALID", Stage.FINAL, "Stored member budget exceeded", source);
         Map<String, Object> configuration = json("author_schema_version", 2, "canonical_profile", CANONICAL_PROFILE,
                 "composition_algorithm", COMPOSITION_ALGORITHM, "members", members.stream().map(member ->
@@ -1196,7 +1200,7 @@ public final class Schema2CompositionKernel {
                 Location location = file.child(Integer.toString(i));
                 switch (declaration.kind) {
                     case "definitions" -> {
-                        if (definitions.size() >= 64) throw fail("S2_BUDGET", Stage.PARSE, "Definition count budget exceeded", location);
+                        if (definitions.size() >= MAX_AUTHOR_DEFINITIONS) throw fail("S2_BUDGET", Stage.PARSE, "Definition count budget exceeded", location);
                         Definition value = definition(rows.get(i), location);
                         originalOwner(module, value.identity(), location.child("identity").child("module_key"));
                         duplicateIdentity(identities, value.identity(), location);
@@ -1696,6 +1700,14 @@ public final class Schema2CompositionKernel {
                 && (kind != FeatureKind.FEATURE || level != 2 || page != 25
                     || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.fighter")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Action Surge requires a second-level Fighter feature from SRD page 25", source);
+        if (ROGUE_EXPERTISE_ALGORITHM.equals(algorithm)
+                && (kind != FeatureKind.FEATURE || level != 1 || page != 39
+                    || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.rogue")))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Expertise requires a first-level Rogue choice from SRD page 39", source);
+        if (ROGUE_CUNNING_ACTION_ALGORITHM.equals(algorithm)
+                && (kind != FeatureKind.FEATURE || level != 2 || page != 40
+                    || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.rogue")))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Cunning Action requires a second-level Rogue feature from SRD page 40", source);
         return new FeatureDefinition(identity, name, description, page, owner, level, kind, mode, algorithm, note);
     }
 
@@ -1725,8 +1737,8 @@ public final class Schema2CompositionKernel {
             case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1",
                     "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1",
                     FIGHTER_EXTRA_ATTACK_ALGORITHM, CHAMPION_IMPROVED_CRITICAL_ALGORITHM, FIGHTER_SECOND_WIND_ALGORITHM,
-                    FIGHTER_ACTION_SURGE_ALGORITHM);
-            case CHOICE -> Set.of(FIGHTER_DEFENSE_ALGORITHM);
+                    FIGHTER_ACTION_SURGE_ALGORITHM, ROGUE_CUNNING_ACTION_ALGORITHM);
+            case CHOICE -> Set.of(FIGHTER_DEFENSE_ALGORITHM, ROGUE_EXPERTISE_ALGORITHM);
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
             case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
         };
@@ -2648,6 +2660,7 @@ public final class Schema2CompositionKernel {
         int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
         boolean extraAttackEnabled = false, improvedCriticalEnabled = false, secondWindEnabled = false;
         boolean defenseEnabled = false, actionSurgeEnabled = false;
+        boolean expertiseEnabled = false, cunningActionEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
         boolean armorMovementEnabled = false, stonecunningEnabled = false;
         Set<RuleIdentity> subraceHitPointOwners = new HashSet<>();
@@ -2735,6 +2748,16 @@ public final class Schema2CompositionKernel {
                         validateActionSurgeResource(feature.definition(), objects, Stage.FINAL, object.source);
                         if (actionSurgeEnabled) throw fail("S2_FIGHTER_ACTION_SURGE_AMBIGUOUS", Stage.FINAL, "Only one Fighter Action Surge may be enabled", object.source);
                         actionSurgeEnabled = true;
+                    }
+                    if (feature.enabled() && ROGUE_EXPERTISE_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
+                        if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Expertise requires its enabled Rogue", object.source);
+                        if (expertiseEnabled) throw fail("S2_ROGUE_EXPERTISE_AMBIGUOUS", Stage.FINAL, "Only one Rogue Expertise may be enabled", object.source);
+                        expertiseEnabled = true;
+                    }
+                    if (feature.enabled() && ROGUE_CUNNING_ACTION_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
+                        if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Cunning Action requires its enabled Rogue", object.source);
+                        if (cunningActionEnabled) throw fail("S2_ROGUE_CUNNING_ACTION_AMBIGUOUS", Stage.FINAL, "Only one Rogue Cunning Action may be enabled", object.source);
+                        cunningActionEnabled = true;
                     }
                     if (feature.enabled() && FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
                         if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Fighter Extra Attack requires its enabled class", object.source);

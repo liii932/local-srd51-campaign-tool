@@ -10,6 +10,8 @@ import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2FeatureSupport;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2SpellRules;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,7 +51,10 @@ public final class CampaignRuleSupport {
         var fighter = context.rule("character.class", "class.fighter");
         var cleric = context.rule("character.class", "class.cleric");
         var wizard = context.rule("character.class", "class.wizard");
-        var progressions = validateGrowth(rules, Map.of(fighter, 6, cleric, 1, wizard, 5));
+        var bounds = new HashMap<>(Map.of(fighter, 6, cleric, 1, wizard, 5));
+        RuleIdentity rogue = context.initialClasses().contains("rogue") ? context.rule("character.class", "class.rogue") : null;
+        if (rogue != null) bounds.put(rogue, 2);
+        var progressions = validateGrowth(rules, bounds);
         var life = required(rules, FinalSpellcasting.class, "LIFE_CASTING").definition();
         var prepared = required(rules, FinalWizardSpellcasting.class, "WIZARD_CASTING").definition();
         var lifeSubclass = context.rule("character.subclass", "subclass.life");
@@ -57,7 +62,7 @@ public final class CampaignRuleSupport {
                 || !prepared.ownerClass().equals(wizard)) throw unsupported("CASTING_OWNER");
         if (enabled(rules, FinalSubclass.class).stream().anyMatch(row -> row.definition().ownerClass().equals(cleric)
                 && !row.identity().equals(lifeSubclass))) throw unsupported("LIFE_SUBCLASS");
-        validateFeatures(rules, progressions.get(fighter), life, prepared);
+        validateFeatures(rules, progressions.get(fighter), rogue == null ? null : progressions.get(rogue), life, prepared);
         int wizardMaximum = progressions.get(wizard).supportedMaximumLevel();
         validateCantrips(projection, cleric, wizard, wizardMaximum);
         validateSpells(projection, life, prepared, wizardMaximum);
@@ -96,15 +101,23 @@ public final class CampaignRuleSupport {
         return progressions;
     }
 
-    private static void validateFeatures(List<FinalRule> rules, ClassProgressionDefinition fighter, SpellcastingDefinition life,
-            WizardSpellcastingDefinition wizard) {
+    private static void validateFeatures(List<FinalRule> rules, ClassProgressionDefinition fighter,
+            ClassProgressionDefinition rogue, SpellcastingDefinition life, WizardSpellcastingDefinition wizard) {
         int arcaneRecovery = 0;
+        Set<String> rogueFeatures = new HashSet<>();
         for (var row : enabled(rules, FinalFeature.class)) {
             var definition = row.definition();
             if (definition.kind() == FeatureKind.OPTION && definition.executionMode() != FeatureExecution.AUTOMATIC)
                 continue;
             if (row.identity().equals(life.requiredFeature()) || row.identity().equals(wizard.requiredFeature()))
                 continue;
+            if (ROGUE_EXPERTISE_ALGORITHM.equals(definition.executionAlgorithm())
+                    || ROGUE_CUNNING_ACTION_ALGORITHM.equals(definition.executionAlgorithm())) {
+                if (rogue == null || !definition.owner().equals(rogue.ownerClass())
+                        || definition.level() > rogue.supportedMaximumLevel() || !rogueFeatures.add(definition.executionAlgorithm()))
+                    throw unsupported("ROGUE_FEATURES");
+                continue;
+            }
             if (FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(definition.executionAlgorithm())
                     || FIGHTER_SECOND_WIND_ALGORITHM.equals(definition.executionAlgorithm())
                     || FIGHTER_DEFENSE_ALGORITHM.equals(definition.executionAlgorithm())
@@ -126,6 +139,7 @@ public final class CampaignRuleSupport {
                     && ++arcaneRecovery == 1) continue;
             throw unsupported("FEATURE_OWNER");
         }
+        if (rogue != null && rogueFeatures.size() != 2) throw unsupported("ROGUE_FEATURES");
     }
 
     private static void validateSpells(ProductionSchema2Projection projection, SpellcastingDefinition life,
@@ -171,7 +185,7 @@ public final class CampaignRuleSupport {
     private static void validateCreation(CampaignRuleContext context) {
         var engine = new CampaignDomainEngine();
         try {
-            for (String characterClass : CampaignRuleContext.INITIAL_CLASSES) {
+            for (String characterClass : context.initialClasses()) {
                 var choices = context.initialChoices(characterClass);
                 var abilities = context.initialAbilities(characterClass);
                 for (String background : CampaignRuleContext.INITIAL_BACKGROUNDS) {

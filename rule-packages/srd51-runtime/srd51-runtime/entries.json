@@ -793,5 +793,225 @@
       "rule_type": "character.proficiency",
       "rule_key": "proficiency.skill.religion"
     }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "acrobatics"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.acrobatics"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "athletics"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.athletics"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "deception"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.deception"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "insight"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.insight"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "intimidation"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.intimidation"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "investigation"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.investigation"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "perception"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.perception"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "performance"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.performance"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "persuasion"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.persuasion"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "sleight_of_hand"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.sleight_of_hand"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "collection_key": "members",
+      "module_key": "srd51_runtime",
+      "entry_key": "stealth"
+    },
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.skill.stealth"
+    }
   }
 ]

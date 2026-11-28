@@ -33,11 +33,12 @@ final class Schema2GrowthRules {
         for (var grant : initial.character().grants()) if (!grant.suppressed() && grant.category() == GrantCategory.TOOL)
             grants.add(new ProficiencyState(grant.slot(), grant.target(), 1));
         grants = proficiencyGrants(catalog, progression.identity(), "starting_proficiencies", 1, grants, choices.proficiencyChoices());
+        validateExpertise(material, starting, grants, choices.expertise());
         long hp = Math.max(1, progression.hitDieSides() + modifier(abilities, "ability.constitution")) + subraceHitPointBonus;
         List<KnownCantrip> knownCantrips = Schema2KnownCantripRules.acquire(material, starting, 1, choices.cantrips(), List.of());
         State state = new State(initial.character().identity(), initial.campaignId(), initial.characterId(), preparation,
                 starting, abilities, 1, 2, hp, hp, classes, List.of(new HitDicePool(progression.hitDieSides(), 1, 1)),
-                subclasses, features(catalog, classes, subclasses, choices.fightingStyle()), List.of(), grants, 0,
+                subclasses, features(catalog, classes, subclasses, choices.fightingStyle(), choices.expertise()), List.of(), grants, 0,
                 resources(catalog, classes, abilities, Map.of()), RestState.INITIAL, List.of(), HealthState.INITIAL, null, knownCantrips);
         return validate(material, state);
     }
@@ -47,6 +48,7 @@ final class Schema2GrowthRules {
         Catalog catalog = new Catalog(material);
         if (choices == null || targetClass == null) fail("S2_GROWTH_REQUEST");
         if (choices.fightingStyle() != null) fail("S2_GROWTH_FIGHTING_STYLE_NOT_DUE");
+        if (!choices.expertise().isEmpty()) fail("S2_ROGUE_EXPERTISE_NOT_DUE");
         if (before.level() >= 20 || targetLevel != before.level() + 1) fail("S2_GROWTH_LEVEL");
         ClassProgressionDefinition target = catalog.growth(targetClass);
         Map<RuleIdentity, Integer> levels = classLevels(before.classes());
@@ -57,6 +59,7 @@ final class Schema2GrowthRules {
             requirePrerequisite(target.multiclassPrerequisite(), before.abilities());
         }
         levels.put(targetClass, next);
+        requireRogueScope(levels);
         List<ClassLevel> classes = levels.entrySet().stream().sorted(Map.Entry.comparingByKey(ORDER))
                 .map(entry -> new ClassLevel(entry.getKey(), entry.getValue())).toList();
         ClassLevelEntry levelRow = catalog.level(target.identity(), next);
@@ -100,12 +103,12 @@ final class Schema2GrowthRules {
         List<KnownCantrip> knownCantrips = Schema2KnownCantripRules.acquire(material, targetClass, next, choices.cantrips(), before.knownCantrips());
         RuleIdentity fightingStyle = before.features().stream().map(FeatureState::feature)
                 .filter(identity -> catalog.rules.get(identity) instanceof FinalFeature feature
-                        && feature.definition().executionMode() == FeatureExecution.CHOICE)
+                        && FIGHTER_DEFENSE_ALGORITHM.equals(feature.definition().executionAlgorithm()))
                 .findFirst().orElse(null);
         State candidate = new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(),
                 before.characterClass(), abilities, targetLevel, 2 + (targetLevel - 1) / 4,
                 before.hitPoints() + minimum, before.maximumHitPoints() + minimum, classes, dice, subclasses,
-                features(catalog, classes, subclasses, fightingStyle), feats, grants, before.version() + 1,
+                features(catalog, classes, subclasses, fightingStyle, before.expertise()), feats, grants, before.version() + 1,
                 resources(catalog, classes, abilities, oldResources), before.rest(), before.equipment(), before.health(), before.spellbook(), knownCantrips);
         validate(material, candidate);
         return new Prepared(candidate, target.hitDieSides(), constitution, minimum, maximum);
@@ -121,6 +124,7 @@ final class Schema2GrowthRules {
         Map<RuleIdentity, Integer> levels = classLevels(state.classes());
         if (!levels.containsKey(state.characterClass()) || levels.values().stream().mapToInt(Integer::intValue).sum() != state.level()
                 || !state.classes().equals(state.classes().stream().sorted(Comparator.comparing(ClassLevel::characterClass, ORDER)).toList())) fail("S2_GROWTH_STATE");
+        requireRogueScope(levels);
         Map<Integer, Integer> maximumDice = new TreeMap<>();
         for (ClassLevel level : state.classes()) {
             var progression = catalog.growth(level.characterClass());
@@ -147,7 +151,7 @@ final class Schema2GrowthRules {
                 .anyMatch(subclass -> subclass.selectionLevel() <= level.level()) && !subclassClasses.contains(level.characterClass())) fail("S2_GROWTH_SUBCLASS_STATE");
         if (!state.subclasses().equals(state.subclasses().stream().sorted(Comparator.comparing(SubclassState::characterClass, ORDER)).toList())) fail("S2_GROWTH_SUBCLASS_STATE");
         RuleIdentity fightingStyle = Schema2FeatureSupport.fightingStyleOption(material, state.characterClass());
-        if (!features(catalog, state.classes(), state.subclasses(), fightingStyle).equals(state.features()))
+        if (!features(catalog, state.classes(), state.subclasses(), fightingStyle, state.expertise()).equals(state.features()))
             fail("S2_GROWTH_FEATURE_STATE");
         if (state.feats().size() > 20 || state.features().size() > 64 || state.proficiencies().size() > 64) fail("S2_GROWTH_BUDGET");
         Set<RuleIdentity> seenFeats = new HashSet<>();
@@ -161,6 +165,7 @@ final class Schema2GrowthRules {
         }
         if (!state.feats().equals(state.feats().stream().sorted(Comparator.comparing(FeatState::feat, ORDER)).toList())) fail("S2_GROWTH_FEAT_STATE");
         validateProficiencies(catalog, state);
+        validateExpertise(material, state.characterClass(), state.proficiencies(), state.expertise());
         List<ResourceState> expected = resources(catalog, state.classes(), state.abilities(), Map.of());
         if (state.resources().size() != expected.size()) fail("S2_RESOURCE_STATE");
         for (int i = 0; i < expected.size(); i++) {
@@ -190,7 +195,7 @@ final class Schema2GrowthRules {
     }
 
     private static List<FeatureState> features(Catalog catalog, List<ClassLevel> classes, List<SubclassState> subclasses,
-            RuleIdentity fightingStyle) {
+            RuleIdentity fightingStyle, List<RuleIdentity> expertise) {
         Map<RuleIdentity, Integer> levels = classLevels(classes);
         for (SubclassState subclass : subclasses) levels.put(subclass.subclass(), levels.get(subclass.characterClass()));
         List<FeatureState> result = new ArrayList<>();
@@ -220,7 +225,8 @@ final class Schema2GrowthRules {
             if (CHAMPION_IMPROVED_CRITICAL_ALGORITHM.equals(feature.definition().executionAlgorithm())
                     && (classes.size() != 1 || levels.get(feature.definition().owner()) > 6))
                 unsupportedImprovedCritical = true;
-            result.add(new FeatureState(feature.identity(), feature.definition().owner(), feature.definition().level()));
+            var chosen = ROGUE_EXPERTISE_ALGORITHM.equals(feature.definition().executionAlgorithm()) ? expertise : List.<RuleIdentity>of();
+            result.add(new FeatureState(feature.identity(), feature.definition().owner(), feature.definition().level(), chosen));
         }
         if (unsupportedImprovedCritical) fail("S2_GROWTH_IMPROVED_CRITICAL_SCOPE");
         if (unsupportedSecondWind) fail("S2_GROWTH_SECOND_WIND_SCOPE");
@@ -330,6 +336,18 @@ final class Schema2GrowthRules {
         if (result.size() > 32) fail("S2_RESOURCE_BUDGET");
         return result.stream().sorted(Comparator.comparing(ResourceState::identity, ORDER)).toList();
     }
+    private static void validateExpertise(ProductionSchema2Projection material, RuleIdentity characterClass,
+            List<ProficiencyState> proficiencies, List<RuleIdentity> expertise) {
+        if (Schema2FeatureSupport.rogueExpertiseFeature(material, characterClass) != null) {
+            Schema2FeatureSupport.requireRogueExpertiseTargets(material, proficiencies, expertise, "S2_ROGUE_EXPERTISE_CHOICES");
+        } else if (!expertise.isEmpty()) fail("S2_ROGUE_EXPERTISE_CHOICES");
+    }
+
+    private static void requireRogueScope(Map<RuleIdentity, Integer> levels) {
+        for (var entry : levels.entrySet()) if (entry.getKey().ruleKey().equals("class.rogue")
+                && (levels.size() != 1 || entry.getValue() > 2)) fail("S2_GROWTH_ROGUE_SCOPE");
+    }
+
     private static int modifier(Map<String, Integer> values, String key) { return Math.floorDiv(values.get(key) - 10, 2); }
     private static void fail(String code) { throw new IllegalArgumentException(code); }
 

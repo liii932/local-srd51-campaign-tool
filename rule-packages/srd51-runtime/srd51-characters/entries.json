@@ -1114,5 +1114,337 @@
         "rule_key": "proficiency.weapon.shortbow"
       }
     }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_1"
+    },
+    "level": 1,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "levels",
+      "module_key": "srd51_characters",
+      "entry_key": "level_2"
+    },
+    "level": 2,
+    "asi_available": false
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "skills"
+    },
+    "growth_grant": {
+      "kind": "CHOICE",
+      "candidates": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "catalog.proficiency_set",
+        "rule_key": "proficiency_set.rogue_skills"
+      },
+      "count": 4
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_dexterity"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.dexterity"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "save_intelligence"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.save.intelligence"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "armor_light"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.armor.light"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "tool_thieves_tools"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.tool",
+        "rule_key": "tool.thieves_tools"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_simple"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.simple"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_hand_crossbow"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.hand_crossbow"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_longsword"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.longsword"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_rapier"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.rapier"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_shortsword"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.shortsword"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_dagger"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.dagger"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_mace"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_runtime",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.mace"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.rogue"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_shortbow"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.shortbow"
+      }
+    }
   }
 ]

@@ -59,6 +59,8 @@ public final class CampaignDomainCommands {
                 if (input.has("subraceKey")) fields.add("subraceKey");
                 if (input.has("cantripKeys")) fields.add("cantripKeys");
                 if (input.has("fightingStyleKey")) fields.add("fightingStyleKey");
+                if (input.has("skillKeys")) fields.add("skillKeys");
+                if (input.has("expertiseKeys")) fields.add("expertiseKeys");
                 CampaignJson.fields(input, fields.toArray(String[]::new));
                 if (characters.size() >= 16) throw new StorageException("CAPACITY", "Campaign roster is full");
                 String name = CampaignJson.name(s(input, "name")), kind = s(input, "kind"), classKey = s(input, "classKey");
@@ -69,8 +71,10 @@ public final class CampaignDomainCommands {
                         s(input, "backgroundKey"), input.has("raceKey") ? s(input, "raceKey") : "human",
                         input.has("subraceKey") ? s(input, "subraceKey") : null);
                 Map<String, Integer> abilities = context.initialAbilities(classKey);
-                var choices = context.creationChoices(classKey, input.has("cantripKeys") ? cantripKeys(input) : null,
-                        input.has("fightingStyleKey") ? s(input, "fightingStyleKey") : null);
+                var choices = context.creationChoices(classKey, choiceKeys(input, "cantripKeys", 3, "S2_KNOWN_CANTRIP_CHOICES"),
+                        input.has("fightingStyleKey") ? s(input, "fightingStyleKey") : null,
+                        choiceKeys(input, "skillKeys", 4, "S2_ROGUE_SKILL_CHOICES"),
+                        choiceKeys(input, "expertiseKeys", 2, "S2_ROGUE_EXPERTISE_CHOICES"));
                 var history = engine.initial(material, initial, child(operationId, "preparation"), abilities, choices, operationId);
                 var character = new Character(name, kind, true, initial, history); characters.add(character);
                 oldText = "null"; newText = CampaignDomainCodec.text(new Profile(subject, name, kind, true));
@@ -192,16 +196,16 @@ public final class CampaignDomainCommands {
         return after;
     }
 
-    private static List<String> cantripKeys(JsonObject input) {
-        JsonArray values = CampaignJson.array(input, "cantripKeys");
-        if (values.size() > 3) throw new IllegalArgumentException("S2_KNOWN_CANTRIP_CHOICES");
-        List<String> spells = new ArrayList<>();
+    private static List<String> choiceKeys(JsonObject input, String field, int maximum, String error) {
+        if (!input.has(field)) return null;
+        JsonArray values = CampaignJson.array(input, field);
+        if (values.size() > maximum) throw new IllegalArgumentException(error);
+        List<String> keys = new ArrayList<>();
         for (JsonElement value : values) {
-            if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString())
-                throw new IllegalArgumentException("S2_KNOWN_CANTRIP_CHOICES");
-            spells.add(value.getAsString());
+            if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) throw new IllegalArgumentException(error);
+            keys.add(value.getAsString());
         }
-        return List.copyOf(spells);
+        return List.copyOf(keys);
     }
 
     private static List<UUID> characterOperations(List<Character> before, List<Character> after, Set<UUID> retainedOperations) {

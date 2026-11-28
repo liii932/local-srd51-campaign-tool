@@ -1,6 +1,6 @@
 {
   "bundles": ["srd51-runtime", "srd51-characters", "srd51-magic", "dm-runtime-house-rules"],
-  "members": ["srd51_runtime@13", "srd51_characters@15", "srd51_magic@19", "dm_runtime_house_rules@25"],
+  "members": ["srd51_runtime@14", "srd51_characters@16", "srd51_magic@20", "dm_runtime_house_rules@29"],
   "driver": "BundledSrd51Scenarios",
   "cases": [
     "initial-character",
@@ -15,6 +15,8 @@
     "fighter-growth",
     "fighter-defense",
     "fighter-action-surge",
+    "rogue-expertise",
+    "rogue-cunning-action",
     "hill-dwarf-toughness",
     "stonecunning",
     "fighter-extra-attack",

@@ -35,10 +35,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.IntUnaryOperator;
@@ -75,6 +78,9 @@ public final class BundledSrd51Scenarios {
                 scenario("fighter-growth", BundledSrd51Scenarios::verifyFighterGrowth),
                 scenario("fighter-defense", BundledSrd51Scenarios::verifyFighterDefense),
                 scenario("fighter-action-surge", BundledSrd51Scenarios::verifyFighterActionSurge),
+                scenario("rogue-expertise", suite -> suite.verifyRogueExpertise(10)),
+                scenario("rogue-expertise-variant", suite -> suite.verifyRogueExpertise(12)),
+                scenario("rogue-cunning-action", BundledSrd51Scenarios::verifyRogueCunningAction),
                 scenario("hill-dwarf-toughness", BundledSrd51Scenarios::verifyHillDwarfToughness),
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
@@ -120,10 +126,10 @@ public final class BundledSrd51Scenarios {
 
     private void verifyClassTemplates() {
         var growth = new Schema2CharacterProgressionRules();
-        for (String characterClass : List.of("fighter", "cleric", "wizard")) {
+        for (String characterClass : List.of("fighter", "cleric", "wizard", "rogue")) {
             var plan = rules.initialPlan(UUID.randomUUID(), UUID.randomUUID(), Schema2PreparationIdentity.random(), characterClass, "custom_artisan");
             State state = growth.initial(rules.projection(), plan, UUID.randomUUID(), ARRAY, rules.initialChoices(characterClass));
-            expectNumber(switch (characterClass) { case "fighter" -> 11; case "cleric" -> 9; default -> 7; }, state.maximumHitPoints());
+            expectNumber(switch (characterClass) { case "fighter" -> 11; case "cleric", "rogue" -> 9; default -> 7; }, state.maximumHitPoints());
             expectNumber(1, state.level());
             expectNumber(2, state.proficiencyBonus());
             assertEquals(rules.rule("character.class", "class." + characterClass), state.characterClass());
@@ -173,6 +179,199 @@ public final class BundledSrd51Scenarios {
                 () -> growth.prepareAdvance(material, plan, state, rules.rule("character.class", "class.wizard"),
                         5, "FIXED_AVERAGE", GrowthChoices.EMPTY));
         expectNumber(4, state.level());
+    }
+
+    private void verifyRogueExpertise(int passiveBase) {
+        var material = rules.projection();
+        var rogue = rules.rule("character.class", "class.rogue");
+        var progression = (FinalClassProgression) find("character.class_progression", "progression.rogue");
+        assertEquals(rogue, progression.definition().ownerClass());
+        expectNumber(8, progression.definition().hitDieSides());
+        expectNumber(2, progression.definition().supportedMaximumLevel());
+        var expertise = (FinalFeature) find("character.feature", "feature.rogue_expertise");
+        assertEquals(rogue, expertise.definition().owner());
+        expectNumber(1, expertise.definition().level());
+        expectNumber(39, expertise.definition().sourcePage());
+        assertEquals(FeatureKind.FEATURE, expertise.definition().kind());
+        assertEquals(FeatureExecution.CHOICE, expertise.definition().executionMode());
+        assertEquals("SRD_2014_ROGUE_EXPERTISE_V1", expertise.definition().executionAlgorithm());
+
+        var candidates = rules.rule("catalog.proficiency_set", "proficiency_set.rogue_skills");
+        var namedSkills = List.of("acrobatics", "athletics", "deception", "insight", "intimidation", "investigation",
+                "perception", "performance", "persuasion", "sleight_of_hand", "stealth");
+        assertEquals(namedSkills.stream().map(key -> rules.rule("character.proficiency", "proficiency.skill." + key)).toList(),
+                material.projection().entries().stream().filter(FinalEntry::enabled).map(FinalEntry::entry)
+                        .filter(row -> candidates.equals(row.identity().rule())).map(Entry::target)
+                        .sorted(Comparator.comparing(RuleIdentity::ruleKey)).toList());
+
+        var skillKeys = List.of("acrobatics", "investigation", "perception", "stealth");
+        var skills = skillKeys.stream().map(key -> rules.rule("character.proficiency", "proficiency.skill." + key)).toList();
+        var acrobatics = skills.getFirst();
+        var perception = skills.get(2);
+        var stealth = skills.getLast();
+        var tools = rules.rule("character.tool", "tool.thieves_tools");
+        var skillSlot = new EntryIdentity(progression.identity(), "starting_proficiencies", "srd51_characters", "skills");
+        var chosen = new GrowthChoices(null, Map.of(), null, Map.of(skillSlot, skills));
+        var growth = new Schema2CharacterProgressionRules();
+        var plan = initialPlan("rogue");
+        State first = growth.initial(material, plan, UUID.randomUUID(), ARRAY, chosen.withExpertise(List.of(perception, stealth)));
+        assertEquals(List.of(perception, stealth), first.expertise());
+        assertEquals(List.of(new FeatureState(expertise.identity(), rogue, 1, List.of(perception, stealth))), first.features());
+        expectNumber(1, first.maximumHitDice());
+        expectNumber(8, first.hitDicePools().getFirst().sides());
+        expectNumber(9, first.maximumHitPoints());
+        expectNumber(2, first.proficiencyBonus());
+        var expectedProficiencies = new HashSet<>(skills);
+        for (String key : List.of("armor.light", "save.dexterity", "save.intelligence", "weapon.simple", "weapon.hand_crossbow",
+                "weapon.longsword", "weapon.rapier", "weapon.shortsword", "weapon.dagger", "weapon.mace", "weapon.shortbow"))
+            expectedProficiencies.add(rules.rule("character.proficiency", "proficiency." + key));
+        expectedProficiencies.add(tools);
+        expectedProficiencies.add(rules.rule("character.tool", "tool.smith_tools"));
+        assertEquals(expectedProficiencies, Set.copyOf(first.proficiencies().stream().map(row -> row.target()).toList()));
+
+        verifySkillResult(plan, first, skillCheck("ability.dexterity", "stealth", 16, CheckInput.GENERAL), 2, 4, 16, true, null);
+        verifySkillResult(plan, first, skillCheck("ability.dexterity", "acrobatics", 16, CheckInput.GENERAL), 2, 2, 14, false, null);
+        var checks = new Schema2CharacterCheckRules();
+        var passive = checks.resolvePassive(checks.prepare(material, plan, first, perceptionCheck("PASSIVE_CHECK_RESOLVED", false, false)));
+        expectNumber(4, passive.proficiencyBonus());
+        expectNumber(passiveBase + 4, passive.total());
+        assertEquals(null, passive.selectedD20());
+
+        var toolCheck = new Command("CHECK_RESOLVED", null, 0, null, null, null, GrowthChoices.EMPTY, null,
+                new CheckInput(rules.checkRule(), "TOOL", "ability.dexterity", tools, 16, false, false,
+                        "The DM checks careful work using the actual tool."));
+        State secondRogue = growth.initial(material, plan, UUID.randomUUID(), ARRAY, chosen.withExpertise(List.of(tools, acrobatics)));
+        expectRejection("checking with unprepared thieves’ tools", "S2_CHECK_TOOL_UNAVAILABLE",
+                () -> checks.prepare(material, plan, secondRogue, toolCheck));
+        State prepared = acquireAndEquip(secondRogue, UUID.randomUUID(), "thieves_tools", "MAIN_HAND");
+        verifySkillResult(plan, prepared, toolCheck, 2, 4, 16, true, null);
+        verifyRogueCreationChoices(skills, stealth, tools);
+    }
+
+    private void verifyRogueCreationChoices(List<RuleIdentity> skills, RuleIdentity stealth, RuleIdentity tools) {
+        var campaign = new CheckParty(rules);
+        var input = fields("name", "Rogue", "kind", "PC", "classKey", "rogue", "backgroundKey", "custom_artisan");
+        var skillKeys = new JsonArray();
+        skills.stream().map(RuleIdentity::ruleKey).forEach(skillKeys::add);
+        input.add("skillKeys", skillKeys);
+        var first = campaign.state;
+        expectRejection("omitting the Expertise selections", "S2_ROGUE_EXPERTISE_CHOICES", () -> campaign.apply("character-create", input));
+        for (String invalid : List.of(stealth.ruleKey(), "proficiency.skill.performance", "tool.smith_tools")) {
+            var expertiseKeys = new JsonArray();
+            expertiseKeys.add(stealth.ruleKey());
+            expertiseKeys.add(invalid);
+            input.add("expertiseKeys", expertiseKeys);
+            expectRejection("selecting an ineligible Expertise option", "S2_ROGUE_EXPERTISE_CHOICES",
+                    () -> campaign.apply("character-create", input));
+        }
+        var expertiseKeys = new JsonArray();
+        expertiseKeys.add(stealth.ruleKey());
+        expertiseKeys.add(tools.ruleKey());
+        input.add("expertiseKeys", expertiseKeys);
+        var tooFew = input.deepCopy();
+        tooFew.getAsJsonArray("skillKeys").remove(0);
+        expectRejection("selecting three starting skills", "S2_ROGUE_SKILL_CHOICES", () -> campaign.apply("character-create", tooFew));
+        assertEquals(first, campaign.state);
+        campaign.apply("character-create", input);
+        var created = campaign.state.characters().getFirst().history().current();
+        expectNumber(2, created.expertise().size());
+        assertEquals(Set.of(stealth, tools), Set.copyOf(created.expertise()));
+    }
+
+    private void verifyRogueCunningAction() {
+        var material = rules.projection();
+        UUID campaign = UUID.randomUUID(), rogue = UUID.randomUUID(), guard = UUID.randomUUID();
+        var preparation = Schema2PreparationIdentity.random();
+        var plan = rules.initialPlan(campaign, rogue, preparation, "rogue", "acolyte");
+        var guardPlan = rules.initialPlan(campaign, guard, preparation, "fighter", "acolyte");
+        var stealth = rules.rule("character.proficiency", "proficiency.skill.stealth");
+        var perception = rules.rule("character.proficiency", "proficiency.skill.perception");
+        var skills = List.of("acrobatics", "investigation", "perception", "stealth").stream()
+                .map(key -> rules.rule("character.proficiency", "proficiency.skill." + key)).toList();
+        var progression = rules.rule("character.class_progression", "progression.rogue");
+        var slot = new EntryIdentity(progression, "starting_proficiencies", "srd51_characters", "skills");
+        var choices = new GrowthChoices(null, Map.of(), null, Map.of(slot, skills)).withExpertise(List.of(perception, stealth));
+        var growth = new Schema2CharacterProgressionRules();
+        State first = growth.initial(material, plan, UUID.randomUUID(), ARRAY, choices);
+        State armedGuard = acquireAndEquip(initial(guardPlan, "fighter"), UUID.randomUUID(), "longsword", "MAIN_HAND");
+        var opponent = new Schema2CombatRules.Context(material, guardPlan, armedGuard);
+        var combat = new Schema2CombatRules();
+        var rookieRoster = Map.of(rogue, new Schema2CombatRules.Context(material, plan, first), guard, opponent);
+        var rookieBattle = startBattle(combat, UUID.randomUUID(), campaign, rookieRoster, rogue, guard);
+        var dash = Schema2CombatState.Command.action(Kind.CUNNING_DASH, rogue);
+        expectRejection("using Cunning Action before acquiring it", "S2_CUNNING_ACTION_UNAVAILABLE",
+                () -> meleeStep(combat, rookieRoster, rookieBattle, dash, List.of()));
+
+        State second = growth.advance(material, growth.prepareAdvance(material, plan, first, first.characterClass(), 2,
+                "FIXED_AVERAGE", GrowthChoices.EMPTY), null);
+        var feature = (FinalFeature) find("character.feature", "feature.rogue_cunning_action");
+        expectNumber(2, feature.definition().level());
+        expectNumber(40, feature.definition().sourcePage());
+        assertEquals(FeatureKind.FEATURE, feature.definition().kind());
+        assertEquals(FeatureExecution.AUTOMATIC, feature.definition().executionMode());
+        assertEquals("SRD_2014_ROGUE_CUNNING_ACTION_V1", feature.definition().executionAlgorithm());
+        assertEquals(List.of(new FeatureState(feature.identity(), first.characterClass(), 2), first.features().getFirst()),
+                second.features());
+        assertEquals(first.expertise(), second.expertise());
+        expectNumber(15, second.maximumHitPoints());
+        expectNumber(2, second.maximumHitDice());
+        expectRejection("advancing the Rogue to level 3", "S2_GROWTH_LEVEL_UNSUPPORTED", () ->
+                growth.prepareAdvance(material, plan, second, first.characterClass(), 3, "FIXED_AVERAGE", GrowthChoices.EMPTY));
+
+        var roster = Map.of(rogue, new Schema2CombatRules.Context(material, plan, second), guard, opponent);
+        verifyRogueDash(combat, roster, campaign, rogue, guard);
+        verifyRogueDisengageAndHide(combat, roster, campaign, rogue, guard);
+    }
+
+    private static void verifyRogueDash(Schema2CombatRules combat, Map<UUID, Schema2CombatRules.Context> roster,
+            UUID campaign, UUID rogue, UUID guard) {
+        UUID scene = UUID.randomUUID();
+        var opened = startBattle(combat, scene, campaign, roster, rogue, guard, new Position(1, 20), List.of(18, 9));
+        var bonus = turnAction(combat, scene, campaign, roster, opened, rogue, Kind.CUNNING_DASH);
+        assertCunningBudget(bonus, 1);
+        expectNumber(30, activeCombatant(bonus).movementBonus());
+        expectRejection("taking a second Cunning Action", "S2_COMBAT_BONUS_ACTION_UNAVAILABLE", () ->
+                meleeStep(combat, roster, bonus, Schema2CombatState.Command.action(Kind.CUNNING_DISENGAGE, rogue), List.of()));
+        var dashed = turnAction(combat, scene, campaign, roster, bonus, rogue, Kind.DASH);
+        assertCunningBudget(dashed, 0);
+        expectNumber(60, activeCombatant(dashed).movementBonus());
+        var path = IntStream.rangeClosed(1, 18).mapToObj(x -> new Position(x, 0)).toList();
+        var moved = meleeStep(combat, roster, dashed, Schema2CombatState.Command.move(rogue, path), List.of());
+        expectNumber(180, activeCombatant(moved).movementSpentHalfFeet());
+        expectNumber(0, activeCombatant(moved).remainingMovementHalfFeet(combat.speed(roster, moved, rogue)));
+    }
+
+    private static void verifyRogueDisengageAndHide(Schema2CombatRules combat, Map<UUID, Schema2CombatRules.Context> roster,
+            UUID campaign, UUID rogue, UUID guard) {
+        UUID scene = UUID.randomUUID();
+        var opened = startBattle(combat, scene, campaign, roster, rogue, guard);
+        var route = Schema2CombatState.Command.move(rogue, List.of(new Position(0, 1), new Position(0, 2)));
+        assertTrue(meleeStep(combat, roster, opened, route, List.of()).activeFlow() != null);
+        var disengaged = turnAction(combat, scene, campaign, roster, opened, rogue, Kind.CUNNING_DISENGAGE);
+        assertCunningBudget(disengaged, 1);
+        var moved = meleeStep(combat, roster, disengaged, route, List.of());
+        assertEquals(null, moved.activeFlow());
+        assertEquals(new Position(0, 2), activeCombatant(moved).position());
+        assertTrue(moved.combatants().stream().anyMatch(row -> guard.equals(row.characterId()) && row.reactionAvailable()));
+
+        var hide = Schema2CombatState.Command.action(Kind.CUNNING_HIDE, rogue);
+        expectRejection("hiding on an unmarked square", "S2_HIDE_UNAVAILABLE",
+                () -> meleeStep(combat, roster, opened, hide, List.of()));
+        var setCell = Schema2CombatState.Command.setObservationCell(new ObservationCellInput(new Position(0, 0),
+                true, false, Cover.NONE));
+        var marked = meleeStep(combat, roster, opened, setCell, List.of());
+        var hidden = meleeStep(combat, roster, marked, hide, List.of(8));
+        assertCunningBudget(hidden, 1);
+        var check = hidden.observation().checks().getLast();
+        assertEquals(new Schema2CombatState.ObservationRoll(8, null, 8, 2, 4, false, 14), check.roll());
+        assertTrue(!Schema2ObservationRules.visible(hidden, guard, rogue));
+    }
+
+    private static void assertCunningBudget(Battle battle, int actionsRemaining) {
+        var actor = activeCombatant(battle);
+        expectNumber(actionsRemaining, actor.actionsRemaining());
+        expectNumber(0, actor.bonusActionsRemaining());
+        assertTrue(actor.reactionAvailable());
     }
 
     private void verifyHillDwarfToughness() {
