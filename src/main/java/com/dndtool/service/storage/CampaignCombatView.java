@@ -8,6 +8,7 @@ import com.dndtool.service.Schema2CombatState.CastInput;
 import com.dndtool.service.Schema2CombatState.Command;
 import com.dndtool.service.Schema2CombatState.Combatant;
 import com.dndtool.service.Schema2CombatState.Cover;
+import com.dndtool.service.Schema2CombatState.Kind;
 import com.dndtool.service.Schema2CombatState.Status;
 import com.dndtool.service.Schema2ObservationRules;
 import com.google.gson.JsonObject;
@@ -62,6 +63,18 @@ final class CampaignCombatView {
                 targets.add(defender.characterId());
         }
         return List.copyOf(targets);
+    }
+
+    static boolean actionSurgeAvailable(Map<UUID, Schema2CombatRules.Context> roster, Battle battle) {
+        UUID actor = battle.activeActor();
+        if (!roster.containsKey(actor) || battle.activeFlow() != null) return false;
+        try {
+            new Schema2CombatRules().preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(), roster,
+                    battle, Command.action(Kind.ACTION_SURGE, actor));
+            return true;
+        } catch (IllegalArgumentException unavailable) {
+            return false;
+        }
     }
 
     static List<CantripChoice> cantripChoices(Map<UUID, Schema2CombatRules.Context> roster, Battle battle,

@@ -177,13 +177,23 @@ public final class Schema2CharacterRuntime {
         public int maximumHitDice() { return hitDicePools.stream().mapToInt(HitDicePool::maximum).sum(); }
     }
     public record GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
-            Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices, List<RuleIdentity> cantrips) {
+            Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices, List<RuleIdentity> cantrips,
+            RuleIdentity fightingStyle) {
         public static final GrowthChoices EMPTY = new GrowthChoices(null, Map.of(), null, Map.of());
         public GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
                 Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices) {
             this(subclass, abilityIncreases, feat, proficiencyChoices, List.of());
         }
+        public GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
+                Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices, List<RuleIdentity> cantrips) {
+            this(subclass, abilityIncreases, feat, proficiencyChoices, cantrips, null);
+        }
+        public GrowthChoices withFightingStyle(RuleIdentity style) {
+            return new GrowthChoices(subclass, abilityIncreases, feat, proficiencyChoices, cantrips, style);
+        }
         public GrowthChoices {
+            if (fightingStyle != null && !validRule(fightingStyle, "character.feature"))
+                throw new IllegalArgumentException("S2_GROWTH_FIGHTING_STYLE_CHOICE");
             if (abilityIncreases == null || proficiencyChoices == null || subclass != null && !validRule(subclass, "character.subclass")
                     || feat != null && !validRule(feat, "character.feat") || abilityIncreases.size() > 2 || proficiencyChoices.size() > MAX_GRANTS)
                 throw new IllegalArgumentException("S2_CHARACTER_CHOICES");
@@ -443,6 +453,7 @@ public final class Schema2CharacterRuntime {
     }
     private static long commandRows(Command command) {
         return command.growthChoices().abilityIncreases().size() + command.growthChoices().cantrips().size()
+                + (command.growthChoices().fightingStyle() == null ? 0 : 1)
                 + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum()
                 + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size() + command.restInput().recoveredSpellSlots().size())
                 + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1)

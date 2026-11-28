@@ -66,7 +66,7 @@ public final class Schema2CombatRules {
             return Schema2ActionFlowRules.handles(command.kind())?actions.mandatorySuffix(roster,before,command):0;
         }
         public Set<UUID> possibleHealthTargets() {
-            if (command.kind() == Kind.SECOND_WIND) return Set.of(command.actorId());
+            if (command.kind() == Kind.SECOND_WIND || command.kind() == Kind.ACTION_SURGE) return Set.of(command.actorId());
             if(Schema2SaveDamageRules.handles(before,command)||Schema2ActionFlowRules.handles(command.kind())||Schema2MonsterRestRules.handles(command.kind())||worldCommand(command.kind())||command.kind()==Kind.STAND_UP&&explorationPosture(before,command.kind())||command.kind()==Kind.END_COMBAT)return Set.copyOf(roster.keySet());
             if(command.kind()==Kind.START)return roster.entrySet().stream().filter(e->e.getValue().character().hitPoints()==0&&!e.getValue().character().health().dead()&&!e.getValue().character().health().stable()).map(Map.Entry::getKey).collect(java.util.stream.Collectors.toUnmodifiableSet());
             if(command.kind()==Kind.END_TURN)return before.activeOrdinal()+1==before.initiative().size()?Set.copyOf(roster.keySet()):roster.containsKey(before.initiative().get(before.activeOrdinal()+1).characterId())?Set.of(before.initiative().get(before.activeOrdinal()+1).characterId()):Set.of();
@@ -175,7 +175,7 @@ public final class Schema2CombatRules {
             if (!existing.position().equals(position) || existing.side() != side) throw invalid("S2_COMBAT_DEPLOYMENT");
             return existing;
         }
-        return new Combatant(id, position, side, 0, 0, true, 0, 0, false, false, null, prone);
+        return new Combatant(id, position, side, 0, 0, true, 0, 0, false, false, null, prone, false);
     }
 
     private static void requireDeparturesSafe(Battle battle, Set<UUID> remaining, Map<UUID,Context> roster) {
@@ -485,6 +485,11 @@ public final class Schema2CombatRules {
                 State paid = growth.spend(context.material(), context.character(), resource, 1);
                 health.applyHealing(paid, 1 + paid.level());
             }
+            case ACTION_SURGE -> {
+                if (p.before.surprised(actor.characterId())) throw invalid("S2_COMBAT_ACTOR_SURPRISED");
+                if (actor.actionSurged()) throw invalid("S2_COMBAT_ACTION_SURGE_ALREADY_USED");
+                actionSurgeCost(p);
+            }
             case DROP_PRONE -> {
                 if (p.before.surprised(actor.characterId())) throw invalid("S2_COMBAT_ACTOR_SURPRISED");
                 if (!p.roster.containsKey(actor.characterId())) throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
@@ -593,7 +598,7 @@ public final class Schema2CombatRules {
             Combatant actor = combatant(battle,p.command.actorId());
             switch (p.command.kind()) {
                 case END_TURN -> {
-                    actor = actor.closeSequence();
+                    actor = actor.endTurn();
                     if (battle.surprised(actor.characterId())) actor = actor.withReactionAvailable(true);
                     battle = replaceActor(battle, actor);
                     int next = (battle.activeOrdinal() + 1) % battle.initiative().size();
@@ -610,8 +615,9 @@ public final class Schema2CombatRules {
                     Map<UUID,Context> contexts=recordRoundTime(p,battle,changes,facts);
                     battle=reconcileEffects(new Prepared(p.operationId,p.combatId,p.campaignId,contexts,p.before,p.command),battle,changes,facts);
                     Battle ending = battle;
-                    var actors = ending.combatants().stream().map(member -> ending.surprised(member.characterId())
-                            ? member.closeSequence().withReactionAvailable(true) : member.closeSequence()).toList();
+                    var actors = ending.combatants().stream().map(Combatant::endTurn)
+                            .map(member -> ending.surprised(member.characterId()) ? member.withReactionAvailable(true) : member)
+                            .toList();
                     battle=copy(battle,Status.EXPLORATION,battle.round(),battle.turnNumber(),battle.activeOrdinal(),actors,battle.flows());
                 }
                 case DASH, DISENGAGE, DODGE, BEGIN_ATTACK -> {
@@ -623,7 +629,7 @@ public final class Schema2CombatRules {
                             actor.movementBonus() + (p.command.kind() == Kind.DASH ? speed(p.roster,battle,actor.characterId()) : 0),
                             actor.disengaged() || p.command.kind() == Kind.DISENGAGE,
                             actor.dodging() || p.command.kind() == Kind.DODGE && speed(p.roster,battle,actor.characterId()) > 0,
-                            sequence,actor.prone()));
+                            sequence,actor.prone(),actor.actionSurged()));
                 }
                 case END_CONCENTRATION -> battle=Schema2SpellRules.end(battle,p.command.actorId(),"VOLUNTARY",facts);
                 case HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE -> {
@@ -635,6 +641,10 @@ public final class Schema2CombatRules {
                     battle = replaceActor(battle, actor.spendBonusAction());
                     applySecondWind(p, dice, changes);
                 }
+                case ACTION_SURGE -> {
+                    battle = replaceActor(battle, actor.grantActionSurge());
+                    changes.add(actionSurgeCost(p));
+                }
                 case DROP_PRONE -> battle = replaceActor(battle, actor.withProne(true));
                 case STAND_UP -> battle = replaceActor(battle,
                         actor.withMovement(actor.position(), actor.movementSpentHalfFeet() + speed(p.roster,battle,actor.characterId()), false));
@@ -643,11 +653,17 @@ public final class Schema2CombatRules {
             }
             battle = new Battle(battle.combatId(),battle.campaignId(),battle.combatRule(),battle.status(),battle.round(),battle.turnNumber(),battle.activeOrdinal(),p.before.version()+1,battle.combatants(),battle.initiative(),battle.flows(),battle.ongoingEffects(),battle.readyPreparations(),battle.triggerFacts(),battle.shields(),battle.concentrationHolders(),battle.environmentZones(),battle.suppressionCauses(),battle.monsters(),battle.saveDamageBatches(),battle.monsterRests(),battle.meleeControl(),battle.observation());
             Kind kind = p.command.kind();
-            boolean secondWind = kind == Kind.SECOND_WIND;
-            boolean observation = Schema2ObservationRules.checkAction(kind);
-            UUID reference = secondWind ? secondWindReference(p.operationId) : observation ? p.operationId : p.combatId;
-            boolean bonusAction = secondWind || kind == Kind.NIMBLE_HIDE || kind == Kind.NIMBLE_DISENGAGE;
-            facts.add(new CombatFact(kind.name(), p.command.actorId(), reference, bonusAction ? "BONUS_ACTION" : null));
+            UUID reference = switch (kind) {
+                case SECOND_WIND -> secondWindReference(p.operationId);
+                case ACTION_SURGE -> actionSurgeReference(p.operationId);
+                default -> Schema2ObservationRules.checkAction(kind) ? p.operationId : p.combatId;
+            };
+            String reason = switch (kind) {
+                case SECOND_WIND, NIMBLE_HIDE, NIMBLE_DISENGAGE -> "BONUS_ACTION";
+                case ACTION_SURGE -> "EXTRA_ACTION";
+                default -> null;
+            };
+            facts.add(new CombatFact(kind.name(), p.command.actorId(), reference, reason));
         }
         battle=reconcileEffects(p,battle,changes,facts);
         battle=Schema2MeleeControlRules.reconcile(battle,p.roster,changes,p.operationId,facts);
@@ -680,6 +696,22 @@ public final class Schema2CombatRules {
 
     static UUID secondWindReference(UUID operationId) {
         return key(operationId, "second-wind");
+    }
+
+    private HealthChange actionSurgeCost(Prepared prepared) {
+        UUID actor = prepared.command.actorId();
+        Context context = prepared.roster.get(actor);
+        if (context == null) throw invalid("S2_COMBAT_ACTION_SURGE_UNAVAILABLE");
+        State before = context.character();
+        RuleIdentity resource = Schema2FeatureSupport.actionSurgeResource(context.material(), before);
+        if (resource == null) throw invalid("S2_COMBAT_ACTION_SURGE_UNAVAILABLE");
+        State paid = growth.spend(context.material(), before, resource, 1);
+        return new HealthChange(actor, before, paid, actionSurgeReference(prepared.operationId),
+                0, false, null, false, false, 0, resource, 1, false);
+    }
+
+    static UUID actionSurgeReference(UUID operationId) {
+        return key(operationId, "action-surge");
     }
 
     private static boolean worldCommand(Kind kind) {return Set.of(Kind.CREATE_ENVIRONMENT_ZONE,Kind.END_ENVIRONMENT_ZONE,Kind.EXPLORATION_HEALTH,Kind.EXPLORATION_ADVANCE_TIME,Kind.EXPLORATION_MOVE,Kind.REENTER_COMBAT,Kind.CLOSE_SCENE).contains(kind);}

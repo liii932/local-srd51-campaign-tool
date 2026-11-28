@@ -52,7 +52,7 @@ class Schema2WizardSpellbookRulesTest {
         State rested=longRest(MATERIAL,context.character());
         State prepared=books.apply(MATERIAL,rested,Command.spellbook("SPELLBOOK_PREPARED",new SpellbookInput(CASTING,List.of(),List.of(spell("alarm")))));
         var roster=Map.of(actor,new Schema2CombatRules.Context(MATERIAL,context.initial(),prepared));
-        var member=new Schema2CombatState.Combatant(actor,new Schema2CombatState.Position(0,0),0,1,1,true,0,0,false,false,null,false);
+        var member=new Schema2CombatState.Combatant(actor,new Schema2CombatState.Position(0,0),0,1,1,true,0,0,false,false,null,false,false);
         var battle=new Schema2CombatState.Battle(UUID.randomUUID(),campaign,Schema2CombatTestFixture.COMBAT,Schema2CombatState.Status.ACTIVE,
                 1,1,0,0,List.of(member),List.of(new Schema2CombatState.Initiative(actor,10,2,12,0)),List.of());
         var input=new Schema2CombatState.CastInput(CASTING,spell("alarm"),List.of(actor),null);

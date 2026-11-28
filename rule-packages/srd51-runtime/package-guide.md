@@ -20,12 +20,12 @@ application that supports the saved mechanisms.
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
 | `srd51_runtime` version `13` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
-| `srd51_characters` version `14` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, melee and ranged weapon attacks, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `18` | extension | `srd51_runtime=13`, `srd51_characters=14` | Selected spells, Cleric and Wizard cantrip choices, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Goblin and Skeleton |
+| `srd51_characters` version `15` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, melee and ranged weapon attacks, Fighter Defense, Second Wind, Action Surge and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `19` | extension | `srd51_runtime=13`, `srd51_characters=15` | Selected spells, Cleric and Wizard cantrip choices, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Goblin and Skeleton |
 | `dm_runtime_house_rules` version `25` | extension | `srd51_runtime=13` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `27` as its
+first three members and selects `dm_runtime_house_rules` version `28` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -39,6 +39,11 @@ acquisition, finite resource capacities and multiclass prerequisites use the
 real typed consumers. Fighter ASI levels are 4 and 6; Wizard ASI is level 4.
 Multiclass acquisition uses its own restricted proficiency declarations.
 
+Fighters select Defense when creating a level 1 fighter in the supported
+profile. The frozen choice grants +1 Armor Class while wearing light, medium
+or heavy armor. A shield contributes its normal bonus independently, and a
+shield alone leaves Defense inactive.
+
 Fighters gain Second Wind at level 1. The SQLite application supports this
 bonus action for a single-class fighter at levels 1–6 on that fighter's own
 active combat turn. It spends one use to heal the fighter by a server-rolled
@@ -49,9 +54,17 @@ The combat action requires the exact acquired feature and available resource.
 Generic resource spending cannot substitute for Second Wind. The MySQL INTERNAL
 combat entry point rejects this action.
 
+Normal fighter advancement to class level 2 grants Action Surge. On the
+fighter's own active combat turn, it spends its own once-per-rest resource to
+grant one additional ordinary action for that turn. It leaves the bonus
+action, reaction and movement budgets intact. A subsequent Dash adds the
+ordinary speed-based movement allowance. A short or long rest restores the
+use.
+
 Normal fighter advancement to class level 5 grants the frozen Extra Attack
 feature. A single-class fighter at level 5 or 6 with that grant can make up to
 two supported weapon attacks in one Attack action on the fighter's own turn.
+An additional Attack action starts a separate sequence with its own two attacks.
 
 A single-class fighter gains Improved Critical by choosing Champion at class
 level 3. Through level 6, the feature applies to supported weapon attacks,
@@ -211,9 +224,8 @@ This selection does not supply racial ability increases, complete racial
 traits, dwarf poison defenses, background
 skill/feature effects, starting equipment packages, general cleric
 preparation, spell transcription, versatile/thrown weapon modes or full class
-feature execution. Fighter Fighting Style and Action Surge are catalog-only
-`OPTION` metadata. The Action Surge resource tracks uses and recovery without
-granting an additional action. Evocation Savant and Sculpt Spells
+feature execution. Defense is the supported Fighter Fighting Style option.
+Evocation Savant and Sculpt Spells
 are also catalog-only `OPTION` metadata and are not acquired, while the
 Evocation subclass identity is retained. Grappler is blocked acquisition
 metadata; its unresolved influence remains subject to the consumer rejection

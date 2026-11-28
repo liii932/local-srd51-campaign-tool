@@ -122,7 +122,7 @@ class Schema2EncounterOpeningTest {
         assertEquals(1, actor(second).actionsRemaining());
     }
 
-    @Test void aSurprisedCharacterCannotUseSecondWindOrVoluntarilyDropProne() {
+    @Test void aSurprisedCharacterCannotUseFighterFeaturesOrVoluntarilyDropProne() {
         UUID fighter = character("fighter"), goblin = UUID.randomUUID();
         var start = Command.start(List.of(at(fighter, 0, 0, 0)), List.of(monster(goblin, GOBLIN_MONSTER, 1, 0, 1)),
                 List.of(fighter, goblin)).withOpening(new OpeningInput(List.of(group(goblin)), List.of()));
@@ -130,6 +130,7 @@ class Schema2EncounterOpeningTest {
         assertEquals(fighter, battle.activeActor());
         assertTrue(battle.surprised(fighter));
         reject(Command.action(Kind.SECOND_WIND, fighter), "S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
+        reject(Command.action(Kind.ACTION_SURGE, fighter), "S2_COMBAT_ACTOR_SURPRISED");
         reject(Command.action(Kind.DROP_PRONE, fighter), "S2_COMBAT_ACTOR_SURPRISED");
         apply(Command.action(Kind.END_TURN, fighter));
         apply(Command.action(Kind.END_TURN, goblin));

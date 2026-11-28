@@ -19,7 +19,7 @@ public final class PlayerCandidateFactory {
     }
     private static final int MAX_CHOICES = 1024;
     private static final List<Kind> TURN_ACTIONS = List.of(Kind.END_TURN, Kind.BEGIN_ATTACK, Kind.FORFEIT_ATTACKS,
-            Kind.DASH, Kind.DISENGAGE, Kind.DODGE, Kind.DROP_PRONE, Kind.STAND_UP, Kind.SECOND_WIND, Kind.END_CONCENTRATION);
+            Kind.DASH, Kind.DISENGAGE, Kind.DODGE, Kind.DROP_PRONE, Kind.STAND_UP, Kind.SECOND_WIND, Kind.ACTION_SURGE, Kind.END_CONCENTRATION);
     private static final String[] DIRECTIONS = {"北", "东北", "东", "东南", "南", "西南", "西", "西北"};
     private static final int[][] STEPS = {{0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}};
 
@@ -158,7 +158,7 @@ public final class PlayerCandidateFactory {
         case END_TURN -> "结束我的回合"; case BEGIN_ATTACK -> "开始攻击动作"; case FORFEIT_ATTACKS -> "放弃剩余攻击";
         case DASH -> "疾走"; case DISENGAGE -> "撤离"; case DODGE -> "闪避";
         case DROP_PRONE -> "主动卧倒"; case STAND_UP -> "起身";
-        case SECOND_WIND -> "回气（附赠动作）"; case END_CONCENTRATION -> "结束专注"; default -> "继续行动";
+        case ACTION_SURGE -> "动作如潮"; case SECOND_WIND -> "回气（附赠动作）"; case END_CONCENTRATION -> "结束专注"; default -> "继续行动";
     }; }
     private static final class BattleChoices {
         final List<Candidate> result; final CampaignDomainData.State domain; final Battle battle; final Map<UUID, Schema2CombatRules.Context> roster;

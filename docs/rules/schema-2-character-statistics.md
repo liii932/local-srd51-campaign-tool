@@ -68,8 +68,8 @@
 `character.feat` 必需声明 `prerequisite`、执行状态和算法。以上各类保留共用展示名、描述、
 页码和备注字段；子职业、特性、专长键分别使用 `subclass.`、`feature.`、`feat.`。
 
-特性执行状态为 `AUTOMATIC`、`DM_ADJUDICATION` 或 `BLOCKED`，算法白名单沿用
-[职业特性合同](class-features-v2.md)的准确语义。获得特性不等于激活其攻击、法术或叙事效果。
+特性执行状态为 `AUTOMATIC`、`CHOICE`、`DM_ADJUDICATION` 或 `BLOCKED`。基础算法白名单见
+[职业特性合同](class-features-v2.md)，当前 `CHOICE` 专属一级战士防御。特性消费者按各自的攻击、法术或叙事规则使用已取得的事实。
 schema 2 的法师 `SRD_2014_WIZARD_ARCANE_RECOVERY_V1` 另按[奥术回想合同](schema-2-arcane-recovery.md)
 支持准确的 AUTOMATIC 声明及真实短休消费者；同算法 BLOCKED 仍不执行，两种声明不自动转换。
 战士 `SRD_2014_FIGHTER_EXTRA_ATTACK_V1` 另按[额外攻击合同](schema-2-extra-attack.md)校验
@@ -78,11 +78,13 @@ schema 2 的法师 `SRD_2014_WIZARD_ARCANE_RECOVERY_V1` 另按[奥术回想合�
 校验 3 级实际子职业授予，限单职业战士 3–6 级；不会仅凭等级产生能力。
 战士 `SRD_2014_FIGHTER_SECOND_WIND_V1` 按[回气合同](schema-2-second-wind.md)校验一级
 实际授予和准确一次/休息资源，当前限单职业战士 1–6 级；使用由 SQLite 战斗入口拥有。
+[防御与动作如潮](schema-2-fighter-actions.md)分别使用 `SRD_2014_FIGHTER_DEFENSE_V1` 的一级显式选择，以及
+`SRD_2014_FIGHTER_ACTION_SURGE_V1` 的二级自动授予。选择绑定初始化命令、摘要和完整角色历史；
+动作如潮绑定准确职业资源，只有战斗入口可扣减。两者都要求单职业战士，最高支持 6 级。
 专长当前仅允许 `BLOCKED`／`BLOCKED_DOWNSTREAM_SYSTEM_V1`：可验证前提并记录获得，不能
-执行未接入的效果。自动获得范围只包括到期的非 `OPTION` 特性；选项记录不自动全部授予。
-遇到到期非 OPTION 特性的 `BOUNDED_FEATURE_SELECTION_V1` 时，在 RNG 前拒绝整次成长，
-不能跳过尚无具体选择消费者的义务。OPTION 目录存在不证明其选择或执行已支持；具体特性
-选项机制另行接入，本合同只实现子职业、ASI／专长及多职业熟练的有界选择。
+执行未接入的效果。到期的非 `OPTION` 特性按其算法取得，`CHOICE` 要求准确选择。
+遇到到期非 OPTION 特性的 `BOUNDED_FEATURE_SELECTION_V1` 时，在 RNG 前拒绝整次成长。
+当前有界选择包括子职业、ASI／专长、多职业熟练与来自冻结规则的一级战士防御。
 
 完整成长的 `levels` 集合必须以稳定条目身份声明 1 至 `supported_maximum_level` 的每个启用
 等级，每项恰有整数 `level` 和布尔 `asi_available`。拒绝重复等级、空洞、禁用等级或越界条目；
@@ -141,9 +143,8 @@ profile、scope 和 execution 使用已验证文本值；不把复合对象压�
 `max(1, hitDieSides + floor((CON - 10) / 2))`，可用／最大生命骰均为 1，版本为 0；
 已取得自动资源以完整容量开始。
 
-完整成长 scope 的初始化还必须消费职业起始熟练选择、到期的一级子职业选择，并保存非 OPTION
-特性。初始语言／工具事实仍从准确的初始计划重建。它不扩张为自由角色作者输入，也不跳过
-任何本次完整成长声明要求的选择。
+完整成长 scope 的初始化还要核对职业起始熟练、到期的一级子职业及冻结规则要求的一级战士防御选择，
+并保存实际取得的特性。初始语言／工具事实仍从准确的初始计划重建。
 
 `STATISTICS_ADVANCED` 只为同一个职业增加一个统计等级。它执行 HP／生命骰和已声明职业
 资源的容量变化，明确不处理经验前提、到期职业特性、子职业、ASI、专长、多职业或施法。

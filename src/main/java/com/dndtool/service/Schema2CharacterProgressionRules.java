@@ -141,6 +141,8 @@ public final class Schema2CharacterProgressionRules {
         if (identity != null && identity.equals(fighterSecondWindResource(state.characterClass()))
                 && identity.equals(Schema2FeatureSupport.secondWindResource(material, state)))
             throw invalid("S2_RESOURCE_FEATURE_OWNER_REQUIRED");
+        if (Schema2FeatureSupport.isFighterActionSurgeResource(material, identity))
+            throw invalid("S2_RESOURCE_FEATURE_OWNER_REQUIRED");
         return spend(material, state, identity, amount);
     }
 

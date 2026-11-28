@@ -585,7 +585,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 原来的资源额度与恢复本身没有治疗执行资格；新增消费者在本人回合用附赠动作
 恢复 `1d10＋战士等级` HP，资源和健康后果、原骰及历史共同提交。
 
-当前回气分别消耗战斗的附赠动作余额和角色的休息资源。动作如潮及其他治疗特性仍需各自的执行与恢复合同。
+回气分别消耗战斗的附赠动作余额和角色的休息资源。二级战士的[动作如潮](../../rules/schema-2-fighter-actions.md)消耗独立次数，向当前回合增加一个普通动作。
 `CampaignSecondWindIntegrationTest` 和 `browser-second-wind.cjs` 定位正常取得、实际执行、
 失败回滚、标准休息及完整文件链证据；[测试指南](../../testing.md#second-wind-verification)
 区分服务集成、浏览器和部署。MySQL INTERNAL、战斗外和多职业回气仍未采用。

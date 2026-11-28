@@ -3,6 +3,7 @@ package com.dndtool.service.storage;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
+import com.dndtool.service.Schema2FeatureSupport;
 import com.dndtool.service.Schema2InitialCharacterPlanService;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2InitialProficiencyRules;
@@ -13,6 +14,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -22,7 +24,7 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Read-only rule consumers share this verified campaign binding and frozen projection. */
 public final class CampaignRuleContext {
-    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V5";
+    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V6";
     static final List<String> INITIAL_CLASSES = List.of("fighter", "cleric", "wizard");
     static final List<String> INITIAL_BACKGROUNDS = List.of("acolyte", "custom_artisan");
     private final ProductionSchema2Projection projection;
@@ -116,7 +118,7 @@ public final class CampaignRuleContext {
         return new Schema2InitialProficiencyRules.Request(sources, choices);
     }
 
-    /** Default creation template with class skills, subclass and known cantrips. */
+    /** Build the explicit choices for the default programmatic character template. */
     public GrowthChoices initialChoices(String classKey) {
         return initialChoices(classKey, null);
     }
@@ -138,7 +140,17 @@ public final class CampaignRuleContext {
         return new GrowthChoices(chosen.equals("cleric") ? rule("character.subclass", "subclass.life") : null,
                 Map.of(), null, Map.of(slot(owner, "starting_proficiencies", "skills"),
                         skills.stream().map(skill -> rule("character.proficiency", "proficiency.skill." + skill)).toList()),
-                initialCantrips(startingClass, cantripKeys));
+                initialCantrips(startingClass, cantripKeys))
+                .withFightingStyle(Schema2FeatureSupport.fightingStyleOption(projection, startingClass));
+    }
+
+    /** A Host creation request must name the enabled style selected for this class. */
+    GrowthChoices creationChoices(String classKey, List<String> cantripKeys, String fightingStyleKey) {
+        GrowthChoices choices = initialChoices(classKey, cantripKeys);
+        RuleIdentity style = choices.fightingStyle();
+        if (!Objects.equals(fightingStyleKey, style == null ? null : style.ruleKey()))
+            throw new IllegalArgumentException("S2_FIGHTING_STYLE_CHOICE");
+        return choices;
     }
 
     private List<RuleIdentity> initialCantrips(RuleIdentity owner, List<String> keys) {
@@ -205,7 +217,8 @@ public final class CampaignRuleContext {
     public record CatalogEntry(String moduleKey, String type, String key, String name, boolean enabled,
                                boolean executable, String description, String abilityKey, String category,
                                Boolean allowAlternateSkillAbility,
-                               RuleIdentity parentRace, boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
+                               RuleIdentity parentRace, RuleIdentity fightingStyleClass,
+                               boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
                                List<String> cantripClasses, List<String> defaultCantripClasses, List<Integer> cantripCounts,
                                List<FieldOverride> overrides, List<MonsterAttackChoice> monsterAttacks, boolean nimbleEscape) {
         public CatalogEntry {
@@ -271,33 +284,38 @@ public final class CampaignRuleContext {
             }
         }
         List<CatalogEntry> catalog = new ArrayList<>();
+        var fighter = rule("character.class", "class.fighter");
+        var defense = Schema2FeatureSupport.fightingStyleOption(projection, fighter);
+        var surgeResource = fighterActionSurgeResource(fighter);
         for (FinalRule row : projection.projection().rules()) {
             Definition definition = row.definition();
+            boolean fightingStyle = row.identity().equals(defense);
             boolean creationChoice = row.enabled() && switch (row.identity().ruleType()) {
                 case "character.race" -> creationAncestries.stream().anyMatch(a -> row.identity().equals(a.race()));
                 case "character.subrace" -> creationAncestries.stream().anyMatch(a -> row.identity().equals(a.subrace()));
                 case "character.class" -> INITIAL_CLASSES.stream().anyMatch(key -> row.identity().ruleKey().equals("class." + key));
                 case "character.background" -> INITIAL_BACKGROUNDS.stream().anyMatch(key -> row.identity().ruleKey().equals("background." + key));
+                case "character.feature" -> fightingStyle;
                 default -> false;
             };
             boolean spellbookChoice = row.enabled() && spellbookChoices.contains(row.identity());
             boolean executable = row.enabled()
                     && !(definition instanceof SpellDefinition spell && spell.algorithm().contains("_METADATA_"))
                     && !(definition instanceof FeatureDefinition feature && (feature.kind() != FeatureKind.FEATURE
-                            || feature.executionMode() != FeatureExecution.AUTOMATIC))
+                            || feature.executionMode() != FeatureExecution.AUTOMATIC && !fightingStyle))
                     && !(definition instanceof ResourceDefinition resource && resource.executionMode() == ResourceExecution.BLOCKED)
                     && !(definition instanceof FeatDefinition)
                     && !(Set.of("character.race", "character.subrace", "character.class", "character.background").contains(row.identity().ruleType()) && !creationChoice)
                     && !row.identity().ruleType().startsWith("catalog.");
             var proficiency = definition instanceof ProficiencyDefinition value ? value : null;
             boolean directResourceSpend = executable && definition instanceof ResourceDefinition
-                    && !secondWindResources.contains(row.identity());
+                    && !secondWindResources.contains(row.identity()) && !surgeResource.equals(row.identity());
             catalog.add(new CatalogEntry(row.identity().moduleKey(), row.identity().ruleType(),
                     row.identity().ruleKey(), definition.displayName(), row.enabled(), executable, description(definition),
                     proficiency == null ? null : proficiency.abilityKey(), proficiency == null ? null : proficiency.category().name(),
                     definition instanceof CheckDefinition check ? check.allowAlternateSkillAbility() : null,
                     definition instanceof CharacterSourceDefinition source ? source.parentRace() : null,
-                    creationChoice, spellbookChoice, directResourceSpend,
+                    fightingStyle ? fighter : null, creationChoice, spellbookChoice, directResourceSpend,
                     cantripClasses.getOrDefault(row.identity(), List.of()),
                     defaultCantripClasses.getOrDefault(row.identity(), List.of()),
                     cantripCounts.getOrDefault(row.identity(), List.of()),
@@ -310,6 +328,7 @@ public final class CampaignRuleContext {
                 interpretation(), binding, catalog, List.of(
                     "Standard-array application characters; racial ability increases and full racial traits are unavailable.",
                     "Fighter levels 1–6, Life-domain cleric level 1, Wizard levels 1–5; this is not complete SRD class support.",
+                    "A fighter choosing Defense gains +1 AC while wearing armor. From level 2, Action Surge grants one additional action on the fighter's turn per completed short or long rest.",
                     "An acquired Fighter Extra Attack allows up to two weapon attacks within the Attack action on that fighter's turn.",
                     "An acquired Fighter Second Wind spends its own use as a bonus action on that fighter's active turn and heals 1d10 plus Fighter level.",
                     "Background sources currently grant languages/tools, without background skills, features or starting gear.",

@@ -232,6 +232,7 @@ async function main() {
       await field('domain-create', 'name').fill(name);
       await field('domain-create', 'kind').selectOption(kind);
       await selectRule('domain-create', 'classKey', 'class.fighter');
+      await selectRule('domain-create', 'fightingStyleKey', 'feature.fighter_defense');
       await action('domain', () => button('domain-create').click());
     }
     const fighter = card(fighterName).id, guard = card(guardName).id, watcher = card(watcherName).id;

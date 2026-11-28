@@ -129,7 +129,7 @@ class CampaignProneIntegrationTest {
             assertEquals(after, f.access());
             assertEquals(1L, f.state().roots().stream().filter(root -> root.operationId().toString().equals(request)).count());
             assertEquals(card, f.card(fighter));
-            assertEquals(new Combatant(fighter, cell(1, 1), 0, 1, 1, true, 0, 0, false, false, null, true),
+            assertEquals(new Combatant(fighter, cell(1, 1), 0, 1, 1, true, 0, 0, false, false, null, true, false),
                     f.actor(fighter));
             assertTrue(f.state().roots().getLast().rolls().isEmpty());
             assertEquals(List.of(new CombatFact("DROP_PRONE", fighter, f.battle().combatId(), null)),
@@ -216,7 +216,7 @@ class CampaignProneIntegrationTest {
             assertEquals(new Combatant(prone.characterId(), prone.position(), prone.side(), prone.actionsRemaining(),
                     prone.bonusActionsRemaining(),
                     prone.reactionAvailable(), prone.movementSpentHalfFeet(), prone.movementBonus(), prone.disengaged(),
-                    prone.dodging(), prone.sequence(), false), f.actor(fighter));
+                    prone.dodging(), prone.sequence(), false, prone.actionSurged()), f.actor(fighter));
             f.leave(fighter);
             assertEquals("WORLD", CampaignSpaceCommands.position(f.state(), fighter).space().kind());
         }

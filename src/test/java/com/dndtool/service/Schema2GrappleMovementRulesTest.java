@@ -97,7 +97,7 @@ class Schema2GrappleMovementRulesTest {
 
         Combatant held = actor(carried);
         battle = Schema2CombatRules.replaceActor(battle, new Combatant(carried, held.position(), held.side(), 0, held.bonusActionsRemaining(),
-                held.reactionAvailable(), held.movementSpentHalfFeet(), 30, held.disengaged(), held.dodging(), null, true));
+                held.reactionAvailable(), held.movementSpentHalfFeet(), 30, held.disengaged(), held.dodging(), null, true, held.actionSurged()));
         reject(Command.move(carried, path), "S2_COMBAT_MOVEMENT_ALLOWANCE");
         reject(Command.action(Kind.STAND_UP, carried), "S2_COMBAT_CANNOT_STAND");
     }

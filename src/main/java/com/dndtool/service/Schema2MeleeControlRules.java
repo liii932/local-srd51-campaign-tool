@@ -324,7 +324,7 @@ public final class Schema2MeleeControlRules {
         if (target.dodging()) battle = replaceActor(battle, new Combatant(target.characterId(), target.position(), target.side(),
                 target.actionsRemaining(), target.bonusActionsRemaining(), target.reactionAvailable(),
                 target.movementSpentHalfFeet(), target.movementBonus(), target.disengaged(), false,
-                target.sequence(), target.prone()));
+                target.sequence(), target.prone(), target.actionSurged()));
         return withControl(battle, new MeleeControl(battle.meleeControl().contests(), relations));
     }
 

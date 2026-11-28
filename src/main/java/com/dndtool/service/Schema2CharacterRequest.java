@@ -119,6 +119,10 @@ public record Schema2CharacterRequest(UUID operationId, Schema2PreparationIdenti
                 out.writeInt(choices.cantrips().size());
                 for (RuleIdentity spell : choices.cantrips()) rule(out, spell);
             }
+            if (choices.fightingStyle() != null) {
+                text(out, "S2_FIGHTING_STYLE_CHOICE_V1");
+                rule(out, choices.fightingStyle());
+            }
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException | NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }

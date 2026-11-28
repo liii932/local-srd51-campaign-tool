@@ -100,12 +100,12 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 | 包 | 角色与直接依赖 |
 |---|---|
 | `srd51_runtime@13` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
-| `srd51_characters@14` | extension，直接依赖 `srd51_runtime@13`，声明短弓、箭、武器熟练与攻击配置，以及战士 Second Wind/Extra Attack 和勇士 Improved Critical |
-| `srd51_magic@18` | extension，直接依赖前两包，含骷髅短剑和短弓、地精弯刀和短弓、灵巧逃脱，以及法师和牧师的戏法来源和法术参数 |
+| `srd51_characters@15` | extension，直接依赖 `srd51_runtime@13`，声明短弓、箭、武器熟练与攻击配置，以及战士 Defense、Second Wind、Action Surge、Extra Attack 和勇士 Improved Critical |
+| `srd51_magic@19` | extension，直接依赖前两包，含骷髅短剑和短弓、地精弯刀和短弓、灵巧逃脱，以及法师和牧师的戏法来源和法术参数 |
 | `dm_runtime_house_rules@25` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@13` |
-| `dm_runtime_house_rules@27` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@14` |
+| `dm_runtime_house_rules@28` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@15` |
 
-标准组合选择家规 @25，变体选择 @27。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
+标准组合选择家规 @25，变体选择 @28。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
 同一变体把石工知识从双倍熟练改为三倍、固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
 一个专属包缺失或与清单不符时，依赖它的内置组合返回 `BUNDLED_RULES_UNAVAILABLE`。三个共享包中任一损坏会影响两组。
@@ -118,7 +118,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 或局部键合并外部内容。新建与文件打开按绑定的原包重组。标准组合使用应用随附字节，自定义组合使用本机接受的原包。打开时逐项比对全部冻结材料。
 最多两份上下文缓存以完整不可变材料为键，损坏规则行或链不能借相同摘要绕过校验。
 改变成员、版本或规则解释必须新建战役，不在历史上热改规则。
-冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V5`；读取时拒绝不匹配的解释标识和缺失字段。
+冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V6`；读取时拒绝不匹配的解释标识和缺失字段。
 数据来源、许可、确定性构建和完整限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
 
 Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级。`character-create` 默认用
@@ -137,6 +137,8 @@ Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级�
 选择智力（历史）时，可把题材设为“辨认石工作品来历”。[石工知识](rules/schema-2-character-foundations.md#石工知识)从建卡种族及冻结材料派生。结果随完整文件保存，重开后可继续普通历史或石工检定。
 标准包矮人的基础步速为 25 尺，重甲策略为 `IGNORE`。家规可分别覆盖[步速、策略、通用减速量和装备门槛](rules/schema-2-combat-authoring.md#步行来源)。重甲的护甲等级、隐匿劣势与
 未受训穿甲的限制分别生效。种族属性提升、完整背景技能和起始装备整包均超出该范围。
+一级战士从冻结特性目录选择防御风格。DM 与玩家卡面的 AC 和攻击命中结算共用装备派生值。二级战士发动动作如潮时，扣减角色资源、增加本回合普通动作与命令收据同事务提交。两次攻击之间保存和同版重开保留实际余额与两次动作各自的攻击序列。[防御风格与动作如潮](rules/schema-2-fighter-actions.md)
+
 单职业战士从一级取得[回气](rules/schema-2-second-wind.md)，在本人战斗回合使用附赠动作
 恢复 `1d10＋战士等级` HP，消耗准确一次/休息资源；原骰、成本和治疗随完整文件保留。勇士 3–6 级的
 [精通重击](rules/schema-2-improved-critical.md)由真实子职业授予驱动，普通近战与短弓，以及近战 OA 与 Ready

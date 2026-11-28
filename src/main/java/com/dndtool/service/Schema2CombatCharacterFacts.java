@@ -52,6 +52,11 @@ final class Schema2CombatCharacterFacts {
         if (command.kind().equals("COMBAT_RESOURCE_SPENT")) {
             if (result != null || command.healthInput() != null || command.amount() != 1)
                 throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            var input = command.combatInput();
+            if (input.frameKey().equals(Schema2CombatRules.actionSurgeReference(input.combatOperationId()))
+                    && (!input.actorId().equals(before.characterId()) || before.hitPoints() == 0
+                        || !command.resource().equals(Schema2FeatureSupport.actionSurgeResource(material, before))))
+                throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
             return new Schema2CharacterProgressionRules().spend(material, before, command.resource(), command.amount());
         }
         if (result == null || command.healthInput() == null || !healthRule(material).equals(command.healthInput().rule()))

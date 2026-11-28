@@ -52,6 +52,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 | 规则角色与初始授予 | `character-create`、`character-profile`；`CampaignDomainEngine`、初始授予规则 | `characters_runtime_character` 的 InitialPlan、initial event/current/history；名字、PC/NPC 与活动状态进入根历史 | 标准数组、语言/工具及有限职业授予。创建默认人类来源，标准组合可选择矮人及其山丘亚种，文件保存准确种族、亚种和初始授予，强韧由初始计划与冻结规则派生 | 准确引用、初始来源、活动状态、Unicode、文件初始前缀。种族属性提升、完整背景技能、起始装备整包和任意加入等级待采用 |
 | 自由角色卡 | `manual-create`、`manual-profile`、`manual-field`、`manual-class`、`manual-proficiency`；`CampaignManualData/Commands` | `scenes_world` 的自由卡聚合及 `manual_character` 核验投影 | 六属性、HP/AC/速度、十二职业等级、技能/豁免熟练；空白卡及平民、守卫、狼 NPC 模板，保存初始卡、当前卡和每次根历史 | 自由卡承担简易建卡，独立生命值/定额治疗建档入口已退出。自由卡 HP 为 DM 记录值，检定和字段校验由自由卡领域负责 |
 | 成长与职业 | `character-command` 的成长分支、角色成长与法术书规则 | 所属规则角色的职业、子职业、ASI、授予及成长事件 | 所选机制的未来写入结构预建，按真实消费者写初始及前后事实 | 战士 1–6、生命牧师 1、法师 1–5 的有限模板，含有限兼职前提及熟练选择。[Extra Attack](../../rules/schema-2-extra-attack.md)由单职业战士 5 级正常成长授予，6 级保持；勇士 3–6 级取得[精通重击](../../rules/schema-2-improved-critical.md)，普通/OA/Ready 近战共用 19/20 重击判定。无消费者专长拒绝取得，多施法职业的共享法术位仍待采用 |
+| 防御风格与动作如潮 | 一级建卡选择和二级战斗命令 `ACTION_SURGE` | 角色历史保存实际选择与独立次数，当前回合保存动作余额和使用标记 | 卡面与命中共用穿甲 AC，扣次与增加动作在同一根提交；完整文件保留尚可花用的动作 | 旧候选、迟到重试、两种休息和二级、五级独立攻击序列见[战士特性合同](../../rules/schema-2-fighter-actions.md) |
 | 回气附赠动作 | SQLite `combat-command/SECOND_WIND`；战斗及健康/资源 owner | 一级实际授予；角色资源/HP、战斗命令原骰及两条角色子历史，同根一次提交 | 保存和直接恢复已付成本、实际治疗与原攻击序列；不用新余额或表 | 本人 ACTIVE 回合、单职业 1–6 级、满 HP/耗尽/过期/回滚/准确授予 |
 | 资源与休息 | character-command；成长与休息网页的资源、生命骰、时间及奥术回想位数选择 | 当前资源、生命骰及休息由角色聚合拥有；`resources_character` 为核验投影 | 同一空间的推进量同根提交，角色累计秒可以不同；原骰、每日使用及消耗直接恢复 | 准确空间、累计日界、资格/预算/位数、失败无部分收益、保存/END/重开 |
 | 物品与装备 | `item`、`manual-item`；`character-command` 的装备分支 | 简单物品归 `scenes_world`，保留来源、说明、数量和状态；装备实例归角色，`equipment_instance` 核验 | 自由卡保留背包、麻绳和火把模板、临时物品与归档。规则装备保留取得、穿脱、掉落和移除事实 | 核对所有者、版本、数量和护甲限制，战斗与施法组件读取同一装备。恢复直接装载实例及历史 |
@@ -72,8 +73,8 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@13`、`srd51_characters@14`、`srd51_magic@18`，第四个成员分别为
-`dm_runtime_house_rules@25` 与 `dm_runtime_house_rules@27`。绑定保留成员顺序、准确版本与
+`srd51_runtime@13`、`srd51_characters@15`、`srd51_magic@19`，第四个成员分别为
+`dm_runtime_house_rules@25` 与 `dm_runtime_house_rules@28`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和
 历史校验共同使用所选战役的冻结规则上下文。标准被动基数为 10，优劣势调整幅度为 5。检定变体分别使用 12 和 3，运动默认以感知结算，允许 DM 为本次技能检定选择其他属性。变体的石工知识采用三倍熟练，自定义工匠获得侏儒语，DM 定额钝击伤害为 3 HP。作者和消费者的对应关系见[规则包指南](../../../rule-packages/srd51-runtime/package-guide.md)。

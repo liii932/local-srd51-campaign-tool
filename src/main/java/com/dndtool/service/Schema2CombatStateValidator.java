@@ -13,6 +13,9 @@ import static com.dndtool.service.Schema2CombatState.*;
 
 /** Structural verification of the saved business graph, independent of JDBC row identifiers. */
 final class Schema2CombatStateValidator {
+    private static final int MAX_WALKING_SPEED_FEET = 120;
+    private static final int MAX_DASH_BONUS_FEET = 2 * MAX_WALKING_SPEED_FEET;
+    private static final int MAX_TURN_MOVEMENT_HALF_FEET = 2 * (MAX_WALKING_SPEED_FEET + MAX_DASH_BONUS_FEET);
     private Schema2CombatStateValidator() { }
     static void validate(Battle b) {
         try {
@@ -23,9 +26,13 @@ final class Schema2CombatStateValidator {
                         && b.activeOrdinal()>=0 && b.activeOrdinal()<b.initiative().size());
             Set<UUID> actors=new HashSet<>(),keys=new HashSet<>();Set<Position> positions=new HashSet<>();
             for(Combatant a:b.combatants()) {
-                id(a.characterId());check(actors.add(a.characterId())&&positions.add(a.position())&&a.side()>=0&&a.side()<16&&validActionBudgets(a)&&a.movementSpentHalfFeet()>=0&&a.movementSpentHalfFeet()<=480&&a.movementBonus()>=0&&a.movementBonus()<=120&&a.movementBonus()%5==0);
+                id(a.characterId());
+                check(actors.add(a.characterId()) && positions.add(a.position()) && a.side() >= 0 && a.side() < 16
+                        && validActionBudgets(b, a) && a.movementSpentHalfFeet() >= 0
+                        && a.movementSpentHalfFeet() <= MAX_TURN_MOVEMENT_HALF_FEET
+                        && a.movementBonus() >= 0 && a.movementBonus() <= MAX_DASH_BONUS_FEET && a.movementBonus() % 5 == 0);
                 AttackSequence s=a.sequence();if(s!=null) {
-                    id(s.sequenceKey());check(keys.add(s.sequenceKey())&&!a.actionAvailable()
+                    id(s.sequenceKey());check(keys.add(s.sequenceKey())&&a.actionsRemaining()<=(a.actionSurged()?1:0)
                             &&s.limit()>=1&&s.limit()<=2&&s.performed()>=0&&s.forfeited()>=0
                             &&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));
                     if(!s.closed())check(b.status()==Status.ACTIVE&&a.characterId().equals(b.activeActor()));
@@ -146,8 +153,11 @@ final class Schema2CombatStateValidator {
         return true;
     }
 
-    static boolean validActionBudgets(Combatant actor) {
-        return actor.actionsRemaining() >= 0 && actor.actionsRemaining() <= Combatant.TURN_ACTIONS
+    static boolean validActionBudgets(Battle battle, Combatant actor) {
+        boolean surged = actor.actionSurged();
+        return (!surged || battle.status() == Status.ACTIVE && actor.characterId().equals(battle.activeActor())
+                    && !battle.surprised(actor.characterId()) && !Schema2MonsterRules.isMonster(battle, actor.characterId()))
+                && actor.actionsRemaining() >= 0 && actor.actionsRemaining() <= Combatant.TURN_ACTIONS + (surged ? 1 : 0)
                 && actor.bonusActionsRemaining() >= 0 && actor.bonusActionsRemaining() <= Combatant.TURN_BONUS_ACTIONS;
     }
 
@@ -158,7 +168,7 @@ final class Schema2CombatStateValidator {
                 &&movement.cursor()>=0&&movement.cursor()<=movement.path().size()&&movement.spent()==movement.cursor()*5
                 &&movement.spentHalfFeet()>=2*movement.spent()&&movement.spentHalfFeet()<=4*movement.spent()
                 &&movement.spentHalfFeet()%10==0&&movement.status()!=null&&movement.readied()==(movement.allowanceFeet()>0)
-                &&movement.allowanceFeet()>=0&&movement.allowanceFeet()<=120);
+                &&movement.allowanceFeet()>=0&&movement.allowanceFeet()<=MAX_WALKING_SPEED_FEET);
         if (movement.readied()) check(movement.spentHalfFeet()<=movement.allowanceFeet()*2);
         if (movement.status()==MovementStatus.COMPLETED)
             check(frame.status()==FrameStatus.TERMINAL&&movement.cursor()==movement.path().size()&&movement.stopReason()==null);
@@ -175,7 +185,7 @@ final class Schema2CombatStateValidator {
         check(!movement.readied()&&frame.invocation()==Invocation.ROOT&&drag.origin()!=null
                 &&reference(actors,drag.targetId(),live)&&!movement.actorId().equals(drag.targetId())
                 &&drag.path().size()==movement.path().size()&&drag.allowanceHalfFeet()>=10*drag.path().size()
-                &&drag.allowanceHalfFeet()>=movement.spentHalfFeet()&&drag.allowanceHalfFeet()<=480);
+                &&drag.allowanceHalfFeet()>=movement.spentHalfFeet()&&drag.allowanceHalfFeet()<=MAX_TURN_MOVEMENT_HALF_FEET);
         GrappleRelation relation=battle.meleeControl().grapples().stream().filter(g->g.grappleKey().equals(drag.grappleKey()))
                 .findFirst().orElseThrow();
         check(relation.grapplerId().equals(movement.actorId())&&relation.targetId().equals(drag.targetId())

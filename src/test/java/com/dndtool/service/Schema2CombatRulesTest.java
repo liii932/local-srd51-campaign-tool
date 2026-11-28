@@ -168,7 +168,7 @@ class Schema2CombatRulesTest {
         Combatant current = actor(a);
         for (int[] counts : new int[][] { {-1, 1}, {2, 1}, {1, -1}, {1, 2} }) {
             var invalidActor = new Combatant(a, current.position(), current.side(), counts[0], counts[1],
-                    current.reactionAvailable(), 0, 0, false, false, null, false);
+                    current.reactionAvailable(), 0, 0, false, false, null, false, false);
             Battle malformed = Schema2CombatRules.replaceActor(battle, invalidActor);
             var rejected = assertThrows(IllegalArgumentException.class, () ->
                     rules.preflight(UUID.randomUUID(), combat, campaign, roster, malformed, Command.action(Kind.DASH, a)));

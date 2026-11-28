@@ -24,6 +24,9 @@ final class Schema2GrowthRules {
         ClassProgressionDefinition progression = catalog.growth(starting);
         if (catalog.level(progression.identity(), 1).asiAvailable()) fail("S2_GROWTH_INITIAL_ASI_UNSUPPORTED");
         if (choices == null || choices.feat() != null || !choices.abilityIncreases().isEmpty()) fail("S2_GROWTH_INITIAL_CHOICES");
+        RuleIdentity fightingStyle = Schema2FeatureSupport.fightingStyleOption(material, starting);
+        if (fightingStyle != null && choices.fightingStyle() == null) fail("S2_GROWTH_FIGHTING_STYLE_REQUIRED");
+        if (!Objects.equals(fightingStyle, choices.fightingStyle())) fail("S2_GROWTH_FIGHTING_STYLE_CHOICE");
         List<ClassLevel> classes = List.of(new ClassLevel(starting, 1));
         List<SubclassState> subclasses = selectSubclass(catalog, starting, 1, List.of(), choices.subclass());
         List<ProficiencyState> grants = new ArrayList<>();
@@ -34,7 +37,7 @@ final class Schema2GrowthRules {
         List<KnownCantrip> knownCantrips = Schema2KnownCantripRules.acquire(material, starting, 1, choices.cantrips(), List.of());
         State state = new State(initial.character().identity(), initial.campaignId(), initial.characterId(), preparation,
                 starting, abilities, 1, 2, hp, hp, classes, List.of(new HitDicePool(progression.hitDieSides(), 1, 1)),
-                subclasses, features(catalog, classes, subclasses), List.of(), grants, 0,
+                subclasses, features(catalog, classes, subclasses, choices.fightingStyle()), List.of(), grants, 0,
                 resources(catalog, classes, abilities, Map.of()), RestState.INITIAL, List.of(), HealthState.INITIAL, null, knownCantrips);
         return validate(material, state);
     }
@@ -43,6 +46,7 @@ final class Schema2GrowthRules {
             String hpChoice, GrowthChoices choices, int subraceHitPointBonus) {
         Catalog catalog = new Catalog(material);
         if (choices == null || targetClass == null) fail("S2_GROWTH_REQUEST");
+        if (choices.fightingStyle() != null) fail("S2_GROWTH_FIGHTING_STYLE_NOT_DUE");
         if (before.level() >= 20 || targetLevel != before.level() + 1) fail("S2_GROWTH_LEVEL");
         ClassProgressionDefinition target = catalog.growth(targetClass);
         Map<RuleIdentity, Integer> levels = classLevels(before.classes());
@@ -94,10 +98,14 @@ final class Schema2GrowthRules {
         Map<RuleIdentity, ResourceState> oldResources = new HashMap<>();
         before.resources().forEach(resource -> oldResources.put(resource.identity(), resource));
         List<KnownCantrip> knownCantrips = Schema2KnownCantripRules.acquire(material, targetClass, next, choices.cantrips(), before.knownCantrips());
+        RuleIdentity fightingStyle = before.features().stream().map(FeatureState::feature)
+                .filter(identity -> catalog.rules.get(identity) instanceof FinalFeature feature
+                        && feature.definition().executionMode() == FeatureExecution.CHOICE)
+                .findFirst().orElse(null);
         State candidate = new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(),
                 before.characterClass(), abilities, targetLevel, 2 + (targetLevel - 1) / 4,
                 before.hitPoints() + minimum, before.maximumHitPoints() + minimum, classes, dice, subclasses,
-                features(catalog, classes, subclasses), feats, grants, before.version() + 1,
+                features(catalog, classes, subclasses, fightingStyle), feats, grants, before.version() + 1,
                 resources(catalog, classes, abilities, oldResources), before.rest(), before.equipment(), before.health(), before.spellbook(), knownCantrips);
         validate(material, candidate);
         return new Prepared(candidate, target.hitDieSides(), constitution, minimum, maximum);
@@ -138,7 +146,9 @@ final class Schema2GrowthRules {
         for (ClassLevel level : state.classes()) if (catalog.subclasses(level.characterClass()).stream()
                 .anyMatch(subclass -> subclass.selectionLevel() <= level.level()) && !subclassClasses.contains(level.characterClass())) fail("S2_GROWTH_SUBCLASS_STATE");
         if (!state.subclasses().equals(state.subclasses().stream().sorted(Comparator.comparing(SubclassState::characterClass, ORDER)).toList())) fail("S2_GROWTH_SUBCLASS_STATE");
-        if (!features(catalog, state.classes(), state.subclasses()).equals(state.features())) fail("S2_GROWTH_FEATURE_STATE");
+        RuleIdentity fightingStyle = Schema2FeatureSupport.fightingStyleOption(material, state.characterClass());
+        if (!features(catalog, state.classes(), state.subclasses(), fightingStyle).equals(state.features()))
+            fail("S2_GROWTH_FEATURE_STATE");
         if (state.feats().size() > 20 || state.features().size() > 64 || state.proficiencies().size() > 64) fail("S2_GROWTH_BUDGET");
         Set<RuleIdentity> seenFeats = new HashSet<>();
         for (FeatState feat : state.feats()) {
@@ -179,7 +189,8 @@ final class Schema2GrowthRules {
         result.sort(Comparator.comparing(SubclassState::characterClass, ORDER)); return List.copyOf(result);
     }
 
-    private static List<FeatureState> features(Catalog catalog, List<ClassLevel> classes, List<SubclassState> subclasses) {
+    private static List<FeatureState> features(Catalog catalog, List<ClassLevel> classes, List<SubclassState> subclasses,
+            RuleIdentity fightingStyle) {
         Map<RuleIdentity, Integer> levels = classLevels(classes);
         for (SubclassState subclass : subclasses) levels.put(subclass.subclass(), levels.get(subclass.characterClass()));
         List<FeatureState> result = new ArrayList<>();
@@ -188,6 +199,13 @@ final class Schema2GrowthRules {
         for (FinalRule rule : catalog.rules.values()) if (rule instanceof FinalFeature feature && rule.enabled()
                 && feature.definition().kind() == FeatureKind.FEATURE && levels.containsKey(feature.definition().owner())
                 && feature.definition().level() <= levels.get(feature.definition().owner())) {
+            if (FIGHTER_DEFENSE_ALGORITHM.equals(feature.definition().executionAlgorithm())
+                    && (classes.size() != 1 || levels.get(feature.definition().owner()) > 6
+                        || !feature.identity().equals(fightingStyle)))
+                fail("S2_GROWTH_FIGHTING_STYLE_SCOPE");
+            if (FIGHTER_ACTION_SURGE_ALGORITHM.equals(feature.definition().executionAlgorithm())
+                    && (classes.size() != 1 || levels.get(feature.definition().owner()) > 6))
+                fail("S2_GROWTH_ACTION_SURGE_SCOPE");
             if (feature.definition().executionAlgorithm().equals("BOUNDED_FEATURE_SELECTION_V1"))
                 fail("S2_GROWTH_FEATURE_SELECTION_UNSUPPORTED");
             if (feature.definition().executionAlgorithm().equals("BOUNDED_SUBCLASS_SELECTION_V1")
