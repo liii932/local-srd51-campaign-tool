@@ -343,6 +343,27 @@
       "kind": "rule",
       "module_key": "srd51_characters",
       "rule_type": "character.feature",
+      "rule_key": "feature.rogue_sneak_attack"
+    },
+    "display_name": "Sneak Attack",
+    "description": "At Rogue levels 1–2, once per turn you may add 1d6 to a hit with a finesse or ranged weapon, if you have advantage or a non-incapacitated enemy of the target is within 5 feet of it and you lack disadvantage.",
+    "source_page": 39,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.rogue"
+    },
+    "level": 1,
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_ROGUE_SNEAK_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
       "rule_key": "feature.rogue_cunning_action"
     },
     "display_name": "Cunning Action",

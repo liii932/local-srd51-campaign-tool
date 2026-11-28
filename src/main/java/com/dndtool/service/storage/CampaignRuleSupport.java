@@ -112,6 +112,7 @@ public final class CampaignRuleSupport {
             if (row.identity().equals(life.requiredFeature()) || row.identity().equals(wizard.requiredFeature()))
                 continue;
             if (ROGUE_EXPERTISE_ALGORITHM.equals(definition.executionAlgorithm())
+                    || ROGUE_SNEAK_ATTACK_ALGORITHM.equals(definition.executionAlgorithm())
                     || ROGUE_CUNNING_ACTION_ALGORITHM.equals(definition.executionAlgorithm())) {
                 if (rogue == null || !definition.owner().equals(rogue.ownerClass())
                         || definition.level() > rogue.supportedMaximumLevel() || !rogueFeatures.add(definition.executionAlgorithm()))
@@ -139,7 +140,9 @@ public final class CampaignRuleSupport {
                     && ++arcaneRecovery == 1) continue;
             throw unsupported("FEATURE_OWNER");
         }
-        if (rogue != null && rogueFeatures.size() != 2) throw unsupported("ROGUE_FEATURES");
+        if (rogue != null && !rogueFeatures.equals(Set.of(
+                ROGUE_EXPERTISE_ALGORITHM, ROGUE_SNEAK_ATTACK_ALGORITHM, ROGUE_CUNNING_ACTION_ALGORITHM)))
+            throw unsupported("ROGUE_FEATURES");
     }
 
     private static void validateSpells(ProductionSchema2Projection projection, SpellcastingDefinition life,

@@ -19,13 +19,13 @@ application that supports the saved mechanisms.
 
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
-| `srd51_runtime` version `14` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
-| `srd51_characters` version `16` | extension | `srd51_runtime=14` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter, Rogue, Cleric and Wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, Rogue Expertise and Cunning Action, health, melee and ranged weapon attacks, Fighter Defense, Second Wind, Action Surge and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `20` | extension | `srd51_runtime=14`, `srd51_characters=16` | Selected spells, Cleric and Wizard cantrip choices, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Goblin and Skeleton |
-| `dm_runtime_house_rules` version `29` | extension | `srd51_runtime=14` | Explicit DM antimagic area and fixed direct vital effects |
+| `srd51_runtime` version `15` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
+| `srd51_characters` version `17` | extension | `srd51_runtime=15` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter, Rogue, Cleric and Wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, Rogue Expertise, Sneak Attack and Cunning Action, health, melee and ranged weapon attacks, Fighter Defense, Second Wind, Action Surge and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `21` | extension | `srd51_runtime=15`, `srd51_characters=17` | Selected spells, Cleric and Wizard cantrip choices, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Goblin and Skeleton |
+| `dm_runtime_house_rules` version `31` | extension | `srd51_runtime=15` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `30` as its
+first three members and selects `dm_runtime_house_rules` version `32` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -86,8 +86,15 @@ proficient skill and proficiency with thieves’ tools. A matching rolled or
 passive check doubles the proficiency bonus. To check with thieves’ tools,
 the character first prepares the matching item using the normal equipment
 rules. At level 2, Cunning Action allows Dash, Disengage or Hide with the
-Rogue’s own combat turn bonus action. The supported Rogue level range is
-1–2. Sneak Attack, third level and multiclass Rogue are outside this profile.
+Rogue’s own combat turn bonus action. The supported Rogue level range is 1–2.
+
+Sneak Attack is granted at Rogue level 1 by an automatic feature declaration
+using `SRD_2014_ROGUE_SNEAK_ATTACK_V1`. A qualifying hit with a supported finesse
+or ranged weapon offers the attacker a choice after the hit is final. The attack
+requires advantage, or a non-incapacitated enemy of the target within 5 feet of it
+and no disadvantage. Using the feature adds 1d6 of the weapon's damage type
+at both supported Rogue levels, or 2d6 on a critical hit. The feature can
+be used once on each combat turn, including qualifying reaction attacks.
 
 Human is the default race source and grants Common and one standard language.
 The bundled dwarf source grants Common, Dwarvish and one artisan's tool

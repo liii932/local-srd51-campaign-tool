@@ -15,6 +15,7 @@ public final class Schema2CombatState {
         GRAPPLE, SHOVE_PRONE, SHOVE_PUSH, CHOOSE_MELEE_DEFENSE, ESCAPE_GRAPPLE, RELEASE_GRAPPLE,
         HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE, CUNNING_DASH, CUNNING_DISENGAGE, CUNNING_HIDE, SET_OBSERVATION_CELL,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
+        USE_SNEAK_ATTACK, DECLINE_SNEAK_ATTACK,
         ADVANCE_WINDOW, CONTINUE_MOVEMENT, CONTINUE_FLOW, CAST, READY_ATTACK, READY_MOVE, READY_SPELL,
         CREATE_ENVIRONMENT_ZONE, END_ENVIRONMENT_ZONE, EXPLORATION_HEALTH, EXPLORATION_ADVANCE_TIME, EXPLORATION_MOVE, REENTER_COMBAT, CLOSE_SCENE, END_CONCENTRATION, END_COMBAT }
     public enum FlowStatus { ACTIVE, COMPLETED }
@@ -22,7 +23,7 @@ public final class Schema2CombatState {
     public enum Invocation { ROOT, REACTION, CONTINUATION }
     public enum FrameStatus { RUNNABLE, WAITING_WINDOW, WAITING_CHILD, WAITING_CHOICE, PENDING, DECIDED, TERMINAL }
     public enum Stage { SAVE_DAMAGE_ROLLED, SAVE_DAMAGE_COMPLETED, MOVEMENT_LEAVE_REACH_BEFORE, MOVEMENT_CONTINUE, ATTACK_HIT_BEFORE_DAMAGE,
-        ATTACK_RESOLVED, CAST_BEFORE_COMPLETION, CAST_RESOLVED, READY_TRIGGER_AFTER, READY_RELEASE_RESOLVED,
+        SNEAK_ATTACK_CHOICE, ATTACK_RESOLVED, CAST_BEFORE_COMPLETION, CAST_RESOLVED, READY_TRIGGER_AFTER, READY_RELEASE_RESOLVED,
         SAVING_THROW_RESOLVED, HEALTH_RESOLVED, MOVEMENT_COMPLETED, MOVEMENT_STOPPED, MELEE_CONTROL_CHOICE, MELEE_CONTROL_RESOLVED }
     public enum WindowStatus { OPEN, CLOSED, CONSUMED }
     public enum OpportunityStatus { PENDING, PASSED, DECLARED, COMPLETED, INELIGIBLE }
@@ -33,6 +34,7 @@ public final class Schema2CombatState {
         CREATURE_ENTER_CELL_AFTER, ATTACK_COMPLETED, CAST_COMPLETED, MONSTER_ACTION_COMPLETED }
     public enum CastStatus { PENDING, HELD, RESOLVED, COUNTERED, INTERRUPTED }
     public enum AttackStatus { HIT_PENDING_DAMAGE, RESOLVED }
+    public enum SneakAttackStatus { PENDING, USED, DECLINED }
     public enum OnHitOutcome { SAVE_SUCCEEDED, PRONE_APPLIED, ALREADY_PRONE, CONDITION_IMMUNE, TARGET_DEAD }
     public enum ReadyResponseKind { ATTACK, MOVE, SPELL }
     public enum ReadyStatus { PREPARING, ARMED, RELEASED, EXPIRED, LOST }
@@ -232,6 +234,9 @@ public final class Schema2CombatState {
         }
         public static Command reaction(Kind kind, UUID actor, UUID item, UUID flow, UUID leaf, UUID window, UUID opportunity) {
             return new Command(kind,actor,null,item,List.of(),List.of(),List.of(),flow,leaf,window,opportunity);
+        }
+        public static Command sneakAttack(Kind kind, UUID actor, UUID flow, UUID leaf) {
+            return new Command(kind,actor,null,null,List.of(),List.of(),List.of(),flow,leaf,null,null);
         }
         public static Command monsterOpportunityAttack(UUID actor, EntryIdentity action, UUID flow, UUID leaf, UUID window, UUID opportunity) {
             return new Command(Kind.DECLARE_OPPORTUNITY_ATTACK,actor,null,null,List.of(),List.of(),List.of(),flow,leaf,window,
@@ -527,7 +532,20 @@ public final class Schema2CombatState {
             UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
             MonsterAttackEvidence monsterAttack, RangedAttackEvidence rangedAttack, boolean attackerSeesTarget,
             boolean targetSeesAttacker, Cover targetCover, Position aimedPosition, boolean targetAtAimedPosition,
-            SpellAttackEvidence spellAttack) {
+            SpellAttackEvidence spellAttack, SneakAttackEvidence sneakAttack) {
+        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
+                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
+                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
+                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
+                UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
+                MonsterAttackEvidence monsterAttack, RangedAttackEvidence rangedAttack, boolean attackerSeesTarget,
+                boolean targetSeesAttacker, Cover targetCover, Position aimedPosition, boolean targetAtAimedPosition,
+                SpellAttackEvidence spellAttack) {
+            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,
+                    selectedD20,abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,
+                    damageAmount,blessingEffectKey,blessingD4,status,initialHit,finalArmorClass,monsterAttack,rangedAttack,
+                    attackerSeesTarget,targetSeesAttacker,targetCover,aimedPosition,targetAtAimedPosition,spellAttack,null);
+        }
         public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
                 UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
                 int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
@@ -541,6 +559,17 @@ public final class Schema2CombatState {
                     attackerSeesTarget,targetSeesAttacker,targetCover,aimedPosition,targetAtAimedPosition,null);
         }
         public AttackAttempt { damageDice = List.copyOf(damageDice); }
+        AttackAttempt withOutcome(int ac, boolean hit, boolean critical, List<Integer> damage, int amount,
+                AttackStatus status, MonsterAttackEvidence monster, SpellAttackEvidence spell, SneakAttackEvidence sneak) {
+            return new AttackAttempt(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,
+                    firstD20,secondD20,selectedD20,abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,
+                    critical,hit,damage,amount,blessingEffectKey,blessingD4,status,initialHit,ac,monster,rangedAttack,
+                    attackerSeesTarget,targetSeesAttacker,targetCover,aimedPosition,targetAtAimedPosition,spell,sneak);
+        }
+    }
+    public record SneakAttackEvidence(SneakAttackStatus status, long turnNumber, UUID nearbyEnemyId,
+            List<Integer> damageDice) {
+        public SneakAttackEvidence { damageDice = List.copyOf(damageDice); }
     }
     public record RangedAttackEvidence(int distanceFeet, int normalRangeFeet, int longRangeFeet, boolean closeEnemy,
             UUID ammunitionItemId) { }

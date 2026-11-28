@@ -148,7 +148,7 @@ class CampaignRogueCombatIntegrationTest {
                 () -> game.service.importFile(CampaignJson.canonical(changed))).code());
     }
 
-    private static UUID rogue(Fixture game, String name, String kind, String... expertise) {
+    static UUID rogue(Fixture game, String name, String kind, String... expertise) {
         JsonObject input = new JsonObject();
         input.addProperty("name", name);
         input.addProperty("kind", kind);

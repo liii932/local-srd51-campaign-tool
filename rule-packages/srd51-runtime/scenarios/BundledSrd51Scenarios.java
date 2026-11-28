@@ -60,6 +60,10 @@ import com.dndtool.service.Schema2CombatState.ObservationCellInput;
 import com.dndtool.service.Schema2CombatState.OpeningGroup;
 import com.dndtool.service.Schema2CombatState.OpeningInput;
 import com.dndtool.service.Schema2CombatState.Position;
+import com.dndtool.service.Schema2CombatState.Resolution;
+import com.dndtool.service.Schema2CombatState.Roll;
+import com.dndtool.service.Schema2CombatState.SneakAttackEvidence;
+import com.dndtool.service.Schema2CombatState.SneakAttackStatus;
 
 /** Authored expectations for the SRD 5.1 runtime combinations. */
 public final class BundledSrd51Scenarios {
@@ -81,6 +85,8 @@ public final class BundledSrd51Scenarios {
                 scenario("rogue-expertise", suite -> suite.verifyRogueExpertise(10)),
                 scenario("rogue-expertise-variant", suite -> suite.verifyRogueExpertise(12)),
                 scenario("rogue-cunning-action", BundledSrd51Scenarios::verifyRogueCunningAction),
+                scenario("rogue-sneak-attack", BundledSrd51Scenarios::verifyRogueSneakAttack),
+                scenario("rogue-sneak-attack-off-turn", BundledSrd51Scenarios::verifyOffTurnSneakAttack),
                 scenario("hill-dwarf-toughness", BundledSrd51Scenarios::verifyHillDwarfToughness),
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
@@ -216,7 +222,9 @@ public final class BundledSrd51Scenarios {
         var plan = initialPlan("rogue");
         State first = growth.initial(material, plan, UUID.randomUUID(), ARRAY, chosen.withExpertise(List.of(perception, stealth)));
         assertEquals(List.of(perception, stealth), first.expertise());
-        assertEquals(List.of(new FeatureState(expertise.identity(), rogue, 1, List.of(perception, stealth))), first.features());
+        var sneakAttack = rules.rule("character.feature", "feature.rogue_sneak_attack");
+        assertEquals(List.of(new FeatureState(expertise.identity(), rogue, 1, List.of(perception, stealth)),
+                new FeatureState(sneakAttack, rogue, 1)), first.features());
         expectNumber(1, first.maximumHitDice());
         expectNumber(8, first.hitDicePools().getFirst().sides());
         expectNumber(9, first.maximumHitPoints());
@@ -310,8 +318,8 @@ public final class BundledSrd51Scenarios {
         assertEquals(FeatureKind.FEATURE, feature.definition().kind());
         assertEquals(FeatureExecution.AUTOMATIC, feature.definition().executionMode());
         assertEquals("SRD_2014_ROGUE_CUNNING_ACTION_V1", feature.definition().executionAlgorithm());
-        assertEquals(List.of(new FeatureState(feature.identity(), first.characterClass(), 2), first.features().getFirst()),
-                second.features());
+        assertEquals(new FeatureState(feature.identity(), first.characterClass(), 2), second.features().getFirst());
+        assertEquals(first.features(), second.features().subList(1, second.features().size()));
         assertEquals(first.expertise(), second.expertise());
         expectNumber(15, second.maximumHitPoints());
         expectNumber(2, second.maximumHitDice());
@@ -372,6 +380,175 @@ public final class BundledSrd51Scenarios {
         expectNumber(actionsRemaining, actor.actionsRemaining());
         expectNumber(0, actor.bonusActionsRemaining());
         assertTrue(actor.reactionAvailable());
+    }
+
+    private void verifyRogueSneakAttack() {
+        var material = rules.projection();
+        var roguePlan = initialPlan("rogue");
+        UUID campaign = roguePlan.campaignId(), rogue = roguePlan.characterId();
+        UUID target = UUID.randomUUID(), ally = UUID.randomUUID();
+        var targetPlan = rules.initialPlan(campaign, target, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var allyPlan = rules.initialPlan(campaign, ally, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var targetContext = new Schema2CombatRules.Context(material, targetPlan, initial(targetPlan, "fighter"));
+        var allyContext = new Schema2CombatRules.Context(material, allyPlan, initial(allyPlan, "fighter"));
+        var feature = (FinalFeature) find("character.feature", "feature.rogue_sneak_attack");
+        var rogueClass = rules.rule("character.class", "class.rogue");
+        assertTrue(feature.enabled());
+        assertEquals(rogueClass, feature.definition().owner());
+        assertEquals(FeatureKind.FEATURE, feature.definition().kind());
+        assertEquals(FeatureExecution.AUTOMATIC, feature.definition().executionMode());
+        assertEquals("SRD_2014_ROGUE_SNEAK_ATTACK_V1", feature.definition().executionAlgorithm());
+        expectNumber(39, feature.definition().sourcePage());
+
+        var combat = new Schema2CombatRules();
+        State first = initial(roguePlan, "rogue");
+        var grant = new FeatureState(feature.identity(), rogueClass, 1);
+        assertTrue(first.features().contains(grant));
+        UUID rapier = UUID.randomUUID();
+        var fencer = acquireAndEquip(first, rapier, "rapier", "MAIN_HAND");
+        var fencingRoster = Map.of(rogue, new Schema2CombatRules.Context(material, roguePlan, fencer),
+                target, targetContext);
+        var fencing = startBattle(combat, UUID.randomUUID(), campaign, fencingRoster, target, rogue);
+        fencing = meleeStep(combat, fencingRoster, fencing, Schema2CombatState.Command.action(Kind.DROP_PRONE, target), List.of());
+        fencing = meleeStep(combat, fencingRoster, fencing, Schema2CombatState.Command.action(Kind.END_TURN, target), List.of());
+        fencing = meleeStep(combat, fencingRoster, fencing, Schema2CombatState.Command.action(Kind.BEGIN_ATTACK, rogue), List.of());
+        var rapierHit = sneakAttackStep(combat, fencingRoster, fencing, Schema2CombatState.Command.attack(rogue, target, rapier),
+                new Roll("ATTACK_D20", rogue, 20, 16), new Roll("ATTACK_D20_SECOND", rogue, 20, 4));
+        assertTrue(rapierHit.healthChanges().isEmpty());
+        fencing = rapierHit.after();
+        assertSneakAttackPending(fencing, null);
+        assertTrue(fencing.activeFlow().attacks().getLast().advantage());
+        var declined = sneakAttackStep(combat, fencingRoster, fencing, sneakAttackChoice(fencing, rogue, Kind.DECLINE_SNEAK_ATTACK),
+                new Roll("DAMAGE", rogue, 8, 3));
+        var declinedAttack = declined.after().flows().getLast().attacks().getLast();
+        assertEquals(new SneakAttackEvidence(SneakAttackStatus.DECLINED, fencing.turnNumber(), null, List.of()),
+                declinedAttack.sneakAttack());
+        expectNumber(5, declined.healthChanges().getFirst().damageAmount());
+
+        var growth = new Schema2CharacterProgressionRules();
+        var second = growth.advance(material, growth.prepareAdvance(material, roguePlan, first, rogueClass, 2,
+                "FIXED_AVERAGE", GrowthChoices.EMPTY), null);
+        assertTrue(second.features().contains(grant));
+        UUID bow = UUID.randomUUID(), arrow = UUID.randomUUID(), scene = UUID.randomUUID();
+        var readyBow = acquireAndEquip(second, bow, "shortbow", "BOTH_HANDS");
+        var archer = new Schema2CharacterEquipmentRules().apply(material, readyBow,
+                equipmentCommand("ITEM_ACQUIRED", arrow, rules.rule("equipment.item", "item.arrow"), "CARRIED"), arrow);
+        var archeryRoster = Map.of(rogue, new Schema2CombatRules.Context(material, roguePlan, archer),
+                target, targetContext, ally, allyContext);
+        var archery = startSneakAttackBattle(combat, scene, campaign, archeryRoster, rogue, target, ally, 12);
+        archery = meleeStep(combat, archeryRoster, archery, Schema2CombatState.Command.action(Kind.BEGIN_ATTACK, rogue), List.of());
+        var shot = sneakAttackStep(combat, archeryRoster, archery, Schema2CombatState.Command.attack(rogue, target, bow),
+                new Roll("ATTACK_D20", rogue, 20, 20));
+        expectNumber(1, shot.ammunitionUses().size());
+        assertEquals(arrow, shot.ammunitionUses().getFirst().itemId());
+        assertTrue(shot.healthChanges().isEmpty());
+        assertSneakAttackPending(shot.after(), ally);
+        var critical = sneakAttackStep(combat, archeryRoster, shot.after(), sneakAttackChoice(shot.after(), rogue, Kind.USE_SNEAK_ATTACK),
+                new Roll("DAMAGE", rogue, 6, 1), new Roll("DAMAGE", rogue, 6, 2),
+                new Roll("SNEAK_ATTACK_DAMAGE", rogue, 6, 3), new Roll("SNEAK_ATTACK_DAMAGE", rogue, 6, 4));
+        var criticalAttack = critical.after().flows().getLast().attacks().getLast();
+        assertTrue(criticalAttack.critical());
+        assertEquals(new SneakAttackEvidence(SneakAttackStatus.USED, archery.turnNumber(), ally, List.of(3, 4)),
+                criticalAttack.sneakAttack());
+        assertEquals(List.of(1, 2), criticalAttack.damageDice());
+        expectNumber(12, criticalAttack.damageAmount());
+        expectNumber(1, critical.healthChanges().size());
+        expectNumber(12, critical.healthChanges().getFirst().damageAmount());
+        assertTrue(critical.ammunitionUses().isEmpty());
+    }
+
+    private void verifyOffTurnSneakAttack() {
+        var material = rules.projection();
+        var roguePlan = initialPlan("rogue");
+        UUID campaign = roguePlan.campaignId(), rogue = roguePlan.characterId();
+        UUID target = UUID.randomUUID(), ally = UUID.randomUUID(), dagger = UUID.randomUUID();
+        var targetPlan = rules.initialPlan(campaign, target, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var allyPlan = rules.initialPlan(campaign, ally, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var roster = new HashMap<>(Map.of(
+                rogue, new Schema2CombatRules.Context(material, roguePlan,
+                        acquireAndEquip(initial(roguePlan, "rogue"), dagger, "dagger", "MAIN_HAND")),
+                target, new Schema2CombatRules.Context(material, targetPlan, initial(targetPlan, "fighter")),
+                ally, new Schema2CombatRules.Context(material, allyPlan, initial(allyPlan, "fighter"))));
+        var combat = new Schema2CombatRules();
+        var opened = startSneakAttackBattle(combat, UUID.randomUUID(), campaign, roster, rogue, target, ally, 1);
+        var begun = meleeStep(combat, roster, opened, Schema2CombatState.Command.action(Kind.BEGIN_ATTACK, rogue), List.of());
+        var hit = sneakAttackStep(combat, roster, begun, Schema2CombatState.Command.attack(rogue, target, dagger),
+                new Roll("ATTACK_D20", rogue, 20, 15)).after();
+        assertSneakAttackPending(hit, ally);
+        var ownTurn = sneakAttackStep(combat, roster, hit, sneakAttackChoice(hit, rogue, Kind.USE_SNEAK_ATTACK),
+                new Roll("DAMAGE", rogue, 4, 1), new Roll("SNEAK_ATTACK_DAMAGE", rogue, 6, 1));
+        assertEquals(new SneakAttackEvidence(SneakAttackStatus.USED, opened.turnNumber(), ally, List.of(1)),
+                ownTurn.after().flows().getLast().attacks().getLast().sneakAttack());
+        expectNumber(4, ownTurn.healthChanges().getFirst().damageAmount());
+        roster.put(target, new Schema2CombatRules.Context(material, targetPlan, ownTurn.healthChanges().getFirst().after()));
+
+        var targetTurn = meleeStep(combat, roster, ownTurn.after(), Schema2CombatState.Command.action(Kind.END_TURN, rogue), List.of());
+        assertEquals(target, targetTurn.activeActor());
+        var destination = new Position(2, 0);
+        var movement = meleeStep(combat, roster, targetTurn, Schema2CombatState.Command.move(target, List.of(destination)), List.of());
+        var movementFlow = movement.activeFlow();
+        var window = movementFlow.windows().getLast();
+        var opportunity = window.opportunities().getFirst();
+        assertEquals(rogue, opportunity.actorId());
+        var opportunityAttack = Schema2CombatState.Command.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK, rogue, dagger,
+                movementFlow.flowKey(), movementFlow.leafFrameKey(), window.windowKey(), opportunity.opportunityKey());
+        var paused = sneakAttackStep(combat, roster, movement, opportunityAttack, new Roll("ATTACK_D20", rogue, 20, 16)).after();
+        assertSneakAttackPending(paused, ally);
+        var offTurn = sneakAttackStep(combat, roster, paused, sneakAttackChoice(paused, rogue, Kind.USE_SNEAK_ATTACK),
+                new Roll("DAMAGE", rogue, 4, 1), new Roll("SNEAK_ATTACK_DAMAGE", rogue, 6, 1));
+        assertEquals(new SneakAttackEvidence(SneakAttackStatus.USED, targetTurn.turnNumber(), ally, List.of(1)),
+                offTurn.after().flows().getLast().attacks().getLast().sneakAttack());
+        assertEquals(target, offTurn.after().activeActor());
+        expectNumber(4, offTurn.healthChanges().getFirst().damageAmount());
+        roster.put(target, new Schema2CombatRules.Context(material, targetPlan, offTurn.healthChanges().getFirst().after()));
+        var continuation = Schema2CombatState.Command.continuation(target, movementFlow.flowKey(),
+                offTurn.after().activeFlow().leafFrameKey(), window.windowKey());
+        var moved = meleeStep(combat, roster, offTurn.after(), continuation, List.of());
+        assertEquals(destination, activeCombatant(moved).position());
+    }
+
+    private static Battle startSneakAttackBattle(Schema2CombatRules combat, UUID scene, UUID campaign,
+            Map<UUID, Schema2CombatRules.Context> roster, UUID rogue, UUID target, UUID ally, int targetX) {
+        var start = Schema2CombatState.Command.start(List.of(new Deployment(rogue, new Position(0, 0), 0),
+                new Deployment(target, new Position(targetX, 0), 1), new Deployment(ally, new Position(targetX, 1), 0)),
+                List.of(rogue, target, ally));
+        var rolls = new ArrayDeque<>(List.of(18, 9, 3));
+        var opened = combat.resolve(combat.preflight(UUID.randomUUID(), scene, campaign, roster, null, start), sides -> {
+            expectNumber(20, sides);
+            return rolls.removeFirst();
+        }).after();
+        assertTrue(rolls.isEmpty());
+        assertEquals(rogue, opened.activeActor());
+        return opened;
+    }
+
+    private static Resolution sneakAttackStep(Schema2CombatRules combat, Map<UUID, Schema2CombatRules.Context> roster,
+            Battle battle, Schema2CombatState.Command command, Roll... expected) {
+        var dice = new ArrayDeque<>(List.of(expected));
+        var resolved = combat.resolve(combat.preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(), roster,
+                battle, command), sides -> {
+            var die = dice.removeFirst();
+            expectNumber(die.sides(), sides);
+            return die.value();
+        });
+        assertTrue(dice.isEmpty());
+        assertEquals(List.of(expected), resolved.rolls());
+        return resolved;
+    }
+
+    private static void assertSneakAttackPending(Battle battle, UUID nearbyEnemy) {
+        var flow = battle.activeFlow();
+        var frame = flow.frames().stream().filter(row -> row.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
+        assertEquals(Schema2CombatState.Stage.SNEAK_ATTACK_CHOICE, frame.stage());
+        assertEquals(Schema2CombatState.FrameStatus.WAITING_CHOICE, frame.status());
+        assertEquals(null, frame.windowKey());
+        assertEquals(new SneakAttackEvidence(SneakAttackStatus.PENDING, battle.turnNumber(), nearbyEnemy, List.of()),
+                flow.attacks().getLast().sneakAttack());
+    }
+
+    private static Schema2CombatState.Command sneakAttackChoice(Battle battle, UUID rogue, Kind kind) {
+        var flow = battle.activeFlow();
+        return Schema2CombatState.Command.sneakAttack(kind, rogue, flow.flowKey(), flow.leafFrameKey());
     }
 
     private void verifyHillDwarfToughness() {

@@ -99,13 +99,13 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 
 | 包 | 角色与直接依赖 |
 |---|---|
-| `srd51_runtime@14` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
-| `srd51_characters@16` | extension，直接依赖 `srd51_runtime@14`，声明短弓、箭、武器熟练与攻击配置，游荡者专精、灵巧动作，以及战士 Defense、Second Wind、Action Surge、Extra Attack 和勇士 Improved Critical |
-| `srd51_magic@20` | extension，直接依赖前两包，含骷髅短剑和短弓、地精弯刀和短弓、灵巧逃脱，以及法师和牧师的戏法来源和法术参数 |
-| `dm_runtime_house_rules@29` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@14` |
-| `dm_runtime_house_rules@30` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@14` 与 `srd51_characters@16` |
+| `srd51_runtime@15` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
+| `srd51_characters@17` | extension，直接依赖 `srd51_runtime@15`，声明短弓、箭、武器熟练与攻击配置，游荡者专精、偷袭、灵巧动作，以及战士 Defense、Second Wind、Action Surge、Extra Attack 和勇士 Improved Critical |
+| `srd51_magic@21` | extension，直接依赖前两包，含骷髅短剑和短弓、地精弯刀和短弓、灵巧逃脱，以及法师和牧师的戏法来源和法术参数 |
+| `dm_runtime_house_rules@31` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@15` |
+| `dm_runtime_house_rules@32` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@15` 与 `srd51_characters@17` |
 
-标准组合选择家规 @29，变体选择 @30。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
+标准组合选择家规 @31，变体选择 @32。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
 同一变体把石工知识从双倍熟练改为三倍、固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
 一个专属包缺失或与清单不符时，依赖它的内置组合返回 `BUNDLED_RULES_UNAVAILABLE`。三个共享包中任一损坏会影响两组。
@@ -118,7 +118,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 或局部键合并外部内容。新建与文件打开按绑定的原包重组。标准组合使用应用随附字节，自定义组合使用本机接受的原包。打开时逐项比对全部冻结材料。
 最多两份上下文缓存以完整不可变材料为键，损坏规则行或链不能借相同摘要绕过校验。
 改变成员、版本或规则解释必须新建战役，不在历史上热改规则。
-冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V7`；读取时拒绝不匹配的解释标识和缺失字段。
+冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V8`；读取时拒绝不匹配的解释标识和缺失字段。
 数据来源、许可、确定性构建和完整限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
 
 Fighter 支持到职业 6 级、Rogue 到 2 级、Life-domain cleric 到 1 级、Wizard 到 5 级。`character-create` 默认用
@@ -137,7 +137,7 @@ Fighter 支持到职业 6 级、Rogue 到 2 级、Life-domain cleric 到 1 级�
 选择智力（历史）时，可把题材设为“辨认石工作品来历”。[石工知识](rules/schema-2-character-foundations.md#石工知识)从建卡种族及冻结材料派生。结果随完整文件保存，重开后可继续普通历史或石工检定。
 标准包矮人的基础步速为 25 尺，重甲策略为 `IGNORE`。家规可分别覆盖[步速、策略、通用减速量和装备门槛](rules/schema-2-combat-authoring.md#步行来源)。重甲的护甲等级、隐匿劣势与
 未受训穿甲的限制分别生效。种族属性提升、完整背景技能和起始装备整包均超出该范围。
-游荡者创建请求用 `skillKeys` 指定四项职业技能，`expertiseKeys` 指定两项专精。冻结职业特性记录选择与取得等级。玩家重新获准后，角色卡使用同一份专精与本回合实际预算。[游荡者的成长、检定与灵巧动作](rules/schema-2-rogue.md)
+游荡者创建请求用 `skillKeys` 指定四项职业技能，`expertiseKeys` 指定两项专精。合格武器最终命中时，攻击记录保留原骰、待决偷袭及其回合。重开后，原控制者重新获准即可继续，服务端在一次命令中结清武器和偷袭伤害并保存收据。[游荡者规则](rules/schema-2-rogue.md)
 
 一级战士从冻结特性目录选择防御风格。DM 与玩家卡面的 AC 和攻击命中结算共用装备派生值。二级战士发动动作如潮时，扣减角色资源、增加本回合普通动作与命令收据同事务提交。两次攻击之间保存和同版重开保留实际余额与两次动作各自的攻击序列。[防御风格与动作如潮](rules/schema-2-fighter-actions.md)
 

@@ -168,6 +168,9 @@
     return result.spell + ' · ' + outcome + (result.damage == null ? '' : ` · 实际伤害 ${result.damage}`)
       + (result.dropped ? ' · 击倒目标' : '');
   }
+  function sneakAttackHit(result) {
+    return `${result.critical ? '重击' : '命中'} · 攻击总值 ${result.attackTotal}`;
+  }
   function listSection(parent, title, values, format) {
     if (!Array.isArray(values) || !values.length) return;
     const details = element('details'), summary = element('summary', '', title), list = element('ul', 'mini-list');
@@ -268,12 +271,19 @@
     const pending = $('player-pending');
     if (pendingKey !== pendingRenderKey) { pendingRenderKey = pendingKey; pending.replaceChildren(); pending.hidden = !view.pending?.active && !view.pending?.frozen;
       if (view.pending) pending.append(element('h2', '', view.pending.title || '等待当前行动继续'), element('p', '', view.pending.description || '请按当前允许的机会继续。'));
+      if (view.pending?.sneakAttack) pending.append(element('p', '', sneakAttackHit(view.pending.sneakAttack)));
     }
     $('player-receipt').hidden = !lastReceipt;
     if (lastReceipt) {
       let note = '上次收据：行动已完成。';
       if (lastReceipt.state === 'NOT_EXECUTED') note = '上次收据：确认未执行，旧请求已作废。';
       else if (lastReceipt.cantripResult) note = cantripResult(lastReceipt.cantripResult);
+      else if (lastReceipt.sneakAttackResult) {
+        const result = lastReceipt.sneakAttackResult;
+        note = `${sneakAttackHit(result)} · ${result.used ? '已使用偷袭' : '已放弃偷袭'}`;
+        if (result.damage != null) note += ` · 伤害合计 ${result.damage}`;
+        if (lastReceipt.outcome === 'WAITING') note += '。当时仍在等待后续决定。';
+      }
       else if (lastReceipt.attackResult) {
         const {hit, damage, dropped} = lastReceipt.attackResult;
         note = `上次攻击${hit ? '命中' : '未命中'}，造成 ${damage} 点伤害，${dropped ? '击倒了目标' : '未击倒目标'}。`;

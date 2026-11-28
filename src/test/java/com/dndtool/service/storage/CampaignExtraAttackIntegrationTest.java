@@ -252,7 +252,7 @@ class CampaignExtraAttackIntegrationTest {
         assertEquals(before, service.status());
     }
 
-    private static byte[] resign(JsonObject file) {
+    static byte[] resign(JsonObject file) {
         var integrity = file.remove("integrity").getAsJsonObject();
         file.addProperty("fileKey", id());
         integrity.addProperty("digest", CampaignJson.digest(CampaignCodec.FILE_DIGEST_DOMAIN, CampaignJson.canonical(file)));
@@ -344,11 +344,11 @@ class CampaignExtraAttackIntegrationTest {
             equipment(id(), fighter, "ITEM_EQUIPPED", new EquipmentInput(weapon, null, "MAIN_HAND", "主持人确认主手装备"));
             return weapon;
         }
-        private void equipment(String request, UUID fighter, String kind, EquipmentInput equipment) {
+        void equipment(String request, UUID fighter, String kind, EquipmentInput equipment) {
             characterCommand(request, fighter, new Schema2CharacterRuntime.Command(kind, null, 0, null, null,
                     null, GrowthChoices.EMPTY, null, null, equipment, null));
         }
-        private void characterCommand(String request, UUID fighter, Schema2CharacterRuntime.Command command) {
+        void characterCommand(String request, UUID fighter, Schema2CharacterRuntime.Command command) {
             var input = input("characterId", fighter, "characterVersion", card(fighter).version());
             input.add("command", CampaignDomainCodec.toJson(command));
             CampaignSpaceFixtures.command(service, request, "character-command", input);

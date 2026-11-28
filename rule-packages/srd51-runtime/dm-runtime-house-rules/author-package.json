@@ -1,20 +1,20 @@
 {
   "author_schema_version": 2,
   "module_key": "dm_runtime_house_rules",
-  "release_version": "29",
+  "release_version": "31",
   "package_display_name": "Current application — explicit DM house rules",
   "role": "extension",
   "dependencies": [
     {
       "module_key": "srd51_runtime",
       "supported_versions": [
-        "14"
+        "15"
       ]
     }
   ],
   "compatible_combinations": [
     {
-      "srd51_runtime": "14"
+      "srd51_runtime": "15"
     }
   ],
   "load_order_constraints": [],

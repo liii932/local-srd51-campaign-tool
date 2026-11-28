@@ -126,22 +126,40 @@ public final class PlayerCampaignProjection {
     }
 
     public static JsonObject receipt(CampaignStorageService.AccessSnapshot access, UUID member, CampaignDomainData.Root root) {
-        requireMember(access.snapshot().domains(), member);
+        var domain = access.snapshot().domains();
+        requireMember(domain, member);
         if (root.actor().kind() != ActorKind.PLAYER || !member.equals(root.actor().memberId()))
             throw new StorageException("PLAYER_REQUEST_UNAVAILABLE", "Request is unavailable");
-        var event = root.combatId() == null ? null : access.snapshot().domains().combats().stream()
-                .filter(c -> c.current().combatId().equals(root.combatId())).flatMap(c -> c.events().stream())
+        var history = root.combatId() == null ? null : domain.combats().stream()
+                .filter(c -> c.current().combatId().equals(root.combatId())).findFirst().orElse(null);
+        var event = history == null ? null : history.events().stream()
                 .filter(e -> e.operationId().equals(root.operationId())).findFirst().orElse(null);
-        boolean waiting = event != null && event.after().activeFlow() != null;
+        var active = event == null ? null : event.after().activeFlow();
+        boolean waiting = active != null;
+        if (active != null) {
+            var leaf = active.frames().stream().filter(f -> f.frameKey().equals(active.leafFrameKey())).findFirst().orElseThrow();
+            var sneakAttack = CampaignCombatView.pendingSneakAttack(active, leaf);
+            if (sneakAttack != null && !sneakAttack.actorId().equals(root.actor().characterId())) waiting = false;
+        }
         JsonObject result = new JsonObject(); result.addProperty("state", "ACCEPTED");
         result.addProperty("outcome", waiting ? "WAITING" : "COMPLETED");
         result.addProperty("label", waiting ? "操作已接受，当时正在等待后续决定" : "操作已完成");
-        if (event != null && Objects.equals(event.command().actorId(), root.actor().characterId())
-                && (event.command().kind() == Schema2CombatState.Kind.ATTACK
-                    || event.command().kind() == Schema2CombatState.Kind.DECLARE_OPPORTUNITY_ATTACK)) addMonsterAttackResult(result, event);
+        if (event != null && Objects.equals(event.command().actorId(), root.actor().characterId())) {
+            switch (event.command().kind()) {
+                case ATTACK, DECLARE_OPPORTUNITY_ATTACK -> addMonsterAttackResult(result, event);
+                case USE_SNEAK_ATTACK, DECLINE_SNEAK_ATTACK -> {
+                    var flow = event.after().flows().stream().filter(f -> f.flowKey().equals(event.command().flowKey()))
+                            .findFirst().orElseThrow();
+                    var attack = flow.attacks().stream().filter(a -> a.frameKey().equals(event.command().leafKey()))
+                            .findFirst().orElseThrow();
+                    result.add("sneakAttackResult", sneakAttackResult(domain, member, history.current(), attack));
+                }
+                default -> { }
+            }
+        }
         if (event != null && isCantrip(event)) {
             var flow = event.after().flows().getLast();
-            JsonObject outcome = cantripOutcome(access.snapshot().domains(), event, flow);
+            JsonObject outcome = cantripOutcome(domain, event, flow);
             if (outcome != null) result.add("cantripResult", outcome);
         }
         return result;
@@ -231,6 +249,25 @@ public final class PlayerCampaignProjection {
         result.addProperty("damage", attack.damageAmount());
         result.addProperty("dropped", attack.hit() && target.dead());
         receipt.add("attackResult", result);
+    }
+
+    private static JsonObject sneakAttackHit(Schema2CombatState.AttackAttempt attack) {
+        JsonObject result = new JsonObject();
+        result.addProperty("attackTotal", CampaignCombatView.weaponAttackTotal(attack));
+        result.addProperty("critical", attack.critical());
+        return result;
+    }
+
+    private static JsonObject sneakAttackResult(CampaignDomainData.State domain, UUID member,
+            Schema2CombatState.Battle battle, Schema2CombatState.AttackAttempt attack) {
+        JsonObject result = sneakAttackHit(attack);
+        result.addProperty("used", attack.sneakAttack().status() == Schema2CombatState.SneakAttackStatus.USED);
+        UUID target = attack.targetId();
+        if ((attack.rangedAttack() == null || shared(domain, member, ShareKind.SCENE, battle.combatId()))
+                && (visible(domain, member).contains(target) || visibleMonsters(domain, member, battle.combatId()).contains(target))
+                && Schema2ObservationRules.visible(battle, attack.actorId(), target))
+            result.addProperty("damage", attack.damageAmount());
+        return result;
     }
 
     static void requireMember(CampaignDomainData.State state, UUID member) {
@@ -365,17 +402,21 @@ public final class PlayerCampaignProjection {
     private static JsonObject pending(CampaignDomainData.State state, UUID member, Set<UUID> own) {
         JsonObject result = new JsonObject(); boolean hasFlow = false, ownChoice = false, ownDefense = false, frozen = false;
         String opportunityTarget = null;
+        Schema2CombatState.AttackAttempt ownSneakAttack = null;
         var focus = state.space().focus().space();
         for (var history : state.combats()) {
             var battle = history.current(); var flow = battle.activeFlow();
             if (battle.status() == Schema2CombatState.Status.ENDED || flow == null || battle.combatants().stream().noneMatch(c -> own.contains(c.characterId()))) continue;
             var leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
+            var sneakAttack = CampaignCombatView.pendingSneakAttack(flow, leaf);
+            if (sneakAttack != null && !own.contains(sneakAttack.actorId())) continue;
             var window = flow.windows().stream().filter(w -> w.windowKey().equals(leaf.windowKey())).findFirst().orElse(null);
             var opportunity = currentOpportunity(window, flow.leafFrameKey());
             UUID mover = CampaignParticipationCommands.opportunityMonster(battle, window);
             if (mover != null && !canViewMonsterOpportunity(state, member, battle, own, mover, opportunity)) continue;
             if (!CampaignSpaceData.Ref.scene(battle.combatId()).equals(focus)) { frozen = true; continue; }
             hasFlow = true;
+            if (sneakAttack != null) ownSneakAttack = sneakAttack;
             ownDefense |= battle.meleeControl().contests().stream().anyMatch(contest -> contest.outcome() == null
                     && contest.frameKey().equals(flow.rootFrameKey()) && own.contains(contest.targetId()));
             if (opportunity != null && own.contains(opportunity.actorId())) {
@@ -386,10 +427,14 @@ public final class PlayerCampaignProjection {
                 }
             }
         }
-        ownChoice |= ownDefense;
+        ownChoice |= ownDefense || ownSneakAttack != null;
+        if (ownSneakAttack != null) result.add("sneakAttack", sneakAttackHit(ownSneakAttack));
         result.addProperty("active", hasFlow); result.addProperty("own", ownChoice); result.addProperty("frozen", frozen);
         result.addProperty("title", ownChoice ? "等待你的决定" : hasFlow ? "行动尚未结束" : frozen ? "后台行动已冻结" : "当前没有待决选择");
-        result.addProperty("description", ownDefense ? "选择力量（运动）或敏捷（杂技）进行防守。" : opportunityTarget != null ? opportunityTarget : ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "请按当前可用选项继续，或等待其他人决定。" : frozen ? "主持人切回该空间后可继续原行动。" : "可用行动随当前回合与主持人许可更新。");
+        result.addProperty("description", ownSneakAttack != null ? "本次攻击已命中。请选择是否使用偷袭。"
+                : ownDefense ? "选择力量（运动）或敏捷（杂技）进行防守。" : opportunityTarget != null ? opportunityTarget
+                : ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "请按当前可用选项继续，或等待其他人决定。"
+                : frozen ? "主持人切回该空间后可继续原行动。" : "可用行动随当前回合与主持人许可更新。");
         return result;
     }
     private static String actionLabel(String action) { return switch (action) { case "combat-command" -> "行动已记录"; case "character-command", "check-effects", "manual-check" -> "角色操作已记录"; default -> "状态已更新"; }; }

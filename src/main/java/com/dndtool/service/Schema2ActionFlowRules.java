@@ -24,7 +24,7 @@ final class Schema2ActionFlowRules {
     private final Schema2CharacterEquipmentRules equipment=new Schema2CharacterEquipmentRules();
     private final Schema2CharacterHealthRules health=new Schema2CharacterHealthRules();
     Schema2ActionFlowRules(Schema2CombatRules combat) { this.combat=combat; }
-    static boolean continuation(Kind k) { return Set.of(Kind.PASS_REACTION,Kind.DECLARE_OPPORTUNITY_ATTACK,Kind.DECLARE_SHIELD,Kind.DECLARE_COUNTERSPELL,Kind.RELEASE_READY,Kind.ADVANCE_WINDOW,Kind.CONTINUE_FLOW,Kind.CONTINUE_MOVEMENT).contains(k); }
+    static boolean continuation(Kind k) { return Schema2SneakAttackRules.decision(k)||Set.of(Kind.PASS_REACTION,Kind.DECLARE_OPPORTUNITY_ATTACK,Kind.DECLARE_SHIELD,Kind.DECLARE_COUNTERSPELL,Kind.RELEASE_READY,Kind.ADVANCE_WINDOW,Kind.CONTINUE_FLOW,Kind.CONTINUE_MOVEMENT).contains(k); }
     static boolean handles(Kind k) { return continuation(k)||Set.of(Kind.ATTACK,Kind.MONSTER_ATTACK,Kind.MOVE,Kind.CAST,Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL).contains(k); }
     void prepare(Map<UUID,Context> roster,Battle b,Command c,Set<UUID> knownPositions) {
         require(c.actorId()!=null && c.deployments().isEmpty() && c.tieBreakOrder().isEmpty() && c.zoneInput()==null && c.zoneKey()==null && c.healthInput()==null && c.seconds()==0 && c.monsterDeployments().isEmpty() && c.breathInput()==null && c.monsterRestInput()==null,"S2_COMBAT_COMMAND");
@@ -55,12 +55,26 @@ final class Schema2ActionFlowRules {
                     int range=source.spell().cantripProfile().rangeFeet();
                     validateRetainedRange(attack,range,range);
                     if (!targetDead(roster,b,attack.targetId())) prepareTargetHealth(roster,b,attack.targetId());
-                } else if (attack.rangedAttack() != null) {
-                    var profile = combat.launchedRangedWeapon(roster.get(attack.actorId()), attack.itemId());
-                    validateRetainedRange(attack, profile.normalRangeFeet(), profile.longRangeFeet());
+                } else {
+                    var profile = retainedWeapon(roster, attack);
+                    if (profile.ranged()) validateRetainedRange(attack, profile.normalRangeFeet(), profile.longRangeFeet());
                 }
             }
-            Frame leaf=frame(f,c.leafKey());Window w=window(f,c.windowKey());
+            Frame leaf=frame(f,c.leafKey());
+            if (Schema2SneakAttackRules.decision(c.kind())) {
+                require(leaf.stage() == Stage.SNEAK_ATTACK_CHOICE && leaf.kind() == FrameKind.ATTACK
+                        && leaf.status() == FrameStatus.WAITING_CHOICE, "ACTION_FLOW_STAGE_INVALID");
+                require(ownerActor(f, leaf).equals(c.actorId()), "ACTION_FLOW_TARGET_MISMATCH");
+                AttackAttempt attack = f.attacks().stream().filter(a -> a.frameKey().equals(leaf.frameKey()))
+                        .findFirst().orElseThrow();
+                var expected = sneakAttackOffer(roster, b, attack, retainedWeapon(roster, attack));
+                require(expected != null && expected.equals(attack.sneakAttack()), "ACTION_FLOW_FROZEN_DATA_INVALID");
+                prepareTargetHealth(roster, b, attack.targetId());
+                requireCapacity(roster, b, c, knownPositions);
+                return;
+            }
+            require(leaf.stage() != Stage.SNEAK_ATTACK_CHOICE, "ACTION_FLOW_STAGE_INVALID");
+            Window w=window(f,c.windowKey());
             require(Objects.equals(leaf.windowKey(),w.windowKey()),"ACTION_FLOW_TARGET_MISMATCH");
             if(c.kind()==Kind.CONTINUE_FLOW||c.kind()==Kind.CONTINUE_MOVEMENT) {
                 require(w.status()==WindowStatus.CLOSED&&w.ownerFrameKey().equals(leaf.frameKey())&&(leaf.kind()==FrameKind.SAVE_DAMAGE?b.saveDamageBatches().stream().filter(v->v.frameKey().equals(leaf.frameKey())).findFirst().orElseThrow().sourceId():ownerActor(f,leaf)).equals(c.actorId())&&c.opportunityKey()==null,"ACTION_FLOW_STAGE_INVALID");
@@ -139,6 +153,13 @@ final class Schema2ActionFlowRules {
     private void prepareTargetHealth(Map<UUID,Context> roster,Battle b,UUID target) {
         if(roster.containsKey(target))health.prepareDamage(roster.get(target).material(),roster.get(target).character());
         else {var m=Schema2MonsterRules.instance(b,target);Schema2MonsterRules.definition(roster,m.monster());if(m.dead())throw invalid("S2_HEALTH_DEAD");}
+    }
+    private WeaponAttackDefinition retainedWeapon(Map<UUID, Context> roster, AttackAttempt attack) {
+        return combat.launchedWeapon(roster.get(attack.actorId()), attack.itemId(), attack.rangedAttack() != null);
+    }
+    private static SneakAttackEvidence sneakAttackOffer(Map<UUID,Context> roster,Battle battle,
+            AttackAttempt attack,WeaponAttackDefinition weapon) {
+        return targetDead(roster,battle,attack.targetId()) ? null : Schema2SneakAttackRules.offer(roster,battle,attack,weapon);
     }
     private void prepareCantripTarget(Map<UUID,Context> roster, Battle battle, UUID source, UUID target,
             SpellDefinition spell) {
@@ -406,7 +427,7 @@ final class Schema2ActionFlowRules {
         requireCharacterCapacity(roster,battle,command);
     }
     private void requireStructureCapacity(Map<UUID,Context> roster,Battle b,Command command) {
-        Flow flow=b.activeFlow();int suffix=mandatorySuffix(roster,b,command);
+        Flow flow=b.activeFlow();int suffix=mandatorySuffix(roster,b,command,false);
         int created=Set.of(Kind.DECLARE_OPPORTUNITY_ATTACK,Kind.DECLARE_SHIELD,Kind.DECLARE_COUNTERSPELL).contains(command.kind())?1:command.kind()==Kind.RELEASE_READY?2:flow==null&&Set.of(Kind.ATTACK,Kind.MONSTER_ATTACK,Kind.MOVE,Kind.CAST,Kind.READY_SPELL).contains(command.kind())?1:0;
         if (flow == null && command.kind() == Kind.CAST
                 && isAlgorithm(roster,command.actorId(),command.castInput().spell(),FIRE_BOLT_ALGORITHM)) created++;
@@ -447,12 +468,19 @@ final class Schema2ActionFlowRules {
     private static boolean isBless(Map<UUID,Context> roster,UUID actor,RuleIdentity spell) {return roster.get(actor).material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).anyMatch(s->s.enabled()&&s.identity().equals(spell)&&Schema2SpellRules.BLESS.equals(s.definition().algorithm()));}
     /** Commands needed to finish by passing every still optional opportunity; each new child reserves its own suffix before acceptance. */
     int mandatorySuffix(Map<UUID,Context> roster,Battle b,Command command) {
+        return mandatorySuffix(roster,b,command,true);
+    }
+    private int mandatorySuffix(Map<UUID,Context> roster,Battle b,Command command,boolean includeSneakAttackChoice) {
         Flow flow=b==null?null:b.activeFlow();int result=0;
         if(flow!=null) {
             for(Window w:flow.windows())if(w.status()!=WindowStatus.CONSUMED)result+=1+(int)w.opportunities().stream().filter(o->o.status()==OpportunityStatus.PENDING).count();
             for(Frame frame:flow.frames())if(frame.status()!=FrameStatus.TERMINAL&&frame.kind()!=FrameKind.REACTION_SELECTION) {
                 if(frame.kind()==FrameKind.ATTACK) {
                     AttackAttempt attack=flow.attacks().stream().filter(v->v.frameKey().equals(frame.frameKey())).findFirst().orElseThrow();
+                    if (includeSneakAttackChoice && attack.status() == AttackStatus.HIT_PENDING_DAMAGE
+                            && attack.itemId() != null && !(attack.disadvantage() && !attack.advantage())
+                            && Schema2SneakAttackRules.available(b, roster.get(attack.actorId()), retainedWeapon(roster, attack)))
+                        result++;
                     if(frame.stage()!=Stage.READY_TRIGGER_AFTER)
                         result+=readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,attack.actorId(),null);
                     if(monsterRootAttack(attack)&&flow.windows().stream().noneMatch(window -> window.ownerFrameKey().equals(frame.frameKey())
@@ -482,6 +510,7 @@ final class Schema2ActionFlowRules {
             if(targetAtAim(b,command.actorId(),command.targetId()))result+=windowCost(shieldCandidates(roster,b,command.targetId()));
             result+=readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,command.actorId(),null);
             if(command.kind()==Kind.MONSTER_ATTACK)result+=readyCost(roster,b,TriggerKind.MONSTER_ACTION_COMPLETED,command.actorId(),null);
+            else if (includeSneakAttackChoice && prospectiveSneakAttack(roster,b,command.actorId(),command.itemId())) result++;
         }
         else if(command.kind()==Kind.CAST||command.kind()==Kind.READY_SPELL) {
             result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null);
@@ -492,15 +521,22 @@ final class Schema2ActionFlowRules {
         }
         else if(command.kind()==Kind.DECLARE_OPPORTUNITY_ATTACK) {
             Window w=window(flow,command.windowKey());result+=windowCost(shieldCandidates(roster,b,w.trigger().subjectId()))+readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,command.actorId(),null);
+            if (includeSneakAttackChoice && command.itemId() != null
+                    && prospectiveSneakAttack(roster,b,command.actorId(),command.itemId())) result++;
         } else if(command.kind()==Kind.DECLARE_SHIELD||command.kind()==Kind.DECLARE_COUNTERSPELL)result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null);
         else if(command.kind()==Kind.RELEASE_READY) {
             ReadyPreparation r=ready(b,command.readyKey());if(r.input().responseKind()==ReadyResponseKind.MOVE)result+=movementFrontier(roster,b,null,null,r.actorId(),r.input().path(),null,0);
             if(r.input().responseKind()==ReadyResponseKind.ATTACK) {
                 if(targetAtAim(b,r.actorId(),r.input().targetId()))result+=windowCost(shieldCandidates(roster,b,r.input().targetId()));
                 result+=readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,r.actorId(),null);
+                if (includeSneakAttackChoice && prospectiveSneakAttack(roster,b,r.actorId(),r.input().itemId())) result++;
             }
         }
         return result;
+    }
+    private boolean prospectiveSneakAttack(Map<UUID, Context> roster, Battle battle, UUID actor, UUID item) {
+        Context source = roster.get(actor);
+        return Schema2SneakAttackRules.available(battle, source, combat.weapon(source, item));
     }
     private int pendingFireBoltCost(Map<UUID,Context> roster, Battle battle, UUID caster, RuleIdentity spell,
             List<UUID> targets) {
@@ -749,6 +785,22 @@ final class Schema2ActionFlowRules {
                     ? Schema2ActionFlowRules.actor(b,a.actorId()).position().distanceFeet(Schema2ActionFlowRules.actor(b,a.targetId()).position())
                     : a.rangedAttack().distanceFeet();
             boolean critical=hit&&(criticalRoll||targetHp(a.targetId())==0&&distance<=5);
+            WeaponAttackDefinition weapon = hit && a.itemId() != null ? retainedWeapon(roster,a) : null;
+            SneakAttackEvidence sneakAttack = weapon == null ? null : sneakAttackOffer(roster,b,a,weapon);
+            if (sneakAttack != null) {
+                attack(a.withOutcome(ac,true,critical,List.of(),0,AttackStatus.HIT_PENDING_DAMAGE,monster,spellAttack,sneakAttack));
+                stage(id,FrameStatus.WAITING_CHOICE,Stage.SNEAK_ATTACK_CHOICE,null,null);
+                leaf=id;
+                return;
+            }
+            finishAttackDamage(a,ac,hit,critical,weapon,false);
+        }
+        private void finishAttackDamage(AttackAttempt a,int ac,boolean hit,boolean critical,
+                WeaponAttackDefinition weapon,boolean useSneakAttack) {
+            UUID id = a.frameKey();
+            MonsterAttackEvidence monster = a.monsterAttack();
+            SpellAttackEvidence spellAttack = a.spellAttack();
+            SneakAttackEvidence sneakAttack = a.sneakAttack();
             List<Integer> damage = new ArrayList<>();
             List<AttackDamageComponent> components = List.of();
             MonsterOnHitSave onHit = null;
@@ -766,11 +818,18 @@ final class Schema2ActionFlowRules {
                         amount=damageResult.effectiveDamage();
                     }
                 } else if (monster == null) {
-                    Context source = roster.get(a.actorId());
-                    var profile = a.rangedAttack() == null ? combat.weapon(source, a.itemId()) : combat.launchedRangedWeapon(source, a.itemId());
-                    for(int i=0;i<profile.diceCount()*(critical?2:1);i++)damage.add(dice.draw("DAMAGE",a.actorId(),profile.diceSides()));
-                    amount=Math.max(0,damage.stream().mapToInt(Integer::intValue).sum()+a.abilityModifier());
-                    amount=Schema2MonsterRules.effectiveDamage(roster,b,a.targetId(),profile.damageType(),true,amount);
+                    for(int i=0;i<weapon.diceCount()*(critical?2:1);i++)damage.add(dice.draw("DAMAGE",a.actorId(),weapon.diceSides()));
+                    int raw = damage.stream().mapToInt(Integer::intValue).sum() + a.abilityModifier();
+                    if (sneakAttack != null) {
+                        List<Integer> extra = new ArrayList<>();
+                        if (useSneakAttack) for (int i = 0; i < (critical ? 2 : 1); i++)
+                            extra.add(dice.draw(Schema2SneakAttackRules.DAMAGE_ROLL,a.actorId(),Schema2SneakAttackRules.DAMAGE_DIE));
+                        raw += extra.stream().mapToInt(Integer::intValue).sum();
+                        sneakAttack = new SneakAttackEvidence(useSneakAttack ? SneakAttackStatus.USED : SneakAttackStatus.DECLINED,
+                                sneakAttack.turnNumber(),sneakAttack.nearbyEnemyId(),extra);
+                    }
+                    amount=Math.max(0,raw);
+                    amount=Schema2MonsterRules.effectiveDamage(roster,b,a.targetId(),weapon.damageType(),true,amount);
                 } else {
                     var profile = Schema2MonsterRules.attack(roster, b, a.actorId(), monster.action(), a.opportunityAttack());
                     components = monsterDamage(a, profile, critical);
@@ -784,10 +843,7 @@ final class Schema2ActionFlowRules {
                 monster = new MonsterAttackEvidence(monster.action(), monster.hitBonus(), monster.reachFeet(),
                         monster.packTacticsAllies(), components, onHitResult);
             }
-            attack(new AttackAttempt(a.frameKey(),a.actorId(),a.targetId(),a.itemId(),a.sequenceKey(),a.attackOrdinal(),a.opportunityAttack(),
-                    a.firstD20(),a.secondD20(),a.selectedD20(),a.abilityModifier(),a.proficiencyBonus(),a.armorClass(),a.advantage(),
-                    a.disadvantage(),critical,hit,damage,amount,a.blessingEffectKey(),a.blessingD4(),AttackStatus.RESOLVED,a.initialHit(),ac,monster,a.rangedAttack(),
-                    a.attackerSeesTarget(),a.targetSeesAttacker(),a.targetCover(),a.aimedPosition(),a.targetAtAimedPosition(),spellAttack));
+            attack(a.withOutcome(ac,hit,critical,damage,amount,AttackStatus.RESOLVED,monster,spellAttack,sneakAttack));
             if (a.sequenceKey() != null && a.rangedAttack() == null) spendAttackOrdinal(a.actorId());
             afterAttack(id, null);
         }
@@ -1108,6 +1164,13 @@ final class Schema2ActionFlowRules {
             windows.add(new Window(window,owner,windows.size(),boundary,WindowStatus.OPEN,ordered,trigger));stage(owner,FrameStatus.WAITING_WINDOW,stage,window,null);frames.add(new Frame(selection,owner,FrameKind.REACTION_SELECTION,first.opportunityKey(),Invocation.CONTINUATION,FrameStatus.PENDING,stage,window,first.opportunityKey()));leaf=selection;facts.add(new CombatFact(kind.name(),trigger.subjectId(),trigger.triggerKey(),null));return true;
         }
         void decide(Command command) {
+            if (Schema2SneakAttackRules.decision(command.kind())) {
+                AttackAttempt attack = attack(command.leafKey());
+                stage(attack.frameKey(),FrameStatus.RUNNABLE,Stage.ATTACK_HIT_BEFORE_DAMAGE,null,null);
+                finishAttackDamage(attack,attack.finalArmorClass(),attack.hit(),attack.critical(),retainedWeapon(roster,attack),
+                        command.kind() == Kind.USE_SNEAK_ATTACK);
+                return;
+            }
             Window w=window(flow(),command.windowKey());
             if(w.status()==WindowStatus.CLOSED) {
                 int index=windows.indexOf(w);windows.set(index,new Window(w.windowKey(),w.ownerFrameKey(),w.checkpointOrdinal(),w.boundaryIndex(),WindowStatus.CONSUMED,w.opportunities(),w.trigger()));

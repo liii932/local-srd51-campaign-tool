@@ -915,9 +915,18 @@
   function characterShotResult(attack) {
     const shot = attack.rangedAttack;
     const dice = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
-    const outcome = attack.status !== 'RESOLVED' ? '等待反应结算' : !attack.hit ? '未命中'
+    const outcome = attack.sneakAttack?.status === 'PENDING' ? '等待偷袭决定' : attack.status !== 'RESOLVED' ? '等待反应结算' : !attack.hit ? '未命中'
       : `${attack.critical ? '重击' : '命中'} · 伤害 ${attack.damageAmount}`;
     return `${personName(attack.actorId)} → ${personName(attack.targetId)} · 射击 · ${rangedDetails(shot)} · 已用 1 支箭 · d20=${dice}，选用 ${attack.selectedD20}，护甲等级 ${attack.finalArmorClass} · ${outcome}${attackSight(attack)}`;
+  }
+  function sneakAttackResult(attack) {
+    const sneak = attack.sneakAttack;
+    const total = attack.selectedD20 + attack.abilityModifier + attack.proficiencyBonus + (attack.blessingD4 ?? 0);
+    const cause = sneak.nearbyEnemyId ? `目标身旁有 ${personName(sneak.nearbyEnemyId)}` : '本次攻击有优势';
+    const hit = `${personName(attack.actorId)} → ${personName(attack.targetId)} · 第 ${sneak.turnNumber} 回合 · 攻击总值 ${total} · ${attack.critical ? '重击' : '命中'} · ${cause}`;
+    if (sneak.status === 'PENDING') return `${hit} · 等待偷袭决定`;
+    const outcome = sneak.status === 'USED' ? `已使用偷袭，额外 d6=${sneak.damageDice.join('、')}` : '已放弃偷袭';
+    return `${hit} · ${outcome} · 伤害合计 ${attack.damageAmount}`;
   }
   function cantripAttackResult(attack, cast) {
     const d20 = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
@@ -973,11 +982,13 @@
     }
     for (const flow of after.flows) {
       const earlier = before?.flows.find(old => old.flowKey === flow.flowKey);
-      for (const attack of flow.attacks.filter(attack => attack.monsterAttack || attack.rangedAttack || attack.spellAttack)) {
+      for (const attack of flow.attacks.filter(attack => attack.monsterAttack || attack.rangedAttack || attack.spellAttack || attack.sneakAttack)) {
         const prior = earlier?.attacks.find(previous => previous.frameKey === attack.frameKey);
-        if (prior?.status === attack.status) continue;
+        if (prior?.status === attack.status && prior?.sneakAttack?.status === attack.sneakAttack?.status) continue;
+        if (attack.sneakAttack) details.push(sneakAttackResult(attack));
         if (attack.spellAttack) details.push(cantripAttackResult(attack, flow.casts.find(c => c.frameKey === attack.spellAttack.castFrameKey)));
-        else details.push(attack.monsterAttack ? monsterAttackResult(attack) : characterShotResult(attack));
+        else if (attack.monsterAttack) details.push(monsterAttackResult(attack));
+        else if (attack.rangedAttack) details.push(characterShotResult(attack));
       }
       for (const cast of flow.casts) {
         const prior = earlier?.casts.find(c => c.frameKey === cast.frameKey);
@@ -1173,6 +1184,8 @@
       if (monsterAttack) text(box, 'p', monsterAttackResult(monsterAttack), 'monster-attack-result');
       const shot = battle.flows.flatMap(flow => flow.attacks).findLast(attack => attack.rangedAttack && !attack.monsterAttack);
       if (shot) text(box, 'p', characterShotResult(shot), 'character-shot-result');
+      const sneakAttack = battle.flows.flatMap(flow => flow.attacks).findLast(attack => attack.sneakAttack && attack.status === 'RESOLVED');
+      if (sneakAttack) text(box, 'p', sneakAttackResult(sneakAttack), 'sneak-attack-result');
       const recentCast = battle.flows.flatMap(flow => flow.casts).findLast(cast => cast.status === 'RESOLVED');
       if (recentCast) {
         const caster = roster().find(character => character.id === recentCast.actorId);
@@ -1198,6 +1211,20 @@
       for (const flow of (battle.flows || []).filter(flow => flow.status === 'ACTIVE')) {
         const panel = document.createElement('article'); panel.className = 'card';
         const leaf = flow.frames.find(frame => frame.frameKey === flow.leafFrameKey);
+        if (leaf?.stage === 'SNEAK_ATTACK_CHOICE') {
+          const attack = flow.attacks.find(attempt => attempt.frameKey === leaf.frameKey);
+          text(panel, 'h4', `${personName(attack.actorId)} 的偷袭决定`);
+          text(panel, 'p', sneakAttackResult(attack));
+          if (executing) {
+            const row = document.createElement('div'); row.className = 'actions';
+            const choice = {...baseCombat('USE_SNEAK_ATTACK', attack.actorId), flowKey: flow.flowKey, leafKey: leaf.frameKey};
+            pendingButton(row, '使用偷袭', battle, choice);
+            pendingButton(row, '放弃偷袭', battle, {...choice, kind: 'DECLINE_SNEAK_ATTACK'});
+            panel.append(row);
+          } else text(panel, 'p', '后台冻结。切换执行焦点后再继续。');
+          pending.append(panel);
+          continue;
+        }
         if (leaf?.kind === 'DOMAIN_CHOICE') {
           const contest = battle.meleeControl?.contests.find(entry => entry.choiceKey === leaf.ownerKey);
           if (contest) {

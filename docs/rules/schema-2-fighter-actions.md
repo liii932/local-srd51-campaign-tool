@@ -5,7 +5,7 @@
 
 ## 作者声明与取得
 
-随附 `srd51_characters@16` 使用下列声明。两项特性的 `owner` 均为启用的完整 `class.fighter` 身份，`feature_kind` 均为 `FEATURE`。
+随附 `srd51_characters@17` 使用下列声明。两项特性的 `owner` 均为启用的完整 `class.fighter` 身份，`feature_kind` 均为 `FEATURE`。
 
 | 特性键 | 职业等级 | 来源页 | `execution_mode` | `execution_algorithm` |
 | --- | ---: | ---: | --- | --- |

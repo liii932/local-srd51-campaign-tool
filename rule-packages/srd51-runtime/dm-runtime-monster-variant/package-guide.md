@@ -1,7 +1,7 @@
 # DM Hell Hound attack profile example
 
 Append this author package after the standard combination with `srd51_magic`
-release `20` and `dm_runtime_house_rules` release `29`. The package replaces the
+release `21` and `dm_runtime_house_rules` release `31`. The package replaces the
 complete `action_profile` for `srd51_magic/monster.hell_hound/actions/bite`.
 
 The variant Bite has a +7 attack modifier, a reach of 10 feet, 2d8 + 4 piercing

@@ -25,7 +25,7 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Read-only rule consumers share this verified campaign binding and frozen projection. */
 public final class CampaignRuleContext {
-    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V7";
+    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V8";
     static final List<String> INITIAL_BACKGROUNDS = List.of("acolyte", "custom_artisan");
     private final ProductionSchema2Projection projection;
     private final Schema2RulesBinding binding;

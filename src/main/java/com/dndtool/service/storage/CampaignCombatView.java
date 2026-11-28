@@ -3,12 +3,16 @@ package com.dndtool.service.storage;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.service.Schema2CombatRules;
+import com.dndtool.service.Schema2CombatState.AttackAttempt;
 import com.dndtool.service.Schema2CombatState.Battle;
 import com.dndtool.service.Schema2CombatState.CastInput;
 import com.dndtool.service.Schema2CombatState.Command;
 import com.dndtool.service.Schema2CombatState.Combatant;
 import com.dndtool.service.Schema2CombatState.Cover;
+import com.dndtool.service.Schema2CombatState.Flow;
+import com.dndtool.service.Schema2CombatState.Frame;
 import com.dndtool.service.Schema2CombatState.Kind;
+import com.dndtool.service.Schema2CombatState.Stage;
 import com.dndtool.service.Schema2CombatState.Status;
 import com.dndtool.service.Schema2ObservationRules;
 import com.dndtool.service.Schema2FeatureSupport;
@@ -50,6 +54,17 @@ final class CampaignCombatView {
         budget.addProperty("movementRemainingHalfFeet", actor.remainingMovementHalfFeet(speed));
         budget.addProperty("surprised", battle.surprised(actor.characterId()));
         return budget;
+    }
+
+    static AttackAttempt pendingSneakAttack(Flow flow, Frame leaf) {
+        if (leaf.stage() != Stage.SNEAK_ATTACK_CHOICE) return null;
+        return flow.attacks().stream().filter(attack -> leaf.frameKey().equals(attack.frameKey()))
+                .findFirst().orElseThrow();
+    }
+
+    static int weaponAttackTotal(AttackAttempt attack) {
+        return attack.selectedD20() + attack.abilityModifier() + attack.proficiencyBonus()
+                + Objects.requireNonNullElse(attack.blessingD4(), 0);
     }
 
     static List<UUID> weaponTargets(Battle battle) {
