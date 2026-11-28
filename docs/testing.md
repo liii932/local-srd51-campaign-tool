@@ -87,7 +87,7 @@ python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```bash
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.6.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.7.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -250,7 +250,7 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    源的一致性及 DRAFT 作者向量。以下为 Bash 示例，Windows 使用对应候选路径及本机 Python。
 
    ```bash
-   war=target/dnd-tool-se-0.6.0.war
+   war=target/dnd-tool-se-0.7.0.war
    scenarios=rule-packages/srd51-runtime/scenarios
    python3 rule-packages/srd51-runtime/build-bundles.py --check
    python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
@@ -411,7 +411,7 @@ ZIP 原始身份和 SQLite 冻结投影。纯规则、应用消费者和独立�
 生产代码或打包资源变化后，从候选对应源码的根目录运行。使用 Python 3.11+ 和环境中的 JDK 21+（`java`、`javac`、`jdeps`）。
 
 ```bash
-python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.6.0.war
+python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.7.0.war
 ```
 
 保存命令、退出码及 JSON 输出，记录字节数、SHA-256、全部 ZIP 条目数、应用类和嵌套 JAR 数。
@@ -753,6 +753,16 @@ QR 像素核验还需独立 Python 环境中的
 ```bash
 node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/player-store
 ```
+
+在另一个全新隔离根以 `--movement` 运行同一脚本，可验收战士同回合攻击与回气、DM 移动狼、跨格前暂停、持剑玩家亲自借机攻击及 DM 继续。主持端和玩家端的预算与逐格位置可交叉核对。
+
+```bash
+node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/movement-store --movement
+```
+
+`PlayerParticipationAcceptanceTest` 用交付规则包、固定骰和两名独立成员检验攻击与放弃两条路径。用例在未决窗口和决定后的继续点保存、结束并重开，核对决定者、原骰、未走路径、两侧预算、撤权与重复提交。`Schema2MonsterAttackRulesTest` 核对冻结怪物步速、倒地收费、疾走、撤离及被借机攻击击倒后的停点。`Schema2SecondWindRulesTest` 和 `CampaignSecondWindIntegrationTest` 核对附赠动作与职业资源分别耗尽和恢复。
+
+用候选 WAR 运行标准组合的 `monster-turn-movement`。该场景从交付的狼和长剑创建参战者，用固定原骰核对超速拒绝、离开触及前的停点、战士用掉的反应及狼走满 40 尺后的余额。[独立作者场景命令](../rule-packages/srd51-runtime/scenarios/README.md#monster-turn-movement)
 
 WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边界/会话/投影/候选类、
 参与/裁定领域及结构；禁止临时证书、测试启动器和任何运行凭据进入 WAR。

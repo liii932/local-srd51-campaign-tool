@@ -129,7 +129,8 @@ final class Schema2SaveDamageRules {
         var batch=new SaveDamageBatch(batchKey,frameKey,c.actorId(),c.breathInput().action(),operation,b.turnNumber(),proof,
                 empty?BatchStatus.NO_TARGETS:BatchStatus.ROLLED,shared,List.of(),List.of(),List.of());
         var monster=Schema2MonsterRules.instance(b,c.actorId());b=Schema2MonsterRules.replace(b,new MonsterInstance(monster.monsterId(),monster.monster(),monster.hitPoints(),monster.dead(),monster.actionUses().stream().map(u->u.action().equals(batch.action())?new MonsterActionUse(u.action(),false):u).toList()));
-        var actor=actor(b,c.actorId());List<Combatant> actors=b.combatants().stream().map(a->a.characterId().equals(c.actorId())?new Combatant(a.characterId(),a.position(),a.side(),false,a.reactionAvailable(),a.movementSpentHalfFeet(),a.movementBonus(),a.disengaged(),a.dodging(),a.sequence(),a.prone()):a).toList();
+        List<Combatant> actors = b.combatants().stream()
+                .map(a -> a.characterId().equals(c.actorId()) ? a.spendAction() : a).toList();
         Frame frame=new Frame(frameKey,null,FrameKind.SAVE_DAMAGE,batchKey,Invocation.ROOT,empty?FrameStatus.RUNNABLE:FrameStatus.PENDING,empty?Stage.SAVE_DAMAGE_COMPLETED:Stage.SAVE_DAMAGE_ROLLED,null,null);
         Flow flow=new Flow(flowKey,frameKey,frameKey,FlowStatus.ACTIVE,List.of(frame),List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),List.of());
         List<Flow> flows=new ArrayList<>(b.flows());flows.add(flow);List<SaveDamageBatch> batches=new ArrayList<>(b.saveDamageBatches());batches.add(batch);b=Schema2MonsterRules.with(b,b.monsters(),batches);
@@ -173,8 +174,7 @@ final class Schema2SaveDamageRules {
         List<Combatant> actors=new ArrayList<>(b.combatants());
         for(DamagePacket packet:packets)if(packet.afterHitPoints()==0) {
             UUID id=targets.get(packet.targetOrdinal()).creatureId();for(int j=0;j<actors.size();j++)if(actors.get(j).characterId().equals(id)) {
-                var a=actors.get(j);var seq=a.sequence();if(seq!=null&&!seq.closed())seq=new AttackSequence(seq.sequenceKey(),seq.limit(),seq.performed(),seq.limit()-seq.performed(),true);
-                actors.set(j,new Combatant(id,a.position(),a.side(),false,a.reactionAvailable(),a.movementSpentHalfFeet(),a.movementBonus(),a.disengaged(),a.dodging(),seq,true));
+                actors.set(j, actors.get(j).incapacitated());
             }
         }
         b=Schema2ActionFlowRules.rebuild(b,actors,b.flows(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.version());

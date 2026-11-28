@@ -35,7 +35,7 @@ class Schema2ProneRulesTest {
         apply(Command.action(Kind.BEGIN_ATTACK, mover));
         Combatant before = actor(mover);
         Resolution dropped = apply(Command.action(Kind.DROP_PRONE, mover));
-        assertEquals(new Combatant(mover, before.position(), before.side(), before.actionAvailable(),
+        assertEquals(new Combatant(mover, before.position(), before.side(), before.actionsRemaining(), before.bonusActionsRemaining(),
                 before.reactionAvailable(), before.movementSpentHalfFeet(), before.movementBonus(),
                 before.disengaged(), before.dodging(), before.sequence(), true), actor(mover));
         assertEquals(List.of(new CombatFact("DROP_PRONE", mover, combat, null)), dropped.facts());
@@ -70,7 +70,7 @@ class Schema2ProneRulesTest {
         assertTrue(rules.preflight(UUID.randomUUID(), combat, campaign, roster, battle, drop).possibleHealthTargets().isEmpty());
 
         Resolution dropped = apply(drop);
-        assertEquals(new Combatant(mover, standing.position(), standing.side(), standing.actionAvailable(),
+        assertEquals(new Combatant(mover, standing.position(), standing.side(), standing.actionsRemaining(), standing.bonusActionsRemaining(),
                 standing.reactionAvailable(), standing.movementSpentHalfFeet(), standing.movementBonus(),
                 standing.disengaged(), standing.dodging(), standing.sequence(), true), actor(mover));
         assertEquals(contexts, roster);
@@ -183,7 +183,7 @@ class Schema2ProneRulesTest {
         assertEquals(Status.EXPLORATION, battle.status());
         assertEquals(turn, battle.turnNumber());
         assertEquals(round, battle.round());
-        assertEquals(new Combatant(mover, before.position(), before.side(), before.actionAvailable(),
+        assertEquals(new Combatant(mover, before.position(), before.side(), before.actionsRemaining(), before.bonusActionsRemaining(),
                 before.reactionAvailable(), 20, before.movementBonus(), before.disengaged(), before.dodging(),
                 before.sequence(), false), actor(mover));
         assertEquals(2, stood.healthChanges().size());

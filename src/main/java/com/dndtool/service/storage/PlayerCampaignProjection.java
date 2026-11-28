@@ -5,6 +5,7 @@ import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CombatHistory;
+import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.util.*;
@@ -50,7 +51,7 @@ public final class PlayerCampaignProjection {
         }
         allowedLogs.stream().skip(Math.max(0, allowedLogs.size() - 50)).forEach(text -> { JsonObject item = new JsonObject(); item.addProperty("text", text); logs.add(item); });
         shared.add("cards", summaries); shared.add("scenes", scenes); shared.add("logs", logs); view.add("shared", shared);
-        view.add("pending", pending(state, own));
+        view.add("pending", pending(state, member, own));
         return view;
     }
     private static JsonObject spaceView(CampaignDomainData.State state, Set<UUID> visible, Set<UUID> monsters,
@@ -94,19 +95,21 @@ public final class PlayerCampaignProjection {
         JsonObject result = new JsonObject(); result.addProperty("state", "ACCEPTED");
         result.addProperty("outcome", waiting ? "WAITING" : "COMPLETED");
         result.addProperty("label", waiting ? "操作已接受，当时正在等待后续决定" : "操作已完成");
-        if (event != null && event.command().kind() == Schema2CombatState.Kind.ATTACK
-                && event.command().actorId().equals(root.actor().characterId())) addMonsterAttackResult(result, event);
+        if (event != null && Objects.equals(event.command().actorId(), root.actor().characterId())
+                && (event.command().kind() == Schema2CombatState.Kind.ATTACK
+                    || event.command().kind() == Schema2CombatState.Kind.DECLARE_OPPORTUNITY_ATTACK)) addMonsterAttackResult(result, event);
         return result;
     }
 
     private static void addMonsterAttackResult(JsonObject receipt, Schema2CombatHistory.Event event) {
-        var target = event.after().monsters().stream().filter(m -> m.monsterId().equals(event.command().targetId()))
-                .findFirst().orElse(null);
-        if (target == null) return;
-        // An ordinary ATTACK starts a new flow. Its root frame identifies this strike even if a reaction is pending.
         var flow = event.after().flows().getLast();
-        var attack = flow.attacks().stream().filter(a -> a.frameKey().equals(flow.rootFrameKey())).findFirst().orElseThrow();
+        UUID frame = event.command().kind() == Schema2CombatState.Kind.ATTACK ? flow.rootFrameKey()
+                : flow.frames().stream().filter(f -> f.kind() == Schema2CombatState.FrameKind.ATTACK
+                        && event.command().leafKey().equals(f.parentFrameKey())).findFirst().orElseThrow().frameKey();
+        var attack = flow.attacks().stream().filter(a -> a.frameKey().equals(frame)).findFirst().orElseThrow();
         if (attack.status() != Schema2CombatState.AttackStatus.RESOLVED) return;
+        var target = event.after().monsters().stream().filter(m -> m.monsterId().equals(attack.targetId())).findFirst().orElse(null);
+        if (target == null) return;
         JsonObject result = new JsonObject();
         result.addProperty("hit", attack.hit());
         result.addProperty("damage", attack.damageAmount());
@@ -190,7 +193,14 @@ public final class PlayerCampaignProjection {
         JsonArray effects = new JsonArray();
         for (var history : domain.combats()) if (history.current().status() != Schema2CombatState.Status.ENDED) {
             var battle = history.current();
-            battle.combatants().stream().filter(p -> p.characterId().equals(c.id())).forEach(p -> { if (p.prone()) effect(effects, "倒地"); if (p.dodging()) effect(effects, "闪避"); });
+            for (var actor : battle.combatants()) if (actor.characterId().equals(c.id())) {
+                if (actor.prone()) effect(effects, "倒地");
+                if (actor.dodging()) effect(effects, "闪避");
+                if (battle.status() == Schema2CombatState.Status.ACTIVE) {
+                    var context = new Schema2CombatRules.Context(material, c.initial(), state);
+                    card.add("turnBudget", CampaignCombatView.turnBudget(Map.of(c.id(), context), battle, actor));
+                }
+            }
             battle.ongoingEffects().stream().filter(e -> e.status() == Schema2CombatState.EffectStatus.ACTIVE && e.targets().contains(c.id())).forEach(e -> effect(effects, ruleName(domain, e.spell())));
             if (battle.concentrationHolders().stream().anyMatch(h -> h.actorId().equals(c.id()))) effect(effects, "专注中");
         } card.add("effects", effects); return card;
@@ -211,23 +221,34 @@ public final class PlayerCampaignProjection {
     }
     private static String location(String location) { return switch (location) { case "MAIN_HAND" -> "主手"; case "OFF_HAND" -> "副手"; case "BOTH_HANDS" -> "双手"; case "WORN" -> "穿戴"; case "GROUND" -> "落地"; default -> "携带"; }; }
     private static void effect(JsonArray rows, String label) { JsonObject row = new JsonObject(); row.addProperty("label", label); rows.add(row); }
-    private static JsonObject pending(CampaignDomainData.State state, Set<UUID> own) {
+    private static JsonObject pending(CampaignDomainData.State state, UUID member, Set<UUID> own) {
         JsonObject result = new JsonObject(); boolean hasFlow = false, ownChoice = false, ownDefense = false, frozen = false;
+        String opportunityTarget = null;
         var focus = state.space().focus().space();
         for (var history : state.combats()) {
             var battle = history.current(); var flow = battle.activeFlow();
             if (battle.status() == Schema2CombatState.Status.ENDED || flow == null || battle.combatants().stream().noneMatch(c -> own.contains(c.characterId()))) continue;
+            var leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
+            var window = flow.windows().stream().filter(w -> w.windowKey().equals(leaf.windowKey())).findFirst().orElse(null);
+            UUID mover = CampaignParticipationCommands.opportunityMonster(battle, window);
+            if (mover != null && !visibleMonsters(state, member, battle.combatId()).contains(mover)) continue;
             if (!CampaignSpaceData.Ref.scene(battle.combatId()).equals(focus)) { frozen = true; continue; }
             hasFlow = true;
             ownDefense |= battle.meleeControl().contests().stream().anyMatch(contest -> contest.outcome() == null
                     && contest.frameKey().equals(flow.rootFrameKey()) && own.contains(contest.targetId()));
-            ownChoice |= flow.windows().stream().filter(w -> w.status() == Schema2CombatState.WindowStatus.OPEN)
-                    .flatMap(w -> w.opportunities().stream()).anyMatch(o -> o.status() == Schema2CombatState.OpportunityStatus.PENDING && Objects.equals(o.selectionFrameKey(), flow.leafFrameKey()) && own.contains(o.actorId()));
+            if (window != null && window.status() == Schema2CombatState.WindowStatus.OPEN && window.opportunities().stream()
+                    .anyMatch(o -> o.status() == Schema2CombatState.OpportunityStatus.PENDING && Objects.equals(o.selectionFrameKey(), flow.leafFrameKey()) && own.contains(o.actorId()))) {
+                ownChoice = true;
+                if (mover != null) {
+                    var cell = CampaignSpaceCommands.position(state, mover).grid();
+                    opportunityTarget = monsterName(state, mover) + "（" + cell.x() + ", " + cell.y() + "）将离开你的触及范围。可以借机攻击或放弃。";
+                }
+            }
         }
         ownChoice |= ownDefense;
         result.addProperty("active", hasFlow); result.addProperty("own", ownChoice); result.addProperty("frozen", frozen);
         result.addProperty("title", ownChoice ? "等待你的决定" : hasFlow ? "行动尚未结束" : frozen ? "后台行动已冻结" : "当前没有待决选择");
-        result.addProperty("description", ownDefense ? "选择力量（运动）或敏捷（杂技）进行防守。" : ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "按当前可用选项继续；需要他人决定时请等待。" : frozen ? "主持人切回该空间后可继续原行动。" : "可用行动随当前回合与主持人许可更新。");
+        result.addProperty("description", ownDefense ? "选择力量（运动）或敏捷（杂技）进行防守。" : opportunityTarget != null ? opportunityTarget : ownChoice ? "选择本次反应，或明确放弃。" : hasFlow ? "请按当前可用选项继续，或等待其他人决定。" : frozen ? "主持人切回该空间后可继续原行动。" : "可用行动随当前回合与主持人许可更新。");
         return result;
     }
     private static String actionLabel(String action) { return switch (action) { case "combat-command" -> "行动已记录"; case "character-command", "check-effects", "manual-check" -> "角色操作已记录"; default -> "状态已更新"; }; }

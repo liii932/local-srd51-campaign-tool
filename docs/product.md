@@ -45,11 +45,13 @@ Wizard 到 5 级；成长、子职业身份、ASI、多职业前提/熟练、HP/
 单职业战士 5–6 级的 [Extra Attack](rules/schema-2-extra-attack.md) 和勇士 3–6 级的
 [Improved Critical](rules/schema-2-improved-critical.md)经正常成长取得并由武器攻击消费者执行。
 单职业战士 1–6 级的 [Second Wind](rules/schema-2-second-wind.md)从一级创建取得，
-在本人战斗回合以附赠动作治疗，准确资源、原骰和健康后果共同保存；标准短休或长休恢复次数。
+在本人战斗回合使用一次附赠动作和一次职业资源治疗，可同回合执行普通攻击。标准短休或长休恢复回气次数。
 其余未接入的 Fighter 特性与 Evocation Savant/Sculpt Spells 是可查的 `OPTION` 元数据，不自动获得；
 Wizard Spellcasting、Arcane Recovery 与一级 Life profile 则由真实消费者拥有。
 
 规则角色可在活动战斗中用本人 Attack 的一击擒抱或推撞，受擒者可用动作挣脱。两次攻击之间和拖带的反应停点均可保存重开。[近战控制](rules/schema-2-melee-control.md)
+
+角色与怪物共用回合预算。DM 可让规则怪物按自身步速逐格走一条路径，离开持械敌人的触及时停下。已获准查看该怪物的玩家可选择借机攻击或放弃。重开待决窗口后，DM 从已到达的格位继续剩余路径。[回合与移动](rules/schema-2-combat.md)
 
 普通检定、装备实例/护甲限制、伤害/治疗、临时 HP、死亡豁免、先攻/回合、近战攻击、移动、
 机会攻击和反应/继续保存实际骰点及完整状态。规则角色可在本人战斗回合

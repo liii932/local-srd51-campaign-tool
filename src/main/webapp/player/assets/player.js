@@ -176,6 +176,10 @@
       top.append(element('span', 'character-avatar', [...card.name || '角'][0]), name);
       const stats = element('div', 'character-stats'); stats.append(stat(card.currentHp === undefined ? '—' : `${card.currentHp} / ${card.maximumHp ?? '—'}`, '生命值'), stat(card.armorClass, '防护等级'), stat(card.speed, '速度'));
       const content = element('div', 'character-content');
+      if (card.turnBudget) {
+        const budget = card.turnBudget;
+        content.append(element('p', 'turn-budget', `普通动作 ${budget.actionsRemaining} · 附赠动作 ${budget.bonusActionsRemaining} · 反应${budget.reactionAvailable ? '可用' : '已用'} · 剩余移动 ${budget.movementRemainingHalfFeet / 2} 尺`));
+      }
       const abilityLabels = {'ability.strength':'力量','ability.dexterity':'敏捷','ability.constitution':'体质','ability.intelligence':'智力','ability.wisdom':'感知','ability.charisma':'魅力'};
       const abilities = Array.isArray(card.abilities) ? card.abilities : Object.entries(card.abilities || {}).map(([key, value]) => ({label: abilityLabels[key] || key, value}));
       if (abilities.length) { const grid = element('div', 'ability-grid'); for (const ability of abilities) grid.append(element('span', '', `${ability.label} ${ability.value}${ability.modifier === undefined ? '' : `（${ability.modifier >= 0 ? '+' : ''}${ability.modifier}）`}`)); content.append(grid); }

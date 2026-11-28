@@ -12,8 +12,9 @@ const playerOrigin = 'https://127.0.0.1:8443';
 const wolfName = '林地灰狼';
 
 async function main() {
-  const [flag, storageRoot] = process.argv.slice(2);
+  const [flag, storageRoot, scenario] = process.argv.slice(2);
   assert.ok(flag === '--fresh-root' && path.isAbsolute(storageRoot), 'Expected --fresh-root /absolute/disposable/player-store');
+  assert.ok(scenario === undefined || scenario === '--movement');
   const root = await fs.realpath(storageRoot);
   const repo = await fs.realpath(path.join(__dirname, '../..'));
   assert.ok(root !== repo && !root.startsWith(repo + path.sep));
@@ -104,8 +105,18 @@ async function main() {
     await selectRule('domain-monster-create', 'monster', 'monster.wolf');
     const created = await domainAction('domain-monster-create');
     const wolf = created.campaign.domain.space.monsters.find(m => m.name === wolfName).id;
+    const placements = [[fighters[0], 1, 1, 0], [wolf, 2, 1, 1], [fighters[1], 3, 3, 0]];
+    const secondWolfName = '营地灰狼';
+    let secondWolf;
+    if (scenario === '--movement') {
+      await field('domain-monster-create', 'name').fill(secondWolfName);
+      await selectRule('domain-monster-create', 'monster', 'monster.wolf');
+      const result = await domainAction('domain-monster-create');
+      secondWolf = result.campaign.domain.space.monsters.find(m => m.name === secondWolfName).id;
+      placements.push([secondWolf, 1, 2, 1]);
+    }
     const scene = await createScene(host, hostAction, '林间空地', 'RULES');
-    await enterScene(host, hostAction, scene, [[fighters[0], 1, 1, 0], [wolf, 2, 1, 1], [fighters[1], 3, 3, 0]]);
+    await enterScene(host, hostAction, scene, placements);
 
     await governance('invite', () => host.locator('#host-players-invite').click());
     const invitation = await host.locator('#host-player-link').getAttribute('href');
@@ -134,6 +145,7 @@ async function main() {
     await host.getByText('共享给谁看', {exact: true}).click();
     await share('SCENE', scene, 'ALL');
     await share('MONSTER', wolf, 'SELECTED', members[0]);
+    if (secondWolf) await share('MONSTER', secondWolf, 'SELECTED', members[0]);
     await attacker.locator('#player-shared li').filter({hasText: wolfName}).waitFor();
     await observer.locator('#player-shared').getByRole('heading', {name: '林间空地'}).waitFor();
     assert.ok(!(await observer.locator('#player-shared').innerText()).includes(wolfName));
@@ -148,6 +160,48 @@ async function main() {
       await field('domain-combat', 'actorId').selectOption(battle().initiative[battle().activeOrdinal].characterId);
       state = await domainAction('domain-combat');
     };
+    if (scenario === '--movement') {
+      const active = () => battle().initiative[battle().activeOrdinal].characterId;
+      const move = () => battle().flows.at(-1).movements[0];
+      const actor = id => battle().combatants.find(row => row.characterId === id);
+      const playerBudget = async () => (await readPlayer(attacker)).view.cards[0].turnBudget;
+      while (active() !== fighters[0]) await endTurn();
+      assert.equal((await playerBudget()).actionsRemaining, 1);
+      await playerCommand(/开始攻击动作/);
+      await playerCommand(new RegExp('攻击 ' + secondWolfName));
+      assert.equal((await playerBudget()).bonusActionsRemaining, 1);
+      await playerCommand(/回气（附赠动作）/);
+      assert.deepEqual(await playerBudget(), {actionsRemaining: 0, bonusActionsRemaining: 0, reactionAvailable: true, movementRemainingHalfFeet: 60});
+      await attacker.locator('#player-cards .turn-budget').filter({hasText: '普通动作 0 · 附赠动作 0'}).waitFor();
+      state = await readHost();
+      while (active() !== wolf) await endTurn();
+
+      await field('domain-combat', 'kind').selectOption('MOVE');
+      await field('domain-combat', 'path').fill('2,0\n3,0\n4,0');
+      state = await domainAction('domain-combat');
+      assert.equal(move().cursor, 1);
+      assert.deepEqual(actor(wolf).position, {x: 2, y: 0});
+      assert.equal(actor(wolf).movementSpentHalfFeet, 10);
+      await attacker.getByText(wolfName + '（2, 0）将离开你的触及范围。', {exact: false}).waitFor();
+      assert.equal((await readPlayer(observer)).view.pending.own, false);
+      assert.ok(!(await readPlayer(observer)).view.candidates.some(c => c.label.includes('借机攻击')));
+      await hostAction('save', () => host.locator('#storage-save').click());
+      const reaction = await playerCommand(/^借机攻击/);
+      assert.deepEqual(Object.keys(reaction.attackResult).sort(), ['damage', 'dropped', 'hit']);
+      assert.equal((await playerBudget()).reactionAvailable, false);
+      await hostAction('domain', () => host.getByRole('button', {name: '继续结算行动', exact: true}).click());
+      state = await readHost();
+      const steps = reaction.attackResult.dropped ? 1 : 3;
+      assert.equal(move().cursor, steps);
+      assert.equal(actor(wolf).movementSpentHalfFeet, steps * 10);
+      assert.deepEqual(actor(wolf).position, {x: steps === 1 ? 2 : 4, y: 0});
+      assert.equal(battle().flows.at(-1).status, 'COMPLETED');
+      await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({result: 'PASSED', playerSessions: seats.length, steps, reaction: reaction.attackResult}));
+      return;
+    }
     let outcome;
     for (let attempt = 0; attempt < 24 && !outcome?.hit; attempt++) {
       while (battle().initiative[battle().activeOrdinal].characterId !== fighters[0]) await endTurn();

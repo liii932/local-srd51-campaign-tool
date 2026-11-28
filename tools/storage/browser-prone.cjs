@@ -172,7 +172,7 @@ async function main() {
     const stood = combatant(fighter);
     assert.equal(stood.prone, false);
     assert.equal(stood.movementSpentHalfFeet, 50);
-    assert.equal(stood.actionAvailable, standing.actionAvailable);
+    assert.equal(stood.actionsRemaining, standing.actionsRemaining);
     assert.equal(stood.reactionAvailable, standing.reactionAvailable);
 
     await kind.selectOption('MOVE');
@@ -250,7 +250,7 @@ async function main() {
     assert.equal(sceneSecond(), beforeDropSecond + 18);
     assert.equal(combatant(fighter).prone, false);
     assert.equal(combatant(fighter).movementSpentHalfFeet, explorationBudget.movementSpentHalfFeet);
-    assert.equal(combatant(fighter).actionAvailable, explorationBudget.actionAvailable);
+    assert.equal(combatant(fighter).actionsRemaining, explorationBudget.actionsRemaining);
     assert.equal(combatant(fighter).reactionAvailable, explorationBudget.reactionAvailable);
 
     await kind.selectOption('EXPLORATION_MOVE');

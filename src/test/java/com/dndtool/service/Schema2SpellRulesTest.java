@@ -198,7 +198,7 @@ class Schema2SpellRulesTest {
         var unknown=new com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity(CASTING.moduleKey(),"character.spellcasting","spellcasting.unpublished");
         rejected(Command.cast(a,new CastInput(unknown,BLESS,List.of(a),symbol(a))),"S2_SPELL_CASTER_UNSUPPORTED");
         Combatant far=battle.combatants().stream().filter(c -> c.characterId().equals(b)).findFirst().orElseThrow();
-        var actors=battle.combatants().stream().map(c -> c.characterId().equals(b)?new Combatant(b,new Position(7,0),far.side(),far.actionAvailable(),far.reactionAvailable(),0,0,false,false,null,false):c).toList();
+        var actors=battle.combatants().stream().map(c -> c.characterId().equals(b)?far.withPosition(new Position(7,0)):c).toList();
         Battle separated=new Battle(battle.combatId(),battle.campaignId(),battle.combatRule(),battle.status(),battle.round(),battle.turnNumber(),battle.activeOrdinal(),battle.version(),actors,battle.initiative(),battle.flows(),battle.ongoingEffects());
         assertEquals("S2_SPELL_TARGET",assertThrows(IllegalArgumentException.class,() -> rules.preflight(UUID.randomUUID(),combat,campaign,roster,separated,bless(a,b))).getMessage());
     }

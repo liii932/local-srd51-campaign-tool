@@ -4,6 +4,7 @@ import com.dndtool.service.Schema2CharacterRuntime;
 
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.*;
 import java.util.*;
@@ -12,6 +13,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntUnaryOperator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import static com.dndtool.service.storage.CampaignParticipationData.*;
 import static com.dndtool.service.Schema2CombatState.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -23,6 +26,9 @@ class PlayerParticipationAcceptanceTest {
     private static final String OUTSIDE_WOLF = "营地外的白狼";
     private static final String FIGHTER = "持剑战士";
     private static final String SCENE = "林中战场";
+    private static final Position WOLF_START = new Position(1, 1);
+    private static final Position FIGHTER_START = new Position(2, 2);
+    private static final List<Position> WOLF_ROUTE = List.of(new Position(2, 1), new Position(3, 0), new Position(4, 0));
     @TempDir Path temporary;
 
     @Test void invitationRotationExactExpiryAndClosureDoNotRevokeAlreadyApprovedPlayers() throws Exception {
@@ -357,6 +363,220 @@ class PlayerParticipationAcceptanceTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void aRevealedWolfResumesItsPaidRouteAfterTheRightPlayerAttacksOrPasses(boolean attacks) throws Exception {
+        var dice = new ScriptedDice();
+        try (Fixture f = new Fixture("wolf-route-" + attacks, dice)) {
+            var encounter = wolfMovement(f, dice);
+            UUID wolf = encounter.wolf(), fighter = encounter.fighter();
+            Seat owner = encounter.owner(), observer = encounter.observer();
+            f.share(ShareKind.MONSTER, wolf, true, owner.member, observer.member);
+            for (Seat seat : List.of(owner, observer)) {
+                var view = f.view(seat);
+                assertWolfParticipant(view, "1, 1", true);
+                assertEquals(List.of(), labels(view));
+            }
+            var move = Command.move(wolf, WOLF_ROUTE);
+            rejectCombat(f, move, Actor.player(owner.member, wolf), "PLAYER_CONTROL_REQUIRED", null);
+
+            Combatant wolfBefore = combatant(f, wolf), fighterBefore = combatant(f, fighter);
+            long wolfPositionBefore = placement(f, wolf).version();
+            var initiative = f.battle().initiative();
+            f.combat(f.battle(), move);
+            var pausedFlow = f.battle().activeFlow();
+            var waiting = wolfWindow(f, wolf, fighter);
+            assertEquals(List.of(), lastRoot(f).rolls());
+            assertEquals(Actor.dm(wolf, null), lastRoot(f).actor());
+            assertEquals(1, pausedFlow.movement().cursor());
+            assertEquals(10, pausedFlow.movement().spentHalfFeet());
+            assertEquals(WOLF_ROUTE, pausedFlow.movement().path());
+            assertEquals(wolfPositionBefore + 1, placement(f, wolf).version());
+            assertRouteBudgets(f, wolfBefore, fighterBefore, WOLF_ROUTE.getFirst(), 10, true);
+            assertPlayerReaction(f, owner, observer, wolf, fighter);
+
+            finishAndOpen(f);
+            assertEquals(pausedFlow, f.battle().activeFlow());
+            assertEquals(initiative, f.battle().initiative());
+            assertEquals(waiting, wolfWindow(f, wolf, fighter));
+            assertRouteBudgets(f, wolfBefore, fighterBefore, WOLF_ROUTE.getFirst(), 10, true);
+            assertEquals("PLAYER_SESSION_REQUIRED", assertThrows(PlayerGatewayException.class, () -> f.read(owner)).code());
+            assertEquals("PLAYER_SESSION_REQUIRED", assertThrows(PlayerGatewayException.class, () -> f.read(observer)).code());
+            f.invitation = f.host("invite", object()).get("invitation").getAsString();
+            Seat restoredOwner = f.approve("重新核对持剑玩家", owner.member);
+            Seat restoredObserver = f.approve("重新核对观察玩家", observer.member);
+            f.takeover(restoredOwner);
+            f.takeover(restoredObserver);
+            assertPlayerReaction(f, restoredOwner, restoredObserver, wolf, fighter);
+
+            String label = attacks ? "借机攻击" : "放弃本次反应";
+            JsonObject option = f.option(restoredOwner, label);
+            var beforeReaction = f.storage.accessSnapshot();
+            assertEquals("PLAYER_VIEW_EXPIRED", assertThrows(PlayerGatewayException.class,
+                    () -> f.post(restoredObserver, "command", f.command(restoredObserver, option))).code());
+            assertEquals(beforeReaction, f.storage.accessSnapshot());
+            if (attacks) dice.add(12, 3);
+            JsonObject request = f.command(restoredOwner, option);
+            var accepted = f.post(restoredOwner, "command", request);
+            assertReceipt("ACCEPTED", accepted);
+            var receipt = accepted.body().getAsJsonObject("receipt");
+            assertEquals("WAITING", receipt.get("outcome").getAsString());
+            assertAbsent(receipt, wolf, "armorClass", "hitPoints", "maxHitPoints");
+            var closedFlow = f.battle().activeFlow();
+            var closedWindow = closedFlow.windows().getFirst();
+            assertEquals(waiting.windowKey(), closedWindow.windowKey());
+            assertEquals(WindowStatus.CLOSED, closedWindow.status());
+            var resolved = closedWindow.opportunities().getFirst();
+            assertEquals(waiting.opportunities().getFirst().opportunityKey(), resolved.opportunityKey());
+            assertEquals(attacks ? OpportunityStatus.COMPLETED : OpportunityStatus.PASSED, resolved.status());
+            assertEquals(Actor.player(restoredOwner.member, fighter), lastRoot(f).actor());
+            if (attacks) {
+                var result = receipt.getAsJsonObject("attackResult");
+                assertEquals(Set.of("hit", "damage", "dropped"), result.keySet());
+                assertTrue(result.get("hit").getAsBoolean());
+                assertEquals(5, result.get("damage").getAsInt());
+                assertFalse(result.get("dropped").getAsBoolean());
+                var attack = closedFlow.attacks().getFirst();
+                assertTrue(attack.opportunityAttack());
+                assertEquals(AttackStatus.RESOLVED, attack.status());
+                assertEquals(fighter, attack.actorId());
+                assertEquals(wolf, attack.targetId());
+                assertEquals(resolved.allowedItems().getFirst(), attack.itemId());
+                assertEquals(12, attack.firstD20());
+                assertEquals(List.of(3), attack.damageDice());
+                assertEquals(13, attack.finalArmorClass());
+                assertEquals(List.of(new CampaignSpaceData.Die(20, 12), new CampaignSpaceData.Die(8, 3)), lastRoot(f).rolls());
+            } else {
+                assertFalse(receipt.has("attackResult"));
+                assertTrue(closedFlow.attacks().isEmpty());
+                assertEquals(List.of(), lastRoot(f).rolls());
+            }
+            assertEquals(attacks ? 6 : 11, f.monster(wolf).hitPoints());
+            assertEquals(wolfPositionBefore + 1, placement(f, wolf).version());
+            assertRouteBudgets(f, wolfBefore, fighterBefore, WOLF_ROUTE.getFirst(), 10, !attacks);
+            var decidedView = accepted.body().getAsJsonObject("view");
+            assertPlayerBudget(decidedView, combatant(f, fighter));
+            assertEquals(List.of(), labels(decidedView));
+            assertEquals(List.of(), labels(f.view(restoredObserver)));
+            var decided = f.storage.accessSnapshot();
+            assertEquals(beforeReaction.revision() + 1, decided.revision());
+            assertEquals(receipt, f.post(restoredOwner, "receipt", receiptIdentity(request)).body().get("receipt"));
+            assertReceipt("UNVERIFIED", f.post(restoredObserver, "receipt", receiptIdentity(request)));
+            assertEquals("PLAYER_VIEW_EXPIRED", assertThrows(PlayerGatewayException.class,
+                    () -> f.post(restoredOwner, "command", request)).code());
+            assertEquals(decided, f.storage.accessSnapshot());
+
+            if (attacks) {
+                var reactionRolls = lastRoot(f).rolls();
+                finishAndOpen(f);
+                assertEquals(closedFlow, f.battle().activeFlow());
+                assertEquals(reactionRolls, lastRoot(f).rolls());
+                assertRouteBudgets(f, wolfBefore, fighterBefore, WOLF_ROUTE.getFirst(), 10, false);
+            }
+
+            var pending = f.storage.accessSnapshot();
+            var continuation = Command.continuation(wolf, closedFlow.flowKey(), closedFlow.leafFrameKey(), closedWindow.windowKey());
+            JsonObject input = combatInput(pending, continuation);
+            String continuationId = uuid();
+            var continued = f.storage.domainCommand(continuationId, pending.epoch(), pending.revision(), "combat-command", input);
+            var completed = f.battle().flows().getLast();
+            assertEquals(closedFlow.flowKey(), completed.flowKey());
+            assertEquals(MovementStatus.COMPLETED, completed.movement().status());
+            assertEquals(WOLF_ROUTE.size(), completed.movement().cursor());
+            assertEquals(30, completed.movement().spentHalfFeet());
+            assertEquals(closedFlow.attacks(), completed.attacks());
+            assertEquals(WindowStatus.CONSUMED, completed.windows().getFirst().status());
+            assertNull(f.battle().activeFlow());
+            assertEquals(wolfPositionBefore + 2, placement(f, wolf).version());
+            assertRouteBudgets(f, wolfBefore, fighterBefore, WOLF_ROUTE.getLast(), 30, !attacks);
+            assertEquals(Actor.dm(wolf, null), lastRoot(f).actor());
+            assertEquals(List.of(), lastRoot(f).rolls());
+            var afterContinue = f.storage.accessSnapshot();
+            assertEquals(pending.revision() + 1, afterContinue.revision());
+            var replay = f.storage.domainCommand(continuationId, pending.epoch(), pending.revision(), "combat-command", input);
+            assertTrue(replay.lastCommand().replayed());
+            assertEquals(continued.lastCommand().acceptedRevision(), replay.lastCommand().acceptedRevision());
+            assertEquals(afterContinue, f.storage.accessSnapshot());
+            assertTrue(dice.isEmpty());
+        }
+    }
+
+    @Test void aHiddenWolfKeepsItsReactionWindowPrivateAfterMonsterSharingIsWithdrawn() throws Exception {
+        var dice = new ScriptedDice();
+        try (Fixture f = new Fixture("hidden-wolf-route", dice)) {
+            var encounter = wolfMovement(f, dice);
+            UUID wolf = encounter.wolf(), fighter = encounter.fighter();
+            Seat owner = encounter.owner();
+            f.combat(f.battle(), Command.move(wolf, WOLF_ROUTE));
+            var flow = f.battle().activeFlow();
+            var window = wolfWindow(f, wolf, fighter);
+            assertHiddenWolf(f.view(owner), wolf);
+            assertHiddenWolf(f.view(encounter.observer()), wolf);
+
+            f.share(ShareKind.MONSTER, wolf, true, owner.member, encounter.observer().member);
+            assertPlayerReaction(f, owner, encounter.observer(), wolf, fighter);
+            JsonObject issued = f.command(owner, f.option(owner, "借机攻击"));
+            f.share(ShareKind.MONSTER, wolf, true, encounter.observer().member);
+            var notShared = f.storage.accessSnapshot();
+            assertEquals("PLAYER_VIEW_EXPIRED", assertThrows(PlayerGatewayException.class,
+                    () -> f.post(owner, "command", issued)).code());
+            assertHiddenWolf(f.view(owner), wolf);
+            assertWolfParticipant(f.view(encounter.observer()), "2, 1", true);
+
+            var offer = window.opportunities().getFirst();
+            var attack = Command.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK, fighter, offer.allowedItems().getFirst(),
+                    flow.flowKey(), flow.leafFrameKey(), window.windowKey(), offer.opportunityKey());
+            var pass = Command.reaction(Kind.PASS_REACTION, fighter, null,
+                    flow.flowKey(), flow.leafFrameKey(), window.windowKey(), offer.opportunityKey());
+            rejectCombat(f, attack, Actor.player(owner.member, fighter), "PLAYER_COMMAND_FORBIDDEN", null);
+            rejectCombat(f, pass, Actor.player(owner.member, fighter), "PLAYER_COMMAND_FORBIDDEN", null);
+            assertEquals(notShared, f.storage.accessSnapshot());
+            assertEquals(flow, f.battle().activeFlow());
+            f.combat(f.battle(), pass);
+            assertEquals(Actor.dm(fighter, owner.member), lastRoot(f).actor());
+            var cleared = f.battle().activeFlow();
+            f.combat(f.battle(), Command.continuation(wolf, flow.flowKey(), cleared.leafFrameKey(), window.windowKey()));
+            assertEquals(WOLF_ROUTE.getLast(), placement(f, wolf).grid());
+            assertTrue(combatant(f, fighter).reactionAvailable());
+            assertTrue(dice.isEmpty());
+        }
+    }
+
+    @Test void invalidWolfRoutesWriteNothingAndDisengagingSkipsTheFightersReaction() throws Exception {
+        var dice = new ScriptedDice();
+        try (Fixture f = new Fixture("wolf-disengage", dice)) {
+            var encounter = wolfMovement(f, dice);
+            UUID wolf = encounter.wolf(), fighter = encounter.fighter();
+            f.share(ShareKind.MONSTER, wolf, true, encounter.owner().member);
+            var overSpeed = new ArrayList<>(WOLF_ROUTE);
+            overSpeed.addAll(List.of(new Position(5, 0), new Position(6, 0), new Position(7, 0),
+                    new Position(8, 0), new Position(9, 0), new Position(9, 1)));
+            rejectCombat(f, Command.move(wolf, overSpeed), null, "DOMAIN_REJECTED", "S2_COMBAT_MOVEMENT_ALLOWANCE");
+            var outOfBounds = List.of(WOLF_ROUTE.getFirst(), WOLF_ROUTE.get(1), new Position(4, -1));
+            rejectCombat(f, Command.move(wolf, outOfBounds), null, "SCENE_GRID_BOUNDS", null);
+            assertEquals(WOLF_START, placement(f, wolf).grid());
+            assertNull(f.battle().activeFlow());
+
+            Combatant fighterBefore = combatant(f, fighter), wolfBefore = combatant(f, wolf);
+            f.combat(f.battle(), Command.action(Kind.DISENGAGE, wolf));
+            Combatant disengaged = combatant(f, wolf);
+            assertEquals(wolfBefore.actionsRemaining() - 1, disengaged.actionsRemaining());
+            assertEquals(wolfBefore.bonusActionsRemaining(), disengaged.bonusActionsRemaining());
+            assertTrue(disengaged.disengaged());
+            assertEquals(0, disengaged.movementSpentHalfFeet());
+            f.combat(f.battle(), Command.move(wolf, WOLF_ROUTE));
+            assertNull(f.battle().activeFlow());
+            var completed = f.battle().flows().getLast();
+            assertTrue(completed.windows().isEmpty());
+            assertEquals(MovementStatus.COMPLETED, completed.movement().status());
+            assertEquals(30, completed.movement().spentHalfFeet());
+            assertRouteBudgets(f, disengaged, fighterBefore, WOLF_ROUTE.getLast(), 30, true);
+            assertEquals(List.of(), lastRoot(f).rolls());
+            assertEquals(List.of(), labels(f.view(encounter.owner())));
+            assertTrue(dice.isEmpty());
+        }
+    }
+
     @Test void swappingHiddenOccupancyPreservesThePlayerViewAndCandidateMeaning() throws Exception {
         var dice = new ScriptedDice();
         try (Fixture f = new Fixture("hidden-wolf", dice)) {
@@ -433,6 +653,164 @@ class PlayerParticipationAcceptanceTest {
             assertAbsent(newlyShared, hidden, HIDDEN_WOLF, outside, OUTSIDE_WOLF);
             assertTrue(dice.isEmpty());
         }
+    }
+
+    private static WolfMovement wolfMovement(Fixture f, ScriptedDice dice) {
+        UUID fighter = f.character(FIGHTER, "PC"), watcher = f.character("观察者", "PC");
+        f.acquire(fighter, true);
+        UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, fighter, watcher);
+        UUID wolf = f.wolf(REVEALED_WOLF);
+        UUID scene = f.createScene(world);
+        dice.add(20, 12, 1);
+        f.enterBattle(scene, List.of(new Deployment(fighter, FIGHTER_START, 0),
+                new Deployment(wolf, WOLF_START, 1), new Deployment(watcher, new Position(8, 8), 0)));
+        assertTrue(dice.isEmpty());
+        f.endTurn();
+        assertEquals(wolf, f.battle().activeActor());
+        assertEquals(1, combatant(f, wolf).actionsRemaining());
+        assertEquals(1, combatant(f, wolf).bonusActionsRemaining());
+        assertTrue(combatant(f, wolf).reactionAvailable());
+        assertTrue(combatant(f, fighter).reactionAvailable());
+        Seat owner = f.approve("持剑玩家"), observer = f.approve("观察玩家");
+        assertNotEquals(owner.member, observer.member);
+        assertNotEquals(owner.token, observer.token);
+        f.assign(fighter, owner.member);
+        f.assign(watcher, observer.member);
+        f.share(ShareKind.SCENE, scene, true, owner.member, observer.member);
+        f.takeover(owner);
+        f.takeover(observer);
+        return new WolfMovement(wolf, fighter, owner, observer);
+    }
+
+    private static Window wolfWindow(Fixture f, UUID wolf, UUID fighter) {
+        var flow = f.battle().activeFlow();
+        assertNotNull(flow);
+        assertEquals(1, flow.windows().size());
+        var window = flow.windows().getFirst();
+        assertEquals(WindowStatus.OPEN, window.status());
+        assertEquals(TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE, window.trigger().kind());
+        assertEquals(wolf, window.trigger().subjectId());
+        assertEquals(WOLF_ROUTE.get(1), window.trigger().position());
+        assertEquals(1, window.boundaryIndex());
+        assertEquals(1, window.opportunities().size());
+        var opportunity = window.opportunities().getFirst();
+        assertEquals(fighter, opportunity.actorId());
+        assertEquals(flow.leafFrameKey(), opportunity.selectionFrameKey());
+        assertEquals(OpportunityStatus.PENDING, opportunity.status());
+        assertEquals(List.of(ReactionKind.OPPORTUNITY_ATTACK), opportunity.options().stream().map(ReactionOption::kind).toList());
+        return window;
+    }
+
+    private static void assertPlayerReaction(Fixture f, Seat owner, Seat observer, UUID wolf, UUID fighter) {
+        var visible = f.view(owner);
+        assertWolfParticipant(visible, "2, 1", true);
+        assertAbsent(visible, wolf, "monster.wolf", "maxHitPoints");
+        assertCardOwner(visible, fighter);
+        assertPlayerBudget(visible, combatant(f, fighter));
+        var pending = visible.getAsJsonObject("pending");
+        assertTrue(pending.get("own").getAsBoolean());
+        assertTrue(pending.get("description").getAsString().contains(REVEALED_WOLF));
+        assertTrue(pending.get("description").getAsString().contains("2, 1"));
+        assertEquals(2, labels(visible).size());
+        option(visible, "借机攻击");
+        option(visible, "放弃本次反应");
+        var observation = f.view(observer);
+        assertWolfParticipant(observation, "2, 1", true);
+        assertAbsent(observation, wolf, fighter, FIGHTER, "monster.wolf");
+        assertFalse(observation.getAsJsonObject("pending").get("own").getAsBoolean());
+        assertEquals(List.of(), labels(observation));
+    }
+
+    private static void assertPlayerBudget(JsonObject view, Combatant combatant) {
+        var card = view.getAsJsonArray("cards").get(0).getAsJsonObject();
+        var budget = card.getAsJsonObject("turnBudget");
+        assertEquals(combatant.actionsRemaining(), budget.get("actionsRemaining").getAsInt());
+        assertEquals(combatant.bonusActionsRemaining(), budget.get("bonusActionsRemaining").getAsInt());
+        assertEquals(combatant.reactionAvailable(), budget.get("reactionAvailable").getAsBoolean());
+        assertEquals(combatant.remainingMovementHalfFeet(card.get("speed").getAsInt()),
+                budget.get("movementRemainingHalfFeet").getAsInt());
+    }
+
+    private static void assertHiddenWolf(JsonObject view, UUID wolf) {
+        assertAbsent(view, wolf, REVEALED_WOLF, "monster.wolf");
+        var pending = view.getAsJsonObject("pending");
+        assertFalse(pending.get("own").getAsBoolean());
+        assertFalse(pending.get("active").getAsBoolean());
+        assertEquals(List.of(), labels(view));
+    }
+
+    private static void assertRouteBudgets(Fixture f, Combatant wolf, Combatant fighter, Position wolfCell,
+            int spent, boolean fighterReaction) {
+        var state = f.storage.accessSnapshot().snapshot().domains();
+        var battle = CampaignSpaceCommands.currentBattle(state).current();
+        var currentWolf = combatant(battle, wolf.characterId());
+        var currentFighter = combatant(battle, fighter.characterId());
+        assertEquals(wolfCell, currentWolf.position());
+        assertEquals(wolfCell, CampaignSpaceCommands.position(state, wolf.characterId()).grid());
+        assertEquals(spent, currentWolf.movementSpentHalfFeet());
+        assertEquals(wolf.actionsRemaining(), currentWolf.actionsRemaining());
+        assertEquals(wolf.bonusActionsRemaining(), currentWolf.bonusActionsRemaining());
+        assertEquals(wolf.reactionAvailable(), currentWolf.reactionAvailable());
+        assertEquals(FIGHTER_START, currentFighter.position());
+        assertEquals(FIGHTER_START, CampaignSpaceCommands.position(state, fighter.characterId()).grid());
+        assertEquals(fighter.movementSpentHalfFeet(), currentFighter.movementSpentHalfFeet());
+        assertEquals(fighter.actionsRemaining(), currentFighter.actionsRemaining());
+        assertEquals(fighter.bonusActionsRemaining(), currentFighter.bonusActionsRemaining());
+        assertEquals(fighterReaction, currentFighter.reactionAvailable());
+    }
+
+    private static Combatant combatant(Fixture f, UUID id) {
+        return combatant(f.battle(), id);
+    }
+
+    private static Combatant combatant(Battle battle, UUID id) {
+        return battle.combatants().stream().filter(actor -> actor.characterId().equals(id)).findFirst().orElseThrow();
+    }
+
+    private static CampaignDomainData.Position placement(Fixture f, UUID id) {
+        return CampaignSpaceCommands.position(f.storage.accessSnapshot().snapshot().domains(), id);
+    }
+
+    private static CampaignDomainData.Root lastRoot(Fixture f) {
+        return f.storage.accessSnapshot().snapshot().domains().roots().getLast();
+    }
+
+    private static void rejectCombat(Fixture f, Command command, Actor actor, String code, String message) {
+        var before = f.storage.accessSnapshot();
+        String request = uuid();
+        var input = combatInput(before, command);
+        var failure = assertThrows(StorageException.class, () -> f.storage.domainCommand(request, before.epoch(),
+                before.revision(), "combat-command", input, actor, access -> {}));
+        assertEquals(code, failure.code());
+        if (message != null) assertEquals(message, failure.getMessage());
+        assertEquals(before, f.storage.accessSnapshot());
+        var submitted = actor == null
+                ? CampaignParticipationCommands.actualActor(before.snapshot().domains(), "combat-command", input) : actor;
+        assertTrue(f.storage.exactDomainReceipt(request, before.runId(), before.revision(), "combat-command", input,
+                submitted, access -> {}).isEmpty());
+    }
+
+    private static JsonObject combatInput(CampaignStorageService.AccessSnapshot access, Command command) {
+        var state = access.snapshot().domains();
+        var current = CampaignSpaceCommands.currentBattle(state).current();
+        var input = object("combatId", current.combatId().toString(), "combatVersion", Long.toString(current.version()));
+        input.add("focus", CampaignSpaceCommands.focusPayload(state));
+        input.add("command", CampaignDomainCodec.toJson(command));
+        return input;
+    }
+
+    private static void finishAndOpen(Fixture f) throws Exception {
+        var before = f.storage.accessSnapshot();
+        String manual = f.storage.save(uuid(), before.epoch(), before.revision()).fileKey();
+        String ended = f.storage.end(uuid(), before.epoch(), before.revision()).fileKey();
+        assertEquals("IDLE", f.storage.status().state());
+        var codec = new CampaignCodec();
+        assertEquals(before.snapshot(), codec.decode(Files.readAllBytes(f.storage.savedFile(manual))).snapshot());
+        assertEquals(before.snapshot(), codec.decode(Files.readAllBytes(f.storage.savedFile(ended))).snapshot());
+        f.storage.open(ended);
+        var reopened = f.storage.accessSnapshot();
+        assertNotEquals(before.runId(), reopened.runId());
+        assertEquals(before.snapshot(), reopened.snapshot());
     }
 
     private static Strike strike(Fixture f, Seat seat, UUID fighter, UUID wolf,
@@ -557,6 +935,8 @@ class PlayerParticipationAcceptanceTest {
                 .filter(option -> option.get("label").getAsString().startsWith(label)).findFirst()
                 .orElseThrow(() -> new AssertionError("Expected current legal option: " + label));
     }
+
+    private record WolfMovement(UUID wolf, UUID fighter, Seat owner, Seat observer) { }
 
     private record Strike(JsonObject command, JsonObject receipt) { }
 

@@ -7,7 +7,7 @@ DM 入口固定为 `http://127.0.0.1:8080`，玩家 HTTPS 默认关闭。
 ## 获取 WAR
 
 使用 0.2.1 发行制品 `dnd-tool-se-0.2.1.war`。从源码构建时需要 Maven 3.9，在仓库根目录执行
-`mvn -DskipTests package` 生成 `target/dnd-tool-se-0.6.0.war`。该命令跳过应用测试。
+`mvn -DskipTests package` 生成 `target/dnd-tool-se-0.7.0.war`。该命令跳过应用测试。
 源码变更的验证范围与候选 WAR 审计见[测试指南](testing.md)。
 
 ## 启动与验收

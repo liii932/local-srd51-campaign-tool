@@ -118,7 +118,7 @@ async function main() {
     const sequence = actor(fighter).sequence;
     assert.equal(sequence.limit, 2);
     assert.equal(sequence.performed, 0);
-    assert.equal(actor(fighter).actionAvailable, false);
+    assert.equal(actor(fighter).actionsRemaining, 0);
     await combat('ATTACK', targets[0], weapon);
     const first = attacks(sequence.sequenceKey)[0];
     assert.equal(first.status, 'RESOLVED');
@@ -137,7 +137,7 @@ async function main() {
     owned = true;
     assert.deepEqual(domain(), before);
     assert.deepEqual(attacks(sequence.sequenceKey), [first]);
-    assert.equal(actor(fighter).actionAvailable, false);
+    assert.equal(actor(fighter).actionsRemaining, 0);
 
     await page.locator('[data-pane="combat"]').click();
     await form('domain-combat-summary').getByText('已攻击 1/2 · 剩余 1', {exact: true}).waitFor();
@@ -148,7 +148,7 @@ async function main() {
     assert.deepEqual(strikes[0], first);
     assert.equal(strikes[1].status, 'RESOLVED');
     assert.deepEqual(actor(fighter).sequence, {...sequence, performed: 2, closed: true});
-    assert.equal(actor(fighter).actionAvailable, false);
+    assert.equal(actor(fighter).actionsRemaining, 0);
     await action('end', () => form('storage-end').click());
     owned = false;
     assert.deepEqual(pageErrors, []);

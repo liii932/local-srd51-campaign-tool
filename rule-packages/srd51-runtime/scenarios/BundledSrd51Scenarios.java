@@ -88,6 +88,7 @@ public final class BundledSrd51Scenarios {
                 scenario("monster-melee-variant", suite -> suite.verifyMonsterMelee(true)),
                 scenario("wolf-bite", suite -> suite.verifyWolfBite(11, Schema2CombatState.OnHitOutcome.SAVE_SUCCEEDED)),
                 scenario("wolf-bite-variant", suite -> suite.verifyWolfBite(12, Schema2CombatState.OnHitOutcome.PRONE_APPLIED)),
+                scenario("monster-turn-movement", BundledSrd51Scenarios::verifyMonsterTurnMovement),
                 scenario("monster-breath-profile", BundledSrd51Scenarios::verifyMonsterBreathProfile),
                 scenario("rule-origins", BundledSrd51Scenarios::verifyRuleOrigins),
                 scenario("wizard-evocation", BundledSrd51Scenarios::verifyWizardEvocation),
@@ -821,6 +822,64 @@ public final class BundledSrd51Scenarios {
         expectNumber(6, breath.damageProfile().diceCount());
         expectNumber(15, breath.area().lengthFeet());
         expectNumber(5, breath.recharge().minimumRoll());
+    }
+
+    private void verifyMonsterTurnMovement() {
+        UUID campaign = UUID.randomUUID(), scene = UUID.randomUUID();
+        UUID wolfId = UUID.randomUUID(), guard = UUID.randomUUID(), longsword = UUID.randomUUID();
+        var material = rules.projection();
+        var wolf = (FinalMonster) find("adventure.monster", "monster.wolf");
+        expectNumber(40, wolf.definition().statBlock().walkSpeedFeet());
+
+        var plan = rules.initialPlan(campaign, guard, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var equipment = new Schema2CharacterEquipmentRules();
+        State carrying = equipment.apply(material, initial(plan, "fighter"), equipmentCommand("ITEM_ACQUIRED",
+                longsword, rules.rule("equipment.item", "item.longsword"), "CARRIED"), longsword);
+        State wielding = equipment.apply(material, carrying,
+                equipmentCommand("ITEM_EQUIPPED", longsword, null, "MAIN_HAND"), UUID.randomUUID());
+        var roster = Map.of(guard, new Schema2CombatRules.Context(material, plan, wielding));
+        var start = Schema2CombatState.Command.start(
+                List.of(new Schema2CombatState.Deployment(guard, new Schema2CombatState.Position(0, 1), 0)),
+                List.of(new Schema2CombatState.MonsterDeployment(wolfId, wolf.identity(), new Schema2CombatState.Position(0, 0), 1)),
+                List.of(wolfId, guard));
+        var combat = new Schema2CombatRules();
+        var initiative = new ArrayDeque<>(List.of(3, 20));
+        var opening = combat.resolve(combat.preflight(UUID.randomUUID(), scene, campaign, roster, null, start), sides -> {
+            expectNumber(20, sides);
+            return initiative.removeFirst();
+        }).after();
+        assertTrue(initiative.isEmpty());
+        assertEquals(wolfId, opening.activeActor());
+
+        var path = IntStream.rangeClosed(1, 9).mapToObj(x -> new Schema2CombatState.Position(x, 0)).toList();
+        expectRejection("walking the wolf 45 feet", "S2_COMBAT_MOVEMENT_ALLOWANCE", () ->
+                meleeStep(combat, roster, opening, Schema2CombatState.Command.move(wolfId, path), List.of()));
+        var paused = meleeStep(combat, roster, opening, Schema2CombatState.Command.move(wolfId, path.subList(0, 8)), List.of());
+        var flow = paused.activeFlow();
+        var window = flow.windows().getLast();
+        var opportunity = window.opportunities().getFirst();
+        assertEquals(Schema2CombatState.TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE, window.trigger().kind());
+        assertEquals(wolfId, window.trigger().subjectId());
+        assertEquals(guard, opportunity.actorId());
+        assertEquals(List.of(longsword), opportunity.allowedItems());
+        assertEquals(path.getFirst(), activeCombatant(paused).position());
+        expectNumber(1, flow.movement().cursor());
+        expectNumber(10, activeCombatant(paused).movementSpentHalfFeet());
+
+        var attack = Schema2CombatState.Command.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK, guard, longsword,
+                flow.flowKey(), flow.leafFrameKey(), window.windowKey(), opportunity.opportunityKey());
+        var afterAttack = meleeStep(combat, roster, paused, attack, List.of(1));
+        assertEquals(path.getFirst(), activeCombatant(afterAttack).position());
+        assertTrue(afterAttack.combatants().stream().noneMatch(actor -> actor.characterId().equals(guard) && actor.reactionAvailable()));
+        var resume = Schema2CombatState.Command.continuation(wolfId, flow.flowKey(), afterAttack.activeFlow().leafFrameKey(), window.windowKey());
+        var completed = meleeStep(combat, roster, afterAttack, resume, List.of());
+        assertEquals(null, completed.activeFlow());
+        assertEquals(path.get(7), activeCombatant(completed).position());
+        expectNumber(80, activeCombatant(completed).movementSpentHalfFeet());
+        expectNumber(80, completed.flows().getLast().movement().spentHalfFeet());
+        expectNumber(activeCombatant(opening).actionsRemaining(), activeCombatant(completed).actionsRemaining());
+        expectRejection("walking beyond the wolf's paid limit", "S2_COMBAT_MOVEMENT_ALLOWANCE", () ->
+                meleeStep(combat, roster, completed, Schema2CombatState.Command.move(wolfId, List.of(path.getLast())), List.of()));
     }
 
     private void verifyRuleOrigins() {

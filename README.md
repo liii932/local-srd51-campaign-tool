@@ -23,6 +23,7 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 - 单职业战士 3 级选择勇士后取得[精通重击](docs/rules/schema-2-improved-critical.md)，3–6 级已支持的近战武器攻击选中 19 或 20 时重击，普通攻击、借机攻击和 Ready 共用结算；
 - 由现有纯规则消费者执行已接入的成长/ASI/多职业、熟练、检定、装备、健康、休息与资源命令；
 - 使用有限普通战斗、移动、机会攻击、反应/继续、Bless、Cure Wounds、Shield、Counterspell、Burning Hands、法师书/准备和奥术回想；
+- 在工作台按规则怪物的步速逐格移动，玩家可对向本人揭示的怪物借机攻击或放弃。角色卡和主持端可核对普通动作、附赠动作、反应和剩余移动。[回合与移动](docs/rules/schema-2-combat.md)
 - 规则角色可在探索中或本人战斗回合[主动卧倒、双倍成本爬行和起身](docs/rules/schema-2-prone.md)；探索卧倒不耗时，移动与起身各推进六秒，战斗起身花半速；复用倒地攻防、OA 与 Ready 移动，姿态和未决路径随完整文件恢复；
 - 建立世界节点、路线及有界网格场景，显式入退场、旅行与切换唯一执行焦点；后台时钟、角色、效果与未决动作冻结；
 - 在[战役工作台](./docs/storage-vitality-loop.md#战役工作台)左栏管理规则库与玩家，中栏主持当前场景，右栏翻阅角色卡。
@@ -142,13 +143,13 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 ## 构建与测试
 
 从源码生成应用 WAR 可在仓库根目录运行 `mvn -DskipTests package`，产物为
-`target/dnd-tool-se-0.6.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
+`target/dnd-tool-se-0.7.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
 JUnit 用例，例如启动逻辑用 `mvn '-Dtest=StorageApplicationListenerTest' test`。
 
 可运行规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
 
 ```sh
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.6.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.7.0.war \
   --case weapon-damage rule-packages/srd51-runtime/scenarios/standard.json
 ```
 

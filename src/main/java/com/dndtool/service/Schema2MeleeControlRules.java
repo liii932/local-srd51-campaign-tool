@@ -223,9 +223,7 @@ public final class Schema2MeleeControlRules {
         Battle after = before;
         Combatant initiator = combatant(before, contest.actorId());
         if (escape) {
-            after = replaceActor(after, new Combatant(initiator.characterId(), initiator.position(), initiator.side(), false,
-                    initiator.reactionAvailable(), initiator.movementSpentHalfFeet(), initiator.movementBonus(),
-                    initiator.disengaged(), initiator.dodging(), initiator.sequence(), initiator.prone()));
+            after = replaceActor(after, initiator.spendAction());
             facts.add(new CombatFact("ESCAPE_ACTION_SPENT", initiator.characterId(), contest.contestKey(), null));
         }
         RolledScore first = roll(dice, contest.actorId(), plan.initiator(), "MELEE_CONTEST_INITIATOR");
@@ -238,7 +236,7 @@ public final class Schema2MeleeControlRules {
         } else {
             AttackSequence sequence = initiator.sequence();
             int performed = sequence.performed() + 1;
-            after = replaceActor(after, Schema2CombatRules.withSequence(initiator, new AttackSequence(sequence.sequenceKey(),
+            after = replaceActor(after, initiator.withSequence(new AttackSequence(sequence.sequenceKey(),
                     sequence.limit(), performed, sequence.forfeited(), performed + sequence.forfeited() == sequence.limit())));
             Flow flow = before.activeFlow();
             after = replaceFlow(after, contestFlow(flow.flowKey(), complete, flow.leafFrameKey()));
@@ -254,7 +252,7 @@ public final class Schema2MeleeControlRules {
             case ESCAPE_GRAPPLE -> end(after, contest.grappleKey(), GrappleEndReason.ESCAPED, operation, facts);
             case SHOVE_PRONE -> {
                 facts.add(new CombatFact("SHOVED_PRONE", target.characterId(), contest.contestKey(), null));
-                yield replaceActor(after, Schema2CombatRules.withPosture(target, true, target.movementSpentHalfFeet()));
+                yield replaceActor(after, target.withProne(true));
             }
             case SHOVE_PUSH -> {
                 facts.add(new CombatFact("SHOVED_FIVE_FEET", target.characterId(), contest.contestKey(), null));
@@ -320,8 +318,9 @@ public final class Schema2MeleeControlRules {
         facts.add(new CombatFact("GRAPPLE_ESTABLISHED", contest.targetId(), contest.grappleKey(), null));
         Combatant target = combatant(battle, contest.targetId());
         if (target.dodging()) battle = replaceActor(battle, new Combatant(target.characterId(), target.position(), target.side(),
-                target.actionAvailable(), target.reactionAvailable(), target.movementSpentHalfFeet(), target.movementBonus(),
-                target.disengaged(), false, target.sequence(), target.prone()));
+                target.actionsRemaining(), target.bonusActionsRemaining(), target.reactionAvailable(),
+                target.movementSpentHalfFeet(), target.movementBonus(), target.disengaged(), false,
+                target.sequence(), target.prone()));
         return withControl(battle, new MeleeControl(battle.meleeControl().contests(), relations));
     }
 
@@ -418,8 +417,7 @@ public final class Schema2MeleeControlRules {
     }
 
     private static Combatant at(Combatant actor, Position position) {
-        return new Combatant(actor.characterId(), position, actor.side(), actor.actionAvailable(), actor.reactionAvailable(),
-                actor.movementSpentHalfFeet(), actor.movementBonus(), actor.disengaged(), actor.dodging(), actor.sequence(), actor.prone());
+        return actor.withPosition(position);
     }
 
     static void validate(Battle battle) {

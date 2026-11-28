@@ -131,6 +131,10 @@ public final class Schema2CombatHistory {
         var resolution = event.resolution();
         require(before != null && before.status() == Status.ACTIVE && before.activeFlow() == null
                 && actor.equals(before.activeActor()) && resolution.healthChanges().size() == 2 && resolution.rolls().size() == 1);
+        Combatant predecessor = member(before, actor);
+        require(predecessor.bonusActionsRemaining() > 0
+                && before.combatants().stream().map(a -> a.characterId().equals(actor) ? a.spendBonusAction() : a)
+                        .toList().equals(event.after().combatants()));
         HealthChange cost = resolution.healthChanges().getFirst(), healing = resolution.healthChanges().getLast();
         Roll roll = resolution.rolls().getFirst();
         int requested = roll.value() + cost.before().level();
@@ -168,7 +172,7 @@ public final class Schema2CombatHistory {
                 && (b.initiative().isEmpty() ? b.status()!=Status.ACTIVE && b.activeOrdinal()==0
                     : b.activeOrdinal()>=0 && b.activeOrdinal()<currentMembers.size() && b.initiative().size()==currentMembers.size()));
         Set<UUID> initiative=new HashSet<>();for(int i=0;i<b.initiative().size();i++) {Initiative n=b.initiative().get(i);require(initiative.add(n.characterId())&&currentMembers.contains(n.characterId())&&n.ordinal()==i&&n.d20()>=1&&n.d20()<=20&&n.dexterityModifier()>=-5&&n.dexterityModifier()<=10&&n.total()==n.d20()+n.dexterityModifier());}
-        for(Combatant c:b.combatants()) {require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0);if(c.sequence()!=null) {AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
+        for(Combatant c:b.combatants()) {require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0&&Schema2CombatStateValidator.validActionBudgets(c));if(c.sequence()!=null) {AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
         require(b.ongoingEffects().size()<=128);Set<UUID> effectKeys=new HashSet<>();
         for(OngoingEffect effect:b.ongoingEffects()) {
             uuid(effect.effectKey()); require(effectKeys.add(effect.effectKey()) && ruleType(effect.spell(),"adventure.spell") && members.contains(effect.casterId())
@@ -257,9 +261,11 @@ public final class Schema2CombatHistory {
                             && member(event.before(), attack.actorId()).reactionAvailable()
                             && !member(event.after(), attack.actorId()).reactionAvailable());
                 } else {
+                    Combatant attacker = member(event.before(), attack.actorId());
+                    Combatant successor = member(event.after(), attack.actorId());
                     require(attack.targetId().equals(command.targetId()) && event.before().activeActor().equals(attack.actorId())
-                            && member(event.before(), attack.actorId()).actionAvailable()
-                            && !member(event.after(), attack.actorId()).actionAvailable());
+                            && attacker.actionAvailable() && successor.actionsRemaining() == attacker.actionsRemaining() - 1
+                            && successor.bonusActionsRemaining() == attacker.bonusActionsRemaining());
                 }
             } else if (old.status() == AttackStatus.RESOLVED) {
                 require(old.equals(attack));
@@ -371,11 +377,13 @@ public final class Schema2CombatHistory {
             Combatant actor = member(event.before(), contest.actorId()), target = member(event.before(), contest.targetId());
             require(actor.position().equals(contest.actorPosition()) && target.position().equals(contest.targetPosition()));
             if (kind == Kind.ESCAPE_GRAPPLE) {
+                Combatant successor = member(event.after(), contest.actorId());
                 require(contest.outcome() != null && contest.selectedSkill() == command.meleeInput().skill()
                         && contest.grappleKey().equals(command.meleeInput().grappleKey())
                         && before.grapples().stream().anyMatch(relation -> relation.active()
                             && relation.grappleKey().equals(contest.grappleKey()))
-                        && actor.actionAvailable() && !member(event.after(), contest.actorId()).actionAvailable());
+                        && actor.actionAvailable() && successor.actionsRemaining() == actor.actionsRemaining() - 1
+                        && successor.bonusActionsRemaining() == actor.bonusActionsRemaining());
                 resolved = contest;
             } else {
                 var input = command.meleeInput();

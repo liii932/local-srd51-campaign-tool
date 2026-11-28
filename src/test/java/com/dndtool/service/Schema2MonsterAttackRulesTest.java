@@ -157,6 +157,138 @@ class Schema2MonsterAttackRulesTest {
         assertEquals(0, game.battle.triggerFacts().stream().filter(t -> t.kind() == TriggerKind.MONSTER_ACTION_COMPLETED).count());
     }
 
+    @Test void monsterCrawlAndDashUseTheFrozenWalkingSpeed() {
+        var files = Schema2MonsterFixtures.packages();
+        var extension = files.getLast();
+        var changes = Schema2GrantFixtures.json(extension.get("changes.json")).getAsJsonArray();
+        var statBlock = changes.asList().stream().map(row -> row.getAsJsonObject())
+                .filter(row -> row.has("field") && row.get("field").getAsString().equals("stat_block")
+                        && row.getAsJsonObject("target").get("rule_key").getAsString().equals(HELL_HOUND.ruleKey()))
+                .findFirst().orElseThrow().getAsJsonObject("value");
+        statBlock.addProperty("walk_speed_feet", 25);
+        extension.put("changes.json", changes.toString().getBytes(StandardCharsets.UTF_8));
+        var game = new Fixture(material(files, false), false);
+        game.start(List.of(new Deployment(A, new Position(7, 7), 0), new Deployment(B, new Position(8, 8), 0)),
+                List.of(new MonsterDeployment(HOUND, HELL_HOUND, new Position(0, 0), 1)), 1, 2, 20);
+        int bonusActions = game.actor(HOUND).bonusActionsRemaining();
+        game.battle = Schema2CombatRules.replaceActor(game.battle, game.actor(HOUND).withProne(true));
+
+        var path = List.of(new Position(1, 0), new Position(2, 0), new Position(3, 0), new Position(4, 0), new Position(5, 0));
+        game.reject(Command.move(A, List.of(new Position(6, 7))), "S2_COMBAT_NOT_CURRENT_TURN");
+        game.reject(Command.move(HOUND, path.subList(0, 3)), "S2_COMBAT_MOVEMENT_ALLOWANCE");
+        game.reject(Command.move(HOUND, List.of(new Position(2, 0))), "S2_COMBAT_PATH");
+        game.apply(Command.move(HOUND, path.subList(0, 2)));
+        assertEquals(40, game.actor(HOUND).movementSpentHalfFeet());
+        assertEquals(1, game.actor(HOUND).actionsRemaining());
+
+        game.apply(Command.action(Kind.DASH, HOUND));
+        assertEquals(25, game.actor(HOUND).movementBonus());
+        assertEquals(0, game.actor(HOUND).actionsRemaining());
+        game.apply(Command.move(HOUND, path.subList(2, 5)));
+        assertEquals(path.getLast(), game.actor(HOUND).position());
+        assertEquals(100, game.actor(HOUND).movementSpentHalfFeet());
+        assertEquals(60, game.battle.flows().getLast().movement().spentHalfFeet());
+        assertEquals(bonusActions, game.actor(HOUND).bonusActionsRemaining());
+        assertTrue(game.actor(HOUND).reactionAvailable());
+        game.reject(Command.move(HOUND, List.of(new Position(6, 0))), "S2_COMBAT_MOVEMENT_ALLOWANCE");
+    }
+
+    @Test void monsterMoveResumesTheSavedSuffixAfterOnePlayerWeaponOpportunity() {
+        var game = new Fixture(false, false);
+        game.start(List.of(new Deployment(A, new Position(0, 1), 0), new Deployment(B, new Position(3, 0), 0)),
+                List.of(new MonsterDeployment(HOUND, HELL_HOUND, new Position(0, 0), 1)), 15, 2, 20);
+        var path = List.of(new Position(1, 0), new Position(2, 0), new Position(3, 0));
+        game.reject(Command.move(HOUND, path), "S2_COMBAT_PATH");
+        game.apply(Command.move(HOUND, path.subList(0, 2)));
+        var paused = game.battle.activeFlow().movement();
+        assertEquals(A, game.opportunity().actorId());
+        assertEquals(1, paused.cursor());
+        assertEquals(10, paused.spentHalfFeet());
+        assertEquals(path.getFirst(), game.actor(HOUND).position());
+        UUID weapon = game.roster.get(A).character().equipment().getFirst().itemId();
+        assertEquals(weapon, game.opportunity().options().getFirst().itemId());
+
+        game.readBack();
+        Command opportunity = game.weaponOpportunityAttack(weapon);
+        game.apply(opportunity, 18, 2);
+        assertFalse(game.actor(A).reactionAvailable());
+        assertEquals(1, game.actor(HOUND).actionsRemaining());
+        assertEquals(paused, game.battle.activeFlow().movement());
+        game.reject(opportunity, "ACTION_FLOW_TARGET_MISMATCH");
+        game.readBack();
+        Command resume = game.continueMovement(HOUND);
+        game.apply(resume);
+        game.reject(resume, "ACTION_FLOW_TARGET_MISMATCH");
+        var complete = game.battle.flows().getLast();
+        assertEquals(MovementStatus.COMPLETED, complete.movement().status());
+        assertEquals(20, complete.movement().spentHalfFeet());
+        assertEquals(20, game.actor(HOUND).movementSpentHalfFeet());
+        assertEquals(path.get(1), game.actor(HOUND).position());
+        assertEquals(HOUND, complete.attacks().getFirst().targetId());
+        assertTrue(complete.attacks().getFirst().opportunityAttack());
+    }
+
+    @Test void lethalWeaponOpportunityStopsMonsterBeforeTheStepAndInvalidatesLaterReactors() {
+        var game = new Fixture(false, false);
+        game.start(List.of(new Deployment(A, new Position(0, 1), 0), new Deployment(B, new Position(1, 1), 0)),
+                List.of(new MonsterDeployment(OTHER, COMMONER, new Position(0, 0), 1)), 15, 10, 20);
+        var path = List.of(new Position(0, -1), new Position(1, -2), new Position(2, -2));
+        // Both weapon reaches include the origin and end before the very first step.
+        game.apply(Command.move(OTHER, path));
+        assertEquals(List.of(A, B), game.window().opportunities().stream().map(Opportunity::actorId).toList());
+        UUID weapon = game.roster.get(A).character().equipment().getFirst().itemId();
+        game.apply(game.weaponOpportunityAttack(weapon), 18, 6);
+        assertTrue(Schema2MonsterRules.instance(game.battle, OTHER).dead());
+        assertEquals(MovementStatus.STOPPED, game.battle.activeFlow().movement().status());
+        assertEquals(B, game.opportunity().actorId());
+        UUID otherWeapon = game.roster.get(B).character().equipment().getFirst().itemId();
+        game.reject(game.weaponOpportunityAttack(otherWeapon), "REACTION_OPTION_INVALID");
+        game.apply(Command.reaction(Kind.ADVANCE_WINDOW, B, null, game.battle.activeFlow().flowKey(),
+                game.battle.activeFlow().leafFrameKey(), game.window().windowKey(), game.opportunity().opportunityKey()));
+        game.readBack();
+        game.apply(game.continueMovement(OTHER));
+        assertEquals(new Position(0, 0), game.actor(OTHER).position());
+        assertEquals(0, game.actor(OTHER).movementSpentHalfFeet());
+        assertEquals(0, game.actor(OTHER).actionsRemaining());
+        assertTrue(game.actor(B).reactionAvailable());
+        assertEquals("ACTOR_INACTIVE_OR_NO_MOVEMENT", game.battle.flows().getLast().movement().stopReason());
+        game.reject(Command.move(OTHER, path), "S2_COMBAT_ACTOR_INACTIVE");
+    }
+
+    @Test void aMonsterCanDisengageBeforeLeavingAnEnemyWeaponReach() {
+        var game = new Fixture(false, false);
+        game.start(List.of(new Deployment(A, new Position(0, 1), 0), new Deployment(B, new Position(7, 7), 0)),
+                List.of(new MonsterDeployment(HOUND, HELL_HOUND, new Position(0, 0), 1)), 15, 2, 20);
+        game.apply(Command.action(Kind.DISENGAGE, HOUND));
+        game.apply(Command.move(HOUND, List.of(new Position(1, 0), new Position(2, 0))));
+        assertNull(game.battle.activeFlow());
+        assertTrue(game.battle.flows().getLast().windows().isEmpty());
+        assertTrue(game.actor(A).reactionAvailable());
+        assertEquals(20, game.actor(HOUND).movementSpentHalfFeet());
+        assertEquals(0, game.actor(HOUND).actionsRemaining());
+    }
+
+    @Test void aMonsterOpportunityCanTurnTheMovingMonsterSuffixIntoACrawl() {
+        var game = new Fixture(onHitMaterial(false), false);
+        game.start(List.of(new Deployment(A, new Position(7, 7), 0), new Deployment(B, new Position(8, 8), 0)),
+                List.of(new MonsterDeployment(HOUND, HELL_HOUND, new Position(0, 0), 1),
+                        new MonsterDeployment(OTHER, HELL_HOUND, new Position(0, 1), 0)), 1, 2, 20, 10);
+        var path = List.of(new Position(1, 0), new Position(2, 0), new Position(3, 0));
+        game.apply(Command.move(HOUND, path));
+        assertEquals(1, game.battle.activeFlow().movement().cursor());
+        assertEquals(OTHER, game.opportunity().actorId());
+        assertEquals(BITE, game.opportunity().options().getFirst().monsterAttack());
+        game.apply(game.opportunityAttack(BITE), 18, 1, 1, 1, 1);
+        assertTrue(game.actor(HOUND).prone());
+        assertFalse(game.actor(OTHER).reactionAvailable());
+        assertEquals(10, game.actor(HOUND).movementSpentHalfFeet());
+        game.readBack();
+        game.apply(game.continueMovement(HOUND));
+        assertEquals(path.getLast(), game.actor(HOUND).position());
+        assertEquals(50, game.actor(HOUND).movementSpentHalfFeet());
+        assertEquals(50, game.battle.flows().getLast().movement().spentHalfFeet());
+    }
+
     @Test void attackCompletionAndMonsterActionCompletionEachResumeTheSameSettledAttack() {
         var game = new Fixture(false, false);
         game.start(List.of(new Deployment(A, new Position(1, 0), 0), new Deployment(B, new Position(0, 1), 0)),
@@ -469,11 +601,19 @@ class Schema2MonsterAttackRulesTest {
         Window window() { return battle.activeFlow().windows().getLast(); }
         Opportunity opportunity() { return window().opportunities().stream().filter(o -> o.status() == OpportunityStatus.PENDING).findFirst().orElseThrow(); }
         Command opportunityAttack(EntryIdentity action) {
-            return Command.monsterOpportunityAttack(HOUND,action,battle.activeFlow().flowKey(),battle.activeFlow().leafFrameKey(),window().windowKey(),opportunity().opportunityKey());
+            return Command.monsterOpportunityAttack(opportunity().actorId(),action,battle.activeFlow().flowKey(),
+                    battle.activeFlow().leafFrameKey(),window().windowKey(),opportunity().opportunityKey());
+        }
+        Command weaponOpportunityAttack(UUID weapon) {
+            return Command.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK,opportunity().actorId(),weapon,battle.activeFlow().flowKey(),
+                    battle.activeFlow().leafFrameKey(),window().windowKey(),opportunity().opportunityKey());
         }
         Command continueFlow(UUID actor) {
             return new Command(Kind.CONTINUE_FLOW, actor, null, null, List.of(), List.of(), List.of(), battle.activeFlow().flowKey(),
                     battle.activeFlow().leafFrameKey(), window().windowKey(), null);
+        }
+        Command continueMovement(UUID actor) {
+            return Command.continuation(actor,battle.activeFlow().flowKey(),battle.activeFlow().leafFrameKey(),window().windowKey());
         }
         Command readyAttack(UUID actor, TriggerKind trigger) {
             UUID item = roster.get(actor).character().equipment().getFirst().itemId();
