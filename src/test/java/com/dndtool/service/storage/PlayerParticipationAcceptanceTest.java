@@ -514,6 +514,254 @@ class PlayerParticipationAcceptanceTest {
         }
     }
 
+    @Test void goblinHideAndSearchKeepIndependentPlayerViewsThroughReopenAndRollback() throws Exception {
+        var dice = new ScriptedDice();
+        var failAfterUpdate = new AtomicBoolean();
+        try (Fixture f = new Fixture("observer-battle", dice, boundary -> {
+            if (boundary == CampaignStorageService.Boundary.AFTER_CHARACTER_UPDATE && failAfterUpdate.getAndSet(false))
+                throw new IllegalStateException("observation transaction failure");
+        })) {
+            String goblinName = "掩体地精";
+            UUID fighter = f.character("警戒战士", "PC"), wizard = f.character("察觉法师", "PC", "wizard");
+            UUID bow = f.acquire(wizard, "item.shortbow");
+            UUID arrow = f.acquire(wizard, "item.arrow");
+            f.equip(wizard, bow, "BOTH_HANDS");
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, fighter, wizard);
+            UUID goblin = f.monster(goblinName, "monster.goblin");
+            UUID scene = f.createScene(world);
+            Position origin = new Position(4, 2), second = new Position(4, 3), third = new Position(5, 3);
+            Position intervening = new Position(3, 2);
+            dice.add(20, 16, 14);
+            f.enterBattle(scene, fighter, List.of(new Deployment(goblin, origin, 1),
+                    new Deployment(fighter, new Position(1, 2), 0), new Deployment(wizard, new Position(2, 2), 0)));
+
+            Seat fighterSeat = f.approve("战士玩家"), wizardSeat = f.approve("法师玩家");
+            f.assign(fighter, fighterSeat.member);
+            f.assign(wizard, wizardSeat.member);
+            f.share(ShareKind.SCENE, scene, true, fighterSeat.member, wizardSeat.member);
+            f.share(ShareKind.MONSTER, goblin, true, fighterSeat.member, wizardSeat.member);
+            f.takeover(fighterSeat);
+            f.takeover(wizardSeat);
+            setObservationCell(f, origin, true, false, Cover.NONE);
+            setObservationCell(f, second, true, false, Cover.NONE);
+            setObservationCell(f, intervening, false, false, Cover.HALF);
+            assertObserverRow(f.view(fighterSeat), goblinName, origin, false, true);
+            assertObserverRow(f.view(wizardSeat), goblinName, origin, false, true);
+            rejectCombat(f, Command.setObservationCell(new ObservationCellInput(origin, false, false, Cover.NONE)),
+                    Actor.player(wizardSeat.member, wizard), "ACTOR_MISMATCH", null);
+
+            var before = f.storage.accessSnapshot();
+            String hideId = uuid();
+            Command hide = Command.action(Kind.NIMBLE_HIDE, goblin);
+            var hideInput = combatInput(before, hide);
+            failAfterUpdate.set(true);
+            dice.add(6);
+            assertEquals("observation transaction failure", assertThrows(IllegalStateException.class, () ->
+                    f.storage.domainCommand(hideId, before.epoch(), before.revision(), "combat-command", hideInput)).getMessage());
+            assertTrue(dice.isEmpty());
+            assertEquals(before, f.storage.accessSnapshot());
+            Actor hideActor = CampaignParticipationCommands.actualActor(before.snapshot().domains(), "combat-command", hideInput);
+            assertTrue(f.storage.exactDomainReceipt(hideId, before.runId(), before.revision(), "combat-command",
+                    hideInput, hideActor, access -> {}).isEmpty());
+            dice.add(6);
+            var accepted = f.storage.domainCommand(hideId, before.epoch(), before.revision(), "combat-command", hideInput);
+            var afterHide = f.storage.accessSnapshot();
+            assertEquals(before.revision() + 1, afterHide.revision());
+            assertFalse(accepted.lastCommand().replayed());
+            assertTrue(f.storage.domainCommand(hideId, before.epoch(), before.revision(), "combat-command",
+                    hideInput).lastCommand().replayed());
+            assertEquals(afterHide, f.storage.accessSnapshot());
+            assertEquals(List.of(new CampaignSpaceData.Die(20, 6)), lastRoot(f).rolls());
+            var check = f.battle().observation().checks().getLast();
+            assertEquals(12, check.roll().total());
+            assertEquals(Map.of(fighter, 13, wizard, 11), check.contests().stream().collect(
+                    java.util.stream.Collectors.toMap(ObservationContest::counterpartId, ObservationContest::opposingScore)));
+            assertEquals(1, f.actor(goblin).actionsRemaining());
+            assertEquals(0, f.actor(goblin).bonusActionsRemaining());
+            rejectCombat(f, Command.action(Kind.NIMBLE_DISENGAGE, goblin), null, "DOMAIN_REJECTED",
+                    "S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
+            assertObserverRow(f.view(fighterSeat), goblinName, origin, false, true);
+            var wizardView = f.view(wizardSeat);
+            assertObserverRow(wizardView, goblinName, origin, true, false);
+            assertEquals("等待其他行动者", publicScene(wizardView).get("turnLabel").getAsString());
+            f.combat(f.battle(), Command.move(goblin, List.of(second)));
+            assertObserverRow(f.view(fighterSeat), goblinName, second, false, true);
+            wizardView = f.view(wizardSeat);
+            assertObserverRow(wizardView, goblinName, origin, true, false);
+            assertAbsent(wizardView, "4, 3", goblin, "hideOperationId", "OBSERVATION_STEALTH");
+
+            UUID fighterMember = fighterSeat.member, wizardMember = wizardSeat.member;
+            finishAndOpen(f);
+            f.invitation = f.host("invite", object()).get("invitation").getAsString();
+            fighterSeat = f.approve("重开后的战士", fighterMember);
+            wizardSeat = f.approve("重开后的法师", wizardMember);
+            f.takeover(fighterSeat);
+            f.takeover(wizardSeat);
+            assertObserverRow(f.view(fighterSeat), goblinName, second, false, true);
+            assertObserverRow(f.view(wizardSeat), goblinName, origin, true, false);
+
+            f.clock.advanceSeconds(10);
+            f.advanceTo(wizard);
+            assertReceipt("ACCEPTED", f.post(wizardSeat, "command",
+                    f.command(wizardSeat, f.option(wizardSeat, "开始攻击动作"))));
+            setObservationCell(f, intervening, false, false, Cover.TOTAL);
+            assertTrue(shotLabels(f.view(wizardSeat)).isEmpty());
+            rejectCombat(f, Command.attack(wizard, goblin, bow), null, "DOMAIN_REJECTED", "S2_COMBAT_TOTAL_COVER");
+            setObservationCell(f, intervening, false, false, Cover.HALF);
+            var sightless = f.view(wizardSeat);
+            assertEquals(1, shotLabels(sightless).size());
+            assertTrue(shotLabels(sightless).getFirst().contains("最后已知 4, 2"));
+            assertAbsent(sightless, "4, 3", goblin);
+            dice.add(20, 20);
+            var staleShot = f.post(wizardSeat, "command",
+                    f.command(wizardSeat, option(sightless, "射击 " + goblinName)));
+            assertReceipt("ACCEPTED", staleShot);
+            var shot = f.latestAttack();
+            assertEquals(origin, shot.aimedPosition());
+            assertEquals(Cover.HALF, shot.targetCover());
+            assertFalse(shot.targetAtAimedPosition());
+            assertFalse(shot.hit());
+            assertFalse(shot.critical());
+            assertEquals(arrow, shot.rangedAttack().ammunitionItemId());
+            assertTrue(f.arrowIds(wizard).isEmpty());
+            assertObserverRow(f.view(wizardSeat), goblinName, origin, true, false);
+
+            f.clock.advanceSeconds(10);
+            f.advanceTo(goblin);
+            var shortbow = new EntryIdentity(f.rules.rule("adventure.monster", "monster.goblin"),
+                    "actions", "srd51_magic", "shortbow");
+            dice.add(1, 2);
+            f.combat(f.battle(), Command.monsterAttack(goblin, wizard, shortbow));
+            var reveal = f.latestAttack();
+            assertFalse(reveal.targetSeesAttacker());
+            assertTrue(reveal.advantage());
+            assertFalse(reveal.hit());
+            assertObserverRow(f.view(wizardSeat), goblinName, second, false, true);
+
+            f.endTurn();
+            f.advanceTo(goblin);
+            dice.add(6);
+            f.combat(f.battle(), hide);
+            setObservationCell(f, second, true, true, Cover.NONE);
+            setObservationCell(f, third, true, true, Cover.NONE);
+            f.combat(f.battle(), Command.move(goblin, List.of(third)));
+            assertObserverRow(f.view(fighterSeat), goblinName, second, true, false);
+            wizardView = f.view(wizardSeat);
+            assertObserverRow(wizardView, goblinName, second, true, false);
+            assertAbsent(wizardView, "5, 3");
+            f.advanceTo(wizard);
+            var search = f.command(wizardSeat, f.option(wizardSeat, "搜索（动作）"));
+            dice.add(12);
+            var searched = f.post(wizardSeat, "command", search);
+            assertReceipt("ACCEPTED", searched);
+            assertEquals(searched.body().get("receipt"), f.post(wizardSeat, "receipt", receiptIdentity(search)).body().get("receipt"));
+            assertStale(f, wizardSeat, search);
+            var searchCheck = f.battle().observation().checks().getLast();
+            assertEquals(Kind.SEARCH, searchCheck.kind());
+            assertEquals(List.of(goblin), searchCheck.contests().stream().map(ObservationContest::counterpartId).toList());
+            assertFalse(searchCheck.contests().getFirst().hiddenAfter());
+            assertObserverRow(f.view(wizardSeat), goblinName, third, true, false);
+            var fighterView = f.view(fighterSeat);
+            assertObserverRow(fighterView, goblinName, second, true, false);
+            assertAbsent(fighterView, "5, 3");
+            assertForgedObservationRejected(f);
+            f.advanceTo(goblin);
+            f.combat(f.battle(), Command.action(Kind.NIMBLE_DISENGAGE, goblin));
+            assertTrue(f.actor(goblin).disengaged());
+            assertEquals(1, f.actor(goblin).actionsRemaining());
+            assertEquals(0, f.actor(goblin).bonusActionsRemaining());
+            assertTrue(lastRoot(f).rolls().isEmpty());
+            assertTrue(dice.isEmpty());
+            finishAndOpen(f);
+            var attached = f.storage.accessSnapshot();
+            f.storage.close();
+            try (var restarted = new CampaignStorageService(temporary.resolve("observer-battle"))) {
+                var recovered = restarted.recover(attached.runId());
+                assertNotEquals(attached.epoch(), recovered.epoch());
+                assertEquals(attached.snapshot(), restarted.accessSnapshot().snapshot());
+            }
+        }
+    }
+
+    @Test void sharedClericTargetMustBeSeenAndAnUnseenMoverDoesNotOpenAnOpportunity() throws Exception {
+        var dice = new ScriptedDice();
+        try (Fixture f = new Fixture("observer-spell", dice)) {
+            String targetName = "受遮蔽目标";
+            UUID cleric = f.character("施法牧师", "PC", "cleric"), target = f.character(targetName, "PC");
+            UUID sword = f.acquire(cleric, "item.longsword");
+            f.equip(cleric, sword, "MAIN_HAND");
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, cleric, target);
+            UUID scene = f.createScene(world);
+            Position targetCell = new Position(2, 1);
+            dice.add(20, 10);
+            f.enterBattle(scene, List.of(new Deployment(cleric, new Position(1, 1), 0), new Deployment(target, targetCell, 1)));
+            Seat seat = f.approve("牧师玩家");
+            f.assign(cleric, seat.member);
+            f.share(ShareKind.SCENE, scene, true, seat.member);
+            f.share(ShareKind.CHARACTER, target, true, seat.member);
+            f.takeover(seat);
+            String heal = "Cure Wounds：" + targetName;
+            assertTrue(labels(f.view(seat)).contains(heal));
+            var spell = Command.cast(cleric, new CastInput(f.rules.rule("character.spellcasting", "spellcasting.life_domain"),
+                    f.rules.rule("adventure.spell", "spell.cure_wounds"), List.of(target), null));
+            for (Cover cover : List.of(Cover.HALF, Cover.TOTAL)) {
+                setObservationCell(f, targetCell, false, cover == Cover.HALF, cover);
+                var view = f.view(seat);
+                assertObserverRow(view, targetName, targetCell, true, false);
+                assertFalse(labels(view).contains(heal));
+                rejectCombat(f, spell, Actor.player(seat.member, cleric), "PLAYER_COMMAND_FORBIDDEN", null);
+                rejectCombat(f, spell, null, "DOMAIN_REJECTED", "S2_SPELL_TARGET");
+            }
+            setObservationCell(f, targetCell, false, false, Cover.NONE);
+            dice.add(3);
+            assertReceipt("ACCEPTED", f.post(seat, "command", f.command(seat, f.option(seat, heal))));
+            assertEquals(cleric, lastRoot(f).actor().characterId());
+            assertEquals(List.of(new CampaignSpaceData.Die(8, 3)), lastRoot(f).rolls());
+            setObservationCell(f, targetCell, false, true, Cover.NONE);
+            f.endTurn();
+            Position destination = new Position(3, 1);
+            f.combat(f.battle(), Command.move(target, List.of(destination)));
+            assertNull(f.battle().activeFlow());
+            assertTrue(f.actor(cleric).reactionAvailable());
+            assertObserverRow(f.view(seat), targetName, targetCell, true, false);
+            assertTrue(dice.isEmpty());
+        }
+    }
+
+    private static void setObservationCell(Fixture f, Position at, boolean hide, boolean blocks, Cover cover) {
+        f.combat(f.battle(), Command.setObservationCell(new ObservationCellInput(at, hide, blocks, cover)));
+    }
+
+    private static void assertObserverRow(JsonObject view, String name, Position at, boolean lastKnown, boolean current) {
+        var row = participants(view).asList().stream().map(JsonElement::getAsJsonObject)
+                .filter(participant -> name.equals(participant.get("name").getAsString())).findFirst().orElseThrow();
+        assertEquals(at.x() + ", " + at.y(), row.get("position").getAsString());
+        assertEquals(current, row.get("current").getAsBoolean());
+        assertEquals(lastKnown, row.has("lastKnown"));
+        if (lastKnown) assertTrue(row.get("lastKnown").getAsBoolean());
+    }
+
+    private static void assertForgedObservationRejected(Fixture f) {
+        var codec = new CampaignCodec();
+        byte[] original = codec.encode(new CampaignData.Document(uuid(), f.storage.accessSnapshot().snapshot()));
+        for (String field : List.of("cells", "pairs")) {
+            var forged = CampaignJson.read(original);
+            var history = forged.getAsJsonObject("domains").getAsJsonArray("combats").get(0).getAsJsonObject();
+            var after = history.getAsJsonArray("events").asList().getLast().getAsJsonObject()
+                    .getAsJsonObject("resolution").getAsJsonObject("after");
+            for (var battle : List.of(history.getAsJsonObject("current"), after)) {
+                var row = battle.getAsJsonObject("observation").getAsJsonArray(field).get(0).getAsJsonObject();
+                if (field.equals("cells")) row.addProperty("cover", Cover.THREE_QUARTERS.name());
+                else row.add("lastKnownPosition", CampaignDomainCodec.toJson(new Position(9, 9)));
+            }
+            var integrity = forged.remove("integrity").getAsJsonObject();
+            integrity.addProperty("digest", CampaignJson.digest(CampaignCodec.FILE_DIGEST_DOMAIN, CampaignJson.canonical(forged)));
+            forged.add("integrity", integrity);
+            assertEquals("INVALID_FILE", assertThrows(StorageException.class,
+                    () -> codec.decode(CampaignJson.canonical(forged))).code());
+        }
+    }
+
     @Test void monsterShortbowUsesCloseEnemyDisadvantageAndNeitherBowProvidesOpportunityAttacks() throws Exception {
         var dice = new ScriptedDice();
         try (Fixture f = new Fixture("ranged-monster", dice)) {
@@ -1425,6 +1673,7 @@ class PlayerParticipationAcceptanceTest {
         @Override public Clock withZone(ZoneId zone) { if (!zone.equals(ZoneOffset.UTC)) throw new IllegalArgumentException("Fixture clock uses UTC"); return this; }
         @Override public Instant instant() { return current; }
         void setMillis(long value) { current = Instant.ofEpochMilli(value); }
+        void advanceSeconds(long seconds) { current = current.plusSeconds(seconds); }
     }
     private static void assertReceipt(String expected, PlayerGatewayService.Reply reply) {
         assertEquals(expected, reply.body().getAsJsonObject("receipt").get("state").getAsString());

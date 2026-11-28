@@ -649,5 +649,72 @@
         ]
       }
     }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.goblin"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "scimitar"
+    },
+    "action_profile": {
+      "display_name": "Scimitar",
+      "description": "A melee attack against one target at 5 feet.",
+      "source_page": 315,
+      "mode": "MELEE_ATTACK_V1",
+      "mechanism": "MONSTER_MELEE_ATTACK_V1",
+      "attack_profile": {
+        "hit_bonus": 4,
+        "reach_feet": 5,
+        "damage": [
+          {
+            "damage_type": "SLASHING",
+            "dice_count": 1,
+            "dice_sides": 6,
+            "modifier": 2
+          }
+        ]
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "adventure.monster",
+        "rule_key": "monster.goblin"
+      },
+      "collection_key": "actions",
+      "module_key": "srd51_magic",
+      "entry_key": "shortbow"
+    },
+    "action_profile": {
+      "display_name": "Shortbow",
+      "description": "A ranged attack against one target with normal range 80 feet and long range 320 feet.",
+      "source_page": 315,
+      "mode": "RANGED_ATTACK_V1",
+      "mechanism": "MONSTER_RANGED_ATTACK_V1",
+      "attack_profile": {
+        "hit_bonus": 4,
+        "normal_range_feet": 80,
+        "long_range_feet": 320,
+        "damage": [
+          {
+            "damage_type": "PIERCING",
+            "dice_count": 1,
+            "dice_sides": 6,
+            "modifier": 2
+          }
+        ]
+      }
+    }
   }
 ]

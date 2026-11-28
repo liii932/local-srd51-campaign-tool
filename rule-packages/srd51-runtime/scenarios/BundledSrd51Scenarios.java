@@ -14,6 +14,7 @@ import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2CombatState;
 import com.dndtool.service.Schema2FeatureSupport;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
+import com.dndtool.service.Schema2ObservationRules;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.dndtool.service.Schema2SpellRules;
 import com.dndtool.service.Schema2WizardSpellbookRules;
@@ -46,9 +47,14 @@ import java.util.stream.IntStream;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import com.dndtool.service.Schema2CombatState.Battle;
 import com.dndtool.service.Schema2CombatState.ContestSkill;
+import com.dndtool.service.Schema2CombatState.Cover;
+import com.dndtool.service.Schema2CombatState.Deployment;
 import com.dndtool.service.Schema2CombatState.HandSlot;
 import com.dndtool.service.Schema2CombatState.Kind;
 import com.dndtool.service.Schema2CombatState.MeleeInput;
+import com.dndtool.service.Schema2CombatState.MonsterDeployment;
+import com.dndtool.service.Schema2CombatState.ObservationCellInput;
+import com.dndtool.service.Schema2CombatState.Position;
 
 /** Authored expectations for the SRD 5.1 runtime combinations. */
 public final class BundledSrd51Scenarios {
@@ -96,6 +102,7 @@ public final class BundledSrd51Scenarios {
                 scenario("wolf-bite-variant", suite -> suite.verifyWolfBite(12, Schema2CombatState.OnHitOutcome.PRONE_APPLIED)),
                 scenario("monster-turn-movement", BundledSrd51Scenarios::verifyMonsterTurnMovement),
                 scenario("monster-breath-profile", BundledSrd51Scenarios::verifyMonsterBreathProfile),
+                scenario("observer-hiding", BundledSrd51Scenarios::verifyObserverHiding),
                 scenario("rule-origins", BundledSrd51Scenarios::verifyRuleOrigins),
                 scenario("wizard-evocation", BundledSrd51Scenarios::verifyWizardEvocation),
                 scenario("burning-hands", BundledSrd51Scenarios::verifyBurningHands)));
@@ -868,6 +875,104 @@ public final class BundledSrd51Scenarios {
         expectNumber(6, breath.damageProfile().diceCount());
         expectNumber(15, breath.area().lengthFeet());
         expectNumber(5, breath.recharge().minimumRoll());
+    }
+
+    private void verifyObserverHiding() {
+        UUID campaign = UUID.randomUUID(), scene = UUID.randomUUID();
+        UUID goblin = UUID.randomUUID(), wizard = UUID.randomUUID(), fighter = UUID.randomUUID();
+        var goblinRule = (FinalMonster) find("adventure.monster", "monster.goblin");
+        assertEquals("srd51_magic", goblinRule.identity().moduleKey());
+        expectNumber(315, goblinRule.definition().sourcePage());
+        var block = goblinRule.definition().statBlock();
+        assertEquals(MonsterSize.SMALL, block.size());
+        expectNumber(15, block.armorClass());
+        expectNumber(7, block.hitPoints());
+        expectNumber(9, block.passivePerception());
+        assertEquals(List.of(new MonsterSkillBonus("skill.stealth", 6)), block.skills());
+        var scimitar = new EntryIdentity(goblinRule.identity(), "actions", "srd51_magic", "scimitar");
+        var scimitarProfile = rules.projection().projection().entries().stream().filter(FinalEntry::enabled)
+                .map(FinalEntry::entry).filter(MonsterActionEntry.class::isInstance).map(MonsterActionEntry.class::cast)
+                .filter(action -> action.identity().equals(scimitar)).findFirst().orElseThrow().actionProfile();
+        assertEquals(new MonsterAttackProfile(4, 5, List.of(new MonsterAttackDamage(DamageType.SLASHING, 1, 6, 2)), null),
+                scimitarProfile.attackProfile());
+
+        var identity = Schema2PreparationIdentity.random();
+        var wizardPlan = rules.initialPlan(campaign, wizard, identity, "wizard", "acolyte");
+        var fighterPlan = rules.initialPlan(campaign, fighter, identity, "fighter", "acolyte");
+        var material = rules.projection();
+        var roster = Map.of(wizard, new Schema2CombatRules.Context(material, wizardPlan, initial(wizardPlan, "wizard")),
+                fighter, new Schema2CombatRules.Context(material, fighterPlan, initial(fighterPlan, "fighter")));
+        var hidingCell = new Position(1, 1);
+        var intervening = new Position(2, 1);
+        var wizardCell = new Position(4, 1);
+        var start = Schema2CombatState.Command.start(
+                List.of(new Deployment(wizard, wizardCell, 0), new Deployment(fighter, new Position(1, 4), 0)),
+                List.of(new MonsterDeployment(goblin, goblinRule.identity(), hidingCell, 1)),
+                List.of(goblin, wizard, fighter));
+        var combat = new Schema2CombatRules();
+        var initiative = new ArrayDeque<>(List.of(12, 8, 20));
+        var opening = combat.resolve(combat.preflight(UUID.randomUUID(), scene, campaign, roster, null, start), sides -> {
+            expectNumber(20, sides);
+            return initiative.removeFirst();
+        }).after();
+        assertTrue(initiative.isEmpty());
+        assertEquals(goblin, opening.activeActor());
+        var ready = meleeStep(combat, roster, opening, Schema2CombatState.Command.setObservationCell(
+                new ObservationCellInput(hidingCell, true, false, Cover.NONE)), List.of());
+        var covered = meleeStep(combat, roster, ready, Schema2CombatState.Command.setObservationCell(
+                new ObservationCellInput(intervening, false, false, Cover.HALF)), List.of());
+        var hidden = meleeStep(combat, roster, covered, Schema2CombatState.Command.action(Kind.NIMBLE_HIDE, goblin), List.of(5));
+        var hide = hidden.observation().checks().getLast();
+        assertEquals(goblinRule.identity(), hide.rule());
+        assertEquals("skill.stealth", hide.monsterSkill());
+        assertEquals(new Schema2CombatState.ObservationRoll(5, null, 5, 2, 4, false, 11), hide.roll());
+        var contests = new HashMap<UUID, Integer>();
+        hide.contests().forEach(contest -> contests.put(contest.counterpartId(), contest.opposingScore()));
+        assertEquals(Map.of(wizard, 10, fighter, 12), contests);
+        assertTrue(hide.nimbleEscape() && !Schema2ObservationRules.visible(hidden, wizard, goblin));
+        assertTrue(Schema2ObservationRules.visible(hidden, fighter, goblin));
+        assertEquals(hidingCell, Schema2ObservationRules.knownPosition(hidden, wizard, goblin));
+        expectNumber(1, activeCombatant(hidden).actionsRemaining());
+        expectNumber(0, activeCombatant(hidden).bonusActionsRemaining());
+        var disengage = Schema2CombatState.Command.action(Kind.NIMBLE_DISENGAGE, goblin);
+        expectRejection("taking a second Nimble Escape bonus action", "S2_COMBAT_BONUS_ACTION_UNAVAILABLE",
+                () -> meleeStep(combat, roster, hidden, disengage, List.of()));
+        var disengaged = meleeStep(combat, roster, covered, disengage, List.of());
+        assertTrue(activeCombatant(disengaged).disengaged());
+        expectNumber(1, activeCombatant(disengaged).actionsRemaining());
+        expectNumber(0, activeCombatant(disengaged).bonusActionsRemaining());
+
+        var bow = new EntryIdentity(goblinRule.identity(), "actions", "srd51_magic", "shortbow");
+        var shot = Schema2CombatState.Command.monsterAttack(goblin, wizard, bow);
+        var attacked = meleeStep(combat, roster, hidden, shot, List.of(7, 9));
+        var attack = attacked.flows().getLast().attacks().getFirst();
+        assertTrue(attack.advantage() && !attack.targetSeesAttacker() && !attack.hit());
+        assertEquals(Cover.HALF, attack.targetCover());
+        assertEquals(wizardCell, attack.aimedPosition());
+        expectNumber(14, attack.armorClass());
+        expectNumber(9, attack.selectedD20());
+        expectNumber(4, attack.monsterAttack().hitBonus());
+        expectNumber(80, attack.rangedAttack().normalRangeFeet());
+        expectNumber(320, attack.rangedAttack().longRangeFeet());
+        assertTrue(Schema2ObservationRules.visible(attacked, wizard, goblin));
+
+        var blocked = meleeStep(combat, roster, hidden, Schema2CombatState.Command.setObservationCell(
+                new ObservationCellInput(intervening, false, false, Cover.TOTAL)), List.of());
+        assertTrue(!Schema2ObservationRules.visible(blocked, goblin, wizard));
+        assertEquals(wizardCell, Schema2ObservationRules.knownPosition(blocked, goblin, wizard));
+        expectRejection("shooting through total cover", "S2_COMBAT_TOTAL_COVER",
+                () -> meleeStep(combat, roster, blocked, shot, List.of()));
+
+        var wizardTurn = meleeStep(combat, roster, hidden, Schema2CombatState.Command.action(Kind.END_TURN, goblin), List.of());
+        assertEquals(wizard, wizardTurn.activeActor());
+        var searched = meleeStep(combat, roster, wizardTurn, Schema2CombatState.Command.action(Kind.SEARCH, wizard), List.of(12));
+        var search = searched.observation().checks().getLast();
+        assertEquals(rules.rule("character.proficiency", "proficiency.skill.perception"), search.skill());
+        expectNumber(12, search.roll().total());
+        assertEquals(List.of(new Schema2CombatState.ObservationContest(goblin, 11, hide.operationId(), false)), search.contests());
+        assertTrue(Schema2ObservationRules.visible(searched, wizard, goblin));
+        expectNumber(0, activeCombatant(searched).actionsRemaining());
+        expectNumber(1, activeCombatant(searched).bonusActionsRemaining());
     }
 
     private void verifyMonsterTurnMovement() {

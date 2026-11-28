@@ -205,8 +205,16 @@
     for (const card of shared.cards || []) add('队友概况', card.name || '已共享角色', card.description || '');
     for (const scene of shared.scenes || []) {
       const article = add(scene.focused ? '执行焦点' : '共享空间', scene.name || '已共享场景', scene.description || '');
-      if (scene.turnLabel) article.append(element('p', '', scene.turnLabel));
-      if (Array.isArray(scene.participants)) { const list = element('ul', 'mini-list'); for (const person of scene.participants) list.append(element('li', '', [person.name, person.position, person.current ? '当前行动者' : ''].filter(Boolean).join(' · '))); article.append(list); }
+      for (const perspective of scene.perspectives || [scene]) {
+        if (perspective.observer) article.append(element('h4', '', perspective.observer + '的视角'));
+        if (perspective.turnLabel) article.append(element('p', '', perspective.turnLabel));
+        const list = element('ul', 'mini-list');
+        for (const person of perspective.participants || []) {
+          const position = person.lastKnown ? '最后已知 ' + person.position + '（当前不可见）' : person.position;
+          list.append(element('li', '', [person.name, position, person.current ? '当前行动者' : ''].filter(Boolean).join(' · ')));
+        }
+        article.append(list);
+      }
     }
     for (const log of shared.logs || []) add('行动记录', log.title || '桌上发生的事', typeof log === 'string' ? log : log.text || '');
     $('player-shared-section').hidden = !container.childElementCount;

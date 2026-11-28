@@ -56,7 +56,7 @@ final class Schema2MonsterRules {
             throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
         if (block.traits().stream().anyMatch(trait -> switch (trait.scope()) {
             case ATTACK_ROLL_PACK_TACTICS_ONLY -> !trait.key().equals("pack_tactics");
-            case PERCEPTION_HEARING_SMELL_ONLY -> false;
+            case PERCEPTION_HEARING_SMELL_ONLY, NIMBLE_ESCAPE_BONUS_HIDE_DISENGAGE_V1 -> false;
             default -> true;
         })) throw invalid("S2_MONSTER_TRAIT_UNSUPPORTED");
         return attack;
@@ -146,8 +146,31 @@ final class Schema2MonsterRules {
         var a=block.abilities();int score=switch(ability) {case "ability.strength"->a.strength();case "ability.dexterity"->a.dexterity();case "ability.constitution"->a.constitution();case "ability.intelligence"->a.intelligence();case "ability.wisdom"->a.wisdom();case "ability.charisma"->a.charisma();default->throw invalid("S2_MONSTER_RULE_UNSUPPORTED");};
         return Math.floorDiv(score-10,2);
     }
+    static int stealthModifier(Map<UUID, Context> roster, Battle battle, UUID id) {
+        var block = definition(roster, instance(battle, id).monster()).statBlock();
+        return skillModifier(block, "skill.stealth", "ability.dexterity");
+    }
+    static int perceptionModifier(Map<UUID, Context> roster, Battle battle, UUID id) {
+        var block = definition(roster, instance(battle, id).monster()).statBlock();
+        return skillModifier(block, "skill.perception", "ability.wisdom");
+    }
+    private static int skillModifier(MonsterStatBlock block, String skill, String ability) {
+        // A listed skills row carries the complete modifier, including any proficiency.
+        return block.skills().stream().filter(row -> row.skillKey().equals(skill)).mapToInt(MonsterSkillBonus::bonus)
+                .findFirst().orElseGet(() -> modifier(block, ability));
+    }
+    static int passivePerception(Map<UUID, Context> roster, Battle battle, UUID id) {
+        return definition(roster, instance(battle, id).monster()).statBlock().passivePerception();
+    }
+    static RuleIdentity nimbleEscapeSource(Map<UUID, Context> roster, Battle battle, UUID id) {
+        if (!isMonster(battle, id)) return null;
+        var owner = instance(battle, id).monster();
+        if (!GOBLIN_MONSTER.equals(owner)) return null;
+        var block = definition(roster, owner).statBlock();
+        return block.traits().stream().anyMatch(trait -> trait.isNimbleEscape(owner)) ? owner : null;
+    }
     static Battle with(Battle b,List<MonsterInstance> monsters,List<SaveDamageBatch> batches) {
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),monsters,batches,b.monsterRests(),b.meleeControl());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),monsters,batches,b.monsterRests(),b.meleeControl(),b.observation());
     }
     static Battle replace(Battle b,MonsterInstance monster) {return with(b,b.monsters().stream().map(m->m.monsterId().equals(monster.monsterId())?monster:m).toList(),b.saveDamageBatches());}
     static Battle damage(Battle b,UUID id,int amount) {

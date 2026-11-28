@@ -14,9 +14,11 @@ const wolfName = '林地灰狼';
 async function main() {
   const [flag, storageRoot, scenario] = process.argv.slice(2);
   assert.ok(flag === '--fresh-root' && path.isAbsolute(storageRoot), 'Expected --fresh-root /absolute/disposable/player-store');
-  assert.ok(scenario === undefined || ['--movement', '--ranged'].includes(scenario), 'Expected --movement or --ranged');
+  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation'].includes(scenario),
+    'Expected --movement, --ranged, or --observation');
   const ranged = scenario === '--ranged';
-  const monsterName = ranged ? '林间骷髅' : wolfName;
+  const observation = scenario === '--observation';
+  const monsterName = observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
   const root = await fs.realpath(storageRoot);
   const repo = await fs.realpath(path.join(__dirname, '../..'));
   assert.ok(root !== repo && !root.startsWith(repo + path.sep));
@@ -79,7 +81,7 @@ async function main() {
     await host.goto(hostOrigin + '/host/storage');
     await waitForStorageReady(host);
     assert.equal((await readHost()).storage.state, 'IDLE');
-    await field('storage-create', 'name').fill(ranged ? '玩家远程验收' : '玩家近战验收');
+    await field('storage-create', 'name').fill(observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收');
     await hostAction('create', () => host.locator('#storage-create button[type="submit"]').click());
     const fighters = [];
     for (const name of ['巡林战士', '营地战士']) {
@@ -111,11 +113,12 @@ async function main() {
     await focusSpace(host, hostAction, 'WORLD', world);
     await placeAtFocus(host, hostAction, fighters);
     await field('domain-monster-create', 'name').fill(monsterName);
-    await selectRule('domain-monster-create', 'monster', ranged ? 'monster.skeleton' : 'monster.wolf');
+    await selectRule('domain-monster-create', 'monster', observation ? 'monster.goblin' : ranged ? 'monster.skeleton' : 'monster.wolf');
     const created = await domainAction('domain-monster-create');
     const monster = created.campaign.domain.space.monsters.find(m => m.name === monsterName).id;
-    const placements = ranged ? [[fighters[0], 1, 1, 0], [monster, 18, 1, 1], [fighters[1], 1, 2, 0]]
-      : [[fighters[0], 1, 1, 0], [monster, 2, 1, 1], [fighters[1], 3, 3, 0]];
+    const placements = observation ? [[fighters[0], 1, 1, 0], [monster, 3, 1, 1], [fighters[1], 1, 3, 0]]
+      : ranged ? [[fighters[0], 1, 1, 0], [monster, 18, 1, 1], [fighters[1], 1, 2, 0]]
+        : [[fighters[0], 1, 1, 0], [monster, 2, 1, 1], [fighters[1], 3, 3, 0]];
     const secondWolfName = '营地灰狼';
     let secondWolf;
     if (scenario === '--movement') {
@@ -177,11 +180,127 @@ async function main() {
       await field('domain-combat', 'actorId').selectOption(active());
       state = await domainAction('domain-combat');
     };
-    if (ranged) {
-      const advanceTo = async id => {
-        for (let i = 0; i < battle().initiative.length && active() !== id; i++) await endTurn();
-        assert.equal(active(), id);
+    const advanceTo = async id => {
+      for (let i = 0; i < battle().initiative.length && active() !== id; i++) await endTurn();
+      assert.equal(active(), id);
+    };
+    if (observation) {
+      const combatForm = 'domain-combat';
+      const terrainForm = 'domain-observation-cell';
+      const setCell = async (x, y, {cover = 'NONE', hideAllowed = false, blocksSight = false}) => {
+        await field(terrainForm, 'combatId').selectOption(scene);
+        await field(terrainForm, 'x').fill(String(x));
+        await field(terrainForm, 'y').fill(String(y));
+        await field(terrainForm, 'y').press('Tab');
+        await field(terrainForm, 'hideAllowed').setChecked(hideAllowed);
+        await field(terrainForm, 'blocksSight').setChecked(blocksSight);
+        await field(terrainForm, 'cover').selectOption(cover);
+        state = await domainAction(terrainForm);
+        const cell = battle().observation.cells.find(cell => cell.position.x === x && cell.position.y === y);
+        if (hideAllowed || blocksSight || cover !== 'NONE') assert.deepEqual(cell, {position: {x, y}, hideAllowed, blocksSight, cover});
+        else assert.equal(cell, undefined);
       };
+      const targetOption = (form, id) => field(form, 'targetId').locator(`option[value="${id}"]`);
+      async function verifyTotalCover(form, action, actorId, targetId, x, y) {
+        await field(form, 'actorId').selectOption(actorId);
+        await field(form, 'kind').selectOption(action);
+        const target = targetOption(form, targetId);
+        await target.waitFor({state: 'attached'});
+        await field(form, 'targetId').selectOption(targetId);
+        await setCell(x, y, {cover: 'TOTAL'});
+        await target.waitFor({state: 'detached'});
+        assert.notEqual(await field(form, 'targetId').inputValue(), targetId);
+        await setCell(x, y, {});
+        await target.waitFor({state: 'attached'});
+      }
+      async function expectGoblin(page, position, lastKnown) {
+        const row = page.locator('#player-shared li').filter({hasText: monsterName});
+        await row.filter({hasText: monsterName + ' · ' + (lastKnown ? `最后已知 ${position}（当前不可见）` : position)}).waitFor();
+        assert.equal((await row.innerText()).includes('最后已知'), lastKnown);
+        const {view} = await readPlayer(page);
+        const sharedScene = view.shared.scenes.find(entry => entry.name === '林间空地');
+        const creature = sharedScene.participants.find(person => person.name === monsterName);
+        assert.equal(creature.position, position);
+        assert.equal(Boolean(creature.lastKnown), lastKnown);
+        if (lastKnown) assert.equal(creature.current, false);
+      }
+
+      await share('MONSTER', monster, 'ALL');
+      await expectGoblin(attacker, '3, 1', false);
+      await expectGoblin(observer, '3, 1', false);
+      await advanceTo(fighters[0]);
+      await verifyTotalCover(combatForm, 'ATTACK', fighters[0], monster, 2, 1);
+      await advanceTo(monster);
+      const monsterForm = 'domain-monster';
+      await verifyTotalCover(monsterForm, 'MONSTER_ATTACK', monster, fighters[1], 1, 3);
+      await setCell(3, 1, {hideAllowed: true});
+      await setCell(2, 1, {blocksSight: true});
+      assert.match(await field(terrainForm, 'cover').locator('option[value="HALF"]').innerText(), /半掩护.*\+2/);
+      await setCell(1, 3, {cover: 'HALF'});
+      await expectGoblin(attacker, '3, 1', true);
+      await expectGoblin(observer, '3, 1', false);
+
+      await field(combatForm, 'actorId').selectOption(monster);
+      const kind = field(combatForm, 'kind');
+      assert.match(await kind.locator('option[value="NIMBLE_HIDE"]').innerText(), /躲藏|隐藏/);
+      assert.match(await kind.locator('option[value="NIMBLE_DISENGAGE"]').innerText(), /撤离/);
+      await kind.selectOption('NIMBLE_HIDE');
+      await kind.selectOption('NIMBLE_DISENGAGE');
+      state = await domainAction(combatForm);
+      assert.equal(actor(monster).disengaged, true);
+      assert.equal(actor(monster).actionsRemaining, 1);
+      assert.equal(actor(monster).bonusActionsRemaining, 0);
+
+      await field(combatForm, 'actorId').selectOption(monster);
+      await kind.selectOption('MOVE');
+      await field(combatForm, 'path').fill('4,1');
+      state = await domainAction(combatForm);
+      assert.deepEqual(actor(monster).position, {x: 4, y: 1});
+      await expectGoblin(observer, '4, 1', false);
+      await expectGoblin(attacker, '3, 1', true);
+
+      await field(monsterForm, 'actorId').selectOption(monster);
+      await field(monsterForm, 'kind').selectOption('MONSTER_ATTACK');
+      const shortbow = field(monsterForm, 'attackAction').locator('option').filter({hasText: /Shortbow/});
+      await field(monsterForm, 'attackAction').selectOption(await shortbow.getAttribute('value'));
+      await field(monsterForm, 'targetId').selectOption(fighters[1]);
+      const defender = state.campaign.domain.characters.find(character => character.id === fighters[1]);
+      const baseAC = 10 + Math.floor((defender.state.abilities['ability.dexterity'] - 10) / 2);
+      state = await domainAction(monsterForm);
+      const shot = battle().flows.at(-1).attacks[0];
+      assert.equal(shot.actorId, monster);
+      assert.equal(shot.targetId, fighters[1]);
+      assert.equal(shot.targetCover, 'HALF');
+      assert.equal(shot.finalArmorClass, baseAC + 2);
+      assert.equal(actor(monster).actionsRemaining, 0);
+      await host.locator('#domain-combat-summary .monster-attack-result')
+        .filter({hasText: /Shortbow/}).filter({hasText: `护甲等级 ${shot.finalArmorClass}`})
+        .filter({hasText: '半掩护（AC +2）'}).waitFor();
+      await expectGoblin(attacker, '4, 1', true);
+
+      await advanceTo(fighters[0]);
+      await field(combatForm, 'actorId').selectOption(fighters[0]);
+      await kind.selectOption('ATTACK');
+      await targetOption(combatForm, monster).waitFor({state: 'attached'});
+      await playerCommand(/^搜索（动作）/);
+      state = await readHost();
+      const search = battle().observation.checks.at(-1);
+      assert.equal(search.kind, 'SEARCH');
+      assert.equal(search.actorId, fighters[0]);
+      assert.ok(search.roll.firstD20 >= 1 && search.roll.firstD20 <= 20);
+      assert.equal(actor(fighters[0]).actionsRemaining, 0);
+      assert.equal(state.campaign.domain.roots.at(-1).actor.memberId, members[0]);
+      await expectGoblin(attacker, '4, 1', true);
+
+      await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({result: 'PASSED', playerSessions: seats.length,
+        rememberedPosition: '3, 1', seenPosition: '4, 1', revealedPosition: '4, 1',
+        weaponDropdownsBlocked: 2, nimbleDisengage: true, cover: shot.targetCover, armorClass: shot.finalArmorClass, playerSearch: true}));
+      return;
+    }
+    if (ranged) {
       const character = (domain, id) => domain.characters.find(c => c.id === id);
       const monsterHp = domain => domain.space.monsters.find(m => m.id === monster).hitPoints;
       async function assertLongRange(attack, evidence, label) {

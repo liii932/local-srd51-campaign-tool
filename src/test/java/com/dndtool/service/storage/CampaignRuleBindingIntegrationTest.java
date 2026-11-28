@@ -307,7 +307,7 @@ class CampaignRuleBindingIntegrationTest {
         var snapshot = service.accessSnapshot().snapshot();
         var state = snapshot.domains();
         var binding = state.material().binding();
-        assertEquals(List.of(BASE + "@" + BASE_RELEASE, "srd51_characters@6", "srd51_magic@6", HOUSE + "@" + release),
+        assertEquals(List.of(BASE + "@" + BASE_RELEASE, "srd51_characters@6", "srd51_magic@7", HOUSE + "@" + release),
                 binding.members().stream().map(member -> member.moduleKey() + "@" + member.releaseVersion()).toList());
         assertEquals(binding, character(state, scenario.actor()).initial().character().binding());
         var trade = character(state, scenario.actor()).initial().character().grants().stream()

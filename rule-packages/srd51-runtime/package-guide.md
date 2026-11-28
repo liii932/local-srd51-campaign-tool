@@ -21,7 +21,7 @@ application that supports the saved mechanisms.
 | --- | --- | --- | --- |
 | `srd51_runtime` version `13` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
 | `srd51_characters` version `14` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, melee and ranged weapon attacks, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `16` | extension | `srd51_runtime=13`, `srd51_characters=14` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Skeleton |
+| `srd51_magic` version `17` | extension | `srd51_runtime=13`, `srd51_characters=14` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Goblin and Skeleton |
 | `dm_runtime_house_rules` version `25` | extension | `srd51_runtime=13` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
@@ -44,8 +44,7 @@ bonus action for a single-class fighter at levels 1–6 on that fighter's own
 active combat turn. It spends one use to heal the fighter by a server-rolled
 `1d10 + fighter level`, capped at maximum hit points. It spends the use even
 when the fighter is already at maximum hit points. A completed short or long
-rest restores the one use outside combat. This is the only executable bonus
-action in this selection.
+rest restores the one use outside combat.
 The combat action requires the exact acquired feature and available resource.
 Generic resource spending cannot substitute for Second Wind. The MySQL INTERNAL
 combat entry point rejects this action.
@@ -169,6 +168,18 @@ reach. Shortbow uses mode `RANGED_ATTACK_V1` and mechanism
 piercing. The Shortsword and Shortbow each use the same frozen hit bonus and
 damage. To change a monster action, replace its entire `action_profile`.
 
+Goblin is a Small humanoid with AC 15, 7 hit points, a speed of 30 feet, a +6
+Stealth modifier and passive Perception 9. Scimitar is a +4 melee attack at 5
+feet for 1d6 + 2 slashing damage. Shortbow is a +4 ranged attack at 80/320 feet
+for 1d6 + 2 piercing damage. The `nimble_escape` trait on
+`srd51_magic/adventure.monster/monster.goblin` uses
+`NIMBLE_ESCAPE_BONUS_HIDE_DISENGAGE_V1`. It lets the Goblin spend its bonus
+action to Hide or Disengage on its own turn. Trait text is for display. The
+stock PC skills use `proficiency.skill.stealth` with Dexterity and
+`proficiency.skill.perception` with Wisdom. A monster uses a listed skill
+modifier as its entire bonus and its ability modifier for an unlisted skill.
+Its passive Perception uses the value declared in its frozen stat block.
+
 The `dm-runtime-monster-variant` and `dm-runtime-wolf-variant` author examples
 replace the full Bite profile for Hell Hound or Wolf after the standard
 combination. The Wolf example changes the saving throw DC to 12. Both have
@@ -211,7 +222,7 @@ Numeric material is selected from local SRD pages 3–5 (race sources and Dwarve
 (cleric/Life), 24–25 (fighter), 52–54 (Wizard), 56–58 (advancement/multiclass/
 Grappler), 59–61 (languages/backgrounds), 63–69/70 (equipment/tools), 77–85
 (checks/ability mappings), 87 (rests), 90–99 (combat/health), the spell-specific
-pages recorded in the author rows, 321–322 (Hell Hound), 333–334 (Mummy) and
+pages recorded in the author rows, 315 (Goblin), 321–322 (Hell Hound), 333–334 (Mummy),
 346 (Skeleton), 393 (Wolf) and 398 (Commoner). The character-source page field is currently limited to 3–74;
 skill declarations use page 56 for advancement proficiency and record the
 78–85 ability-mapping reference in their author notes.

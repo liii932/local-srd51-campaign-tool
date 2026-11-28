@@ -238,8 +238,10 @@ public final class CampaignDomainEngine {
             resolution = combatRules.place(material, operationId, combatId, campaign, contexts, beforeBattle, command, arrivingMonsters);
             if (command.kind() != Kind.CLOSE_SCENE) {
                 int closeEvents = resolution.after().combatants().isEmpty() ? 1 : 2;
+                long priorObservation = beforeBattle == null ? 0 : Schema2ObservationRules.factCount(beforeBattle.observation());
+                long observationGrowth = Schema2ObservationRules.factCount(resolution.after().observation()) - priorObservation;
                 try { Schema2CombatHistory.checkReservedCapacity(previous, beforeBattle, closeEvents,
-                        resolution.after().combatants().size(), 0); }
+                        resolution.after().combatants().size(), 0, Math.max(0, observationGrowth)); }
                 catch (Schema2RuntimeFactsException exhausted) { throw rejected("S2_COMBAT_CAPACITY"); }
             }
         } else {
@@ -490,7 +492,8 @@ public final class CampaignDomainEngine {
             if(Set.of(Kind.READY_ATTACK,Kind.READY_MOVE,Kind.READY_SPELL,Kind.DECLARE_SHIELD).contains(command.kind()))closeEvents+=histories.size();
             int remaining=command.kind()==Kind.MOVE?command.path().size():before==null||before.activeFlow()==null?0:
                     before.activeFlow().movements().stream().filter(m->m.status()==MovementStatus.PENDING).mapToInt(m->m.path().size()-m.cursor()).sum();
-            Schema2CombatHistory.checkReservedCapacity(previous,before,suffix+closeEvents,before==null?command.deployments().size()+command.monsterDeployments().size():before.combatants().size(),remaining);
+            Schema2CombatHistory.checkReservedCapacity(previous,before,suffix+closeEvents,before==null?command.deployments().size()+command.monsterDeployments().size():before.combatants().size(),remaining,
+                    Schema2ObservationRules.potentialGrowth(before, command, remaining));
             // The mandatory path may pass all optional reactions. Already accepted attacks/casts
             // still need their damage/healing and root exploration-time children before returning.
             Map<UUID,Integer> required=new HashMap<>();for(UUID id:histories.keySet())required.put(id,0);

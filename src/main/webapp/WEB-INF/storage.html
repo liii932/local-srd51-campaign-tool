@@ -291,6 +291,8 @@
             <label>行动者<select name="actorId" class="combat-actor-choice" required></select></label>
             <label>行动<select name="kind">
               <option value="END_TURN">结束回合</option><option value="DASH">疾走</option><option value="DISENGAGE">撤离</option><option value="DODGE">闪避</option>
+              <option value="HIDE">躲藏（动作）</option><option value="SEARCH">搜索（动作）</option>
+              <option value="NIMBLE_HIDE">灵巧逃脱：躲藏（附赠动作）</option><option value="NIMBLE_DISENGAGE">灵巧逃脱：撤离（附赠动作）</option>
               <option value="SECOND_WIND">回气（附赠动作）</option><option value="DROP_PRONE">主动卧倒</option><option value="STAND_UP">起身</option>
               <option value="BEGIN_ATTACK">开始攻击动作</option><option value="ATTACK">攻击</option><option value="GRAPPLE">擒抱</option>
               <option value="SHOVE_PRONE">推倒</option><option value="SHOVE_PUSH">推开 5 尺</option><option value="FORFEIT_ATTACKS">放弃余下攻击</option>
@@ -322,6 +324,17 @@
             <label>方向<select name="direction"><option value="0">东</option><option value="1">东南</option><option value="2">南</option><option value="3">西南</option><option value="4">西</option><option value="5">西北</option><option value="6">北</option><option value="7">东北</option></select></label>
             <label>休息类型<select name="restKind"><option value="SHORT">短休</option><option value="LONG">长休</option></select></label>
             <button>应用怪物操作</button>
+          </form>
+          <form id="domain-observation-cell">
+            <h3>格位的躲藏、视线和掩护</h3>
+            <label>规则场景<select name="combatId" class="combat-choice" required></select></label>
+            <label>格位 X<input name="x" type="number" min="0" max="10000" value="0" required></label>
+            <label>格位 Y<input name="y" type="number" min="0" max="10000" value="0" required></label>
+            <label><input name="hideAllowed" type="checkbox">允许在此躲藏</label>
+            <label><input name="blocksSight" type="checkbox">遮挡视线</label>
+            <label>掩护<select name="cover"><option value="NONE">无</option><option value="HALF">半掩护（AC +2）</option><option value="THREE_QUARTERS">四分之三掩护（AC +5）</option><option value="TOTAL">全掩护</option></select></label>
+            <p>取消两个勾选并选择“无”，可移除此格标记。</p>
+            <button>保存格位标记</button>
           </form>
           <form id="domain-environment"><h3>环境效果与探索健康</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>发起者<select name="actorId" class="combat-actor-choice" required></select></label><label>操作<select name="kind"><option value="CREATE_ENVIRONMENT_ZONE">建立环境区域</option><option value="END_ENVIRONMENT_ZONE">结束环境区域</option><option value="EXPLORATION_HEALTH">探索中的健康效果</option></select></label><label>环境规则<select name="rule" data-rules="adventure.environment"></select></label><label>已有区域<select name="zoneKey" class="zone-choice" data-optional></select></label><label>区域 X<input name="x" type="number" min="0" max="10000" value="0"></label><label>区域 Y<input name="y" type="number" min="0" max="10000" value="0"></label><label>健康目标<select name="targetId" class="combat-actor-choice"></select></label><label>健康规则<select name="healthRule" data-rules="adventure.health"></select></label><label>健康效果<select name="effect" data-rules="adventure.vital_effect"></select></label><label>临时生命值冲突<select name="temporaryChoice"><option value="">无冲突</option><option value="REPLACE">使用新值</option><option value="KEEP">保留旧值</option></select></label><label>裁定说明<input name="adjudication" value="DM 环境裁定" maxlength="160" required></label><button>应用环境操作</button></form>
           <form id="domain-ready"><h3>预备动作</h3><label>战斗<select name="combatId" class="combat-choice" required></select></label><label>行动者<select name="actorId" class="combat-actor-choice" required></select></label><label>预备响应<select name="responseKind"><option value="ATTACK">攻击</option><option value="MOVE">移动</option><option value="SPELL">施法</option></select></label><label>触发<select name="triggerKind"><option value="ATTACK_COMPLETED">指定生物完成攻击</option><option value="CAST_COMPLETED">指定生物完成施法</option><option value="CREATURE_ENTER_CELL_AFTER">指定生物进入格位</option><option value="MONSTER_ACTION_COMPLETED">指定怪物完成动作</option></select></label><label>触发生物<select name="subjectId" class="combat-actor-choice" required></select></label><label>响应目标<select name="targetId" class="combat-actor-choice" data-optional></select></label><label>武器 / 法器<select name="itemId" class="equipment-choice" data-optional></select></label><label>响应或触发格 X<input name="x" type="number" min="0" max="10000" value="1"></label><label>响应或触发格 Y<input name="y" type="number" min="0" max="10000" value="0"></label><label>施法规则<select name="castingRule" data-rules="character.spellcasting,character.wizard_spellcasting"></select></label><label>预备法术<select name="spell" data-rules="adventure.spell"></select></label><label>法术位等级<input name="slotLevel" type="number" min="1" max="9" value="1"></label><button>预备响应</button></form>

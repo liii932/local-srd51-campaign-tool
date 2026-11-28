@@ -51,7 +51,8 @@ public final class PlayerCandidateFactory {
             Flow flow = battle.activeFlow(); Frame leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
             Window window = flow.windows().stream().filter(w -> Objects.equals(w.windowKey(), leaf.windowKey())).findFirst().orElse(null);
             UUID mover = CampaignParticipationCommands.opportunityMonster(battle, window);
-            if (mover != null && !visibleMonsters.contains(mover)) return List.copyOf(result);
+            if (mover != null && !PlayerCampaignProjection.canViewOpportunity(domain, player, battle, own, mover))
+                return List.copyOf(result);
             if (leaf.kind() == FrameKind.DOMAIN_CHOICE) {
                 var contest = battle.meleeControl().contests().stream().filter(c -> leaf.ownerKey().equals(c.choiceKey()))
                         .findFirst().orElseThrow();
@@ -65,7 +66,8 @@ public final class PlayerCandidateFactory {
             }
             if (window != null && window.status() == WindowStatus.OPEN) {
                 var opportunity = window.opportunities().stream().filter(o -> o.status() == OpportunityStatus.PENDING && Objects.equals(o.selectionFrameKey(), leaf.frameKey())).findFirst().orElse(null);
-                if (opportunity != null && own.contains(opportunity.actorId())) {
+                if (opportunity != null && own.contains(opportunity.actorId())
+                        && (mover == null || Schema2ObservationRules.visible(battle, opportunity.actorId(), mover))) {
                     UUID actor = opportunity.actorId();
                     factory.add(Command.reaction(Kind.PASS_REACTION, actor, null, flow.flowKey(), leaf.frameKey(), window.windowKey(), opportunity.opportunityKey()), "放弃本次反应");
                     factory.add(Command.reaction(Kind.ADVANCE_WINDOW, actor, null, flow.flowKey(), leaf.frameKey(), window.windowKey(), opportunity.opportunityKey()), "确认本次机会已不可用");
@@ -91,6 +93,10 @@ public final class PlayerCandidateFactory {
             if (!roster.containsKey(actor)) continue;
             if (battle.status() == Status.ACTIVE && actor.equals(battle.activeActor())) {
                 TURN_ACTIONS.forEach(kind -> factory.add(Command.action(kind, actor), label(kind)));
+                if (sharedScene) {
+                    factory.add(Command.action(Kind.HIDE, actor), "躲藏（动作）");
+                    factory.add(Command.action(Kind.SEARCH, actor), "搜索（动作）");
+                }
                 factory.attacks(actor, visible, visibleMonsters);
                 factory.attackReplacements(actor, visible);
                 factory.moves(actor); factory.spells(actor, visible);
@@ -153,16 +159,28 @@ public final class PlayerCandidateFactory {
     }; }
     private static final class BattleChoices {
         final List<Candidate> result; final CampaignDomainData.State domain; final Battle battle; final Map<UUID, Schema2CombatRules.Context> roster;
-        final boolean sharedScene; final Set<UUID> knownPositions;
+        final boolean sharedScene; final Set<UUID> sharedPositions;
+        final Map<UUID, Set<UUID>> visibleOccupants = new HashMap<>();
         final Schema2CombatRules rules = new Schema2CombatRules();
         BattleChoices(List<Candidate> result, CampaignDomainData.State domain, Battle battle,
                 Map<UUID, Schema2CombatRules.Context> roster, boolean sharedScene, Set<UUID> knownPositions) {
             this.result = result; this.domain = domain; this.battle = battle; this.roster = roster;
-            this.sharedScene = sharedScene; this.knownPositions = knownPositions;
+            this.sharedScene = sharedScene; this.sharedPositions = knownPositions;
+        }
+        private Set<UUID> visibleOccupants(UUID observer) {
+            return visibleOccupants.computeIfAbsent(observer, id -> {
+                Set<UUID> result = new HashSet<>();
+                for (var subject : battle.combatants()) {
+                    if (sharedPositions.contains(subject.characterId()) && Schema2ObservationRules.visible(battle, id, subject.characterId()))
+                        result.add(subject.characterId());
+                }
+                return result;
+            });
         }
         void add(Command command, String label) {
             if (result.size() >= MAX_CHOICES) return;
             try {
+                Set<UUID> knownPositions = visibleOccupants(command.actorId());
                 CampaignDomainCommands.preflightGrid(domain, command, sharedScene, knownPositions::contains);
                 rules.preflightCandidate(UUID.randomUUID(), roster, battle, command, knownPositions);
             }
@@ -224,15 +242,16 @@ public final class PlayerCandidateFactory {
                 if (weapon.ranged() && !sharedScene) continue;
                 for (var target : battle.combatants()) {
                     UUID id = target.characterId();
-                    if (id.equals(actor)) continue;
-                    String name;
-                    if (visibleMonsters.contains(id))
-                        name = PlayerCampaignProjection.monsterName(domain, id) + "（" + target.position().x() + ", " + target.position().y() + "）";
-                    else if (visible.contains(id) && roster.containsKey(id)) name = PlayerCampaignProjection.characterName(domain, id);
-                    else continue;
+                    boolean monster = visibleMonsters.contains(id);
+                    if (id.equals(actor) || !monster && !(visible.contains(id) && roster.containsKey(id))) continue;
+                    Position aim = Schema2ObservationRules.knownPosition(battle, actor, id);
+                    boolean inSight = Schema2ObservationRules.visible(battle, actor, id);
+                    if (aim == null || !inSight && !sharedScene) continue;
+                    String name = monster ? PlayerCampaignProjection.monsterName(domain, id) : PlayerCampaignProjection.characterName(domain, id);
+                    if (monster || !inSight) name += "（" + (inSight ? "" : "最后已知 ") + aim.x() + ", " + aim.y() + "）";
                     String label = (weapon.ranged() ? "射击 " : "攻击 ") + name + " · " + PlayerCampaignProjection.ruleName(domain, item.item());
                     if (weapon.ranged()) {
-                        int feet = source.position().distanceFeet(target.position());
+                        int feet = source.position().distanceFeet(aim);
                         var band = Schema2CombatRules.rangedDistance(feet, weapon.normalRangeFeet(), weapon.longRangeFeet());
                         if (band == Schema2CombatRules.RangedDistance.OUT_OF_RANGE) continue;
                         label += " · " + feet + " 尺（" + (band == Schema2CombatRules.RangedDistance.LONG ? "长射程" : "正常射程") + "）";
@@ -248,7 +267,7 @@ public final class PlayerCandidateFactory {
             if (sequence == null || sequence.closed()) return;
             for (var target : battle.combatants()) {
                 UUID id = target.characterId();
-                if (id.equals(actor) || !visible.contains(id) || !roster.containsKey(id)
+                if (id.equals(actor) || !visible.contains(id) || !roster.containsKey(id) || !Schema2ObservationRules.visible(battle, actor, id)
                         || attacker.position().distanceFeet(target.position()) != 5) continue;
                 String name = PlayerCampaignProjection.characterName(domain, id);
                 for (HandSlot hand : HandSlot.values()) {

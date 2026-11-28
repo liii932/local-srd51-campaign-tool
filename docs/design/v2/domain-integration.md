@@ -72,7 +72,7 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@13`、`srd51_characters@14`、`srd51_magic@16`，第四个成员分别为
+`srd51_runtime@13`、`srd51_characters@14`、`srd51_magic@17`，第四个成员分别为
 `dm_runtime_house_rules@25` 与 `dm_runtime_house_rules@27`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和

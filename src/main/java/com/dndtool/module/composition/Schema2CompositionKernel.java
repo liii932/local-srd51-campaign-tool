@@ -230,8 +230,17 @@ public final class Schema2CompositionKernel {
     public record MonsterDamageDefense(MonsterDefenseKind kind, DamageType damageType, MonsterDefenseQualifier qualifier) { }
     /** Trait scopes are closed inputs. Display text supplies no runtime behavior. */
     public record MonsterLanguage(String name, boolean understands, boolean speaks) { }
-    public enum MonsterTraitScope { PERCEPTION_HEARING_SMELL_ONLY, ATTACK_ROLL_PACK_TACTICS_ONLY, UNSUPPORTED }
-    public record MonsterTrait(String key, MonsterTraitScope scope, String displayName, String description) { }
+    public enum MonsterTraitScope {
+        PERCEPTION_HEARING_SMELL_ONLY, ATTACK_ROLL_PACK_TACTICS_ONLY, NIMBLE_ESCAPE_BONUS_HIDE_DISENGAGE_V1, UNSUPPORTED
+    }
+    public static final RuleIdentity GOBLIN_MONSTER = new RuleIdentity("srd51_magic", "adventure.monster", "monster.goblin");
+    private static final String NIMBLE_ESCAPE_KEY = "nimble_escape";
+    public record MonsterTrait(String key, MonsterTraitScope scope, String displayName, String description) {
+        public boolean isNimbleEscape(RuleIdentity owner) {
+            return GOBLIN_MONSTER.equals(owner) && NIMBLE_ESCAPE_KEY.equals(key)
+                    && scope == MonsterTraitScope.NIMBLE_ESCAPE_BONUS_HIDE_DISENGAGE_V1;
+        }
+    }
     public record MonsterStatBlock(MonsterSize size, MonsterCreatureType creatureType, String alignment,
             int armorClass, String armorDescription, int hitPoints, int hitDiceCount, int hitDiceSides, int hitDiceModifier,
             int walkSpeedFeet, MonsterAbilities abilities, List<MonsterSaveBonus> savingThrows,
@@ -2480,6 +2489,14 @@ public final class Schema2CompositionKernel {
             if (object.identity instanceof RuleIdentity rule && newAdvancementType(rule.ruleType())) {
                 FinalRule checked = finalRule(rule, object.fields);
                 validateCombatReferences(checked,objects,object.source);
+                if (checked instanceof FinalMonster monster) {
+                    for (MonsterTrait trait : monster.definition().statBlock().traits()) {
+                        if ((NIMBLE_ESCAPE_KEY.equals(trait.key()) || trait.scope() == MonsterTraitScope.NIMBLE_ESCAPE_BONUS_HIDE_DISENGAGE_V1)
+                                && !trait.isNimbleEscape(rule))
+                            throw fail("S2_TYPE", Stage.FINAL, "Nimble Escape requires the Goblin's exact trait identity and scope",
+                                    object.source.child("stat_block").child("traits"));
+                    }
+                }
                 if(checked instanceof FinalFeature feature) validateWizardAuxiliaryFeature(feature,objects,object.source);
                 if (checked instanceof FinalSpellcasting casting) {
                     validateSpellcastingReferences(casting,objects,object.source);

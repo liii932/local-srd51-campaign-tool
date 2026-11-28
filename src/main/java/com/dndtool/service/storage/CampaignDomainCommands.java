@@ -247,6 +247,7 @@ public final class CampaignDomainCommands {
         if (untyped && (command.kind() == Schema2CombatState.Kind.MONSTER_BREATH || command.castInput() != null && command.castInput().coneDirection() != null))
             throw new StorageException("SCENE_RULE_FACTS_REQUIRED", "Use DM adjudication for an area action involving untyped scene participants");
         if (scene != null && command.zoneInput() != null) CampaignSpaceCommands.checkCell(scene, command.zoneInput().center());
+        if (command.observationCell() != null && scene != null) CampaignSpaceCommands.checkCell(scene, command.observationCell().position());
     }
     private static void checkScenePath(State state, CampaignSpaceData.Scene scene, CampaignSpaceData.Ref ref,
             Set<UUID> movers, List<Schema2CombatState.Position> path, Predicate<UUID> knownOccupant) {

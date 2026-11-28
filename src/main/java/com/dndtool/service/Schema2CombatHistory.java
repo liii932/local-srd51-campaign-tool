@@ -77,7 +77,7 @@ public final class Schema2CombatHistory {
                 require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
             }
             validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);validateMonsterAttackTransition(e);
-            validateRangedAttackTransition(e);
+            validateRangedAttackTransition(e);validateObservationTransition(e);validateAttackObservationTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
             for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
             for(CombatFact f:e.resolution().facts())require(token(f.kind())&&(f.reason()==null||token(f.reason())));
@@ -152,6 +152,11 @@ public final class Schema2CombatHistory {
     /** Reserves the complete mandatory suffix before an accepted prefix consumes any die. */
     public static void checkReservedCapacity(History previous, Battle before, int suffixEvents,
             int rosterSize, int remainingPath) {
+        checkReservedCapacity(previous, before, suffixEvents, rosterSize, remainingPath, 0);
+    }
+
+    static void checkReservedCapacity(History previous, Battle before, int suffixEvents,
+            int rosterSize, int remainingPath, long observationGrowth) {
         if (suffixEvents < 0 || rosterSize < 0 || rosterSize > MAX_COMBATANTS || remainingPath < 0 || remainingPath > 64
                 || (previous == null ? 0 : previous.events().size()) + 1L + suffixEvents > MAX_EVENTS)
             throw new Schema2RuntimeFactsException("S2_COMBAT_CAPACITY");
@@ -160,13 +165,15 @@ public final class Schema2CombatHistory {
         // The root allowance includes one ordinary attack flow. Each remaining movement
         // boundary can retain a window, all selection/attack frames, source items and dice.
         // Every suffix event saves both snapshots.
-        long addedState = 64L + 100L * rosterSize * remainingPath;
+        long addedState = 64L + 100L * rosterSize * remainingPath + observationGrowth;
         long perEvent = 2048L + 2L * (stateSize + addedState);
         if (retained + (suffixEvents + 1L) * perEvent > MAX_HISTORY_CHILD_ROWS)
             throw new Schema2RuntimeFactsException("S2_COMBAT_CAPACITY");
     }
     private static void validateState(Battle b,List<UUID> characterMembers,Set<UUID> knownCharacters,Map<UUID,RuleIdentity> knownMonsters) {
         List<UUID> currentMembers=validateMonsterState(b,characterMembers,knownCharacters,knownMonsters);
+        try { Schema2ObservationRules.validate(b); }
+        catch (IllegalArgumentException malformed) { throw corrupt(); }
         List<UUID> members=new ArrayList<>(knownCharacters);
         members.addAll(knownMonsters.keySet());
         uuid(b.combatId());uuid(b.campaignId());require(b.combatRule()!=null&&b.combatRule().ruleType().equals("adventure.combat")&&b.status()!=null&&b.round()>=1&&b.turnNumber()>=1&&b.version()>=0);
@@ -261,8 +268,7 @@ public final class Schema2CombatHistory {
             }
             require(event.before() != null && attack.frameKey().equals(flow.rootFrameKey()));
             Combatant source = member(event.before(), attack.actorId());
-            Combatant target = member(event.before(), attack.targetId());
-            require(source.position().distanceFeet(target.position()) == ranged.distanceFeet());
+            require(source.position().distanceFeet(attack.aimedPosition()) == ranged.distanceFeet());
             if (attack.monsterAttack() != null) continue;
             require(++spent == 1 && uses.size() == 1 && event.command().kind() == Kind.ATTACK
                     && attack.actorId().equals(event.command().actorId()) && attack.targetId().equals(event.command().targetId())
@@ -373,6 +379,73 @@ public final class Schema2CombatHistory {
         expectedRolls.add(new Roll(purpose + "_D20", target, 20, save.firstD20()));
         if (save.secondD20() != null) expectedRolls.add(new Roll(purpose + "_SECOND_D20", target, 20, save.secondD20()));
         if (save.blessingD4() != null) expectedRolls.add(new Roll(purpose + "_BLESS_D4", target, 4, save.blessingD4()));
+    }
+
+    private static void validateObservationTransition(Event event) {
+        Battle before = event.before(), after = event.after();
+        Kind kind = event.command().kind();
+        ObservationState prior = before == null ? ObservationState.EMPTY : before.observation();
+        ObservationState current = after.observation();
+        if (kind == Kind.SET_OBSERVATION_CELL) {
+            require(before != null && before.activeFlow() == null && before.status() == after.status()
+                    && before.combatants().equals(after.combatants()) && event.resolution().rolls().isEmpty()
+                    && event.resolution().healthChanges().isEmpty() && event.resolution().ammunitionUses().isEmpty()
+                    && event.resolution().facts().equals(List.of(new CombatFact(kind.name(), null, event.operationId(), null)))
+                    && Schema2ObservationRules.setCell(before, event.command().observationCell()).observation().equals(current));
+            return;
+        }
+        require(prior.cells().equals(current.cells()));
+        boolean checkAction = Schema2ObservationRules.checkAction(kind);
+        require(current.checks().size() == prior.checks().size() + (checkAction ? 1 : 0)
+                && current.checks().subList(0, prior.checks().size()).equals(prior.checks()));
+        if (!checkAction) return;
+        ObservationCheck check = current.checks().getLast();
+        UUID actorId = event.command().actorId();
+        require(before != null && before.status() == Status.ACTIVE && before.activeFlow() == null && actorId.equals(before.activeActor())
+                && check.operationId().equals(event.operationId()) && check.kind() == kind && check.actorId().equals(actorId)
+                && event.resolution().healthChanges().isEmpty() && event.resolution().ammunitionUses().isEmpty());
+        Combatant actor = member(before, actorId);
+        require(actor.position().equals(check.position()));
+        boolean nimble = check.nimbleEscape();
+        require(nimble ? actor.bonusActionsRemaining() > 0 : actor.actionAvailable());
+        Combatant paid = nimble ? actor.spendBonusAction() : actor.spendAction();
+        Combatant expected = kind == Kind.NIMBLE_DISENGAGE ? paid.withDisengaged() : paid;
+        require(after.combatants().equals(before.combatants().stream().map(a -> a.equals(actor) ? expected : a).toList())
+                && event.resolution().facts().contains(new CombatFact(kind.name(), actorId, event.operationId(), nimble ? "BONUS_ACTION" : null)));
+        List<Roll> rolls = new ArrayList<>();
+        if (check.roll() != null) {
+            String purpose = Schema2ObservationRules.hiding(kind) ? "OBSERVATION_STEALTH" : "OBSERVATION_PERCEPTION";
+            rolls.add(new Roll(purpose, actorId, 20, check.roll().firstD20()));
+            if (check.roll().secondD20() != null) rolls.add(new Roll(purpose + "_SECOND", actorId, 20, check.roll().secondD20()));
+        }
+        require(event.resolution().rolls().equals(rolls));
+    }
+
+    private static void validateAttackObservationTransition(Event event) {
+        Battle before = event.before();
+        if (before == null) return;
+        Map<UUID, AttackAttempt> retained = new HashMap<>();
+        for (Flow flow : before.flows()) for (AttackAttempt attack : flow.attacks())
+            require(retained.put(attack.frameKey(), attack) == null);
+        for (Flow flow : event.after().flows()) for (AttackAttempt attack : flow.attacks()) {
+            AttackAttempt old = retained.remove(attack.frameKey());
+            if (old != null) {
+                require(old.attackerSeesTarget() == attack.attackerSeesTarget() && old.targetSeesAttacker() == attack.targetSeesAttacker()
+                        && old.targetCover() == attack.targetCover() && old.aimedPosition().equals(attack.aimedPosition())
+                        && old.targetAtAimedPosition() == attack.targetAtAimedPosition());
+                if (old.status() == AttackStatus.RESOLVED) require(old.equals(attack));
+                continue;
+            }
+            if (!flow.rootFrameKey().equals(attack.frameKey()) && !attack.opportunityAttack()) continue;
+            UUID sourceId = attack.actorId(), targetId = attack.targetId();
+            Position aim = Schema2ObservationRules.knownPosition(before, sourceId, targetId);
+            boolean present = member(before, targetId).position().equals(aim);
+            require(attack.aimedPosition().equals(aim) && attack.targetAtAimedPosition() == present
+                    && attack.targetCover() == Schema2ObservationRules.cover(before, member(before, sourceId).position(), aim)
+                    && attack.attackerSeesTarget() == (present && Schema2ObservationRules.visible(before, sourceId, targetId))
+                    && attack.targetSeesAttacker() == (present && Schema2ObservationRules.visible(before, targetId, sourceId)));
+        }
+        require(retained.isEmpty());
     }
 
     private static void validateExtendedTransition(Event event) {
@@ -552,6 +625,12 @@ public final class Schema2CombatHistory {
         if(b.status()==Status.ENDED)require(holders.isEmpty()&&b.activeFlow()==null&&b.ongoingEffects().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.shields().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)&&b.environmentZones().stream().allMatch(z->z.endedOperationId()!=null)&&b.suppressionCauses().stream().allMatch(c->c.releasedOperationId()!=null));
     }
     private static void validateCommand(Command c) {
+        if (c.kind() == Kind.SET_OBSERVATION_CELL) {
+            require(c.observationCell() != null && Command.setObservationCell(c.observationCell()).equals(c)
+                    && c.observationCell().position().x() >= 0 && c.observationCell().position().y() >= 0);
+            return;
+        }
+        require(c.observationCell() == null);
         if (c.monsterAttackInput() != null) {
             var action = c.monsterAttackInput().action();
             require(validAction(action) && c.actorId() != null);
@@ -735,6 +814,7 @@ public final class Schema2CombatHistory {
         if (command.breathInput() != null) count++;
         if (command.monsterRestInput() != null) count++;
         if (command.meleeInput() != null) count++;
+        if (command.observationCell() != null) count++;
         if (command.dragInput() != null) count += 1L + command.dragInput().path().size();
         if (event.before() != null) count += stateFactCount(event.before());
         return count + stateFactCount(event.after());
@@ -745,6 +825,7 @@ public final class Schema2CombatHistory {
                 + state.shields().size() + state.concentrationHolders().size() + state.environmentZones().size()
                 + state.suppressionCauses().size() + state.monsterRests().size();
         count += state.meleeControl().grapples().size();
+        count += Schema2ObservationRules.factCount(state.observation());
         for (MeleeContest contest : state.meleeControl().contests()) count += contest.outcome() == null ? 1 : 3;
         for (OngoingEffect effect : state.ongoingEffects()) count += 1L + effect.targets().size();
         for (ReadyPreparation ready : state.readyPreparations()) count += 1L + readyInputFactCount(ready.input());

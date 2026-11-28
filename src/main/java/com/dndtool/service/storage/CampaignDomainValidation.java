@@ -160,6 +160,10 @@ public final class CampaignDomainValidation {
             var battle = history.current(); UUID id = battle.combatId();
             if (!actualScenes.add(id) || !scenes.contains(id)) throw CampaignJson.bad("Orphan rule scene");
             var scene = state.space().scene(id);
+            for (var event : history.events()) {
+                var cell = event.command().observationCell();
+                if (cell != null) CampaignSpaceCommands.checkCell(scene, cell.position());
+            }
             String mode = switch (battle.status()) { case ACTIVE -> "COMBAT"; case EXPLORATION -> "EXPLORATION"; case ENDED -> "CLOSED"; };
             if (!scene.resolution().equals("RULES") || !scene.mode().equals(mode)) throw CampaignJson.bad("Scene and combat mode disagree");
             Set<UUID> expected = new HashSet<>(), actual = new HashSet<>();

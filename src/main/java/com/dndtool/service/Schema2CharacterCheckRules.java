@@ -78,10 +78,8 @@ public final class Schema2CharacterCheckRules {
         PreparedRoll roll = prepareRoll(material, initial, before, new RollInput(input.rule(), input.kind(),
                 input.abilityKey(), input.proficiency(), input.advantage(), input.disadvantage()), input.subject());
         boolean passive = PASSIVE_CHECK.equals(command.kind());
-        int adjustment = (roll.effectiveAdvantage ? roll.definition.passiveAdvantageAdjustment() : 0)
-                - (roll.effectiveDisadvantage ? roll.definition.passiveAdvantageAdjustment() : 0);
         return new PreparedCheck(input, roll, withNextVersion(before), passive ? roll.definition.passiveBaseScore() : null,
-                passive ? adjustment : null);
+                passive ? passiveAdjustment(roll) : null);
     }
 
     public PreparedRoll prepareContestRoll(ProductionSchema2Projection material, State before, RollInput input) {
@@ -174,6 +172,16 @@ public final class Schema2CharacterCheckRules {
         int total = selected + prepared.abilityModifier + prepared.proficiencyBonus;
         return new RolledScore(firstD20, secondD20, selected, prepared.abilityModifier, prepared.proficiencyBonus,
                 total, prepared.effectiveAdvantage, prepared.effectiveDisadvantage);
+    }
+
+    int passiveScore(PreparedRoll prepared) {
+        return prepared.definition.passiveBaseScore() + prepared.abilityModifier + prepared.proficiencyBonus
+                + passiveAdjustment(prepared);
+    }
+
+    private static int passiveAdjustment(PreparedRoll roll) {
+        int adjustment = roll.definition.passiveAdvantageAdjustment();
+        return (roll.effectiveAdvantage ? adjustment : 0) - (roll.effectiveDisadvantage ? adjustment : 0);
     }
 
     public static ContestOutcome compareContest(int initiatorTotal, int responderTotal, int minimumWinningMargin) {

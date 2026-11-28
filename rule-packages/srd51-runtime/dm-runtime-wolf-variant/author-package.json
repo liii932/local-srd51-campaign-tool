@@ -1,14 +1,14 @@
 {
   "author_schema_version": 2,
   "module_key": "dm_runtime_wolf_variant",
-  "release_version": "2",
+  "release_version": "3",
   "package_display_name": "DM Wolf Bite saving throw example",
   "role": "extension",
   "dependencies": [
     {
       "module_key": "srd51_magic",
       "supported_versions": [
-        "16"
+        "17"
       ]
     },
     {
@@ -20,7 +20,7 @@
   ],
   "compatible_combinations": [
     {
-      "srd51_magic": "16",
+      "srd51_magic": "17",
       "dm_runtime_house_rules": "25"
     }
   ],
