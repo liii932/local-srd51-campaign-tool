@@ -184,7 +184,8 @@ async function main() {
     await screenshot('01-empty-wide.png');
     report.checks.push('Fresh private root, true IDLE, empty active roster and collapsed rule library');
 
-    await field('domain-create', 'name').fill('工作区战士'); await rule('domain-create', 'classKey', 'class.fighter'); await submit('domain-create');
+    await field('domain-create', 'name').fill('工作区战士'); await rule('domain-create', 'classKey', 'class.fighter');
+    await rule('domain-create', 'fightingStyleKey', 'feature.fighter_defense'); await submit('domain-create');
     const fighter = card('工作区战士').id;
     assert.deepEqual(await identity(), [['RULE', fighter]]);
     assert.equal(await first.isEnabled(), false); assert.equal(await next.isEnabled(), false);

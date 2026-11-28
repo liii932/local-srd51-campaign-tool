@@ -187,6 +187,7 @@ async function main() {
     await field('domain-create', 'name').fill(observerName);
     await field('domain-create', 'kind').selectOption('PC');
     await selectRule('domain-create', 'classKey', 'class.fighter');
+    await selectRule('domain-create', 'fightingStyleKey', 'feature.fighter_defense');
     await action('domain', () => button('domain-create').click());
     const observer = domain().characters.find(character => character.name === observerName).id;
     const world = await createNode(page, action, '林地');

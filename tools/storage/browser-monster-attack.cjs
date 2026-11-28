@@ -178,6 +178,7 @@ async function main() {
       await field('domain-create', 'name').fill(name);
       await field('domain-create', 'kind').selectOption('PC');
       await selectRule('domain-create', 'classKey', 'class.fighter');
+      await selectRule('domain-create', 'fightingStyleKey', 'feature.fighter_defense');
       await action('domain', () => button('domain-create').click());
     }
     const mover = card(moverName).id, carried = card(carriedName).id;

@@ -200,6 +200,62 @@ class PlayerParticipationAcceptanceTest {
         }
     }
 
+    @Test void defenseAndSurgeUseTheControlledCardAndRecheckAuthorityBeforeSpending() throws Exception {
+        var dice = new ScriptedDice();
+        try (Fixture f = new Fixture("fighter-surge", dice)) {
+            var before = f.storage.accessSnapshot();
+            for (var invalid : List.of(object("classKey", "fighter"), object("classKey", "fighter", "fightingStyleKey", "unknown"),
+                    object("classKey", "wizard", "fightingStyleKey", "feature.fighter_defense"))) {
+                invalid.addProperty("name", "无效选择");
+                invalid.addProperty("kind", "PC");
+                invalid.addProperty("backgroundKey", "acolyte");
+                assertThrows(StorageException.class, () -> f.send("character-create", invalid));
+                assertEquals(before, f.storage.accessSnapshot());
+            }
+            UUID fighter = f.character("守卫", "PC");
+            Seat owner = f.approve("原玩家"), successor = f.approve("接手玩家");
+            f.assign(fighter, owner.member);
+            f.takeover(owner);
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, fighter);
+            UUID plate = f.acquire(fighter, "item.plate");
+            f.equip(fighter, plate, "WORN");
+            assertEquals(19, f.storage.current().domain().getAsJsonArray("characters").get(0).getAsJsonObject().get("armorClass").getAsInt());
+            assertEquals(19, f.view(owner).getAsJsonArray("cards").get(0).getAsJsonObject().get("armorClass").getAsInt());
+            f.characterCommand(fighter, new Schema2CharacterRuntime.Command("CHARACTER_ADVANCED", null, 0, null,
+                    "FIXED_AVERAGE", f.rules.rule("character.class", "class.fighter"), Schema2CharacterRuntime.GrowthChoices.EMPTY));
+            f.permit(fighter);
+            var surge = f.rules.rule("character.resource", "resource.fighter.action_surge");
+            var resource = f.rules.metadata().catalog().stream().filter(entry -> entry.key().equals(surge.ruleKey())).findFirst().orElseThrow();
+            assertFalse(resource.directResourceSpend());
+            assertFalse(labels(f.view(owner)).contains("使用 1 次 " + resource.name()));
+            var beforeResource = f.storage.accessSnapshot();
+            var forbidden = assertThrows(StorageException.class, () -> f.characterCommand(fighter,
+                    new Schema2CharacterRuntime.Command("RESOURCE_SPENT", surge, 1, null, null)));
+            assertEquals("S2_RESOURCE_FEATURE_OWNER_REQUIRED", forbidden.getMessage());
+            assertEquals(beforeResource, f.storage.accessSnapshot());
+            UUID wolf = f.wolf("对手"), scene = f.createScene(world);
+            dice.add(20, 1);
+            f.enterBattle(scene, List.of(new Deployment(fighter, new Position(2, 2), 0),
+                    new Deployment(wolf, new Position(2, 1), 1)));
+            f.share(ShareKind.SCENE, scene, true, owner.member, successor.member);
+            JsonObject stale = f.command(owner, f.option(owner, "动作如潮"));
+            f.assign(fighter, successor.member);
+            assertStale(f, owner, stale);
+            f.takeover(successor);
+            var request = f.command(successor, f.option(successor, "动作如潮"));
+            var accepted = f.post(successor, "command", request);
+            assertReceipt("ACCEPTED", accepted);
+            assertEquals(2, f.actor(fighter).actionsRemaining());
+            assertTrue(f.state().roots().getLast().rolls().isEmpty());
+            var after = f.storage.accessSnapshot();
+            assertStale(f, successor, request);
+            assertEquals(accepted.body().get("receipt"), f.post(successor, "receipt", receiptIdentity(request)).body().get("receipt"));
+            assertEquals(after, f.storage.accessSnapshot());
+            assertFalse(labels(f.view(successor)).contains("动作如潮"));
+            assertTrue(dice.isEmpty());
+        }
+    }
+
     @Test void serializedControlTransferRejectsAQueuedOldCommandBeforeAnyPartialWriteOrDie() throws Exception {
         try (Fixture f = new Fixture("transfer")) {
             UUID pc = f.character("被交接的战士", "PC"); f.acquire(pc, false);
@@ -1892,8 +1948,9 @@ class PlayerParticipationAcceptanceTest {
         JsonObject command(Seat seat, JsonObject option) { return object("connectionId", seat.connection, "candidateId", option.get("id").getAsString(), "precondition", option.get("precondition").getAsString(), "requestId", uuid()); }
         UUID character(String name, String kind) { return character(name, kind, "fighter"); }
         UUID character(String name, String kind, String classKey) {
-            return UUID.fromString(send("character-create", object("name", name, "kind", kind, "classKey", classKey,
-                    "backgroundKey", "acolyte")).lastCommand().subjectId());
+            var input = object("name", name, "kind", kind, "classKey", classKey, "backgroundKey", "acolyte");
+            return UUID.fromString(send("character-create",
+                    CampaignRuleFixtures.chooseTemplateStyle(rules, classKey, input)).lastCommand().subjectId());
         }
         UUID manual(String name, String kind) { send("manual-create", object("name", name, "kind", kind, "template", "blank")); return storage.accessSnapshot().snapshot().domains().manual().characters().stream().filter(character -> character.current().name().equals(name)).findFirst().orElseThrow().id(); }
         UUID wolf(String name) { return monster(name, "monster.wolf"); }

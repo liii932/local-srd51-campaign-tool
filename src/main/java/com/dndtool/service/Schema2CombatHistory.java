@@ -4,6 +4,7 @@ import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import java.util.*;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.fighterActionSurgeResource;
 import static com.dndtool.module.composition.Schema2CompositionKernel.fighterSecondWindResource;
 import static com.dndtool.service.Schema2CombatState.*;
 
@@ -93,7 +94,9 @@ public final class Schema2CombatHistory {
     }
     private static void validateCastResults(Event event) {
         boolean secondWind = event.command().kind() == Kind.SECOND_WIND;
+        boolean actionSurge = event.command().kind() == Kind.ACTION_SURGE;
         if (secondWind) validateSecondWindResults(event);
+        if (actionSurge) validateActionSurgeResults(event);
         Map<UUID,CastAttempt> retained=new HashMap<>();
         if(event.before()!=null)for(Flow flow:event.before().flows())for(CastAttempt cast:flow.casts())require(retained.put(cast.frameKey(),cast)==null);
         List<CastAttempt> created=new ArrayList<>(),completedHealing=new ArrayList<>();Set<UUID> seen=new HashSet<>();
@@ -113,7 +116,7 @@ public final class Schema2CombatHistory {
             if(!cast.healingDice().isEmpty()&&(old==null||old.healingDice().isEmpty()))completedHealing.add(cast);
         }
         require(retained.isEmpty());
-        List<HealthChange> changes = secondWind ? List.of() : event.resolution().healthChanges();
+        List<HealthChange> changes = secondWind || actionSurge ? List.of() : event.resolution().healthChanges();
         List<HealthChange> costs=changes.stream().filter(c->c.resource()!=null).toList();
         require(created.size()==costs.size());Set<UUID> costFrames=new HashSet<>();
         for(CastAttempt cast:created) {
@@ -234,6 +237,26 @@ public final class Schema2CombatHistory {
                         (int) Math.min(requested, healing.before().maximumHitPoints() - healing.before().hitPoints())))
                 && resolution.facts().equals(List.of(new CombatFact(Kind.SECOND_WIND.name(), actor, cost.frameKey(), "BONUS_ACTION"))));
     }
+
+    private static void validateActionSurgeResults(Event event) {
+        UUID actor = event.command().actorId();
+        Battle before = event.before();
+        Resolution resolution = event.resolution();
+        require(before != null && before.status() == Status.ACTIVE && before.activeFlow() == null
+                && before.activeActor().equals(actor) && !before.surprised(actor)
+                && resolution.rolls().isEmpty() && resolution.ammunitionUses().isEmpty()
+                && resolution.healthChanges().size() == 1);
+        Combatant predecessor = member(before, actor);
+        require(!predecessor.actionSurged()
+                && before.combatants().stream().map(member -> actor.equals(member.characterId()) ? member.grantActionSurge() : member)
+                        .toList().equals(event.after().combatants()));
+        HealthChange cost = resolution.healthChanges().getFirst();
+        UUID reference = Schema2CombatRules.actionSurgeReference(event.operationId());
+        require(actor.equals(cost.characterId()) && cost.before().hitPoints() > 0
+                && fighterActionSurgeResource(cost.before().characterClass()).equals(cost.resource())
+                && cost.resourceAmount() == 1 && reference.equals(cost.frameKey())
+                && resolution.facts().equals(List.of(new CombatFact(Kind.ACTION_SURGE.name(), actor, reference, "EXTRA_ACTION"))));
+    }
     /** Reserves the complete mandatory suffix before an accepted prefix consumes any die. */
     public static void checkReservedCapacity(History previous, Battle before, int suffixEvents,
             int rosterSize, int remainingPath) {
@@ -267,7 +290,7 @@ public final class Schema2CombatHistory {
                     : b.activeOrdinal()>=0 && b.activeOrdinal()<currentMembers.size() && b.initiative().size()==currentMembers.size()));
         Set<UUID> initiative=new HashSet<>();for(int i=0;i<b.initiative().size();i++) {Initiative n=b.initiative().get(i);require(initiative.add(n.characterId())&&currentMembers.contains(n.characterId())&&n.ordinal()==i&&n.d20()>=1&&n.d20()<=20&&n.dexterityModifier()>=-5&&n.dexterityModifier()<=10&&n.total()==n.d20()+n.dexterityModifier());}
         require(Schema2CombatStateValidator.validOpeningState(b));
-        for(Combatant c:b.combatants()) {require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0&&Schema2CombatStateValidator.validActionBudgets(c));if(c.sequence()!=null) {AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
+        for(Combatant c:b.combatants()) {require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0&&Schema2CombatStateValidator.validActionBudgets(b,c));if(c.sequence()!=null) {AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
         require(b.ongoingEffects().size()<=128);Set<UUID> effectKeys=new HashSet<>();
         for(OngoingEffect effect:b.ongoingEffects()) {
             uuid(effect.effectKey()); require(effectKeys.add(effect.effectKey()) && ruleType(effect.spell(),"adventure.spell") && members.contains(effect.casterId())

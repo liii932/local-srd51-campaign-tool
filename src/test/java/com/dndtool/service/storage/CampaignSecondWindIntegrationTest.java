@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class CampaignSecondWindIntegrationTest {
     private static final String FEATURE = "feature.fighter_second_wind";
     private static final String RESOURCE = "resource.fighter.second_wind";
+    private static final String SURGE = "resource.fighter.action_surge";
     @TempDir Path temporary;
 
     @Test void levelOnePaymentHealingAndReceiptAreAtomicAndSurviveDirectOpen() throws Exception {
@@ -73,7 +74,7 @@ class CampaignSecondWindIntegrationTest {
             fixture.failAfterWrite = true;
             var fault = fixture.withDice(() -> assertThrows(IllegalStateException.class,
                     () -> fixture.submit(request, before, input)), new Die(10, 1));
-            assertEquals("second wind transaction failure", fault.getMessage());
+            assertEquals("fighter feature transaction failure", fault.getMessage());
             assertEquals(before, fixture.access());
 
             var accepted = fixture.withDice(() -> fixture.submit(request, before, input), new Die(10, 10));
@@ -170,6 +171,7 @@ class CampaignSecondWindIntegrationTest {
             fixture.combat(Command.action(Kind.END_TURN, wizard), new Die(20, 10));
             assertEquals(fighter, fixture.battle().activeActor());
             fixture.rejectCombat(Command.action(Kind.SECOND_WIND, fighter), "S2_COMBAT_ACTOR_INACTIVE");
+            fixture.rejectCombat(Command.action(Kind.ACTION_SURGE, fighter), "S2_COMBAT_ACTOR_INACTIVE");
             assertEquals(1, fixture.resource(fighter).current());
         }
     }
@@ -210,6 +212,186 @@ class CampaignSecondWindIntegrationTest {
             assertEquals(List.of(0, 1), fixture.battle().flows().stream().flatMap(row -> row.attacks().stream())
                     .filter(attack -> oneAttack.sequenceKey().equals(attack.sequenceKey())).map(AttackAttempt::attackOrdinal).toList());
         }
+    }
+
+    @Test void actionSurgeCommitsOnceAndKeepsTwoPaidAttackSequencesAcrossRestore() throws Exception {
+        try (var fixture = new Fixture(temporary.resolve("action-surge"), true)) {
+            UUID fighter = fixture.character("五级战士", "PC", "fighter");
+            UUID guard = fixture.character("守卫", "NPC", "fighter");
+            fixture.advance(fighter, 5);
+            UUID dagger = fixture.dagger(fighter);
+            fixture.dagger(guard);
+            fixture.damage(fighter);
+            fixture.startBattle(fighter, guard, 20, 10);
+            var command = Command.action(Kind.ACTION_SURGE, fighter);
+            fixture.combat(Command.move(fighter, List.of(new Position(0, 0))));
+            fixture.rejectCombat(command, "ACTION_FLOW_BUSY");
+            var pending = fixture.battle().activeFlow();
+            var window = pending.windows().getLast();
+            var opportunity = window.opportunities().stream().filter(row -> row.status() == OpportunityStatus.PENDING)
+                    .findFirst().orElseThrow();
+            fixture.combat(Command.reaction(Kind.PASS_REACTION, guard, null, pending.flowKey(), pending.leafFrameKey(),
+                    window.windowKey(), opportunity.opportunityKey()));
+            pending = fixture.battle().activeFlow();
+            fixture.combat(Command.continuation(fighter, pending.flowKey(), pending.leafFrameKey(), window.windowKey()));
+            fixture.combat(Command.move(fighter, List.of(new Position(1, 0))));
+            var before = fixture.access();
+            var actor = fixture.actor(fighter);
+            var card = fixture.card(fighter);
+            var input = fixture.combatInput(command);
+            String request = id();
+
+            fixture.failAfterWrite = true;
+            assertThrows(IllegalStateException.class, () -> fixture.submit(request, before, input));
+            assertEquals(before, fixture.access());
+            var accepted = fixture.submit(request, before, input);
+            var committed = fixture.access();
+            var replay = fixture.submit(request, before, input);
+            assertTrue(replay.lastCommand().replayed());
+            assertEquals(accepted.lastCommand().acceptedRevision(), replay.lastCommand().acceptedRevision());
+            assertEquals(committed, fixture.access());
+            assertCode("IDEMPOTENCY_CONFLICT", () -> fixture.submit(request, before,
+                    fixture.combatInput(Command.action(Kind.DASH, fighter))));
+
+            var event = fixture.battleHistory().events().getLast();
+            assertEquals(command, event.command());
+            assertTrue(event.resolution().rolls().isEmpty());
+            assertEquals(2, fixture.actor(fighter).actionsRemaining());
+            assertTrue(fixture.actor(fighter).actionSurged());
+            assertEquals(actor.bonusActionsRemaining(), fixture.actor(fighter).bonusActionsRemaining());
+            assertEquals(actor.reactionAvailable(), fixture.actor(fighter).reactionAvailable());
+            assertEquals(actor.movementSpentHalfFeet(), fixture.actor(fighter).movementSpentHalfFeet());
+            assertEquals(actor.movementBonus(), fixture.actor(fighter).movementBonus());
+            assertEquals(card.hitPoints(), fixture.card(fighter).hitPoints());
+            assertEquals(1, fixture.resource(fighter).current());
+            assertEquals(0, fixture.surgeUses(fighter));
+            var cost = event.resolution().healthChanges().getFirst();
+            assertEquals(List.of(new CombatFact("ACTION_SURGE", fighter, cost.frameKey(), "EXTRA_ACTION")),
+                    event.resolution().facts());
+            var child = fixture.history(fighter).events().getLast();
+            assertEquals("COMBAT_RESOURCE_SPENT", child.kind());
+            assertEquals(fixture.rule("character.resource", SURGE), child.command().resource());
+            assertEquals(1, child.command().amount());
+            assertEquals(List.of(child.operationId()), event.characterOperations());
+            fixture.rejectCombat(command, "S2_COMBAT_ACTION_SURGE_ALREADY_USED");
+
+            fixture.service.save(id(), committed.epoch(), committed.revision());
+            String file = fixture.end();
+            byte[] bytes = Files.readAllBytes(fixture.service.savedFile(file));
+            assertTamperedSurgeRejected(fixture.service, bytes, fighter);
+            fixture.service.open(file);
+            assertEquals(committed.snapshot(), fixture.access().snapshot());
+            fixture.rejectCombat(command, "S2_COMBAT_ACTION_SURGE_ALREADY_USED");
+
+            fixture.combat(Command.action(Kind.BEGIN_ATTACK, fighter));
+            var first = fixture.actor(fighter).sequence();
+            assertEquals(2, first.limit());
+            assertEquals(1, fixture.actor(fighter).actionsRemaining());
+            fixture.rejectCombat(Command.action(Kind.BEGIN_ATTACK, fighter), "S2_COMBAT_SEQUENCE_ACTIVE");
+            fixture.combat(Command.attack(fighter, guard, dagger), new Die(20, 1));
+            fixture.combat(Command.attack(fighter, guard, dagger), new Die(20, 1));
+            fixture.combat(Command.action(Kind.BEGIN_ATTACK, fighter));
+            var second = fixture.actor(fighter).sequence();
+            assertEquals(2, second.limit());
+            assertNotEquals(first.sequenceKey(), second.sequenceKey());
+            assertEquals(0, fixture.actor(fighter).actionsRemaining());
+            var wounded = fixture.card(fighter);
+            var betweenAttacks = fixture.actor(fighter);
+            fixture.combat(Command.action(Kind.SECOND_WIND, fighter), new Die(10, 1));
+            fixture.assertSecondWind(fighter, wounded, betweenAttacks, 1);
+            fixture.combat(Command.attack(fighter, guard, dagger), new Die(20, 1));
+            fixture.combat(Command.attack(fighter, guard, dagger), new Die(20, 1));
+            fixture.rejectCombat(Command.action(Kind.BEGIN_ATTACK, fighter), "S2_COMBAT_ACTION_UNAVAILABLE");
+            for (var sequence : List.of(first, second)) {
+                var ordinals = fixture.battle().flows().stream().flatMap(row -> row.attacks().stream())
+                        .filter(attack -> sequence.sequenceKey().equals(attack.sequenceKey()))
+                        .map(AttackAttempt::attackOrdinal).toList();
+                assertEquals(List.of(0, 1), ordinals);
+            }
+        }
+    }
+
+    @Test void actionSurgeEnablesDoubleDashExpiresAndRestoresAtCompletedRests() throws Exception {
+        try (var fixture = new Fixture(temporary.resolve("action-surge-rests"), true)) {
+            UUID fighter = fixture.character("二级战士", "PC", "fighter");
+            UUID guard = fixture.character("一级守卫", "NPC", "fighter");
+            fixture.advance(fighter, 2);
+            var surge = Command.action(Kind.ACTION_SURGE, fighter);
+            var dash = Command.action(Kind.DASH, fighter);
+            fixture.startBattle(fighter, guard, 20, 10);
+            fixture.rejectCombat(Command.action(Kind.ACTION_SURGE, guard), "S2_COMBAT_NOT_CURRENT_TURN");
+            fixture.combat(dash);
+            int firstDash = fixture.actor(fighter).movementBonus();
+            assertTrue(firstDash > 0);
+            assertEquals(0, fixture.actor(fighter).actionsRemaining());
+            fixture.combat(surge);
+            assertEquals(1, fixture.actor(fighter).actionsRemaining());
+            assertEquals(firstDash, fixture.actor(fighter).movementBonus());
+            fixture.combat(dash);
+            assertEquals(firstDash * 2, fixture.actor(fighter).movementBonus());
+            fixture.rejectCombat(dash, "S2_COMBAT_ACTION_UNAVAILABLE");
+            fixture.combat(Command.action(Kind.END_TURN, fighter));
+            assertFalse(fixture.actor(fighter).actionSurged());
+            fixture.rejectCombat(Command.action(Kind.ACTION_SURGE, guard), "S2_COMBAT_ACTION_SURGE_UNAVAILABLE");
+            fixture.combat(Command.action(Kind.END_TURN, guard));
+            fixture.rejectCombat(surge, "S2_RESOURCE_INSUFFICIENT");
+            fixture.leaveBattle(fighter, guard);
+
+            fixture.characterCommand(fighter, rest("REST_STARTED", "SHORT_REST", null, 0));
+            fixture.characterCommand(fighter, rest("TIME_ADVANCED", null, "LIGHT", 59));
+            var complete = rest("REST_COMPLETED", null, null, 0);
+            fixture.rejectCharacter(fighter, complete, "S2_REST_REQUIREMENTS");
+            fixture.characterCommand(fighter, rest("TIME_ADVANCED", null, "LIGHT", 1));
+            assertEquals(0, fixture.surgeUses(fighter));
+            fixture.characterCommand(fighter, complete);
+            assertEquals(1, fixture.surgeUses(fighter));
+            fixture.characterCommand(fighter, rest("REST_ENDED", null, null, 0));
+
+            fixture.startBattle(fighter, guard, 20, 10);
+            fixture.combat(Command.action(Kind.DODGE, fighter));
+            fixture.combat(surge);
+            assertTrue(fixture.actor(fighter).dodging());
+            fixture.combat(Command.action(Kind.END_TURN, fighter));
+            assertEquals(0, fixture.actor(fighter).actionsRemaining());
+            assertFalse(fixture.actor(fighter).actionSurged());
+            fixture.combat(Command.action(Kind.END_TURN, guard));
+            assertEquals(1, fixture.actor(fighter).actionsRemaining());
+            fixture.rejectCombat(surge, "S2_RESOURCE_INSUFFICIENT");
+            fixture.leaveBattle(fighter, guard);
+
+            fixture.characterCommand(fighter, rest("REST_STARTED", "LONG_REST", null, 0));
+            fixture.characterCommand(fighter, rest("TIME_ADVANCED", null, "SLEEP", 480));
+            assertEquals(0, fixture.surgeUses(fighter));
+            fixture.characterCommand(fighter, complete);
+            assertEquals(1, fixture.surgeUses(fighter));
+            fixture.startBattle(fighter, guard, 20, 10);
+            fixture.combat(surge);
+            fixture.combat(Command.action(Kind.END_COMBAT, fighter));
+            assertEquals(1, fixture.actor(fighter).actionsRemaining());
+            assertFalse(fixture.actor(fighter).actionSurged());
+        }
+    }
+
+    private static void assertTamperedSurgeRejected(CampaignStorageService service, byte[] complete, UUID fighter) {
+        var before = service.status();
+        var withoutGrant = CampaignJson.read(complete);
+        var combat = domains(withoutGrant).getAsJsonArray("combats").get(0).getAsJsonObject();
+        var last = combat.getAsJsonArray("events").asList().getLast().getAsJsonObject();
+        for (JsonObject state : List.of(combat.getAsJsonObject("current"),
+                last.getAsJsonObject("resolution").getAsJsonObject("after"))) {
+            var actor = state.getAsJsonArray("combatants").asList().stream().map(JsonElement::getAsJsonObject)
+                    .filter(member -> fighter.toString().equals(member.get("characterId").getAsString()))
+                    .findFirst().orElseThrow();
+            actor.addProperty("actionsRemaining", "1");
+        }
+        assertCode("INVALID_FILE", () -> service.importFile(resign(withoutGrant)));
+        var badCost = CampaignJson.read(complete);
+        var event = domains(badCost).getAsJsonArray("combats").get(0).getAsJsonObject()
+                .getAsJsonArray("events").asList().getLast().getAsJsonObject();
+        var cost = event.getAsJsonObject("resolution").getAsJsonArray("healthChanges").get(0).getAsJsonObject();
+        cost.addProperty("resourceAmount", "2");
+        assertCode("INVALID_FILE", () -> service.importFile(resign(badCost)));
+        assertEquals(before, service.status());
     }
 
     private static void assertTamperedFilesRejected(CampaignStorageService service, byte[] complete, UUID fighter, String request) {
@@ -310,14 +492,20 @@ class CampaignSecondWindIntegrationTest {
     private static final class Fixture implements AutoCloseable {
         final CampaignStorageService service;
         final CampaignRuleContext rules;
+        final boolean fighterFeatures;
         final ArrayDeque<Die> dice = new ArrayDeque<>();
         boolean failAfterWrite;
 
         Fixture(Path root) throws IOException {
+            this(root, false);
+        }
+
+        Fixture(Path root, boolean fighterFeatures) throws IOException {
+            this.fighterFeatures = fighterFeatures;
             service = new CampaignStorageService(root, boundary -> {
                 if (boundary == CampaignStorageService.Boundary.AFTER_CHARACTER_UPDATE && failAfterWrite) {
                     failAfterWrite = false;
-                    throw new IllegalStateException("second wind transaction failure");
+                    throw new IllegalStateException("fighter feature transaction failure");
                 }
             }, sides -> {
                 Die roll = dice.poll();
@@ -326,7 +514,8 @@ class CampaignSecondWindIntegrationTest {
                 return roll.value();
             });
             var library = service.ruleLibrary();
-            var members = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD).stream().map(artifact -> {
+            var members = fighterFeatures ? CampaignRuleFixtures.installFighterFeatures(service)
+                    : BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD).stream().map(artifact -> {
                 var imported = library.importArtifact(id(), artifact.originalZip()).imported().member();
                 var review = library.review(imported.moduleKey(), imported.releaseVersion());
                 assertEquals(imported, review.imported().member());
@@ -360,9 +549,15 @@ class CampaignSecondWindIntegrationTest {
             return card(id).resources().stream().filter(resource -> resource.identity().equals(resourceRule())).findFirst().orElseThrow();
         }
 
+        long surgeUses(UUID id) {
+            return card(id).resources().stream().filter(resource -> resource.identity().ruleKey().equals(SURGE))
+                    .findFirst().orElseThrow().current();
+        }
+
         UUID character(String name, String kind, String classKey) {
-            return UUID.fromString(CampaignSpaceFixtures.command(service, "character-create",
-                    fields("name", name, "kind", kind, "classKey", classKey, "backgroundKey", "acolyte")).lastCommand().subjectId());
+            var input = fields("name", name, "kind", kind, "classKey", classKey, "backgroundKey", "acolyte");
+            if (fighterFeatures && classKey.equals("fighter")) input.addProperty("fightingStyleKey", "feature.fighter_defense");
+            return UUID.fromString(CampaignSpaceFixtures.command(service, "character-create", input).lastCommand().subjectId());
         }
 
         void characterCommand(UUID id, Schema2CharacterRuntime.Command command) {
@@ -489,7 +684,7 @@ class CampaignSecondWindIntegrationTest {
             assertEquals(new Combatant(combatant.characterId(), combatant.position(), combatant.side(),
                     combatant.actionsRemaining(), 0, combatant.reactionAvailable(), combatant.movementSpentHalfFeet(),
                     combatant.movementBonus(), combatant.disengaged(), combatant.dodging(), combatant.sequence(),
-                    combatant.prone()), actor(fighter));
+                    combatant.prone(), combatant.actionSurged()), actor(fighter));
             var events = history(fighter).events();
             var spent = events.get(events.size() - 2);
             var healed = events.getLast();

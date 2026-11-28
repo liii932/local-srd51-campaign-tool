@@ -196,6 +196,7 @@ async function main() {
         await form('domain-create').locator('[name="name"]').fill(name);
         await form('domain-create').locator('[name="kind"]').selectOption(kind);
         await rule('#domain-create [name="classKey"]', 'class.fighter');
+        await rule('#domain-create [name="fightingStyleKey"]', 'feature.fighter_defense');
         await submit('domain-create', '创建完整角色');
       }
       pcId = card(PC).id; npcId = card(NPC).id;

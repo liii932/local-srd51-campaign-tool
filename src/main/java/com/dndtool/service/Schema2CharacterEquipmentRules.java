@@ -91,7 +91,8 @@ public final class Schema2CharacterEquipmentRules {
     }
 
     public Derived derive(ProductionSchema2Projection material, State state) {
-        validateState(material, state); requireNoUnownedEffects(material,state);
+        validateState(material, state);
+        boolean defense = Schema2FeatureSupport.hasFighterDefense(material, state);
         int dexterity = Math.floorDiv(state.abilities().get("ability.dexterity") - 10, 2);
         int ac = 10 + dexterity, shield = 0; boolean untrained = false;
         Set<RuleIdentity> stealth = new HashSet<>();
@@ -100,6 +101,7 @@ public final class Schema2CharacterEquipmentRules {
             ItemDefinition item = definition(material, instance.item());
             if (armor(item.kind())) {
                 ac = item.armorClass() + switch (item.kind()) { case LIGHT_ARMOR -> dexterity; case MEDIUM_ARMOR -> Math.min(2, dexterity); default -> 0; };
+                if (defense && instance.location().equals("WORN")) ac++;
                 if (item.stealthDisadvantage()) stealth.add(item.stealthSkill());
             } else if (item.kind() == EquipmentKind.SHIELD) shield = 2;
             if ((armor(item.kind()) || item.kind() == EquipmentKind.SHIELD)

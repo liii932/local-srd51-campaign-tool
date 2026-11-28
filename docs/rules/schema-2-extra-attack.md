@@ -8,7 +8,7 @@ SRD 5.1 的战士从职业 5 级起，在自己回合执行 Attack 动作时可�
 
 ## 声明、组合与授予
 
-内置角色包 `srd51_characters@14` 声明
+内置角色包 `srd51_characters@15` 声明
 `(srd51_characters, character.feature, feature.fighter_extra_attack)`。
 它使用现有特性类型和字段链，必需 `feature_kind=FEATURE`、`execution_mode=AUTOMATIC`、
 `execution_algorithm=SRD_2014_FIGHTER_EXTRA_ATTACK_V1`、`source_page=25`、`level=5`，
@@ -40,7 +40,9 @@ SRD 5.1 的战士从职业 5 级起，在自己回合执行 Attack 动作时可�
 单击输入、武器和目标校验及反应窗口；每一击可以独立选择合法武器和目标。短弓在发射时消耗一支箭并占用该击，护盾术继续时沿用原序号。移动沿用当前回合的
 移动额度，允许发生在两击之间。次数用完、主动放弃或回合结束时，既有战斗序列关闭。
 失去行动资格时拒绝后续攻击。Ready 和借机攻击分别沿用各自的单击结算。
-[战斗合同](schema-2-combat.md)
+五至六级战士在同一回合使用动作如潮时可支付第二次普通动作。第一序列完成或放弃后可开启第二个序列，
+两者各自派生两击，保留各自的序列身份。动作如潮发放额度时保留当前序列。
+[战斗合同](schema-2-combat.md) · [动作如潮](schema-2-fighter-actions.md#动作如潮的回合与资源)
 
 ## 存储与恢复
 

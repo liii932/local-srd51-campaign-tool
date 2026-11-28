@@ -324,7 +324,8 @@ class CampaignExtraAttackIntegrationTest {
             return card(id).features().stream().filter(feature -> feature.feature().ruleKey().equals(FEATURE)).toList();
         }
         UUID character(String name, String kind) {
-            return subject("character-create", input("name", name, "kind", kind, "classKey", "fighter", "backgroundKey", "acolyte"));
+            var input = input("name", name, "kind", kind, "classKey", "fighter", "backgroundKey", "acolyte");
+            return subject("character-create", CampaignRuleFixtures.chooseTemplateStyle(state().material().restore(), "fighter", input));
         }
         void advance(UUID fighter, int targetLevel) {
             for (int level = card(fighter).level() + 1; level <= targetLevel; level++) {

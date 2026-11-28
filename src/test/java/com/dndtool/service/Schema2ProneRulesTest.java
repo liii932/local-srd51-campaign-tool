@@ -37,7 +37,7 @@ class Schema2ProneRulesTest {
         Resolution dropped = apply(Command.action(Kind.DROP_PRONE, mover));
         assertEquals(new Combatant(mover, before.position(), before.side(), before.actionsRemaining(), before.bonusActionsRemaining(),
                 before.reactionAvailable(), before.movementSpentHalfFeet(), before.movementBonus(),
-                before.disengaged(), before.dodging(), before.sequence(), true), actor(mover));
+                before.disengaged(), before.dodging(), before.sequence(), true, before.actionSurged()), actor(mover));
         assertEquals(List.of(new CombatFact("DROP_PRONE", mover, combat, null)), dropped.facts());
         assertTrue(dropped.healthChanges().isEmpty());
         reject("S2_COMBAT_ALREADY_PRONE", Command.action(Kind.DROP_PRONE, mover));
@@ -72,7 +72,7 @@ class Schema2ProneRulesTest {
         Resolution dropped = apply(drop);
         assertEquals(new Combatant(mover, standing.position(), standing.side(), standing.actionsRemaining(), standing.bonusActionsRemaining(),
                 standing.reactionAvailable(), standing.movementSpentHalfFeet(), standing.movementBonus(),
-                standing.disengaged(), standing.dodging(), standing.sequence(), true), actor(mover));
+                standing.disengaged(), standing.dodging(), standing.sequence(), true, standing.actionSurged()), actor(mover));
         assertEquals(contexts, roster);
         assertTrue(dropped.healthChanges().isEmpty());
         assertTrue(dropped.rolls().isEmpty());
@@ -185,7 +185,7 @@ class Schema2ProneRulesTest {
         assertEquals(round, battle.round());
         assertEquals(new Combatant(mover, before.position(), before.side(), before.actionsRemaining(), before.bonusActionsRemaining(),
                 before.reactionAvailable(), 20, before.movementBonus(), before.disengaged(), before.dodging(),
-                before.sequence(), false), actor(mover));
+                before.sequence(), false, before.actionSurged()), actor(mover));
         assertEquals(2, stood.healthChanges().size());
         assertTrue(stood.healthChanges().stream().allMatch(change -> change.timeAdvance() && change.seconds() == 6));
         assertEquals(18, roster.get(mover).sceneSecond());

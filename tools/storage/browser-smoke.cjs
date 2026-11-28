@@ -369,6 +369,7 @@ async function main() {
       await form('domain-create').locator('[name="name"]').fill(name);
       await form('domain-create').locator('[name="kind"]').selectOption(kind);
       await chooseRule('#domain-create [name="classKey"]', 'fighter');
+      await chooseRule('#domain-create [name="fightingStyleKey"]', 'feature.fighter_defense');
       await action('domain', () => form('domain-create').getByRole('button', { name: '创建完整角色', exact: true }).click());
     }
     const ruleCards = (await currentCampaign()).domain.characters;

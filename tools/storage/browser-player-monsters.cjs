@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {chromium} = require('playwright');
-const {observeStorageAction, waitForStorageReady, waitForHistoryCount} = require('./browser-action.cjs');
+const {observeStorageAction, waitForStorageReady, waitForHistoryCount, showCharacter} = require('./browser-action.cjs');
 const {createNode, focusSpace, placeAtFocus, createScene, enterScene} = require('./browser-spaces.cjs');
 
 const hostOrigin = 'http://127.0.0.1:8080';
@@ -14,13 +14,14 @@ const wolfName = '林地灰狼';
 async function main() {
   const [flag, storageRoot, scenario] = process.argv.slice(2);
   assert.ok(flag === '--fresh-root' && path.isAbsolute(storageRoot), 'Expected --fresh-root /absolute/disposable/player-store');
-  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise', '--cantrips'].includes(scenario),
-    'Expected --movement, --ranged, --observation, --surprise, or --cantrips');
+  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise', '--cantrips', '--fighter'].includes(scenario),
+    'Expected --movement, --ranged, --observation, --surprise, --cantrips, or --fighter');
   const ranged = scenario === '--ranged';
   const observation = scenario === '--observation';
   const surprise = scenario === '--surprise';
   const cantrips = scenario === '--cantrips';
-  const monsterName = observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
+  const fighterFeatures = scenario === '--fighter';
+  const monsterName = fighterFeatures ? '林间地狱犬' : observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
   const root = await fs.realpath(storageRoot);
   const repo = await fs.realpath(path.join(__dirname, '../..'));
   assert.ok(root !== repo && !root.startsWith(repo + path.sep));
@@ -46,7 +47,7 @@ async function main() {
     const field = (form, name) => host.locator('#' + form).locator('[name="' + name + '"]');
     const submit = form => host.locator('#' + form + ' button').click();
     const hostAction = async (action, trigger) => {
-      if (!cantrips) return (await observeStorageAction(host, action, trigger, {})).body;
+      if (!cantrips && !fighterFeatures) return (await observeStorageAction(host, action, trigger, {})).body;
       // Participation polling can refresh the Host while a form submission is finishing.
       const [response] = await Promise.all([
         host.waitForResponse(response => response.url() === hostOrigin + '/api/host/storage/' + action
@@ -54,12 +55,18 @@ async function main() {
         trigger()
       ]);
       const body = await response.json();
-      assert.equal(response.status(), 200, body.code);
-      assert.equal(body.status, 'OK');
+      const actionKind = action === 'domain' ? new URLSearchParams(response.request().postData()).get('action') : null;
+      const scope = actionKind ? `${action} / ${actionKind}` : action;
+      const result = `Host ${scope} returned HTTP ${response.status()}${body.code ? ' ' + body.code : ''}`;
+      assert.equal(response.status(), 200, result);
+      assert.equal(body.status, 'OK', result);
       await waitForStorageReady(host);
       return body;
     };
-    const domainAction = form => hostAction('domain', () => submit(form));
+    const domainAction = async form => {
+      try { return await hostAction('domain', () => submit(form)); }
+      catch (failure) { throw new Error(`Host form #${form}: ${failure.message}`, {cause: failure}); }
+    };
     const readHost = () => host.evaluate(async () => (await fetch('/api/host/storage/state')).json());
     const readPlayer = page => page.evaluate(async () => (await fetch('/api/player/state')).json());
     async function governance(action, trigger) {
@@ -67,7 +74,7 @@ async function main() {
         host.waitForResponse(r => r.url() === hostOrigin + '/api/host/storage/players/' + action && r.request().method() === 'POST'),
         trigger()
       ]);
-      assert.equal(reply.status(), 200, (await reply.json()).code);
+      assert.equal(reply.status(), 200, `Host players/${action} returned HTTP ${reply.status()} ${(await reply.json()).code || ''}`);
       await host.locator('#host-players[aria-busy="false"]').waitFor();
     }
     async function selectRule(form, name, ruleKey) {
@@ -89,14 +96,15 @@ async function main() {
         page.waitForResponse(r => r.url() === playerOrigin + '/api/player/command'),
         page.getByRole('button', {name: label}).click()
       ]);
-      assert.equal(response.status(), 200);
-      return (await response.json()).receipt;
+      const body = await response.json();
+      assert.equal(response.status(), 200, `Player command ${label} returned HTTP ${response.status()} ${body.code || ''}`);
+      return body.receipt;
     }
 
     await host.goto(hostOrigin + '/host/storage');
     await waitForStorageReady(host);
     assert.equal((await readHost()).storage.state, 'IDLE');
-    const campaignName = cantrips ? '已知戏法验收' : surprise ? '受惊与分组先攻验收'
+    const campaignName = fighterFeatures ? '战士防御与动作如潮验收' : cantrips ? '已知戏法验收' : surprise ? '受惊与分组先攻验收'
       : observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收';
     await field('storage-create', 'name').fill(campaignName);
     await hostAction('create', () => host.locator('#storage-create button[type="submit"]').click());
@@ -111,6 +119,14 @@ async function main() {
       await host.locator('[data-pane="people"]').click();
       await field('domain-create', 'name').fill(name);
       await selectRule('domain-create', 'classKey', owner);
+      if (owner === 'class.fighter') {
+        const style = field('domain-create', 'fightingStyleKey');
+        if (fighterFeatures) {
+          assert.equal(await style.inputValue(), '');
+          assert.equal(await style.evaluate(select => select.validity.valueMissing), true);
+        }
+        await selectRule('domain-create', 'fightingStyleKey', 'feature.fighter_defense');
+      }
       if (known) {
         const select = field('domain-create', 'cantripKeys');
         await select.waitFor();
@@ -128,6 +144,12 @@ async function main() {
       if (known) {
         assert.deepEqual(character.state.knownCantrips.map(entry => entry.spell.ruleKey).sort(), known.slice().sort());
         assert.ok(character.state.knownCantrips.every(entry => entry.characterClass.ruleKey === owner));
+      }
+      if (fighterFeatures) {
+        const defense = character.state.features.find(feature => feature.feature.ruleKey === 'feature.fighter_defense');
+        assert.equal(defense.acquiredAtClassLevel, 1);
+        assert.equal(character.level, 1);
+        assert.ok(!character.state.resources.some(resource => resource.identity.ruleKey === 'resource.fighter.action_surge'));
       }
     }
     let weapon;
@@ -150,12 +172,51 @@ async function main() {
         await domainAction('domain-equipment');
       }
     }
-
     const world = await createNode(host, hostAction, '林地');
     await focusSpace(host, hostAction, 'WORLD', world);
     await placeAtFocus(host, hostAction, fighters);
+    const card = (domain, id) => domain.characters.find(character => character.id === id);
+    const surgeResource = (domain, id) => card(domain, id).state.resources
+      .find(resource => resource.identity.ruleKey === 'resource.fighter.action_surge');
+    if (fighterFeatures) {
+      const [fighter] = fighters;
+      const form = 'domain-equipment';
+      const baseArmorClass = card((await readHost()).campaign.domain, fighter).armorClass;
+      await host.locator('[data-pane="actions"]').click();
+      await field(form, 'characterId').selectOption(fighter);
+      await field(form, 'kind').selectOption('ITEM_ACQUIRED');
+      await selectRule(form, 'item', 'item.chain_mail');
+      const carried = card((await domainAction(form)).campaign.domain, fighter);
+      const armor = carried.state.equipment.find(item => item.item.ruleKey === 'item.chain_mail').itemId;
+      assert.equal(carried.armorClass, baseArmorClass);
+      for (const [kind, armorClass] of [['ITEM_EQUIPPED', 17], ['ITEM_UNEQUIPPED', baseArmorClass], ['ITEM_EQUIPPED', 17]]) {
+        await field(form, 'kind').selectOption(kind);
+        await field(form, 'itemId').selectOption(armor);
+        if (kind === 'ITEM_EQUIPPED') await field(form, 'location').selectOption('WORN');
+        const changed = card((await domainAction(form)).campaign.domain, fighter);
+        assert.equal(changed.armorClass, armorClass);
+        await showCharacter(host, 'RULE', fighter);
+        await host.locator('#character-browser-scroll [data-character-id="' + fighter + '"]')
+          .getByText(new RegExp('防护等级 ' + armorClass + ' ·')).waitFor();
+      }
+      await host.locator('[data-pane="growth"]').click();
+      for (const id of fighters) {
+        await field('domain-growth', 'characterId').selectOption(id);
+        await selectRule('domain-growth', 'class', 'class.fighter');
+        const advanced = (await domainAction('domain-growth')).campaign.domain;
+        const granted = card(advanced, id).state.features.find(feature => feature.feature.ruleKey === 'feature.fighter_action_surge');
+        assert.equal(granted.acquiredAtClassLevel, 2);
+        assert.equal(card(advanced, id).level, 2);
+        const uses = surgeResource(advanced, id);
+        assert.equal(uses.current, 1);
+        assert.equal(uses.maximum, 1);
+      }
+    }
+
+    if (fighterFeatures) await host.locator('[data-pane="world"]').click();
     await field('domain-monster-create', 'name').fill(monsterName);
-    await selectRule('domain-monster-create', 'monster', observation ? 'monster.goblin' : ranged ? 'monster.skeleton' : 'monster.wolf');
+    const monsterKey = fighterFeatures ? 'monster.hell_hound' : observation ? 'monster.goblin' : ranged ? 'monster.skeleton' : 'monster.wolf';
+    await selectRule('domain-monster-create', 'monster', monsterKey);
     const created = await domainAction('domain-monster-create');
     const monster = created.campaign.domain.space.monsters.find(m => m.name === monsterName).id;
     const placements = cantrips ? [[fighters[0], 1, 1, 0], [monster, 4, 1, 1], [fighters[1], 1, 3, 0]]
@@ -182,20 +243,28 @@ async function main() {
     const scene = await createScene(host, hostAction, '林间空地', 'RULES');
     await enterScene(host, hostAction, scene, placements);
 
-    await governance('invite', () => host.locator('#host-players-invite').click());
-    const invitation = await host.locator('#host-player-link').getAttribute('href');
     const seats = [attacker, observer], members = [];
-    for (const [index, page] of seats.entries()) {
-      await page.goto(invitation);
-      await page.locator('#player-nickname').fill(['巡林玩家', '营地玩家'][index]);
-      await page.locator('#player-join-form button').click();
-      await page.locator('#player-waiting').waitFor();
+    async function approvePlayers(existingMembers = []) {
+      await governance('invite', () => host.locator('#host-players-invite').click());
+      const invitation = await host.locator('#host-player-link').getAttribute('href');
+      const nicknames = ['巡林玩家', '营地玩家'];
+      for (const [index, page] of seats.entries()) {
+        if (existingMembers.length) await page.goto('about:blank');
+        await page.goto(invitation);
+        await page.locator('#player-nickname').fill(nicknames[index]);
+        await page.locator('#player-join-form button').click();
+        await page.locator('#player-waiting').waitFor();
+      }
+      await host.getByRole('button', {name: '刷新席位', exact: true}).click();
+      await host.locator('#host-player-applications .player-application').nth(1).waitFor();
+      for (const [index, nickname] of nicknames.entries()) {
+        const application = host.locator('#host-player-applications .player-application')
+          .filter({has: host.getByRole('heading', {name: nickname, exact: true})});
+        if (existingMembers.length) await application.getByRole('combobox').selectOption(existingMembers[index]);
+        await governance('approve', () => application.getByRole('button', {name: '核对并批准', exact: true}).click());
+      }
     }
-    await host.getByRole('button', {name: '刷新席位', exact: true}).click();
-    await host.locator('#host-player-applications .player-application').nth(1).waitFor();
-    for (let i = 0; i < seats.length; i++) {
-      await governance('approve', () => host.getByRole('button', {name: '核对并批准', exact: true}).first().click());
-    }
+    await approvePlayers();
     await host.getByText('角色控制与探索许可', {exact: true}).click();
     for (const [i, page] of seats.entries()) {
       await page.locator('#player-table').waitFor();
@@ -206,7 +275,7 @@ async function main() {
     }
     assert.notEqual(members[0], members[1]);
     await attacker.locator('#player-takeover').click();
-    if (surprise || cantrips) await observer.locator('#player-takeover').click();
+    if (surprise || cantrips || fighterFeatures) await observer.locator('#player-takeover').click();
     await host.getByText('共享给谁看', {exact: true}).click();
     await share('SCENE', scene, 'ALL');
     await share('MONSTER', monster, 'SELECTED', members[0]);
@@ -235,6 +304,101 @@ async function main() {
       for (let i = 0; i < battle().initiative.length && active() !== id; i++) await endTurn();
       assert.equal(active(), id);
     };
+    if (fighterFeatures) {
+      const [fighter, otherFighter] = fighters;
+      const domain = () => state.campaign.domain;
+      const history = () => domain().combats.find(row => row.current.combatId === scene);
+      const monsterState = () => domain().space.monsters.find(row => row.id === monster);
+      const ownCard = async (page, id) => (await readPlayer(page)).view.cards.find(row => row.id === id);
+      async function strike() {
+        const before = monsterState();
+        await playerCommand(/^开始攻击动作(?:\s|$)/);
+        const {attackResult} = await playerCommand(new RegExp('^攻击 ' + monsterName));
+        state = await readHost();
+        const event = history().events.at(-1);
+        const root = domain().roots.at(-1);
+        const attempt = battle().flows.at(-1).attacks[0];
+        assert.equal(event.command.kind, 'ATTACK');
+        assert.equal(root.operationId, event.operationId);
+        assert.deepEqual(root.actor, {kind: 'PLAYER', memberId: members[0], representedMemberId: null, characterId: fighter});
+        assert.equal(attempt.actorId, fighter);
+        assert.equal(attempt.targetId, monster);
+        assert.equal(attempt.itemId, weapon);
+        assert.equal(attempt.attackOrdinal, 0);
+        assert.equal(attempt.hit, attackResult.hit);
+        assert.ok(Number.isInteger(attempt.firstD20) && attempt.firstD20 >= 1 && attempt.firstD20 <= 20);
+        assert.deepEqual(event.resolution.rolls.find(roll => roll.purpose === 'ATTACK_D20'),
+          {purpose: 'ATTACK_D20', subjectId: fighter, sides: 20, value: attempt.firstD20});
+        assert.equal(monsterState().hitPoints, Math.max(0, before.hitPoints - attackResult.damage));
+        assert.equal(monsterState().dead, attackResult.dropped);
+        await attacker.locator('#player-receipt').filter({hasText: `上次攻击${attackResult.hit ? '命中' : '未命中'}，造成 ${attackResult.damage} 点伤害`}).waitFor();
+        await waitForHistoryCount(host, domain().roots.length);
+        return attempt;
+      }
+
+      await advanceTo(fighter);
+      assert.equal((await ownCard(attacker, fighter)).armorClass, 17);
+      await attacker.locator('#player-cards .character-stats').filter({hasText: /17.*防护等级/}).waitFor();
+      assert.equal(actor(fighter).actionsRemaining, 1);
+      const first = await strike();
+      assert.equal(actor(fighter).actionsRemaining, 0);
+      assert.equal(surgeResource(domain(), fighter).current, 1);
+      const beforeSurge = (await ownCard(attacker, fighter)).turnBudget;
+      const receipt = await playerCommand(/^动作如潮(?:\s|$)/);
+      assert.equal(receipt.state, 'ACCEPTED');
+      assert.equal(receipt.outcome, 'COMPLETED');
+      state = await readHost();
+      const surge = history().events.at(-1);
+      assert.equal(surge.command.kind, 'ACTION_SURGE');
+      assert.deepEqual(surge.resolution.rolls, []);
+      assert.equal(surgeResource(domain(), fighter).current, 0);
+      assert.deepEqual((await ownCard(attacker, fighter)).turnBudget, {...beforeSurge, actionsRemaining: 1});
+      await attacker.locator('#player-actions').getByRole('button', {name: /^动作如潮(?:\s|$)/}).waitFor({state: 'detached'});
+
+      const retained = domain();
+      await hostAction('save', () => host.locator('#storage-save').click());
+      const ended = await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      await host.locator('#storage-files').selectOption(ended.savedFile);
+      state = await hostAction('open', () => host.locator('#storage-open button[type="submit"]').click());
+      assert.deepEqual(domain(), retained);
+      assert.equal(active(), fighter);
+      assert.deepEqual(history().events.find(event => event.operationId === surge.operationId), surge);
+      await approvePlayers(members);
+      for (const [index, page] of seats.entries()) {
+        await page.locator('#player-table').waitFor();
+        assert.equal((await readPlayer(page)).session.playerKey, members[index]);
+        await page.locator('#player-takeover').click();
+      }
+      assert.equal((await ownCard(attacker, fighter)).armorClass, 17);
+      assert.equal((await ownCard(attacker, fighter)).turnBudget.actionsRemaining, 1);
+      await assertMonsterHiddenFromObserver();
+      const second = await strike();
+      assert.notEqual(second.sequenceKey, first.sequenceKey);
+      assert.equal(actor(fighter).actionsRemaining, 0);
+      assert.equal(surgeResource(domain(), fighter).current, 0);
+      assert.ok(!(await readPlayer(attacker)).view.candidates.some(candidate => candidate.label === '开始攻击动作'));
+
+      await host.locator('[data-pane="combat"]').click();
+      await advanceTo(otherFighter);
+      const starting = (await ownCard(observer, otherFighter)).turnBudget;
+      await playerCommand(/^疾走(?:\s|$)/, observer);
+      await playerCommand(/^动作如潮(?:\s|$)/, observer);
+      await playerCommand(/^疾走(?:\s|$)/, observer);
+      state = await readHost();
+      const afterDashes = (await ownCard(observer, otherFighter)).turnBudget;
+      assert.deepEqual(afterDashes, {...starting, actionsRemaining: 0,
+        movementRemainingHalfFeet: 3 * starting.movementRemainingHalfFeet});
+      assert.equal(surgeResource(domain(), otherFighter).current, 0);
+      assert.ok(!(await readPlayer(observer)).view.candidates.some(candidate => candidate.label === '疾走'));
+
+      await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({result: 'PASSED', playerSessions: seats.length, armorClass: 17,
+        attackRolls: [first.firstD20, second.firstD20], reopenedAndContinued: true, doubleDash: true}));
+      return;
+    }
     if (cantrips) {
       const [wizard, cleric] = fighters;
       const ownCard = page => page.locator('#player-cards .character-card');
@@ -713,4 +877,9 @@ async function main() {
   }
 }
 
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+main().catch(error => {
+  const redact = value => String(value).replace(/([#?&]invite=)[^\s"'&]+/g, '$1[redacted]');
+  console.error(redact(error.stack || error.message));
+  if (error.cause) console.error(redact(error.cause.stack || error.cause.message));
+  process.exitCode = 1;
+});

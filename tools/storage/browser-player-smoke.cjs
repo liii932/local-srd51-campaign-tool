@@ -55,7 +55,7 @@ async function main(){
   assert.equal(initialState.storage.state,'IDLE');await host.locator('#storage-create [name="name"]').fill('玩家入席验证战役');
   assert.equal(await host.locator('#storage-create-rules').inputValue(), 'standard');
   await hostAction('create',()=>host.locator('#storage-create button[type="submit"]').click());
-  for(const [name,kind]of [[PC,'PC'],[OTHER,'PC'],[SECRET,'NPC']]){await host.locator('#domain-create [name="name"]').fill(name);await host.locator('#domain-create [name="kind"]').selectOption(kind);await rule('#domain-create [name="classKey"]','class.fighter');await hostAction('domain',()=>host.locator('#domain-create button').click());}
+  for(const [name,kind]of [[PC,'PC'],[OTHER,'PC'],[SECRET,'NPC']]){await host.locator('#domain-create [name="name"]').fill(name);await host.locator('#domain-create [name="kind"]').selectOption(kind);await rule('#domain-create [name="classKey"]','class.fighter');await rule('#domain-create [name="fightingStyleKey"]','feature.fighter_defense');await hostAction('domain',()=>host.locator('#domain-create button').click());}
   }else{
     assert.equal(initialState.storage.state,'ACTIVE');assert.equal(initialState.campaign.name,'玩家入席验证战役');assert.equal(initialState.campaign.revision,4);
     assert.deepEqual(initialState.campaign.domain.characters.map(card=>[card.name,card.kind]).sort(),[[PC,'PC'],[OTHER,'PC'],[SECRET,'NPC']].sort());

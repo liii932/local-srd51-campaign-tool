@@ -285,7 +285,7 @@ class CampaignWolfBiteIntegrationTest {
                 variant = CampaignRuleSupportTest.extension(WOLF_VARIANT, artifacts, List.of(), List.of(), overrides);
             } else variant = ProductionRuleArtifact.read(Files.readAllBytes(Path.of(variantPath)));
             assertEquals(WOLF_VARIANT, variant.moduleKey());
-            assertEquals(variantPath == null ? "1" : "3", variant.releaseVersion());
+            assertEquals(variantPath == null ? "1" : "5", variant.releaseVersion());
             artifacts.add(variant);
         }
         createWithRules(fixture.service, "狼啮咬验收", artifacts);

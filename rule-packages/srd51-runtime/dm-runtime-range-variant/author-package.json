@@ -1,14 +1,14 @@
 {
   "author_schema_version": 2,
   "module_key": "dm_runtime_range_variant",
-  "release_version": "1",
+  "release_version": "2",
   "package_display_name": "DM shortbow range example",
   "role": "extension",
   "dependencies": [
-    {"module_key": "srd51_characters", "supported_versions": ["14"]},
+    {"module_key": "srd51_characters", "supported_versions": ["15"]},
     {"module_key": "dm_runtime_house_rules", "supported_versions": ["25"]}
   ],
-  "compatible_combinations": [{"srd51_characters": "14", "dm_runtime_house_rules": "25"}],
+  "compatible_combinations": [{"srd51_characters": "15", "dm_runtime_house_rules": "25"}],
   "load_order_constraints": [],
   "files": [{"kind": "changes", "path": "changes.json"}]
 }

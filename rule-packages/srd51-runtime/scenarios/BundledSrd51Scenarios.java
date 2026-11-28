@@ -73,6 +73,8 @@ public final class BundledSrd51Scenarios {
         ModuleScenario.run(args, Map.ofEntries(
                 scenario("class-templates", BundledSrd51Scenarios::verifyClassTemplates),
                 scenario("fighter-growth", BundledSrd51Scenarios::verifyFighterGrowth),
+                scenario("fighter-defense", BundledSrd51Scenarios::verifyFighterDefense),
+                scenario("fighter-action-surge", BundledSrd51Scenarios::verifyFighterActionSurge),
                 scenario("hill-dwarf-toughness", BundledSrd51Scenarios::verifyHillDwarfToughness),
                 scenario("hill-dwarf-toughness-author-edit", BundledSrd51Scenarios::verifyHillDwarfToughnessAuthorEdit),
                 scenario("alternate-skill-disabled", BundledSrd51Scenarios::verifyAlternateSkillDisabled),
@@ -129,12 +131,14 @@ public final class BundledSrd51Scenarios {
                     grant.target().equals(rules.rule("character.tool", "tool.smith_tools"))));
             expectNumber(characterClass.equals("cleric") ? 1 : 0, state.subclasses().size());
             if (characterClass.equals("fighter")) {
+                var defense = rules.rule("character.feature", "feature.fighter_defense");
                 var secondWind = (FinalFeature) find("character.feature", "feature.fighter_second_wind");
                 expectNumber(24, secondWind.definition().sourcePage());
                 assertEquals(FeatureKind.FEATURE, secondWind.definition().kind());
                 assertEquals(FeatureExecution.AUTOMATIC, secondWind.definition().executionMode());
                 assertEquals(FIGHTER_SECOND_WIND_ALGORITHM, secondWind.definition().executionAlgorithm());
-                assertEquals(List.of(new FeatureState(secondWind.identity(), state.characterClass(), 1)), state.features());
+                assertEquals(List.of(new FeatureState(defense, state.characterClass(), 1),
+                        new FeatureState(secondWind.identity(), state.characterClass(), 1)), state.features());
                 var resource = rules.rule("character.resource", "resource.fighter.second_wind");
                 assertEquals(List.of(new ResourceState(resource, 1, 1, false)), state.resources());
                 assertTrue(rules.metadata().catalog().stream().anyMatch(row ->
@@ -158,8 +162,11 @@ public final class BundledSrd51Scenarios {
         expectNumber(25, critical.definition().sourcePage());
         assertEquals(CHAMPION_IMPROVED_CRITICAL_ALGORITHM, critical.definition().executionAlgorithm());
         assertEquals(FeatureExecution.AUTOMATIC, critical.definition().executionMode());
+        var surge = rules.rule("character.feature", "feature.fighter_action_surge");
+        var defense = rules.rule("character.feature", "feature.fighter_defense");
         var secondWind = rules.rule("character.feature", "feature.fighter_second_wind");
         assertEquals(List.of(new FeatureState(critical.identity(), rules.rule("character.subclass", "subclass.champion"), 3),
+                new FeatureState(surge, fighter, 2), new FeatureState(defense, fighter, 1),
                 new FeatureState(secondWind, fighter, 1)), state.features());
         assertTrue(rules.metadata().catalog().stream().anyMatch(row -> row.key().equals(critical.identity().ruleKey()) && row.executable()));
         expectRejection("taking the first wizard level with Intelligence 12", "S2_GROWTH_PREREQUISITE",
@@ -384,6 +391,7 @@ public final class BundledSrd51Scenarios {
             fighter.addProperty("kind", "PC");
             fighter.addProperty("classKey", "fighter");
             fighter.addProperty("backgroundKey", "acolyte");
+            fighter.addProperty("fightingStyleKey", "feature.fighter_defense");
             UUID id = campaign.apply("character-create", fighter).subjectId();
             var position = new JsonObject();
             position.addProperty("characterId", id.toString());
@@ -675,17 +683,216 @@ public final class BundledSrd51Scenarios {
 
         var plan = initialPlan("fighter");
         State fourth = fighterAtLevelFour(growth, plan);
-        var improvedCritical = fourth.features().getFirst();
-        var secondWind = fourth.features().getLast();
         expectNumber(1, Schema2FeatureSupport.attacksPerAttackAction(material, fourth));
         State fifth = advanceFighter(growth, plan, fourth, 5, GrowthChoices.EMPTY);
         expectNumber(3, fifth.proficiencyBonus());
         var acquired = new FeatureState(feature.identity(), fighter, 5);
-        assertEquals(List.of(improvedCritical, acquired, secondWind), fifth.features());
+        assertEquals(fourth.features(), fifth.features().stream().filter(row -> !row.equals(acquired)).toList());
+        expectNumber(1, fifth.features().stream().filter(acquired::equals).count());
         expectNumber(2, Schema2FeatureSupport.attacksPerAttackAction(material, fifth));
         State sixth = advanceFighter(growth, plan, fifth, 6, new GrowthChoices(null, Map.of("ability.strength", 2), null, Map.of()));
         assertEquals(fifth.features(), sixth.features());
         expectNumber(2, Schema2FeatureSupport.attacksPerAttackAction(material, sixth));
+    }
+
+    private void verifyFighterDefense() {
+        var defense = (FinalFeature) find("character.feature", "feature.fighter_defense");
+        expectNumber(24, defense.definition().sourcePage());
+        expectNumber(1, defense.definition().level());
+        assertEquals(FeatureKind.FEATURE, defense.definition().kind());
+        assertEquals(FeatureExecution.CHOICE, defense.definition().executionMode());
+        assertEquals("SRD_2014_FIGHTER_DEFENSE_V1", defense.definition().executionAlgorithm());
+
+        var material = rules.projection();
+        var equipment = new Schema2CharacterEquipmentRules();
+        var fighterPlan = initialPlan("fighter");
+        State initial = initial(fighterPlan, "fighter");
+        assertEquals(defense.identity(), rules.initialChoices("fighter").fightingStyle());
+        assertTrue(initial.features().contains(new FeatureState(defense.identity(), initial.characterClass(), 1)));
+        expectNumber(12, equipment.derive(material, initial).armorClass());
+        expectNumber(14, equipment.derive(material, acquireAndEquip(initial, UUID.randomUUID(), "leather", "WORN")).armorClass());
+        expectNumber(17, equipment.derive(material, acquireAndEquip(initial, UUID.randomUUID(), "scale_mail", "WORN")).armorClass());
+
+        UUID shield = UUID.randomUUID(), plate = UUID.randomUUID();
+        State shieldOnly = acquireAndEquip(initial, shield, "shield", "OFF_HAND");
+        expectNumber(14, equipment.derive(material, shieldOnly).armorClass());
+        State shieldAndPlate = acquireAndEquip(shieldOnly, plate, "plate", "WORN");
+        expectNumber(21, equipment.derive(material, shieldAndPlate).armorClass());
+        State doffed = equipment.apply(material, shieldAndPlate,
+                equipmentCommand("ITEM_UNEQUIPPED", plate, null, null), UUID.randomUUID());
+        expectNumber(14, equipment.derive(material, doffed).armorClass());
+
+        UUID campaign = fighterPlan.campaignId(), defender = fighterPlan.characterId();
+        UUID attacker = UUID.randomUUID(), cleric = UUID.randomUUID(), weapon = UUID.randomUUID();
+        var attackerPlan = rules.initialPlan(campaign, attacker, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var clericPlan = rules.initialPlan(campaign, cleric, Schema2PreparationIdentity.random(), "cleric", "acolyte");
+        State wielding = acquireAndEquip(initial(attackerPlan, "fighter"), weapon, "longsword", "MAIN_HAND");
+        State armoredFighter = acquireAndEquip(initial, UUID.randomUUID(), "plate", "WORN");
+        State armoredCleric = acquireAndEquip(initial(clericPlan, "cleric"), UUID.randomUUID(), "plate", "WORN");
+        var source = new Schema2CombatRules.Context(material, attackerPlan, wielding, 0);
+        verifyDefenseThreshold(source, new Schema2CombatRules.Context(material, fighterPlan, armoredFighter, 0),
+                weapon, defender, 19, false);
+        verifyDefenseThreshold(source, new Schema2CombatRules.Context(material, clericPlan, armoredCleric, 0),
+                weapon, cleric, 18, true);
+    }
+
+    private static void verifyDefenseThreshold(Schema2CombatRules.Context attacker, Schema2CombatRules.Context defender,
+            UUID weapon, UUID target, int expectedArmorClass, boolean expectedHit) {
+        UUID actor = attacker.character().characterId(), campaign = defender.character().campaignId(), scene = UUID.randomUUID();
+        var roster = Map.of(actor, attacker, target, defender);
+        var combat = new Schema2CombatRules();
+        var opened = startBattle(combat, scene, campaign, roster, actor, target);
+        var begun = turnAction(combat, scene, campaign, roster, opened, actor, Kind.BEGIN_ATTACK);
+        var dice = new ArrayDeque<>(expectedHit ? List.of(14, 1) : List.of(14));
+        var strike = Schema2CombatState.Command.attack(actor, target, weapon);
+        var resolution = combat.resolve(combat.preflight(UUID.randomUUID(), scene, campaign, roster, begun, strike), sides -> {
+            expectNumber(dice.size() == (expectedHit ? 2 : 1) ? 20 : 8, sides);
+            return dice.removeFirst();
+        });
+        assertTrue(dice.isEmpty());
+        var attack = resolution.after().flows().getLast().attacks().getFirst();
+        expectNumber(18, attack.selectedD20() + attack.abilityModifier() + attack.proficiencyBonus());
+        expectNumber(expectedArmorClass, attack.finalArmorClass());
+        assertEquals(expectedHit, attack.hit());
+        expectNumber(expectedHit ? 3 : 0, attack.damageAmount());
+    }
+
+    private State acquireAndEquip(State state, UUID item, String key, String location) {
+        var material = rules.projection();
+        var equipment = new Schema2CharacterEquipmentRules();
+        State carrying = equipment.apply(material, state, equipmentCommand("ITEM_ACQUIRED", item,
+                rules.rule("equipment.item", "item." + key), "CARRIED"), item);
+        return equipment.apply(material, carrying, equipmentCommand("ITEM_EQUIPPED", item, null, location), UUID.randomUUID());
+    }
+
+    private void verifyFighterActionSurge() {
+        var feature = (FinalFeature) find("character.feature", "feature.fighter_action_surge");
+        expectNumber(25, feature.definition().sourcePage());
+        assertEquals(FeatureKind.FEATURE, feature.definition().kind());
+        assertEquals(FeatureExecution.AUTOMATIC, feature.definition().executionMode());
+        assertEquals("SRD_2014_FIGHTER_ACTION_SURGE_V1", feature.definition().executionAlgorithm());
+        var fighterPlan = initialPlan("fighter");
+        var growth = new Schema2CharacterProgressionRules();
+        State first = initial(fighterPlan, "fighter");
+        var resource = rules.rule("character.resource", "resource.fighter.action_surge");
+        assertTrue(first.features().stream().noneMatch(row -> row.feature().equals(feature.identity())));
+        assertTrue(first.resources().stream().noneMatch(row -> row.identity().equals(resource)));
+        State second = advanceFighter(growth, fighterPlan, first, 2, GrowthChoices.EMPTY);
+        assertTrue(second.features().contains(new FeatureState(feature.identity(), first.characterClass(), 2)));
+        assertTrue(second.resources().contains(new ResourceState(resource, 1, 1, false)));
+
+        UUID actor = fighterPlan.characterId(), guard = UUID.randomUUID(), campaign = fighterPlan.campaignId();
+        var guardPlan = rules.initialPlan(campaign, guard, Schema2PreparationIdentity.random(), "fighter", "acolyte");
+        var defender = new Schema2CombatRules.Context(rules.projection(), guardPlan, initial(guardPlan, "fighter"));
+        var combat = new Schema2CombatRules();
+        var noGrant = Map.of(actor, new Schema2CombatRules.Context(rules.projection(), fighterPlan, first), guard, defender);
+        var firstLevel = startBattle(combat, UUID.randomUUID(), campaign, noGrant, actor, guard);
+        var surge = Schema2CombatState.Command.action(Kind.ACTION_SURGE, actor);
+        expectRejection("first-level Action Surge", "S2_COMBAT_ACTION_SURGE_UNAVAILABLE", () ->
+                combat.preflight(UUID.randomUUID(), firstLevel.combatId(), campaign, noGrant, firstLevel, surge));
+
+        State fifth = advanceFighter(growth, fighterPlan, fighterAtLevelFour(growth, fighterPlan), 5, GrowthChoices.EMPTY);
+        verifySurgeAttackSequences(second, fighterPlan, defender, resource, 1);
+        verifySurgeAttackSequences(fifth, fighterPlan, defender, resource, 2);
+        verifySurgeDash(second, fighterPlan, defender, resource);
+    }
+
+    private void verifySurgeAttackSequences(State fighter, InitialPlan plan, Schema2CombatRules.Context defender,
+            RuleIdentity resource, int limit) {
+        UUID actor = fighter.characterId(), target = defender.character().characterId(), weapon = UUID.randomUUID();
+        var roster = new HashMap<>(Map.of(actor, new Schema2CombatRules.Context(rules.projection(), plan,
+                acquireAndEquip(fighter, weapon, "longsword", "MAIN_HAND")), target, defender));
+        var combat = new Schema2CombatRules();
+        UUID scene = UUID.randomUUID(), campaign = fighter.campaignId();
+        var opened = startBattle(combat, scene, campaign, roster, actor, target);
+        var begun = turnAction(combat, scene, campaign, roster, opened, actor, Kind.BEGIN_ATTACK);
+        var first = activeCombatant(begun).sequence();
+        expectNumber(limit, first.limit());
+        var strike = Schema2CombatState.Command.attack(actor, target, weapon);
+        var firstStrike = meleeStep(combat, roster, begun, strike, List.of(1));
+        expectNumber(0, activeCombatant(firstStrike).actionsRemaining());
+
+        var surged = activateSurge(combat, roster, firstStrike, resource);
+        expectNumber(1, activeCombatant(surged).actionsRemaining());
+        assertEquals(activeCombatant(firstStrike).sequence(), activeCombatant(surged).sequence());
+        Battle firstComplete = limit == 1 ? surged : meleeStep(combat, roster, surged, strike, List.of(1));
+        var firstSequence = activeCombatant(firstComplete).sequence();
+        assertTrue(firstSequence.closed());
+        expectNumber(limit, firstSequence.performed());
+
+        var next = turnAction(combat, scene, campaign, roster, firstComplete, actor, Kind.BEGIN_ATTACK);
+        var second = activeCombatant(next).sequence();
+        assertTrue(!first.sequenceKey().equals(second.sequenceKey()));
+        expectNumber(limit, second.limit());
+        expectNumber(0, activeCombatant(next).actionsRemaining());
+        for (int ordinal = 0; ordinal < limit; ordinal++) {
+            next = meleeStep(combat, roster, next, strike, List.of(1));
+            var attack = next.flows().getLast().attacks().getFirst();
+            assertEquals(second.sequenceKey(), attack.sequenceKey());
+            expectNumber(ordinal, attack.attackOrdinal());
+        }
+        expectNumber(limit, activeCombatant(next).sequence().performed());
+        assertTrue(activeCombatant(next).sequence().closed());
+        assertEquals(IntStream.range(0, limit).boxed().toList(), next.flows().stream().flatMap(flow -> flow.attacks().stream())
+                .filter(attack -> first.sequenceKey().equals(attack.sequenceKey())).map(Schema2CombatState.AttackAttempt::attackOrdinal).toList());
+        Battle exhausted = next;
+        expectRejection("starting a third Attack action", "S2_COMBAT_ACTION_UNAVAILABLE", () ->
+                combat.preflight(UUID.randomUUID(), scene, campaign, roster, exhausted, Schema2CombatState.Command.action(Kind.BEGIN_ATTACK, actor)));
+    }
+
+    private void verifySurgeDash(State fighter, InitialPlan plan, Schema2CombatRules.Context defender, RuleIdentity resource) {
+        UUID actor = fighter.characterId(), target = defender.character().characterId();
+        UUID scene = UUID.randomUUID(), campaign = fighter.campaignId();
+        var roster = new HashMap<>(Map.of(actor, new Schema2CombatRules.Context(rules.projection(), plan, fighter), target, defender));
+        var combat = new Schema2CombatRules();
+        var opened = startBattle(combat, scene, campaign, roster, actor, target, new Position(1, 20), List.of(18, 9));
+        var alreadyMoved = meleeStep(combat, roster, opened, Schema2CombatState.Command.move(actor, List.of(new Position(1, 0))), List.of());
+        expectNumber(10, activeCombatant(alreadyMoved).movementSpentHalfFeet());
+        var surged = activateSurge(combat, roster, alreadyMoved, resource);
+        expectNumber(2, activeCombatant(surged).actionsRemaining());
+        var dashed = turnAction(combat, scene, campaign, roster, surged, actor, Kind.DASH);
+        expectNumber(1, activeCombatant(dashed).actionsRemaining());
+        dashed = turnAction(combat, scene, campaign, roster, dashed, actor, Kind.DASH);
+        expectNumber(0, activeCombatant(dashed).actionsRemaining());
+        expectNumber(60, activeCombatant(dashed).movementBonus());
+        var path = IntStream.rangeClosed(2, 18).mapToObj(x -> new Position(x, 0)).toList();
+        var moved = meleeStep(combat, roster, dashed, Schema2CombatState.Command.move(actor, path), List.of());
+        expectNumber(180, activeCombatant(moved).movementSpentHalfFeet());
+        expectNumber(0, activeCombatant(moved).remainingMovementHalfFeet(combat.speed(roster, moved, actor)));
+        expectRejection("walking beyond the combined Dash allowance", "S2_COMBAT_MOVEMENT_ALLOWANCE", () ->
+                combat.preflight(UUID.randomUUID(), scene, campaign, roster, moved,
+                        Schema2CombatState.Command.move(actor, List.of(new Position(19, 0)))));
+    }
+
+    private static Battle activateSurge(Schema2CombatRules combat, Map<UUID, Schema2CombatRules.Context> roster,
+            Battle before, RuleIdentity resource) {
+        UUID actor = before.activeActor(), operation = UUID.randomUUID();
+        var command = Schema2CombatState.Command.action(Kind.ACTION_SURGE, actor);
+        var result = combat.resolve(combat.preflight(operation, before.combatId(), before.campaignId(), roster, before, command),
+                sides -> { throw new AssertionError("Action Surge drew a die"); });
+        combat.verify(operation, before.combatId(), before.campaignId(), roster, before, command, result);
+        assertEquals(List.of(), result.rolls());
+        expectNumber(1, result.healthChanges().size());
+        var payment = result.healthChanges().getFirst();
+        assertEquals(actor, payment.characterId());
+        assertEquals(resource, payment.resource());
+        expectNumber(1, payment.resourceAmount());
+        var prior = roster.get(actor);
+        assertEquals(prior.character(), payment.before());
+        assertEquals(payment.before().resources().stream().map(row -> row.identity().equals(resource)
+                ? new ResourceState(resource, 0, 1, false) : row).toList(), payment.after().resources());
+        roster.put(actor, new Schema2CombatRules.Context(prior.material(), prior.initial(), payment.after(), prior.sceneSecond()));
+        var after = result.after();
+        var was = activeCombatant(before);
+        var now = activeCombatant(after);
+        expectNumber(was.actionsRemaining() + 1, now.actionsRemaining());
+        expectNumber(was.bonusActionsRemaining(), now.bonusActionsRemaining());
+        expectNumber(was.movementSpentHalfFeet(), now.movementSpentHalfFeet());
+        expectNumber(was.movementBonus(), now.movementBonus());
+        assertEquals(was.reactionAvailable(), now.reactionAvailable());
+        expectRejection("using Action Surge twice in one turn", "S2_COMBAT_ACTION_SURGE_ALREADY_USED", () ->
+                combat.preflight(UUID.randomUUID(), before.combatId(), before.campaignId(), roster, after, command));
+        return after;
     }
 
     private void verifyClericGrowthLimit() {
@@ -1128,7 +1335,7 @@ public final class BundledSrd51Scenarios {
         fighter = equipment.apply(rules.projection(), fighter, equipmentCommand("ITEM_ACQUIRED", plate,
                 rules.rule("equipment.item", "item.plate"), "CARRIED"), plate);
         fighter = equipment.apply(rules.projection(), fighter, equipmentCommand("ITEM_EQUIPPED", plate, null, "WORN"), UUID.randomUUID());
-        expectNumber(18, equipment.derive(rules.projection(), fighter).armorClass());
+        expectNumber(19, equipment.derive(rules.projection(), fighter).armorClass());
     }
 
     private void verifyDwarfHeavyArmorSpeed() {

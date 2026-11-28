@@ -106,7 +106,9 @@ public final class CampaignRuleSupport {
             if (row.identity().equals(life.requiredFeature()) || row.identity().equals(wizard.requiredFeature()))
                 continue;
             if (FIGHTER_EXTRA_ATTACK_ALGORITHM.equals(definition.executionAlgorithm())
-                    || FIGHTER_SECOND_WIND_ALGORITHM.equals(definition.executionAlgorithm())) {
+                    || FIGHTER_SECOND_WIND_ALGORITHM.equals(definition.executionAlgorithm())
+                    || FIGHTER_DEFENSE_ALGORITHM.equals(definition.executionAlgorithm())
+                    || FIGHTER_ACTION_SURGE_ALGORITHM.equals(definition.executionAlgorithm())) {
                 if (!definition.owner().equals(fighter.ownerClass())) throw unsupported("FEATURE_OWNER");
                 if (definition.level() > fighter.supportedMaximumLevel()) throw unsupported("FEATURE_RANGE");
                 continue;

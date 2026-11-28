@@ -263,7 +263,7 @@
     }
     for (const select of document.querySelectorAll('.node-choice')) options(select, (domain().nodes || []).map(node => node.id), id => domain().nodes.find(node => node.id === id).name);
     refreshCreationSubraces();
-    refreshCreationCantrips();
+    refreshCreationClassChoices();
     refreshCharacterChoices();
     refreshCheckAbility();
     refreshCheckAbility(byId('domain-group-check'));
@@ -277,9 +277,14 @@
     subraceKey.disabled = choices.length === 0;
     subraceKey.parentElement.hidden = subraceKey.disabled;
   }
-  function refreshCreationCantrips() {
+  function refreshCreationClassChoices() {
     const fields = byId('domain-create').elements;
     const owner = ruleFromValue(fields.classKey.value);
+    const styles = catalog().filter(rule => rule.fightingStyleClass && ruleValue(rule.fightingStyleClass) === fields.classKey.value);
+    const style = fields.fightingStyleKey;
+    options(style, styles.map(ruleValue), value => ruleFromValue(value).name);
+    style.disabled = styles.length === 0;
+    style.parentElement.hidden = style.disabled;
     chooseCantrips(fields.cantripKeys, owner, owner?.cantripCounts?.[0] || 0, [], '已知戏法', 'create');
   }
   function refreshGrowthCantrips() {
@@ -772,7 +777,7 @@
     const placement = placeFor(character.id);
     text(card, 'p', placement ? `${spaceName(placement.space)}${inFocus(character.id) ? ' · 执行焦点' : ' · 后台冻结'}` : '尚未安置');
     text(card, 'span', `${character.hitPoints} / ${character.maximumHitPoints}`, 'hp');
-    text(card, 'p', `${character.level} 级 · 熟练 +${current.proficiencyBonus} · ${current.health?.dead ? '已死亡' : current.health?.stable ? '稳定' : '存活'} · 临时生命值 ${current.health?.temporaryHitPoints || 0}`);
+    text(card, 'p', `${character.level} 级 · 防护等级 ${character.armorClass ?? '待裁定'} · 熟练 +${current.proficiencyBonus} · ${current.health?.dead ? '已死亡' : current.health?.stable ? '稳定' : '存活'} · 临时生命值 ${current.health?.temporaryHitPoints || 0}`);
     table(card, abilityNames, [abilities.map(key => current.abilities?.['ability.' + key] ?? '—')]);
     text(card, 'p', `职业：${(current.classes || []).map(entry => `${ruleName(entry.characterClass)} ${entry.level}`).join('、')}`);
     text(card, 'p', `资源：${(current.resources || []).map(resource => `${ruleName(resource.identity)} ${resource.unlimited ? '不限' : `${resource.current}/${resource.maximum}`}`).join('；') || '无'}`);
@@ -1356,6 +1361,7 @@
     const exploration = ['DROP_PRONE', 'STAND_UP', 'EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
     const actions = battle?.status === 'EXPLORATION' ? exploration : battle?.status === 'ACTIVE'
       ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT'
+        && (kind !== 'ACTION_SURGE' || battleHistory(battle.combatId)?.actionSurgeAvailable)
         && (!kind.startsWith('NIMBLE_') || nimble) && (!surprised || ['END_TURN', 'END_COMBAT', 'END_CONCENTRATION'].includes(kind))) : [];
     options(form.elements.kind, actions, kind => combatActions.get(kind));
     form.elements.kind.disabled = actions.length === 0;
@@ -1394,6 +1400,7 @@
       : replacement ? `本次替代第 ${sequence.performed + 1} 次攻击。目标须选择防御检定。${destination ? `推开目的格为 (${destination.x},${destination.y})。` : ''}`
       : escape ? (grapples.length ? '选择要挣脱的擒抱关系及检定。尝试会消耗一次动作。' : '该行动者当前未被擒抱。')
       : drag ? (grapples.length ? '两条路径须逐格对应。被拖带者至少小两个体型级别时可按原速拖带，其余情况速度减半。' : '该行动者当前未擒抱其他生物。')
+      : kind === 'ACTION_SURGE' ? '消耗一次动作如潮，本回合获得一个额外普通动作。完成短休或长休后恢复次数。'
       : kind === 'SECOND_WIND' ? '战士消耗本回合的一次附赠动作和一次回气，恢复 1d10＋战士等级的生命值。回气次数在短休或长休后恢复。'
       : kind === 'DROP_PRONE' ? (battle.status === 'EXPLORATION' ? '角色可在探索中主动卧倒，不推进场景时钟。' : '角色可在本人回合主动卧倒，保留动作、反应与移动力。')
       : kind === 'STAND_UP' ? (battle.status === 'EXPLORATION' ? '倒地生物在探索中起身会推进场景时钟 6 秒。' : '倒地生物在本人回合起身时，消耗等于当前速度一半的移动力。')
@@ -1710,6 +1717,7 @@
       accepted = true;
       if (body.savedFile) lastSaved = body.savedFile;
       preferredFile = body.savedFile || body.importedFile || null;
+      if (action === 'domain' && fields.action?.[0] === 'character-create') byId('domain-create').elements.fightingStyleKey.value = '';
       if (action === 'domain' && fields.action?.[0] === 'manual-create' && body.commandResult?.subjectId) manualSelected = body.commandResult.subjectId;
       if (String(body.storage.epoch) !== String(epoch)) await load(preferredFile);
       else { view = body; render(preferredFile); }
@@ -1982,7 +1990,7 @@
   }
   function baseCharacter(kind) {
     return {type: 'character.Command', kind, resource: null, amount: '0', recoveryTrigger: null, hpChoice: null, targetClass: null,
-      growthChoices: {type: 'character.GrowthChoices', subclass: null, abilityIncreases: [], feat: null, proficiencyChoices: [], cantrips: []},
+      growthChoices: {type: 'character.GrowthChoices', subclass: null, abilityIncreases: [], feat: null, proficiencyChoices: [], cantrips: [], fightingStyle: null},
       restInput: null, checkInput: null, equipmentInput: null, healthInput: null, combatInput: null, spellbookInput: null};
   }
   function domainForm(id, action, build) {
@@ -2004,18 +2012,19 @@
   }
   const multipleRules = select => Array.from(select.selectedOptions, option => typedRule(option.value));
   byId('domain-create').elements.raceKey.addEventListener('change', refreshCreationSubraces);
-  byId('domain-create').elements.classKey.addEventListener('change', refreshCreationCantrips);
+  byId('domain-create').elements.classKey.addEventListener('change', refreshCreationClassChoices);
   byId('domain-growth').elements.class.addEventListener('change', refreshGrowthCantrips);
   for (const field of [byId('domain-create').elements.cantripKeys, byId('domain-growth').elements.newCantrips])
     field.addEventListener('change', () => validateCantripCount(field));
   domainForm('domain-create', 'character-create', (form, values) => ({name: values.name, kind: values.kind,
     raceKey: ruleFromValue(values.raceKey).key, classKey: ruleFromValue(values.classKey).key,
     backgroundKey: ruleFromValue(values.backgroundKey).key,
+    ...(values.fightingStyleKey ? {fightingStyleKey: ruleFromValue(values.fightingStyleKey).key} : {}),
     cantripKeys: Array.from(form.elements.cantripKeys.selectedOptions, option => ruleFromValue(option.value).key),
     ...(values.subraceKey ? {subraceKey: ruleFromValue(values.subraceKey).key} : {})}));
   domainForm('domain-profile', 'character-profile', (_, values) => ({characterId: values.characterId, name: values.name, kind: values.kind, active: values.active === 'on'}));
   characterForm('domain-growth', (form, values) => ({...baseCharacter('CHARACTER_ADVANCED'), hpChoice: values.hpChoice, targetClass: typedRule(values.class),
-    growthChoices: {type: 'character.GrowthChoices', subclass: typedRule(values.subclass), feat: typedRule(values.feat),
+    growthChoices: {type: 'character.GrowthChoices', subclass: typedRule(values.subclass), feat: typedRule(values.feat), fightingStyle: null,
       abilityIncreases: values.ability ? [[values.ability, '2']] : [], proficiencyChoices: [], cantrips: multipleRules(form.elements.newCantrips)}}));
   characterForm('domain-resource', (_, values) => ({...baseCharacter(values.kind),
     resource: values.kind === 'RESOURCE_SPENT' ? typedRule(values.resource) : null,

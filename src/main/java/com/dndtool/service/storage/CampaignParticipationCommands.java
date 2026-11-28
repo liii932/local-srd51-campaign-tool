@@ -221,7 +221,8 @@ public final class CampaignParticipationCommands {
                 Schema2CombatState.Kind.DROP_PRONE, Schema2CombatState.Kind.STAND_UP,
                 Schema2CombatState.Kind.GRAPPLE, Schema2CombatState.Kind.SHOVE_PRONE, Schema2CombatState.Kind.SHOVE_PUSH,
                 Schema2CombatState.Kind.ESCAPE_GRAPPLE, Schema2CombatState.Kind.RELEASE_GRAPPLE,
-                Schema2CombatState.Kind.SECOND_WIND, Schema2CombatState.Kind.END_CONCENTRATION).contains(command.kind()))
+                Schema2CombatState.Kind.SECOND_WIND, Schema2CombatState.Kind.ACTION_SURGE,
+                Schema2CombatState.Kind.END_CONCENTRATION).contains(command.kind()))
             throw playerPermissionDenied();
     }
     private static void requireSeenCharacters(CampaignDomainData.State state, UUID member,

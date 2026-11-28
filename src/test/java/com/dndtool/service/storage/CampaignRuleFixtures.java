@@ -1,6 +1,7 @@
 package com.dndtool.service.storage;
 
 import com.dndtool.module.composition.ProductionSchema2Projection.StoredMember;
+import com.dndtool.module.composition.ProductionRuleArtifact;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import java.io.IOException;
@@ -16,14 +17,45 @@ public final class CampaignRuleFixtures {
     private static final CampaignRuleContext RULES = CampaignDomainData.Material.of(BundledCampaignRules.projection()).restore();
     private CampaignRuleFixtures() { }
     public static CampaignRuleContext rules() { return RULES; }
+    static JsonObject chooseTemplateStyle(CampaignRuleContext rules, String classKey, JsonObject input) {
+        var style = rules.initialChoices(classKey).fightingStyle();
+        if (style != null) input.addProperty("fightingStyleKey", style.ruleKey());
+        return input;
+    }
     public static List<StoredMember> install(CampaignStorageService service) { return install(service, BundledCampaignRules.STANDARD); }
     public static List<StoredMember> install(CampaignStorageService service, String combination) {
+        return install(service, BundledCampaignRules.artifacts(combination));
+    }
+    private static List<StoredMember> install(CampaignStorageService service, List<ProductionRuleArtifact> artifacts) {
         var library = service.ruleLibrary();
-        return BundledCampaignRules.artifacts(combination).stream().map(artifact -> {
+        return artifacts.stream().map(artifact -> {
             var member = library.importArtifact(UUID.randomUUID().toString(), artifact.originalZip()).imported().member();
             library.accept(UUID.randomUUID().toString(), member, LocalRuleLibrary.REVIEW_PROTOCOL, "local-dm");
             return member;
         }).toList();
+    }
+    static List<ProductionRuleArtifact> fighterFeatureArtifacts() throws IOException {
+        var base = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD);
+        String module = "test_fighter_features";
+        var defense = fighterFeature(module, "feature.fighter_fighting_style", "feature.fighter_defense",
+                "CHOICE", "SRD_2014_FIGHTER_DEFENSE_V1");
+        var surge = fighterFeature(module, "feature.fighter_action_surge", "feature.test_action_surge",
+                "AUTOMATIC", "SRD_2014_FIGHTER_ACTION_SURGE_V1");
+        var artifacts = new ArrayList<>(base);
+        artifacts.add(CampaignRuleSupportTest.extension(module, base, List.of(defense, surge), List.of(), List.of()));
+        return List.copyOf(artifacts);
+    }
+    private static JsonObject fighterFeature(String module, String template, String key, String mode, String algorithm) {
+        var feature = CampaignRuleSupportTest.authorRow(CHARACTER_MODULE, "rules.json", "rule_key", template);
+        feature.getAsJsonObject("identity").addProperty("module_key", module);
+        feature.getAsJsonObject("identity").addProperty("rule_key", key);
+        feature.addProperty("feature_kind", "FEATURE");
+        feature.addProperty("execution_mode", mode);
+        feature.addProperty("execution_algorithm", algorithm);
+        return feature;
+    }
+    static List<StoredMember> installFighterFeatures(CampaignStorageService service) throws IOException {
+        return install(service, fighterFeatureArtifacts());
     }
     public static CampaignStorageService.CampaignView create(CampaignStorageService service, String name) {
         return create(service, name, BundledCampaignRules.STANDARD);

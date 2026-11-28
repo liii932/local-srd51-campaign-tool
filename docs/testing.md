@@ -87,7 +87,7 @@ python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```bash
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.11.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.12.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -250,7 +250,7 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    源的一致性及 DRAFT 作者向量。以下为 Bash 示例，Windows 使用对应候选路径及本机 Python。
 
    ```bash
-   war=target/dnd-tool-se-0.11.0.war
+   war=target/dnd-tool-se-0.12.0.war
    scenarios=rule-packages/srd51-runtime/scenarios
    python3 rule-packages/srd51-runtime/build-bundles.py --check
    python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
@@ -259,10 +259,10 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    ```
 
    自定义规则另从 WAR 外提供一份受支持的准确候选 ZIP。可在仓库外复制随附 `check-variant` 原包的
-   条目，将 `author-package.json` 的 `release_version` 改为 `"27"`，将 `rules.json` 中
+   条目，将 `author-package.json` 的 `release_version` 改为 `"29"`，将 `rules.json` 中
    `vital_effect.dm_damage` 的 `modifier` 改为 `2`，更新包内 `README.md` 后将这些文件打包在 ZIP
-   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@27`
-   原字节及摘要。随附 `check-variant` 按 `@26`、固定伤害 `3` 的独立场景验证。自定义组合前三包
+   根目录。包内条目名与清单声明的路径保持一致。保管重新打包后的 `dm_runtime_house_rules@29`
+   原字节及摘要。随附 `check-variant` 按 `@28`、固定伤害 `3` 的独立场景验证。自定义组合前三包
    使用标准包，第四包使用这份外部候选。
 
    通过工作台的本机规则库执行外部原包上传（`POST /api/host/storage/rule-import`），从随附列表导入
@@ -411,7 +411,7 @@ ZIP 原始身份和 SQLite 冻结投影。纯规则、应用消费者和独立�
 生产代码或打包资源变化后，从候选对应源码的根目录运行。使用 Python 3.11+ 和环境中的 JDK 21+（`java`、`javac`、`jdeps`）。
 
 ```bash
-python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.11.0.war
+python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.12.0.war
 ```
 
 保存命令、退出码及 JSON 输出，记录字节数、SHA-256、全部 ZIP 条目数、应用类和嵌套 JAR 数。
@@ -806,6 +806,17 @@ mvn '-Dtest=PlayerParticipationAcceptanceTest#openingSurpriseSurvivesReopenAndAl
 ```bash
 node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/surprise-store --surprise
 ```
+
+<a id="fighter-actions-verification"></a>
+### 战士防御风格与动作如潮
+
+```bash
+mvn '-Dtest=CampaignFighterFeatureRulesTest,CampaignSecondWindIntegrationTest,CampaignExtraAttackIntegrationTest,Schema2EncounterOpeningTest' test
+mvn '-Dtest=PlayerParticipationAcceptanceTest#defenseAndSurgeUseTheControlledCardAndRecheckAuthorityBeforeSpending' test
+node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/fighter-store --fighter
+```
+
+用候选 WAR 运行标准组合的 `fighter-defense` 和 `fighter-action-surge` 作者场景。用固定攻击总值对照 AC 18 与 19，分别验证二级和五级每个攻击动作的攻击上限。用独立的主持与玩家浏览器检查建卡、穿脱、升级、两次攻击间保存重开及原成员重新接管。SQLite 用例另查原收据、写入失败回滚与两种休息的恢复。[规则合同](rules/schema-2-fighter-actions.md) · [作者场景入口](../rule-packages/srd51-runtime/scenarios/README.md)
 
 <a id="known-cantrips-verification"></a>
 

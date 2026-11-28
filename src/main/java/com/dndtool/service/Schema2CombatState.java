@@ -11,7 +11,7 @@ import java.util.*;
 public final class Schema2CombatState {
     private Schema2CombatState() { }
     public enum Status { ACTIVE, EXPLORATION, ENDED }
-    public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, MONSTER_ATTACK, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, DROP_PRONE, STAND_UP, SECOND_WIND, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
+    public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, MONSTER_ATTACK, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, DROP_PRONE, STAND_UP, SECOND_WIND, ACTION_SURGE, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
         GRAPPLE, SHOVE_PRONE, SHOVE_PUSH, CHOOSE_MELEE_DEFENSE, ESCAPE_GRAPPLE, RELEASE_GRAPPLE,
         HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE, SET_OBSERVATION_CELL,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
@@ -357,7 +357,7 @@ public final class Schema2CombatState {
     public record AttackSequence(UUID sequenceKey, int limit, int performed, int forfeited, boolean closed) { }
     public record Combatant(UUID characterId, Position position, int side, int actionsRemaining,
             int bonusActionsRemaining, boolean reactionAvailable, int movementSpentHalfFeet, int movementBonus,
-            boolean disengaged, boolean dodging, AttackSequence sequence, boolean prone) {
+            boolean disengaged, boolean dodging, AttackSequence sequence, boolean prone, boolean actionSurged) {
         static final int TURN_ACTIONS = 1;
         static final int TURN_BONUS_ACTIONS = 1;
 
@@ -373,18 +373,32 @@ public final class Schema2CombatState {
         Combatant spendAction() {
             if (!actionAvailable()) throw invalid("S2_COMBAT_ACTION_UNAVAILABLE");
             return new Combatant(characterId, position, side, actionsRemaining - 1, bonusActionsRemaining,
-                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone, actionSurged);
         }
 
         Combatant spendBonusAction() {
             if (bonusActionsRemaining <= 0) throw invalid("S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
             return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining - 1,
-                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone, actionSurged);
+        }
+
+        Combatant grantActionSurge() {
+            return new Combatant(characterId, position, side, actionsRemaining + 1, bonusActionsRemaining,
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone, true);
+        }
+
+        Combatant endTurn() {
+            Combatant ended = closeSequence();
+            if (!actionSurged) return ended;
+            // Ordinary actions consume the turn's regular allowance before the additional one.
+            return new Combatant(characterId, position, side, Math.max(0, actionsRemaining - 1),
+                    bonusActionsRemaining, reactionAvailable, movementSpentHalfFeet, movementBonus,
+                    disengaged, dodging, ended.sequence(), prone, false);
         }
 
         Combatant withDisengaged() {
             return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining,
-                    reactionAvailable, movementSpentHalfFeet, movementBonus, true, dodging, sequence, prone);
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, true, dodging, sequence, prone, actionSurged);
         }
 
         Combatant spendReaction() {
@@ -393,12 +407,12 @@ public final class Schema2CombatState {
 
         Combatant withReactionAvailable(boolean available) {
             return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining, available,
-                    movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
+                    movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone, actionSurged);
         }
 
         Combatant startTurn(boolean living, boolean isProne) {
             return new Combatant(characterId, position, side, living ? TURN_ACTIONS : 0,
-                    living ? TURN_BONUS_ACTIONS : 0, true, 0, 0, false, false, null, isProne);
+                    living ? TURN_BONUS_ACTIONS : 0, true, 0, 0, false, false, null, isProne, false);
         }
 
         Combatant withPosition(Position destination) {
@@ -411,12 +425,12 @@ public final class Schema2CombatState {
 
         Combatant withMovement(Position destination, int spentHalfFeet, boolean isProne) {
             return new Combatant(characterId, destination, side, actionsRemaining, bonusActionsRemaining,
-                    reactionAvailable, spentHalfFeet, movementBonus, disengaged, dodging, sequence, isProne);
+                    reactionAvailable, spentHalfFeet, movementBonus, disengaged, dodging, sequence, isProne, actionSurged);
         }
 
         Combatant withSequence(AttackSequence next) {
             return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining,
-                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, next, prone);
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, next, prone, actionSurged);
         }
 
         Combatant closeSequence() {
@@ -427,7 +441,7 @@ public final class Schema2CombatState {
 
         Combatant incapacitated() {
             return new Combatant(characterId, position, side, 0, 0, reactionAvailable, movementSpentHalfFeet,
-                    movementBonus, disengaged, false, sequence, true).closeSequence();
+                    movementBonus, disengaged, false, sequence, true, actionSurged).closeSequence();
         }
     }
     public record Frame(UUID frameKey, UUID parentFrameKey, FrameKind kind, UUID ownerKey,

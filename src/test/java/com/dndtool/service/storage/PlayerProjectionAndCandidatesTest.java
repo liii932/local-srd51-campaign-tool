@@ -551,7 +551,7 @@ class PlayerProjectionAndCandidatesTest {
             var positions = List.of(placed(first, 2, 1, 0), placed(second, 4, 2, 0), placed(target, 4, 1, 1),
                     placed(monster, 5, 3, 1), placed(untracked, 8, 8, 1));
             var combatants = positions.stream().filter(position -> !position.characterId().equals(untracked))
-                    .map(p -> new Combatant(p.characterId(), p.grid(), p.side(), 1, 1, true, 0, 0, false, false, null, false)).toList();
+                    .map(p -> new Combatant(p.characterId(), p.grid(), p.side(), 1, 1, true, 0, 0, false, false, null, false, false)).toList();
             var observation = obscure ? obscuredView() : ObservationState.EMPTY;
             var battle = new Battle(scene, campaign, rules.rule("adventure.combat", "combat.standard"), Status.ACTIVE, 1, 1, 0,
                     obscure ? 2 : 1, combatants, List.of(new Initiative(first, 19, 1, 20, 0)),

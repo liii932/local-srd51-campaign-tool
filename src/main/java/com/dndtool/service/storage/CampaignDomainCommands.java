@@ -58,6 +58,7 @@ public final class CampaignDomainCommands {
                 if (input.has("raceKey") || input.has("subraceKey")) fields.add("raceKey");
                 if (input.has("subraceKey")) fields.add("subraceKey");
                 if (input.has("cantripKeys")) fields.add("cantripKeys");
+                if (input.has("fightingStyleKey")) fields.add("fightingStyleKey");
                 CampaignJson.fields(input, fields.toArray(String[]::new));
                 if (characters.size() >= 16) throw new StorageException("CAPACITY", "Campaign roster is full");
                 String name = CampaignJson.name(s(input, "name")), kind = s(input, "kind"), classKey = s(input, "classKey");
@@ -68,8 +69,8 @@ public final class CampaignDomainCommands {
                         s(input, "backgroundKey"), input.has("raceKey") ? s(input, "raceKey") : "human",
                         input.has("subraceKey") ? s(input, "subraceKey") : null);
                 Map<String, Integer> abilities = context.initialAbilities(classKey);
-                var choices = input.has("cantripKeys") ? context.initialChoices(classKey, cantripKeys(input))
-                        : context.initialChoices(classKey);
+                var choices = context.creationChoices(classKey, input.has("cantripKeys") ? cantripKeys(input) : null,
+                        input.has("fightingStyleKey") ? s(input, "fightingStyleKey") : null);
                 var history = engine.initial(material, initial, child(operationId, "preparation"), abilities, choices, operationId);
                 var character = new Character(name, kind, true, initial, history); characters.add(character);
                 oldText = "null"; newText = CampaignDomainCodec.text(new Profile(subject, name, kind, true));

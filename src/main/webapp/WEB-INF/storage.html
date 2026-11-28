@@ -121,6 +121,7 @@
         <p id="domain-roster-note" role="status"></p>
         <div class="columns">
           <form id="domain-create"><h3>创建角色 / NPC</h3><label>名称<input name="name" required maxlength="160"></label><label>类型<select name="kind"><option value="PC">玩家角色</option><option value="NPC">NPC</option></select></label><label>种族<select name="raceKey" data-rules="character.race" required></select></label><label hidden>亚种<select name="subraceKey" data-placeholder="不选亚种" disabled></select></label><label>职业<select name="classKey" data-rules="character.class" required></select></label><label>背景<select name="backgroundKey" data-rules="character.background" required></select></label>
+            <label hidden>战斗风格<select name="fightingStyleKey" data-placeholder="请选择战斗风格" required disabled></select></label>
             <label hidden><span>已知戏法</span><select name="cantripKeys" multiple size="4" disabled></select></label>
             <button>创建完整角色</button></form>
           <form id="domain-profile"><h3>角色资料</h3><label>角色<select name="characterId" class="domain-character" required></select></label><label>名称<input name="name" required maxlength="160"></label><label>类型<select name="kind"><option value="PC">玩家角色</option><option value="NPC">NPC</option></select></label><label><input type="checkbox" name="active" checked> 加入当前队伍</label><button>保存角色资料</button></form>
@@ -297,7 +298,7 @@
               <option value="END_TURN">结束回合</option><option value="DASH">疾走</option><option value="DISENGAGE">撤离</option><option value="DODGE">闪避</option>
               <option value="HIDE">躲藏（动作）</option><option value="SEARCH">搜索（动作）</option>
               <option value="NIMBLE_HIDE">灵巧逃脱：躲藏（附赠动作）</option><option value="NIMBLE_DISENGAGE">灵巧逃脱：撤离（附赠动作）</option>
-              <option value="SECOND_WIND">回气（附赠动作）</option><option value="DROP_PRONE">主动卧倒</option><option value="STAND_UP">起身</option>
+              <option value="ACTION_SURGE">动作如潮</option><option value="SECOND_WIND">回气（附赠动作）</option><option value="DROP_PRONE">主动卧倒</option><option value="STAND_UP">起身</option>
               <option value="BEGIN_ATTACK">开始攻击动作</option><option value="ATTACK">攻击</option><option value="GRAPPLE">擒抱</option>
               <option value="SHOVE_PRONE">推倒</option><option value="SHOVE_PUSH">推开 5 尺</option><option value="FORFEIT_ATTACKS">放弃余下攻击</option>
               <option value="ESCAPE_GRAPPLE">挣脱擒抱</option><option value="MOVE">移动</option><option value="DRAG_GRAPPLE">拖带移动</option>

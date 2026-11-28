@@ -115,6 +115,7 @@ async function main() {
         .find(option => option.endsWith('/' + classKey));
       assert.ok(value, `Missing selectable rule ${classKey}`);
       await classes.selectOption(value);
+      if (classKey === 'class.fighter') await field('domain-create', 'fightingStyleKey').selectOption({label: 'Defense'});
       await action('domain', () => button('domain-create').click());
     }
     const fighter = card(fighterName).id;

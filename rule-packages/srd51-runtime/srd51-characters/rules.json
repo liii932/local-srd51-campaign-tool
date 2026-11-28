@@ -194,10 +194,10 @@
       "kind": "rule",
       "module_key": "srd51_characters",
       "rule_type": "character.feature",
-      "rule_key": "feature.fighter_fighting_style"
+      "rule_key": "feature.fighter_defense"
     },
-    "display_name": "Fighting Style",
-    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "display_name": "Defense",
+    "description": "Choose the Defense Fighting Style at fighter level 1 to gain +1 Armor Class while wearing light, medium, or heavy armor. A shield alone does not qualify.",
     "source_page": 24,
     "owner": {
       "kind": "rule",
@@ -206,9 +206,9 @@
       "rule_key": "class.fighter"
     },
     "level": 1,
-    "feature_kind": "OPTION",
-    "execution_mode": "BLOCKED",
-    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+    "feature_kind": "FEATURE",
+    "execution_mode": "CHOICE",
+    "execution_algorithm": "SRD_2014_FIGHTER_DEFENSE_V1"
   },
   {
     "identity": {
@@ -239,7 +239,7 @@
       "rule_key": "feature.fighter_action_surge"
     },
     "display_name": "Action Surge",
-    "description": "Catalog metadata only. This finite application profile does not acquire or execute this class or subclass feature.",
+    "description": "Starting at fighter level 2, spend one use on your own active combat turn to gain an additional ordinary action for that turn. A short or long rest restores the use in the supported fighter levels 2–6.",
     "source_page": 25,
     "owner": {
       "kind": "rule",
@@ -248,9 +248,9 @@
       "rule_key": "class.fighter"
     },
     "level": 2,
-    "feature_kind": "OPTION",
-    "execution_mode": "BLOCKED",
-    "execution_algorithm": "BLOCKED_DOWNSTREAM_SYSTEM_V1"
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_FIGHTER_ACTION_SURGE_V1"
   },
   {
     "identity": {
@@ -363,8 +363,8 @@
       "rule_type": "character.resource",
       "rule_key": "resource.fighter.action_surge"
     },
-    "display_name": "Fighter Action_Surge",
-    "description": "Tracks finite uses and rest recovery only; resource spending does not execute an unsupported feature. Class-level support gates apply before these profiles are used.",
+    "display_name": "Fighter Action Surge",
+    "description": "Tracks Action Surge uses and restores them upon finishing a short or long rest. Only the Action Surge combat action spends the use.",
     "source_page": 25,
     "owner_class": {
       "kind": "rule",

@@ -4,6 +4,7 @@ import com.dndtool.persistence.storage.*;
 import com.dndtool.persistence.storage.CampaignRepository.*;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.ProductionSchema2Projection.StoredMember;
+import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.io.*;
@@ -691,16 +692,23 @@ public final class CampaignStorageService implements AutoCloseable {
     private static JsonObject domainView(CampaignDomainData.State state) {
         if (state == null) return null;
         Gson json = new GsonBuilder().serializeNulls().disableHtmlEscaping().create(); JsonObject result = new JsonObject();
+        var material = state.material().restore();
+        var equipment = new Schema2CharacterEquipmentRules();
         JsonArray characters = new JsonArray();
         for (var c : state.characters()) {
             var current = c.history().current(); JsonObject card = new JsonObject();
             card.addProperty("id", c.id().toString()); card.addProperty("name", c.name()); card.addProperty("kind", c.kind()); card.addProperty("active", c.active());
             card.addProperty("version", Long.toString(current.version())); card.addProperty("level", current.level());
             card.addProperty("hitPoints", current.hitPoints()); card.addProperty("maximumHitPoints", current.maximumHitPoints());
+            try {
+                card.addProperty("armorClass", equipment.derive(material.projection(), current).armorClass());
+            } catch (IllegalArgumentException unsupported) {
+                if (current.classes().size() < 2 || !"S2_EQUIPMENT_EFFECT_UNSUPPORTED".equals(unsupported.getMessage())) throw unsupported;
+                card.add("armorClass", JsonNull.INSTANCE);
+            }
             card.add("state", json.toJsonTree(current)); card.add("initial", json.toJsonTree(c.initial())); card.add("history", json.toJsonTree(c.history()));
             characters.add(card);
         }
-        var material = state.material().restore();
         JsonArray combats = new JsonArray();
         for (var history : state.combats()) {
             JsonObject view = json.toJsonTree(history).getAsJsonObject();
@@ -713,6 +721,7 @@ public final class CampaignStorageService implements AutoCloseable {
                 view.add("turnBudgets", budgets);
                 view.add("weaponTargets", json.toJsonTree(CampaignCombatView.weaponTargets(battle)));
                 if (CampaignSpaceData.Ref.scene(battle.combatId()).equals(state.space().focus().space())) {
+                    view.addProperty("actionSurgeAvailable", CampaignCombatView.actionSurgeAvailable(roster, battle));
                     Set<UUID> participants = new HashSet<>();
                     battle.combatants().forEach(actor -> participants.add(actor.characterId()));
                     view.add("cantripChoices", json.toJsonTree(CampaignCombatView.cantripChoices(roster, battle, participants)));
