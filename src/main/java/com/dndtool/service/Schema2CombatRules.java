@@ -185,6 +185,24 @@ public final class Schema2CombatRules {
     }
 
     public Prepared preflight(UUID operationId, UUID combatId, UUID campaignId, Map<UUID,Context> roster, Battle before, Command command) {
+        return preflight(operationId, combatId, campaignId, roster, before, command, null);
+    }
+
+    /** Checks candidate eligibility using the actor's view of positions. It cannot authorize execution. */
+    public void preflightCandidate(UUID operationId, Map<UUID,Context> roster, Battle before, Command command,
+            Set<UUID> knownPositions) {
+        Objects.requireNonNull(knownPositions);
+        boolean complete = before.combatants().stream().allMatch(actor -> knownPositions.contains(actor.characterId()));
+        preflight(operationId, before.combatId(), before.campaignId(), roster, before, command,
+                complete ? null : knownPositions);
+    }
+
+    static boolean positionKnown(Set<UUID> knownPositions, UUID subject) {
+        return knownPositions == null || knownPositions.contains(subject);
+    }
+
+    private Prepared preflight(UUID operationId, UUID combatId, UUID campaignId, Map<UUID,Context> roster,
+            Battle before, Command command, Set<UUID> knownPositions) {
         uuid(operationId); uuid(combatId); uuid(campaignId);
         if (operationId.equals(combatId) || operationId.equals(campaignId) || combatId.equals(campaignId)) throw invalid("S2_COMBAT_IDENTITY");
         if (roster == null || roster.isEmpty() || roster.size() > MAX_COMBATANTS || command == null) throw invalid("S2_COMBAT_ROSTER");
@@ -209,10 +227,10 @@ public final class Schema2CombatRules {
         } else if (command.kind() != Kind.START) throw invalid("S2_COMBAT_NOT_FOUND");
         if (Schema2MeleeControlRules.handles(command.kind()))
             return new Prepared(operationId, combatId, campaignId, roster, before, command,
-                    melee.prepare(operationId, roster, before, command));
+                    melee.prepare(operationId, roster, before, command, knownPositions));
         Prepared prepared = new Prepared(operationId,combatId,campaignId,roster,before,command);
         // The minimum branch checks every deterministic dependency and permitted future boundary.
-        preflightIntent(prepared);
+        preflightIntent(prepared, knownPositions);
         return prepared;
     }
 
@@ -331,11 +349,11 @@ public final class Schema2CombatRules {
     }
     private static boolean preparedItem(EquipmentItem item) { return Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(item.location()); }
 
-    private void preflightIntent(Prepared p) {
+    private void preflightIntent(Prepared p, Set<UUID> knownPositions) {
         Command command = p.command;
         if(Schema2SaveDamageRules.handles(p.before,command)) {new Schema2SaveDamageRules().prepare(p.roster,p.before,command);return;}
         if(Schema2MonsterRestRules.handles(command.kind())) {Schema2MonsterRestRules.prepare(p.roster,p.before,command);return;}
-        if(Schema2ActionFlowRules.handles(command.kind())) {new Schema2ActionFlowRules(this).prepare(p.roster,p.before,command);return;}
+        if(Schema2ActionFlowRules.handles(command.kind())) {new Schema2ActionFlowRules(this).prepare(p.roster,p.before,command,knownPositions);return;}
         if(worldCommand(command.kind()) || explorationPosture(p.before,command.kind())) {prepareWorld(p);return;}
         if (command.kind() == Kind.START) {
             for(Context context:p.roster.values())

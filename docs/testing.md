@@ -87,7 +87,7 @@ python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```bash
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.5.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.6.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -250,7 +250,7 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    源的一致性及 DRAFT 作者向量。以下为 Bash 示例，Windows 使用对应候选路径及本机 Python。
 
    ```bash
-   war=target/dnd-tool-se-0.5.0.war
+   war=target/dnd-tool-se-0.6.0.war
    scenarios=rule-packages/srd51-runtime/scenarios
    python3 rule-packages/srd51-runtime/build-bundles.py --check
    python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
@@ -411,7 +411,7 @@ ZIP 原始身份和 SQLite 冻结投影。纯规则、应用消费者和独立�
 生产代码或打包资源变化后，从候选对应源码的根目录运行。使用 Python 3.11+ 和环境中的 JDK 21+（`java`、`javac`、`jdeps`）。
 
 ```bash
-python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.5.0.war
+python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.6.0.war
 ```
 
 保存命令、退出码及 JSON 输出，记录字节数、SHA-256、全部 ZIP 条目数、应用类和嵌套 JAR 数。
@@ -696,6 +696,9 @@ mvn '-Dtest=CampaignParticipationIntegrationTest,PlayerGatewayServiceTest,Player
 `PlayerParticipationAcceptanceTest` 使用可控时钟和独立 SQLite，补查邀请轮换及准确到期、
 END 后新运行的身份/收据隔离、后来成员的共享范围、控制转交与排队命令的串行边界，
 以及真实反应窗口暂停时不代选、不追加业务事实。
+玩家怪物用例用两名独立成员比较共享场景、先攻、目标和可选方向，在隐藏占位阻挡时验证整次拒绝。
+通过真实玩家网关提交战士的长剑攻击，核对狼的权威 HP、玩家收到的命中/伤害/击倒结果、
+失去共享或控制后的旧候选，以及响应丢失后的原收据。治理与完整文件重开见 `CampaignParticipationIntegrationTest`。
 
 独立进程恢复使用 `mvn '-Dtest=PlayerProcessRecoveryIntegrationTest' test`。它在两个
 独立 JVM 间重启同一私有根，分别只信任对应临时证书，核对 RESIDUAL、Host 显式恢复与
@@ -742,6 +745,14 @@ QR 像素核验还需独立 Python 环境中的
 暂停、双标签接管及结束。截图/证书/日志和临时库不入 Git/WAR。
 若前段已成功而邀请阶段中止，可用 `--resume-after-roster` 续跑；脚本先核对固定角色、
 装备、版本和空参与状态，任何检查点差异都拒绝继续，不重放已完成的建队操作。
+
+要验收玩家攻击规则怪物，在新的空白测试根启动同一玩家测试容器，沿用上述浏览器环境和测试证书信任设置。
+运行以下脚本，使用 DM 表单分别审批两名玩家，只向其中一名揭示狼。该玩家从自己的页面使用长剑，
+脚本将战果与主持端 HP 对照，再撤回共享并结束本次测试战役。
+
+```bash
+node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/player-store
+```
 
 WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边界/会话/投影/候选类、
 参与/裁定领域及结构；禁止临时证书、测试启动器和任何运行凭据进入 WAR。

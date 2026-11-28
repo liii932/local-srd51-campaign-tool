@@ -88,11 +88,15 @@ public final class Schema2SpellRules {
         return prepare(roster,battle,actor,input,false);
     }
     public Prepared prepare(Map<UUID,Context> roster, Battle battle, UUID actor, CastInput input, boolean reaction) {
+        return prepare(roster,battle,actor,input,reaction,null);
+    }
+    Prepared prepare(Map<UUID,Context> roster, Battle battle, UUID actor, CastInput input, boolean reaction,
+            Set<UUID> knownPositions) {
         Context context = roster.get(actor);
         if (context==null || input==null) throw invalid("S2_SPELL_COMMAND");
         State caster=context.character(); Schema2FeatureSupport.requireSupportedFeatures(context.material(),caster,"S2_SPELL_EFFECT_UNSUPPORTED");
         Schema2OngoingEffectRules.requireCastingAllowed(roster,battle,actor);
-        if(input.castingRule().ruleType().equals("character.wizard_spellcasting"))return prepareWizard(roster,battle,actor,input,reaction);
+        if(input.castingRule().ruleType().equals("character.wizard_spellcasting"))return prepareWizard(roster,battle,actor,input,reaction,knownPositions);
         if(reaction || input.slotLevel()!=1 || input.targetCastFrameKey()!=null || input.coneDirection()!=null)throw invalid("S2_SPELL_UNAVAILABLE");
         var profiles=context.material().projection().rules().stream().filter(FinalSpellcasting.class::isInstance)
                 .map(FinalSpellcasting.class::cast).filter(p -> p.enabled() && p.identity().equals(input.castingRule())).toList();
@@ -134,7 +138,8 @@ public final class Schema2SpellRules {
         if (caster.version()>=Schema2CharacterRuntime.MAX_EVENTS-1) throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
         return new Prepared(profile,spell,input,caster,Math.floorDiv(caster.abilities().get(profile.abilityKey())-10,2)+3,bless);
     }
-    private Prepared prepareWizard(Map<UUID,Context> roster,Battle battle,UUID actor,CastInput input,boolean reaction) {
+    private Prepared prepareWizard(Map<UUID,Context> roster,Battle battle,UUID actor,CastInput input,boolean reaction,
+            Set<UUID> knownPositions) {
         Context context=roster.get(actor);State caster=context.character();new Schema2WizardSpellbookRules().validateState(context.material(),caster);
         var profiles=context.material().projection().rules().stream().filter(FinalWizardSpellcasting.class::isInstance).map(FinalWizardSpellcasting.class::cast).filter(p->p.enabled()&&p.identity().equals(input.castingRule())&&ownsWizard(p.definition(),caster)).toList();
         if(profiles.size()!=1)throw invalid("S2_SPELL_CASTER_UNSUPPORTED");
@@ -160,7 +165,7 @@ public final class Schema2SpellRules {
                     || !Schema2MeleeControlRules.handFree(battle, caster, HandSlot.OFF_HAND)) throw invalid("S2_SPELL_COMPONENT");
             if(input.coneDirection()==null || !input.targets().isEmpty() || input.targetCastFrameKey()!=null)throw invalid("S2_SPELL_TARGET");
             requireEvocationScope(context);
-            Schema2SaveDamageRules.prepareSpell(roster,battle,actor,input);
+            Schema2SaveDamageRules.prepareSpell(roster,battle,actor,input,knownPositions);
         } else if(input.coneDirection()!=null)throw invalid("S2_SPELL_TARGET");
         else if(shield) {
             if(!input.targets().equals(List.of(actor)) || input.targetCastFrameKey()!=null)throw invalid("S2_SPELL_TARGET");

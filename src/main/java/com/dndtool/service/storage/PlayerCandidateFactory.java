@@ -39,12 +39,17 @@ public final class PlayerCandidateFactory {
         }
         Battle battle = history.current(); Map<UUID, Schema2CombatRules.Context> roster = new LinkedHashMap<>();
         var scene = CampaignSpaceData.Ref.scene(battle.combatId());
+        boolean sharedScene = PlayerCampaignProjection.shared(domain, player, CampaignParticipationData.ShareKind.SCENE, scene.id());
+        Set<UUID> visibleMonsters = PlayerCampaignProjection.visibleMonsters(domain, player, scene.id());
+        Set<UUID> knownPositions = new HashSet<>(own);
+        if (sharedScene) knownPositions.addAll(visible);
+        knownPositions.addAll(visibleMonsters);
         long sceneSecond = domain.space().clock(scene).second();
         Set<UUID> combatants = new HashSet<>(battle.combatants().stream().map(Combatant::characterId).toList());
         domain.characters().stream()
                 .filter(c -> combatants.contains(c.id()) && CampaignSpaceCommands.focused(domain, c.id()))
                 .forEach(c -> roster.put(c.id(), new Schema2CombatRules.Context(material, c.initial(), c.history().current(), sceneSecond)));
-        var factory = new BattleChoices(result, domain, battle, roster);
+        var factory = new BattleChoices(result, domain, battle, roster, sharedScene, knownPositions);
         factory.relationChoices(own, visible);
         if (battle.activeFlow() != null) {
             Flow flow = battle.activeFlow(); Frame leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
@@ -89,15 +94,20 @@ public final class PlayerCandidateFactory {
             if (battle.status() == Status.ACTIVE && actor.equals(battle.activeActor())) {
                 TURN_ACTIONS.forEach(kind -> factory.add(Command.action(kind, actor), label(kind)));
                 for (UUID target : visible) if (!target.equals(actor) && roster.containsKey(target))
-                    for (var item : roster.get(actor).character().equipment())
-                        factory.add(Command.attack(actor, target, item.itemId()), "攻击 " + PlayerCampaignProjection.characterName(domain, target) + " · " + PlayerCampaignProjection.ruleName(domain, item.item()));
+                    factory.attacks(actor, target, PlayerCampaignProjection.characterName(domain, target));
+                for (var target : battle.combatants()) {
+                    UUID id = target.characterId();
+                    if (visibleMonsters.contains(id))
+                        factory.attacks(actor, id, PlayerCampaignProjection.monsterName(domain, id)
+                                + "（" + target.position().x() + ", " + target.position().y() + "）");
+                }
                 factory.attackReplacements(actor, visible);
                 factory.moves(actor); factory.spells(actor, visible);
             } else if (battle.status() == Status.EXPLORATION) {
                 if (CampaignParticipationCommands.permitted(domain, actor, "EXPLORATION_MOVE")) {
                     factory.add(Command.action(Kind.DROP_PRONE, actor), label(Kind.DROP_PRONE));
                     factory.add(Command.action(Kind.STAND_UP, actor), label(Kind.STAND_UP));
-                    factory.route(actor, player);
+                    factory.route(actor);
                 }
                 if (CampaignParticipationCommands.permitted(domain, actor, "END_CONCENTRATION")) factory.add(Command.action(Kind.END_CONCENTRATION, actor), "结束专注");
                 // Spell use in exploration must be explicitly granted for this exact scene.
@@ -152,15 +162,18 @@ public final class PlayerCandidateFactory {
     }; }
     private static final class BattleChoices {
         final List<Candidate> result; final CampaignDomainData.State domain; final Battle battle; final Map<UUID, Schema2CombatRules.Context> roster;
+        final boolean sharedScene; final Set<UUID> knownPositions;
         final Schema2CombatRules rules = new Schema2CombatRules();
-        BattleChoices(List<Candidate> result, CampaignDomainData.State domain, Battle battle, Map<UUID, Schema2CombatRules.Context> roster) {
+        BattleChoices(List<Candidate> result, CampaignDomainData.State domain, Battle battle,
+                Map<UUID, Schema2CombatRules.Context> roster, boolean sharedScene, Set<UUID> knownPositions) {
             this.result = result; this.domain = domain; this.battle = battle; this.roster = roster;
+            this.sharedScene = sharedScene; this.knownPositions = knownPositions;
         }
         void add(Command command, String label) {
             if (result.size() >= MAX_CHOICES) return;
             try {
-                CampaignDomainCommands.preflightGrid(domain, command);
-                rules.preflight(UUID.randomUUID(), battle.combatId(), battle.campaignId(), roster, battle, command);
+                CampaignDomainCommands.preflightGrid(domain, command, sharedScene, knownPositions::contains);
+                rules.preflightCandidate(UUID.randomUUID(), roster, battle, command, knownPositions);
             }
             catch (StorageException | IllegalArgumentException unavailable) { return; }
             JsonObject input = combatInput();
@@ -173,16 +186,15 @@ public final class PlayerCandidateFactory {
             input.add("focus", CampaignSpaceCommands.focusPayload(domain));
             return input;
         }
-        void route(UUID actor, UUID member) {
+        void route(UUID actor) {
             Schema2ExplorationRules.MoveBudget budget;
             try { budget = Schema2ExplorationRules.moveBudget(roster, battle, actor); }
             catch (IllegalArgumentException unavailable) { return; }
             if (budget.maxSteps() == 0) return;
             var scene = domain.space().scene(battle.combatId());
-            boolean shared = PlayerCampaignProjection.shared(domain, member, CampaignParticipationData.ShareKind.SCENE, scene.id());
-            if (shared && scene.width() == 1 && scene.height() == 1) return;
+            if (sharedScene && scene.width() == 1 && scene.height() == 1) return;
             var route = new ExplorationRoute(budget.start().x(), budget.start().y(), budget.maxSteps(), budget.stepCostFeet(),
-                    shared ? scene.width() : null, shared ? scene.height() : null);
+                    sharedScene ? scene.width() : null, sharedScene ? scene.height() : null);
             PlayerCandidateFactory.add(result, budget.stepCostFeet() == 10 ? "规划探索匍匐路线" : "规划探索移动路线",
                     actor, "combat-command", combatInput(), route);
         }
@@ -207,6 +219,11 @@ public final class PlayerCandidateFactory {
                                 (skill == ContestSkill.ATHLETICS ? "用力量（运动）挣脱" : "用敏捷（杂技）挣脱") + " · " + source);
                 }
             }
+        }
+
+        void attacks(UUID actor, UUID target, String name) {
+            for (var item : roster.get(actor).character().equipment())
+                add(Command.attack(actor, target, item.itemId()), "攻击 " + name + " · " + PlayerCampaignProjection.ruleName(domain, item.item()));
         }
 
         void attackReplacements(UUID actor, Set<UUID> visible) {

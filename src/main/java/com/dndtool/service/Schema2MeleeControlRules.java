@@ -64,7 +64,8 @@ public final class Schema2MeleeControlRules {
                 && flow == (command.leafKey() != null) && (choice ? flow : release || !flow), "S2_COMBAT_COMMAND");
     }
 
-    ContestPlan prepare(UUID operation, Map<UUID, Context> roster, Battle battle, Command command) {
+    ContestPlan prepare(UUID operation, Map<UUID, Context> roster, Battle battle, Command command,
+            Set<UUID> knownPositions) {
         require(battle.status() == Status.ACTIVE, "S2_COMBAT_REQUIRED");
         UUID actorId = command.actorId();
         if (command.kind() == Kind.RELEASE_GRAPPLE) {
@@ -104,7 +105,7 @@ public final class Schema2MeleeControlRules {
             if (escape) {
                 require(actor.actionAvailable(), "S2_COMBAT_ACTION_UNAVAILABLE");
             } else {
-                checkReplacement(battle, command, actorContext, actor, target, actorSize, targetSize);
+                checkReplacement(battle, command, actorContext, actor, target, actorSize, targetSize, knownPositions);
             }
 
             CheckDefinition definition = checkDefinition(actorContext);
@@ -155,7 +156,7 @@ public final class Schema2MeleeControlRules {
     }
 
     private static void checkReplacement(Battle battle, Command command, Context context, Combatant actor, Combatant target,
-                                         CreatureSize actorSize, CreatureSize targetSize) {
+                                         CreatureSize actorSize, CreatureSize targetSize, Set<UUID> knownPositions) {
         var input = command.meleeInput();
         var sequence = actor.sequence();
         require(sequence != null && !sequence.closed(), "S2_COMBAT_SEQUENCE_UNAVAILABLE");
@@ -170,11 +171,14 @@ public final class Schema2MeleeControlRules {
         }
         if (command.kind() == Kind.SHOVE_PUSH) {
             require(input.destination().equals(pushDestination(actor.position(), target.position()))
-                    && battle.combatants().stream().noneMatch(value -> value.position().equals(input.destination())),
+                    && battle.combatants().stream().noneMatch(value -> Schema2CombatRules.positionKnown(knownPositions, value.characterId())
+                            && value.position().equals(input.destination())),
                     "S2_COMBAT_SHOVE_DESTINATION");
-            // Prove the area suppression write before admitting a possible push.
-            Battle projected = replaceActor(battle, at(target, input.destination()));
-            Schema2OngoingEffectRules.reconcile(projected, key(battle.combatId(), "shove-capacity-" + battle.version()));
+            if (knownPositions == null) {
+                // Prove the area suppression write before admitting a possible push.
+                Battle projected = replaceActor(battle, at(target, input.destination()));
+                Schema2OngoingEffectRules.reconcile(projected, key(battle.combatId(), "shove-capacity-" + battle.version()));
+            }
         }
         for (ReadyPreparation ready : battle.readyPreparations()) {
             if (ready.status() != ReadyStatus.ARMED) continue;

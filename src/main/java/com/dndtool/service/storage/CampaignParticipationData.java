@@ -6,7 +6,7 @@ import java.util.*;
 public final class CampaignParticipationData {
     private CampaignParticipationData() { }
     public enum ActorKind { DM, PLAYER }
-    public enum ShareKind { CHARACTER, SCENE, LOG }
+    public enum ShareKind { CHARACTER, SCENE, MONSTER, LOG }
     public enum AudienceKind { ALL, SPECIFIC }
     public record Actor(ActorKind kind, UUID memberId, UUID representedMemberId, UUID characterId) {
         public Actor {
@@ -50,6 +50,10 @@ public final class CampaignParticipationData {
         public Member member(UUID id) { return members.stream().filter(m -> m.id().equals(id)).findFirst().orElseThrow(() -> new StorageException("MEMBER_NOT_FOUND", "Campaign member not found")); }
         public Control control(UUID character) { return controls.stream().filter(c -> c.characterId().equals(character)).findFirst().orElse(null); }
         public UUID controller(UUID character) { Control c = control(character); return c == null ? null : c.memberId(); }
+        boolean shared(UUID member, ShareKind kind, UUID subject) {
+            return shares.stream().anyMatch(share -> share.kind() == kind && share.active()
+                    && share.subjectId().equals(subject) && share.audience().includes(member));
+        }
     }
     private static void unique(List<UUID> ids) { if (new HashSet<>(ids).size() != ids.size()) throw CampaignJson.bad("Duplicate participation identity"); }
     private static void uuid(UUID value) { if (value == null) throw CampaignJson.bad("Missing participation identity"); CampaignJson.uuid(value.toString()); }

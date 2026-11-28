@@ -245,6 +245,11 @@
     if (lastReceipt) {
       let note = '上次收据：行动已完成。';
       if (lastReceipt.state === 'NOT_EXECUTED') note = '上次收据：确认未执行，旧请求已作废。';
+      else if (lastReceipt.attackResult) {
+        const {hit, damage, dropped} = lastReceipt.attackResult;
+        note = `上次攻击${hit ? '命中' : '未命中'}，造成 ${damage} 点伤害，${dropped ? '击倒了目标' : '未击倒目标'}。`;
+        if (lastReceipt.outcome === 'WAITING') note += '当时仍在等待后续决定。';
+      }
       else if (lastReceipt.outcome === 'WAITING') note = '上次收据：行动已接受，当时等待后续决定。当前现场请看上方进度。';
       if ($('player-receipt').textContent !== note) $('player-receipt').textContent = note;
     }

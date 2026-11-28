@@ -58,8 +58,18 @@ public final class CampaignParticipationCommands {
                 switch (r.kind()) {
                     case CHARACTER -> profile(profiles, manual, r.subjectId());
                     case SCENE -> { if (space.scenes().stream().noneMatch(s -> s.id().equals(r.subjectId())) && nodes.stream().noneMatch(n -> n.id().equals(r.subjectId()))) throw CampaignJson.bad("Unknown scene share target"); }
+                    case MONSTER -> {
+                        if (space.monsters().stream().noneMatch(monster -> monster.id().equals(r.subjectId())))
+                            throw CampaignJson.bad("Unknown monster share target");
+                        if (shares.stream().anyMatch(share -> share.kind() == ShareKind.MONSTER
+                                && share.subjectId().equals(r.subjectId()) && !share.equals(old)))
+                            throw new StorageException("STALE_PARTICIPATION", "Refresh the existing monster share policy");
+                    }
                     case LOG -> { if (!campaign.equals(r.subjectId()) && roots.stream().noneMatch(root -> root.operationId().equals(r.subjectId()))) throw CampaignJson.bad("Unknown log share target"); }
                 }
+                if (old != null && (old.kind() == ShareKind.MONSTER || r.kind() == ShareKind.MONSTER)
+                        && (old.kind() != r.kind() || !old.subjectId().equals(r.subjectId())))
+                    throw CampaignJson.bad("A monster share policy must retain its instance identity");
                 subject = old == null ? operation : old.id(); shares.remove(old); shares.add(new Share(subject, r.kind(), r.subjectId(), r.audience(), r.active(), Math.addExact(r.shareVersion(), 1)));
             }
             case ExplorationSet r -> {
@@ -108,6 +118,23 @@ public final class CampaignParticipationCommands {
                 && state.participation().exploration().stream().anyMatch(p -> p.characterId().equals(character)
                         && p.active() && focus.id().equals(p.sceneId()) && p.actions().contains(action));
     }
+    static Set<UUID> visibleMonsters(CampaignDomainData.State state, UUID member, UUID sceneId) {
+        var participation = state.participation();
+        if (!participation.shared(member, ShareKind.SCENE, sceneId)) return Set.of();
+        var scene = CampaignSpaceData.Ref.scene(sceneId);
+        Set<UUID> revealed = new HashSet<>();
+        for (var share : participation.shares()) {
+            if (share.kind() == ShareKind.MONSTER && share.active() && share.audience().includes(member))
+                revealed.add(share.subjectId());
+        }
+        if (revealed.isEmpty()) return Set.of();
+        Set<UUID> visible = new LinkedHashSet<>();
+        for (var placement : state.positions()) {
+            if (scene.equals(placement.space()) && revealed.contains(placement.characterId()))
+                visible.add(placement.characterId());
+        }
+        return Collections.unmodifiableSet(visible);
+    }
     public static void requireExecutionPermission(CampaignDomainData.State state, String action, JsonObject input, Actor actor) {
         if (actor.kind() != ActorKind.PLAYER) return;
         UUID character = actor.characterId();
@@ -123,6 +150,10 @@ public final class CampaignParticipationCommands {
         if (!action.equals("combat-command") || current == null) throw playerPermissionDenied();
         var command = CampaignDomainCodec.fromJson(input.get("command"), Schema2CombatState.Command.class);
         var battle = current.current();
+        if (command.kind() == Schema2CombatState.Kind.ATTACK
+                && battle.monsters().stream().anyMatch(monster -> monster.monsterId().equals(command.targetId()))
+                && !visibleMonsters(state, actor.memberId(), battle.combatId()).contains(command.targetId()))
+            throw playerPermissionDenied();
         if (battle.activeFlow() != null) return; // Scene preflight accepts only the entitled current leaf.
         if (battle.status() == Schema2CombatState.Status.EXPLORATION) {
             String required = switch (command.kind()) {

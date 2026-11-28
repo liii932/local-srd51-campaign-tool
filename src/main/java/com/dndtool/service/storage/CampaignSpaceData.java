@@ -23,9 +23,11 @@ public final class CampaignSpaceData {
     }
     public record Scene(UUID id, String name, UUID nodeId, int width, int height,
                         String resolution, String mode, long version) {
+        static final int MAX_DIMENSION = 201;
+
         public Scene {
             uuid(id); uuid(nodeId); CampaignJson.name(name);
-            if (width < 1 || width > 201 || height < 1 || height > 201 || version < 0
+            if (width < 1 || width > MAX_DIMENSION || height < 1 || height > MAX_DIMENSION || version < 0
                     || !Set.of("DM", "RULES").contains(resolution)
                     || !Set.of("EXPLORATION", "COMBAT", "CLOSED").contains(mode)) throw CampaignJson.bad("Invalid local scene");
         }
