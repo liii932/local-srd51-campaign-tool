@@ -42,18 +42,19 @@ final class Schema2SaveDamageRules {
             if(!targets(roster,b,batch.sourceId(),batch.targetProof().direction(),batch.targetProof().rosterVersion()).equals(batch.targetProof()))throw invalid("ACTION_FLOW_TARGET_MISMATCH");
         }
         if(batch.targetProof().targets().size()>64||6+batch.targetProof().targets().size()*6>4096)throw invalid("ACTION_FLOW_LIMIT_EXCEEDED");
-        prepareTargets(roster,b,batch.targetProof());
+        prepareTargets(roster,b,batch.targetProof(),null);
     }
-    private static void prepareTargets(Map<UUID,Context> roster,Battle b,TargetSetProof proof) {
+    private static void prepareTargets(Map<UUID,Context> roster,Battle b,TargetSetProof proof,Set<UUID> knownPositions) {
         // Includes every future health/check/effect dependency before any raw damage roll.
         for(CreatureRef ref:proof.targets()) {
+            if(!Schema2CombatRules.positionKnown(knownPositions,ref.creatureId()))continue;
             if(ref.kind()==CreatureKind.CHARACTER) {var context=roster.get(ref.creatureId());new Schema2CharacterHealthRules().prepareDamage(context.material(),context.character());}
             Schema2SavingThrowRules.prepare(roster,b,ref,"ability.dexterity");
             if(b.concentrationHolders().stream().anyMatch(h->h.actorId().equals(ref.creatureId())))Schema2SavingThrowRules.prepare(roster,b,ref,"ability.constitution");
             defenses(roster,b,ref);
         }
     }
-    static void prepareSpell(Map<UUID,Context> roster,Battle b,UUID caster,CastInput input) {
+    static void prepareSpell(Map<UUID,Context> roster,Battle b,UUID caster,CastInput input,Set<UUID> knownPositions) {
         if(b.status()!=Status.ACTIVE)throw invalid("S2_SPELL_AREA_SCENE");
         if(b.environmentZones().stream().anyMatch(z->z.endedOperationId()==null))throw invalid("S2_SPELL_AREA_ANTIMAGIC_UNSUPPORTED");
         if(b.saveDamageBatches().size()>=128||b.activeFlow()==null&&b.version()>=Schema2CombatRules.MAX_FACTS-4
@@ -65,7 +66,7 @@ final class Schema2SaveDamageRules {
         for(Context context:roster.values())for(var item:context.character().equipment())
             if("GROUND".equals(item.location())&&b.combatId().equals(item.groundCombatId())
                     &&inside(proof.origin(),new Position(item.groundX(),item.groundY()),input.coneDirection()))throw invalid("S2_SPELL_OBJECT_EFFECT_UNSUPPORTED");
-        prepareTargets(roster,b,proof);
+        prepareTargets(roster,b,proof,knownPositions);
     }
     private static void prepareNestedObjectBoundary(Map<UUID,Context> roster,Battle b,UUID caster) {
         Set<UUID> countercasters=reactionCasters(roster,b,Schema2SpellRules.COUNTERSPELL);
@@ -97,7 +98,7 @@ final class Schema2SaveDamageRules {
     }
     static SaveDamageBatch rollSpell(UUID operation,Map<UUID,Context> roster,Battle b,CastAttempt cast,UUID frame,Schema2ActionFlowRules.Roller dice) {
         CastInput input=new CastInput(cast.castingRule(),cast.spell(),List.of(),null,cast.slotLevel(),null,cast.coneDirection());
-        prepareSpell(roster,b,cast.actorId(),input);
+        prepareSpell(roster,b,cast.actorId(),input,null);
         var state=roster.get(cast.actorId()).character();
         var source=new SpellDamageSource(cast.frameKey(),cast.spell(),cast.slotLevel(),Math.floorDiv(state.abilities().get("ability.intelligence")-10,2),state.proficiencyBonus());
         var proof=targets(roster,b,cast.actorId(),cast.coneDirection(),b.version());

@@ -359,7 +359,16 @@ public final class CampaignSpaceCommands {
     private static Scene requireScene(CampaignDomainData.State state) { Ref ref = state.space().focus().space(); if (ref == null || !ref.kind().equals("SCENE")) throw CampaignJson.bad("A local scene must have focus"); return state.space().scene(ref.id()); }
     private static void requireWorld(CampaignDomainData.State state, UUID node) { if (!isWorldFocus(state) || !state.space().focus().space().id().equals(node)) throw new StorageException("SPACE_ANCHOR_MISMATCH", "The actual source must be the focused world node"); }
     private static void requireDirectClock(CampaignDomainData.State state) { if (state.space().focus().space() == null || !isWorldFocus(state) && !requireScene(state).resolution().equals("DM")) throw new StorageException("RULE_SCENE_OWNER_REQUIRED", "Use the focused rule scene's time command"); }
-    public static void checkCell(Scene scene, Schema2CombatState.Position p) { if (p == null || p.x() < 0 || p.y() < 0 || p.x() >= scene.width() || p.y() >= scene.height()) throw new StorageException("SCENE_GRID_BOUNDS", "Cell lies outside the scene grid"); }
+    public static void checkCell(Scene scene, Schema2CombatState.Position p) {
+        checkCell(p, scene.width(), scene.height());
+    }
+    static void checkCampaignGridCell(Schema2CombatState.Position p) {
+        checkCell(p, Scene.MAX_DIMENSION, Scene.MAX_DIMENSION);
+    }
+    private static void checkCell(Schema2CombatState.Position p, int width, int height) {
+        if (p == null || p.x() < 0 || p.y() < 0 || p.x() >= width || p.y() >= height)
+            throw new StorageException("SCENE_GRID_BOUNDS", "Cell lies outside the scene grid");
+    }
     public static boolean occupied(List<Position> positions, Ref space, Schema2CombatState.Position cell, UUID except) { return positions.stream().anyMatch(p -> p.space().equals(space) && !p.characterId().equals(except) && Objects.equals(p.grid(), cell)); }
     public static void uniqueCells(List<Position> positions) { Set<String> seen = new HashSet<>(); for (Position p : positions) if (p.grid() != null && !seen.add(p.space().id() + ":" + p.grid().x() + ":" + p.grid().y())) throw new StorageException("SCENE_CELL_OCCUPIED", "Two subjects cannot occupy the same cell"); }
     private static long nextPlacementVersion(CampaignDomainData.State state, UUID subject) {

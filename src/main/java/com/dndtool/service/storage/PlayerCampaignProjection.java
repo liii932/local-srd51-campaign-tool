@@ -4,6 +4,7 @@ import com.dndtool.service.Schema2CharacterRuntime;
 
 import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import com.dndtool.service.Schema2CharacterEquipmentRules;
+import com.dndtool.service.Schema2CombatHistory;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.util.*;
@@ -34,10 +35,10 @@ public final class PlayerCampaignProjection {
             var ref = CampaignSpaceData.Ref.scene(local.id());
             var battle = state.combats().stream().map(h -> h.current()).filter(b -> b.combatId().equals(local.id())).findFirst().orElse(null);
             String mode = local.mode().equals("COMBAT") ? "战斗" : "探索";
-            scenes.add(spaceView(state, visible, ref, local.name(), focus, battle, mode));
+            scenes.add(spaceView(state, visible, visibleMonsters(state, member, local.id()), ref, local.name(), focus, battle, mode));
         }
         for (var node : state.nodes()) if (scenes.size() < 16 && shared(state, member, ShareKind.SCENE, node.id()))
-            scenes.add(spaceView(state, visible, CampaignSpaceData.Ref.world(node.id()), node.name(), focus, null, "世界节点"));
+            scenes.add(spaceView(state, visible, Set.of(), CampaignSpaceData.Ref.world(node.id()), node.name(), focus, null, "世界节点"));
         List<String> allowedLogs = new ArrayList<>();
         UUID campaign = UUID.fromString(access.snapshot().campaignId());
         for (var root : state.roots()) {
@@ -52,8 +53,8 @@ public final class PlayerCampaignProjection {
         view.add("pending", pending(state, own));
         return view;
     }
-    private static JsonObject spaceView(CampaignDomainData.State state, Set<UUID> visible, CampaignSpaceData.Ref ref,
-            String name, CampaignSpaceData.Ref focus, Schema2CombatState.Battle battle, String mode) {
+    private static JsonObject spaceView(CampaignDomainData.State state, Set<UUID> visible, Set<UUID> monsters,
+            CampaignSpaceData.Ref ref, String name, CampaignSpaceData.Ref focus, Schema2CombatState.Battle battle, String mode) {
         boolean focused = ref.equals(focus);
         JsonObject row = new JsonObject();
         row.addProperty("name", name);
@@ -63,15 +64,16 @@ public final class PlayerCampaignProjection {
                 ? battle.initiative().stream().map(Schema2CombatState.Initiative::characterId).toList() : List.of();
         UUID actor = order.isEmpty() ? null : battle.activeActor();
         if (focused && actor != null)
-            row.addProperty("turnLabel", visible.contains(actor) ? characterName(state, actor) + "的回合" : "等待其他行动者");
+            row.addProperty("turnLabel", visible.contains(actor) || monsters.contains(actor)
+                    ? participantName(state, monsters, actor) + "的回合" : "等待其他行动者");
         List<CampaignDomainData.Position> placements = state.positions().stream()
-                .filter(p -> ref.equals(p.space()) && visible.contains(p.characterId()))
+                .filter(p -> ref.equals(p.space()) && (visible.contains(p.characterId()) || monsters.contains(p.characterId())))
                 .sorted(Comparator.comparingInt(p -> order.contains(p.characterId()) ? order.indexOf(p.characterId()) : order.size()))
                 .limit(64).toList();
         JsonArray participants = new JsonArray();
         for (var placement : placements) {
             JsonObject person = new JsonObject();
-            person.addProperty("name", characterName(state, placement.characterId()));
+            person.addProperty("name", participantName(state, monsters, placement.characterId()));
             var grid = placement.grid();
             person.addProperty("position", grid == null ? name : grid.x() + ", " + grid.y());
             person.addProperty("current", focused && placement.characterId().equals(actor));
@@ -85,13 +87,31 @@ public final class PlayerCampaignProjection {
         requireMember(access.snapshot().domains(), member);
         if (root.actor().kind() != ActorKind.PLAYER || !member.equals(root.actor().memberId()))
             throw new StorageException("PLAYER_REQUEST_UNAVAILABLE", "Request is unavailable");
-        boolean waiting = root.combatId() != null && access.snapshot().domains().combats().stream()
+        var event = root.combatId() == null ? null : access.snapshot().domains().combats().stream()
                 .filter(c -> c.current().combatId().equals(root.combatId())).flatMap(c -> c.events().stream())
-                .filter(e -> e.operationId().equals(root.operationId())).anyMatch(e -> e.after().activeFlow() != null);
+                .filter(e -> e.operationId().equals(root.operationId())).findFirst().orElse(null);
+        boolean waiting = event != null && event.after().activeFlow() != null;
         JsonObject result = new JsonObject(); result.addProperty("state", "ACCEPTED");
         result.addProperty("outcome", waiting ? "WAITING" : "COMPLETED");
         result.addProperty("label", waiting ? "操作已接受，当时正在等待后续决定" : "操作已完成");
+        if (event != null && event.command().kind() == Schema2CombatState.Kind.ATTACK
+                && event.command().actorId().equals(root.actor().characterId())) addMonsterAttackResult(result, event);
         return result;
+    }
+
+    private static void addMonsterAttackResult(JsonObject receipt, Schema2CombatHistory.Event event) {
+        var target = event.after().monsters().stream().filter(m -> m.monsterId().equals(event.command().targetId()))
+                .findFirst().orElse(null);
+        if (target == null) return;
+        // An ordinary ATTACK starts a new flow. Its root frame identifies this strike even if a reaction is pending.
+        var flow = event.after().flows().getLast();
+        var attack = flow.attacks().stream().filter(a -> a.frameKey().equals(flow.rootFrameKey())).findFirst().orElseThrow();
+        if (attack.status() != Schema2CombatState.AttackStatus.RESOLVED) return;
+        JsonObject result = new JsonObject();
+        result.addProperty("hit", attack.hit());
+        result.addProperty("damage", attack.damageAmount());
+        result.addProperty("dropped", attack.hit() && target.dead());
+        receipt.add("attackResult", result);
     }
 
     static void requireMember(CampaignDomainData.State state, UUID member) {
@@ -111,7 +131,17 @@ public final class PlayerCampaignProjection {
         return Collections.unmodifiableSet(ids);
     }
     static boolean shared(CampaignDomainData.State state, UUID member, ShareKind kind, UUID subject) {
-        return state.participation().shares().stream().anyMatch(s -> s.kind() == kind && s.active() && s.subjectId().equals(subject) && s.audience().includes(member));
+        return state.participation().shared(member, kind, subject);
+    }
+    static Set<UUID> visibleMonsters(CampaignDomainData.State state, UUID member, UUID sceneId) {
+        return CampaignParticipationCommands.visibleMonsters(state, member, sceneId);
+    }
+    private static String participantName(CampaignDomainData.State state, Set<UUID> monsters, UUID id) {
+        return monsters.contains(id) ? monsterName(state, id) : characterName(state, id);
+    }
+    static String monsterName(CampaignDomainData.State state, UUID id) {
+        return state.space().monsters().stream().filter(monster -> monster.id().equals(id)).map(CampaignSpaceData.Monster::name)
+                .findFirst().orElseThrow(() -> CampaignJson.bad("Unknown campaign monster"));
     }
     static String characterName(CampaignDomainData.State state, UUID id) {
         return state.characters().stream().filter(c -> c.id().equals(id)).map(CampaignDomainData.Character::name).findFirst()

@@ -130,8 +130,17 @@
   }
   function renderShareSubjects() {
     const form=$('host-player-share-form'), kind=form.elements.kind.value;
-    const choices=kind==='CHARACTER' ? cards() : kind==='SCENE' ? [...(domain()?.nodes || []), ...(domain()?.space.scenes || [])] : hostView?.campaign ? [{id:hostView.campaign.campaignId,name:'持续共享获准的行动记录'}] : [];
-    selectOptions(form.elements.subjectId,choices,value=>value.name);
+    const campaign = hostView?.campaign;
+    const space = domain()?.space;
+    let choices = [];
+    switch (kind) {
+      case 'CHARACTER': choices = cards(); break;
+      case 'SCENE': choices = [...(domain()?.nodes || []), ...(space?.scenes || [])]; break;
+      case 'MONSTER': choices = space?.monsters || []; break;
+      case 'LOG': if (campaign) choices = [{id:campaign.campaignId,name:'持续共享获准的行动记录'}]; break;
+    }
+    selectOptions(form.elements.subjectId, choices, value => kind === 'MONSTER' ? `${value.name} · ${value.id.slice(0, 8)}` : value.name);
+    $('host-player-monster-share-note').hidden = kind !== 'MONSTER';
     renderSharePolicy();
   }
   function renderSharePolicy() {

@@ -288,17 +288,25 @@ class CampaignWolfBiteIntegrationTest {
             assertEquals("1", variant.releaseVersion());
             artifacts.add(variant);
         }
-        var library = fixture.service.ruleLibrary();
+        createWithRules(fixture.service, "狼啮咬验收", artifacts);
+    }
+
+    static void createWithDeliveredRules(CampaignStorageService service, String name) throws IOException {
+        createWithRules(service, name, standardArtifacts(null));
+    }
+
+    private static void createWithRules(CampaignStorageService service, String name, List<ProductionRuleArtifact> artifacts) {
+        var library = service.ruleLibrary();
         var members = artifacts.stream().map(artifact -> {
             var member = library.importArtifact(id(), artifact.originalZip()).imported().member();
             assertEquals(BundledRuleManifest.Entry.from(artifact).member(), member);
             library.accept(id(), member, LocalRuleLibrary.REVIEW_PROTOCOL, "local-dm");
             return member;
         }).toList();
-        var preview = fixture.service.previewRules(members);
+        var preview = service.previewRules(members);
         assertEquals(members, preview.binding().members());
-        fixture.service.create("狼啮咬验收", members);
-        assertEquals(preview.binding(), fixture.state().material().binding());
+        service.create(name, members);
+        assertEquals(preview.binding(), service.accessSnapshot().snapshot().domains().material().binding());
     }
 
     private static List<ProductionRuleArtifact> standardArtifacts(String warPath) throws IOException {

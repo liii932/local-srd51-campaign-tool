@@ -78,6 +78,7 @@ class PlayerProjectionAndCandidatesTest {
             var access = service.accessSnapshot(); var offered = choices.candidates(access,member);
             assertTrue(offered.stream().anyMatch(c -> c.label().equals("结束我的回合")));
             assertFalse(offered.stream().anyMatch(c -> c.label().contains("隐藏守卫")));
+            assertFalse(offered.stream().anyMatch(c -> c.label().equals("向北移动一格")));
             var move = offered.stream().filter(c -> c.label().equals("向西移动一格")).findFirst().orElseThrow();
             String request = UUID.randomUUID().toString();
             service.domainCommand(request,access.epoch(),access.revision(),move.action(),move.input(),Actor.player(member,pc),current -> { });
@@ -103,6 +104,40 @@ class PlayerProjectionAndCandidatesTest {
             assertNull(battle(service).activeFlow());
             assertEquals("WAITING",projection.receipt(service.accessSnapshot(),member,root).get("outcome").getAsString(),"receipt describes the original acceptance, never today's flow");
             assertNoPrivateKeys(projection.project(service.accessSnapshot(),member));
+        }
+    }
+
+    @Test void combatMovementPreviewUsesSharedBoundsKnownOccupancyAndTheActorsBudget() throws Exception {
+        try (var service = create("movement-preview")) {
+            UUID pc = character(service, "玩家战士", "PC"), npc = character(service, "场景守卫", "NPC");
+            UUID player = member(service, "玩家");
+            assign(service, pc, player);
+            UUID anchor = PlayerSpaceFixture.placeAtWorld(service, pc, npc);
+            var created = command(service, "scene-create", json("name", "靠近边界", "nodeId", anchor.toString(),
+                    "width", "10", "height", "201", "resolution", "RULES"));
+            UUID scene = UUID.fromString(created.lastCommand().requestId());
+            var placements = new JsonArray();
+            placements.add(json("id", pc.toString(), "version", "0", "x", "9", "y", "200", "side", "0"));
+            placements.add(json("id", npc.toString(), "version", "0", "x", "8", "y", "200", "side", "1"));
+            var enter = json("sceneId", scene.toString());
+            enter.add("subjects", placements);
+            command(service, "scene-enter", enter);
+            combat(service, battle(service), Command.reenter(pc, List.of(pc, npc)));
+            if (battle(service).activeActor().equals(npc)) combat(service, battle(service), Command.action(Kind.END_TURN, npc));
+
+            assertFalse(labels(service, player).contains("向南移动一格"));
+            assertTrue(labels(service, player).contains("向东移动一格"));
+            share(service, player, ShareKind.SCENE, scene);
+            assertFalse(labels(service, player).contains("向东移动一格"));
+            assertTrue(labels(service, player).contains("向西移动一格"));
+            share(service, player, ShareKind.CHARACTER, npc);
+            assertFalse(labels(service, player).contains("向西移动一格"));
+
+            for (int y = 199; y >= 194; y--) {
+                assertTrue(labels(service, player).contains("向北移动一格"));
+                combat(service, battle(service), Command.move(pc, List.of(new Position(9, y))));
+            }
+            assertTrue(labels(service, player).stream().noneMatch(label -> label.endsWith("移动一格")));
         }
     }
 
@@ -199,6 +234,18 @@ class PlayerProjectionAndCandidatesTest {
     private static UUID character(CampaignStorageService service,String name,String kind) { command(service,"character-create",json("name",name,"kind",kind,"classKey","fighter","backgroundKey","acolyte")); return service.accessSnapshot().snapshot().domains().characters().stream().filter(c->c.name().equals(name)).findFirst().orElseThrow().id(); }
     private static UUID member(CampaignStorageService service,String name) { var v=command(service,"member-add",json("name",name)); return UUID.fromString(v.lastCommand().requestId()); }
     private static void assign(CampaignStorageService service,UUID pc,UUID member) { command(service,"control-set",json("characterId",pc.toString(),"memberId",member.toString(),"controlVersion","0")); }
+    private static void share(CampaignStorageService service, UUID player, ShareKind kind, UUID subject) {
+        JsonObject share = json("shareVersion", "0", "kind", kind.name(), "subjectId", subject.toString());
+        share.add("shareId", JsonNull.INSTANCE);
+        share.addProperty("active", true);
+        share.add("audience", CampaignDomainCodec.toJson(new Audience(AudienceKind.SPECIFIC, List.of(player))));
+        command(service, "share-set", share);
+    }
+    private static Set<String> labels(CampaignStorageService service, UUID player) {
+        Set<String> result = new HashSet<>();
+        PlayerCandidateFactory.candidates(service.accessSnapshot(), player).forEach(choice -> result.add(choice.label()));
+        return result;
+    }
     private static void permit(CampaignStorageService service,UUID pc,UUID node) { JsonObject p=json("characterId",pc.toString(),"permissionVersion","0","sceneId",node.toString());p.addProperty("active",true);JsonArray actions=new JsonArray();actions.add("CHARACTER_COMMAND");p.add("actions",actions);command(service,"exploration-set",p); }
     private static void acquire(CampaignStorageService service,UUID id) { var c=new Schema2CharacterRuntime.Command("ITEM_ACQUIRED",null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,null,new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(),CampaignRuleFixtures.rules().rule("equipment.item","item.longsword"),"CARRIED","主持人准备装备"),null); characterCommand(service,id,c); }
     private static void equip(CampaignStorageService service,UUID id) { acquire(service,id);var item=service.accessSnapshot().snapshot().domains().characters().stream().filter(c->c.id().equals(id)).findFirst().orElseThrow().history().current().equipment().getFirst(); characterCommand(service,id,new Schema2CharacterRuntime.Command("ITEM_EQUIPPED",null,0,null,null,null,Schema2CharacterRuntime.GrowthChoices.EMPTY,null,null,new Schema2CharacterRuntime.EquipmentInput(item.itemId(),null,"MAIN_HAND","准备武器"),null)); }

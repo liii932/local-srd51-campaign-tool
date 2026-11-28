@@ -50,6 +50,92 @@ class CampaignParticipationIntegrationTest {
         }
     }
 
+    @Test void monsterRevealsFollowTheirExactAudienceAndSceneThroughReopen() throws Exception {
+        int[] draws = {0};
+        try (var storage = new CampaignStorageService(temporary.resolve("monster-reveals"), ignored -> { }, sides -> {
+            draws[0]++;
+            return Math.min(sides, 10);
+        })) {
+            CampaignRuleFixtures.create(storage, "两只地狱犬");
+            send(storage, "character-create", object("name", "战士", "kind", "PC", "classKey", "fighter", "backgroundKey", "acolyte"));
+            UUID pc = storage.accessSnapshot().snapshot().domains().characters().getFirst().id();
+            UUID first = member(storage, "甲"), second = member(storage, "乙");
+            control(storage, pc, first, 0);
+            UUID world = PlayerSpaceFixture.placeAtWorld(storage, pc);
+            send(storage, "character-command", characterInput(storage.accessSnapshot().snapshot().domains(), pc, acquire()));
+            var equipped = storage.accessSnapshot().snapshot().domains();
+            UUID sword = equipped.roots().getLast().operationId();
+            send(storage, "character-command", characterInput(equipped, pc, equipCommand(sword)));
+            UUID firstHound = createHellHound(storage, "灰耳"), secondHound = createHellHound(storage, "白足");
+            UUID scene = enterMonsterScene(storage, world, List.of(pc, firstHound, secondHound));
+
+            var firstAudience = new Audience(AudienceKind.SPECIFIC, List.of(first));
+            var secondAudience = new Audience(AudienceKind.SPECIFIC, List.of(second));
+            var all = new Audience(AudienceKind.ALL, List.of());
+            var reveal = setShare(storage, null, ShareKind.MONSTER, firstHound, firstAudience, true);
+            setShare(storage, null, ShareKind.MONSTER, secondHound, secondAudience, true);
+            var unshared = storage.accessSnapshot();
+            assertEquals(Set.of(), PlayerCampaignProjection.visibleMonsters(unshared.snapshot().domains(), first, scene));
+            assertTrue(PlayerCampaignProjection.project(unshared, first).getAsJsonObject("shared").getAsJsonArray("scenes").isEmpty());
+
+            assertEquals("STALE_PARTICIPATION", assertThrows(StorageException.class,
+                    () -> setShare(storage, null, ShareKind.MONSTER, firstHound, all, true)).code());
+            assertThrows(StorageException.class, () -> setShare(storage, reveal, ShareKind.CHARACTER, pc, firstAudience, true));
+            assertThrows(StorageException.class, () -> setShare(storage, null, ShareKind.MONSTER, pc, firstAudience, true));
+            assertThrows(StorageException.class, () -> control(storage, firstHound, first, 0));
+            assertEquals(unshared.snapshot(), storage.accessSnapshot().snapshot());
+
+            var scenePolicy = setShare(storage, null, ShareKind.SCENE, scene, all, true);
+            advanceTo(storage, firstHound);
+            var visible = storage.accessSnapshot();
+            assertEquals(Set.of(firstHound), PlayerCampaignProjection.visibleMonsters(visible.snapshot().domains(), first, scene));
+            assertEquals(Set.of(secondHound), PlayerCampaignProjection.visibleMonsters(visible.snapshot().domains(), second, scene));
+            var firstScene = PlayerCampaignProjection.project(visible, first).getAsJsonObject("shared");
+            var secondScene = PlayerCampaignProjection.project(visible, second).getAsJsonObject("shared");
+            assertTrue(firstScene.getAsJsonArray("cards").isEmpty());
+            assertTrue(secondScene.getAsJsonArray("cards").isEmpty());
+            var firstView = firstScene.getAsJsonArray("scenes").get(0).getAsJsonObject();
+            var secondView = secondScene.getAsJsonArray("scenes").get(0).getAsJsonObject();
+            assertEquals("灰耳的回合", firstView.get("turnLabel").getAsString());
+            assertEquals("等待其他行动者", secondView.get("turnLabel").getAsString());
+            List<String> firstOrder = monsterBattle(storage).initiative().stream().map(Schema2CombatState.Initiative::characterId)
+                    .filter(id -> !id.equals(secondHound)).map(id -> id.equals(firstHound) ? "灰耳" : "战士").toList();
+            assertEquals(firstOrder, firstView.getAsJsonArray("participants").asList().stream()
+                    .map(p -> p.getAsJsonObject().get("name").getAsString()).toList());
+            var secondParticipants = secondView.getAsJsonArray("participants");
+            assertEquals(1, secondParticipants.size());
+            var otherHound = secondParticipants.get(0).getAsJsonObject();
+            assertEquals("白足", otherHound.get("name").getAsString());
+            assertEquals("1, 1", otherHound.get("position").getAsString());
+            assertEquals(Set.of("name", "position", "current"), otherHound.keySet());
+
+            advanceTo(storage, pc);
+            PlayerSpaceFixture.combat(storage, monsterBattle(storage), Schema2CombatState.Command.action(Schema2CombatState.Kind.BEGIN_ATTACK, pc));
+            int beforeDraws = draws[0];
+            var beforeAttack = storage.accessSnapshot();
+            assertEquals("PLAYER_COMMAND_FORBIDDEN", assertThrows(StorageException.class,
+                    () -> attackAsPlayer(storage, pc, first, secondHound, sword)).code());
+            assertEquals(beforeAttack.snapshot(), storage.accessSnapshot().snapshot());
+            scenePolicy = setShare(storage, scenePolicy, ShareKind.SCENE, scene, all, false);
+            assertEquals("PLAYER_COMMAND_FORBIDDEN", assertThrows(StorageException.class,
+                    () -> attackAsPlayer(storage, pc, first, firstHound, sword)).code());
+            assertEquals(beforeDraws, draws[0]);
+            setShare(storage, scenePolicy, ShareKind.SCENE, scene, all, true);
+            attackAsPlayer(storage, pc, first, firstHound, sword);
+            assertTrue(draws[0] > beforeDraws);
+            assertEquals(Actor.player(first, pc), storage.accessSnapshot().snapshot().domains().roots().getLast().actor());
+
+            setShare(storage, reveal, ShareKind.MONSTER, firstHound, firstAudience, false);
+            var complete = storage.accessSnapshot();
+            String file = storage.end(uuid(), complete.epoch(), complete.revision()).fileKey();
+            storage.open(file);
+            var reopened = storage.accessSnapshot();
+            assertEquals(complete.snapshot(), reopened.snapshot());
+            assertEquals(Set.of(), PlayerCampaignProjection.visibleMonsters(reopened.snapshot().domains(), first, scene));
+            assertEquals(Set.of(secondHound), PlayerCampaignProjection.visibleMonsters(reopened.snapshot().domains(), second, scene));
+        }
+    }
+
     @Test void guardPrecedesReplayAndReceiptLookupIsReadOnlyAndBindsExactActor() throws Exception {
         try (var storage = new CampaignStorageService(temporary.resolve("guard"))) {
             CampaignRuleFixtures.create(storage, "串行授权");
@@ -293,6 +379,61 @@ class CampaignParticipationIntegrationTest {
         input.add("actions", actions);
         input.addProperty("active", true);
         return input;
+    }
+    private static UUID createHellHound(CampaignStorageService storage, String name) {
+        var input = object("name", name);
+        input.add("monster", CampaignDomainCodec.toJson(CampaignRuleFixtures.rules().rule("adventure.monster", "monster.hell_hound")));
+        send(storage, "monster-create", input);
+        return storage.accessSnapshot().snapshot().domains().roots().getLast().subjectId();
+    }
+    private static UUID enterMonsterScene(CampaignStorageService storage, UUID world, List<UUID> actors) {
+        send(storage, "scene-create", object("name", "练习场", "nodeId", world.toString(), "width", "5", "height", "5", "resolution", "RULES"));
+        var state = storage.accessSnapshot().snapshot().domains();
+        UUID scene = state.roots().getLast().subjectId();
+        List<Schema2CombatState.Position> cells = List.of(new Schema2CombatState.Position(1, 0),
+                new Schema2CombatState.Position(2, 0), new Schema2CombatState.Position(1, 1));
+        var subjects = new JsonArray();
+        for (int i = 0; i < actors.size(); i++) {
+            UUID actor = actors.get(i);
+            var placement = CampaignSpaceCommands.position(state, actor);
+            var cell = cells.get(i);
+            subjects.add(object("id", actor.toString(), "version", Long.toString(placement.version()),
+                    "x", Integer.toString(cell.x()), "y", Integer.toString(cell.y()), "side", i == 0 ? "0" : "1"));
+        }
+        var input = object("sceneId", scene.toString());
+        input.add("subjects", subjects);
+        send(storage, "scene-enter", input);
+        PlayerSpaceFixture.combat(storage, monsterBattle(storage), Schema2CombatState.Command.reenter(actors.getFirst(), actors));
+        return scene;
+    }
+    private static Share setShare(CampaignStorageService storage, Share previous, ShareKind kind, UUID subject, Audience audience, boolean active) {
+        var input = object("shareVersion", Long.toString(previous == null ? 0 : previous.version()), "kind", kind.name(), "subjectId", subject.toString());
+        input.add("shareId", previous == null ? JsonNull.INSTANCE : new JsonPrimitive(previous.id().toString()));
+        input.add("audience", CampaignDomainCodec.toJson(audience));
+        input.addProperty("active", active);
+        send(storage, "share-set", input);
+        return storage.accessSnapshot().snapshot().domains().participation().shares().stream()
+                .filter(share -> share.kind() == kind && share.subjectId().equals(subject)).findFirst().orElseThrow();
+    }
+    private static Schema2CombatState.Battle monsterBattle(CampaignStorageService storage) {
+        return CampaignSpaceCommands.currentBattle(storage.accessSnapshot().snapshot().domains()).current();
+    }
+    private static void advanceTo(CampaignStorageService storage, UUID actor) {
+        var battle = monsterBattle(storage);
+        for (int i = 0; i < battle.initiative().size() && !battle.activeActor().equals(actor); i++) {
+            PlayerSpaceFixture.combat(storage, battle, Schema2CombatState.Command.action(Schema2CombatState.Kind.END_TURN, battle.activeActor()));
+            battle = monsterBattle(storage);
+        }
+        assertEquals(actor, battle.activeActor());
+    }
+    private static void attackAsPlayer(CampaignStorageService storage, UUID pc, UUID member, UUID target, UUID item) {
+        var access = storage.accessSnapshot();
+        var state = access.snapshot().domains();
+        var battle = CampaignSpaceCommands.currentBattle(state).current();
+        var input = object("combatId", battle.combatId().toString(), "combatVersion", Long.toString(battle.version()));
+        input.add("command", CampaignDomainCodec.toJson(Schema2CombatState.Command.attack(pc, target, item)));
+        storage.domainCommand(uuid(), access.epoch(), access.revision(), "combat-command", CampaignSpaceFixtures.focused(state, input),
+                Actor.player(member, pc), ignored -> { });
     }
     private static CampaignData.Snapshot snapshot(String id, CampaignDomainData.State state) { return new CampaignData.Snapshot(id, "玩家参与", state); }
     private static UUID manual(CampaignStorageService s, String name, String kind) { send(s, "manual-create", object("name", name, "kind", kind, "template", "blank")); return s.accessSnapshot().snapshot().domains().manual().characters().stream().filter(c -> c.current().name().equals(name)).findFirst().orElseThrow().id(); }

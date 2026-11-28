@@ -9,6 +9,7 @@ import com.dndtool.service.Schema2MeleeControlRules;
 import com.google.gson.*;
 import java.util.*;
 import java.util.function.IntUnaryOperator;
+import java.util.function.Predicate;
 import static com.dndtool.service.storage.CampaignDomainData.*;
 import com.dndtool.service.storage.CampaignDomainData.Character;
 
@@ -212,7 +213,12 @@ public final class CampaignDomainCommands {
         return new UUID((value.getMostSignificantBits() & ~0xf000L) | 0x4000L, (value.getLeastSignificantBits() & 0x3fffffffffffffffL) | 0x8000000000000000L);
     }
     static void preflightGrid(State state, Schema2CombatState.Command command) {
-        var ref = state.space().focus().space(); var scene = state.space().scene(ref.id());
+        preflightGrid(state, command, true, subject -> true);
+    }
+    static void preflightGrid(State state, Schema2CombatState.Command command, boolean knownBounds,
+            Predicate<UUID> knownOccupant) {
+        var ref = state.space().focus().space();
+        var scene = knownBounds ? state.space().scene(ref.id()) : null;
         List<Schema2CombatState.Position> path = command.path();
         if (command.kind() == Schema2CombatState.Kind.READY_MOVE && command.readyInput() != null)
             path = command.readyInput().path();
@@ -229,24 +235,26 @@ public final class CampaignDomainCommands {
             var battle = CampaignSpaceCommands.currentBattle(state).current();
             var relation = Schema2MeleeControlRules.activeGrapple(battle, command.actorId(), drag.grappleKey());
             if (relation != null) movers.add(relation.targetId());
-            checkScenePath(state, scene, ref, movers, drag.path());
+            checkScenePath(state, scene, ref, movers, drag.path(), knownOccupant);
         }
-        checkScenePath(state, scene, ref, movers, path);
+        checkScenePath(state, scene, ref, movers, path, knownOccupant);
         if (command.kind() == Schema2CombatState.Kind.SHOVE_PUSH && command.meleeInput() != null
                 && command.meleeInput().destination() != null) {
-            checkScenePath(state, scene, ref, Set.of(), List.of(command.meleeInput().destination()));
+            checkScenePath(state, scene, ref, Set.of(), List.of(command.meleeInput().destination()), knownOccupant);
         }
-        boolean untyped = state.positions().stream().filter(p -> p.space().equals(ref)).anyMatch(p -> state.manual().characters().stream().anyMatch(c -> c.id().equals(p.characterId())));
+        boolean untyped = state.positions().stream().filter(p -> p.space().equals(ref) && knownOccupant.test(p.characterId()))
+                .anyMatch(p -> state.manual().characters().stream().anyMatch(c -> c.id().equals(p.characterId())));
         if (untyped && (command.kind() == Schema2CombatState.Kind.MONSTER_BREATH || command.castInput() != null && command.castInput().coneDirection() != null))
             throw new StorageException("SCENE_RULE_FACTS_REQUIRED", "Use DM adjudication for an area action involving untyped scene participants");
-        if (command.zoneInput() != null) CampaignSpaceCommands.checkCell(scene, command.zoneInput().center());
+        if (scene != null && command.zoneInput() != null) CampaignSpaceCommands.checkCell(scene, command.zoneInput().center());
     }
     private static void checkScenePath(State state, CampaignSpaceData.Scene scene, CampaignSpaceData.Ref ref,
-            Set<UUID> movers, List<Schema2CombatState.Position> path) {
+            Set<UUID> movers, List<Schema2CombatState.Position> path, Predicate<UUID> knownOccupant) {
         for (var cell : path) {
-            CampaignSpaceCommands.checkCell(scene, cell);
+            if (scene == null) CampaignSpaceCommands.checkCampaignGridCell(cell);
+            else CampaignSpaceCommands.checkCell(scene, cell);
             if (state.positions().stream().anyMatch(p -> p.space().equals(ref)
-                    && !movers.contains(p.characterId()) && cell.equals(p.grid())))
+                    && !movers.contains(p.characterId()) && knownOccupant.test(p.characterId()) && cell.equals(p.grid())))
                 throw new StorageException("SCENE_CELL_OCCUPIED", "The complete scene occupancy blocks this path");
         }
     }
