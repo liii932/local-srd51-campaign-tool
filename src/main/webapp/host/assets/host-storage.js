@@ -144,6 +144,9 @@
     let manualCheckDraft = null;
     if (scope !== workspaceScope) {
       manualCheckDraft = resetManualCheck(workspaceScope === undefined ? scope : null);
+      const creation = byId('domain-create').elements;
+      creation.skillKeys.selectedIndex = -1;
+      creation.expertiseKeys.selectedIndex = -1;
       byId('domain-group-check').reset();
       byId('domain-contest-check').reset();
       workspaceScope = scope;
@@ -286,6 +289,25 @@
     style.disabled = styles.length === 0;
     style.parentElement.hidden = style.disabled;
     chooseCantrips(fields.cantripKeys, owner, owner?.cantripCounts?.[0] || 0, [], '已知戏法', 'create');
+    refreshRogueChoices();
+  }
+  function refreshRogueChoices() {
+    const {classKey, skillKeys, expertiseKeys} = byId('domain-create').elements;
+    const rogue = domain()?.rules?.rogueCreation;
+    const active = rogue && ruleValue(rogue.owner) === classKey.value;
+    function update(select, values, count) {
+      const scope = JSON.stringify([workspaceScope, values]);
+      if (scope !== select.dataset.scope) {
+        options(select, values, value => ruleFromValue(value).name);
+        select.dataset.scope = scope;
+      }
+      select.disabled = !active;
+      select.parentElement.hidden = !active;
+      select.setCustomValidity(active && select.selectedOptions.length !== count ? `请选择 ${count} 项。` : '');
+    }
+    update(skillKeys, active ? rogue.skillOptions.map(ruleValue) : [], 4);
+    const selected = Array.from(skillKeys.selectedOptions, option => option.value);
+    update(expertiseKeys, active ? [...new Set([...selected, ...rogue.fixedSkills.map(ruleValue), ruleValue(rogue.thievesTools)])] : [], 2);
   }
   function refreshGrowthCantrips() {
     const form = byId('domain-growth'), character = selectedCharacter(form);
@@ -666,6 +688,7 @@
     const subject = input.subject === 'STONEWORK_ORIGIN' ? '（辨认石工作品来历）' : '';
     const proficiency = result.stonecunningRule
       ? `石工知识 ${result.baseProficiencyBonus} × ${result.proficiencyBonus / result.baseProficiencyBonus}`
+      : result.expertiseRule ? `专精 ${result.baseProficiencyBonus} × 2`
       : `熟练 ${result.proficiencyBonus}`;
     const passive = event.command.kind === 'PASSIVE_CHECK_RESOLVED';
     const base = passive ? `被动基础分 ${result.passiveBaseScore}` : `d20 ${result.selectedD20}`;
@@ -785,6 +808,8 @@
     text(card, 'p', `装备：${(current.equipment || []).map(item => `${ruleName(item.item)}（${locationName(item.location)}）`).join('；') || '无'}`);
     text(card, 'p', `特性：${(current.features || []).map(feature => ruleName(feature.feature)).join('；') || '无'}`);
     text(card, 'p', `熟练：${(current.proficiencies || []).map(proficiency => ruleName(proficiency.target)).join('；') || '无'}`);
+    if (character.expertise?.length)
+      text(card, 'p', '专精：' + character.expertise.map(entry => `${entry.name}（熟练贡献 +${entry.proficiencyContribution}）`).join('、'));
     if (current.rest?.active) text(card, 'p', `休息中：${current.rest.active.kind || current.rest.active.restKind} · ${current.rest.active.phase}`);
     if (current.knownCantrips.length) {
       const known = current.knownCantrips.map(entry => ruleName(entry.spell) + '（' + ruleName(entry.characterClass)
@@ -855,6 +880,7 @@
   }
   const coverNames = {NONE: '无掩护', HALF: '半掩护（AC +2）', THREE_QUARTERS: '四分之三掩护（AC +5）', TOTAL: '全掩护'};
   const observationActions = {HIDE: '躲藏', SEARCH: '搜索', NIMBLE_HIDE: '灵巧逃脱（躲藏）', NIMBLE_DISENGAGE: '灵巧逃脱（撤离）',
+    CUNNING_HIDE: '灵巧动作（躲藏）',
     START: '开场隐匿', REENTER_COMBAT: '开场隐匿'};
   function attackSight(attack) {
     const details = [];
@@ -1362,6 +1388,7 @@
     const actions = battle?.status === 'EXPLORATION' ? exploration : battle?.status === 'ACTIVE'
       ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT'
         && (kind !== 'ACTION_SURGE' || battleHistory(battle.combatId)?.actionSurgeAvailable)
+        && (!kind.startsWith('CUNNING_') || battleHistory(battle.combatId)?.cunningActions?.includes(kind))
         && (!kind.startsWith('NIMBLE_') || nimble) && (!surprised || ['END_TURN', 'END_COMBAT', 'END_CONCENTRATION'].includes(kind))) : [];
     options(form.elements.kind, actions, kind => combatActions.get(kind));
     form.elements.kind.disabled = actions.length === 0;
@@ -1393,9 +1420,10 @@
       : kind === 'REENTER_COMBAT' ? (battle.combatants.length < 2 ? '请先安排至少两名参与者进入场景。' : '按场景名册开始战斗，由规则判定受惊并掷先攻。')
       : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列。每次攻击可使用武器，或改为擒抱或推撞。'
       : kind === 'ATTACK' ? '选择目标和持用的武器。每击使用一次攻击额度，短弓须双手持用且每次射击消耗一支携带的箭。'
-      : kind === 'HIDE' || kind === 'NIMBLE_HIDE' ? '在允许躲藏的格位掷一次隐匿，分别与敌人的被动察觉比较。'
+      : ['HIDE', 'NIMBLE_HIDE', 'CUNNING_HIDE'].includes(kind) ? '在允许躲藏的格位掷一次隐匿，分别与敌人的被动察觉比较。'
       : kind === 'SEARCH' ? '花一次普通动作进行感知（察觉）检定，更新此行动者对隐藏敌人的观察。'
-      : kind === 'NIMBLE_DISENGAGE' ? '用一次附赠动作撤离，本回合移动可离开敌人的触及。'
+      : ['NIMBLE_DISENGAGE', 'CUNNING_DISENGAGE'].includes(kind) ? '用一次附赠动作撤离，本回合移动可离开敌人的触及。'
+      : kind === 'CUNNING_DASH' ? '用一次附赠动作疾走，本回合按当前速度增加移动力。'
       : replacement && (!sequence || sequence.closed) ? '请先开始攻击动作，再使用一次剩余攻击擒抱或推撞。'
       : replacement ? `本次替代第 ${sequence.performed + 1} 次攻击。目标须选择防御检定。${destination ? `推开目的格为 (${destination.x},${destination.y})。` : ''}`
       : escape ? (grapples.length ? '选择要挣脱的擒抱关系及检定。尝试会消耗一次动作。' : '该行动者当前未被擒抱。')
@@ -1717,7 +1745,12 @@
       accepted = true;
       if (body.savedFile) lastSaved = body.savedFile;
       preferredFile = body.savedFile || body.importedFile || null;
-      if (action === 'domain' && fields.action?.[0] === 'character-create') byId('domain-create').elements.fightingStyleKey.value = '';
+      if (action === 'domain' && fields.action?.[0] === 'character-create') {
+        const creation = byId('domain-create').elements;
+        creation.fightingStyleKey.value = '';
+        creation.skillKeys.selectedIndex = -1;
+        creation.expertiseKeys.selectedIndex = -1;
+      }
       if (action === 'domain' && fields.action?.[0] === 'manual-create' && body.commandResult?.subjectId) manualSelected = body.commandResult.subjectId;
       if (String(body.storage.epoch) !== String(epoch)) await load(preferredFile);
       else { view = body; render(preferredFile); }
@@ -1990,7 +2023,7 @@
   }
   function baseCharacter(kind) {
     return {type: 'character.Command', kind, resource: null, amount: '0', recoveryTrigger: null, hpChoice: null, targetClass: null,
-      growthChoices: {type: 'character.GrowthChoices', subclass: null, abilityIncreases: [], feat: null, proficiencyChoices: [], cantrips: [], fightingStyle: null},
+      growthChoices: {type: 'character.GrowthChoices', subclass: null, abilityIncreases: [], feat: null, proficiencyChoices: [], cantrips: [], fightingStyle: null, expertise: []},
       restInput: null, checkInput: null, equipmentInput: null, healthInput: null, combatInput: null, spellbookInput: null};
   }
   function domainForm(id, action, build) {
@@ -2013,6 +2046,8 @@
   const multipleRules = select => Array.from(select.selectedOptions, option => typedRule(option.value));
   byId('domain-create').elements.raceKey.addEventListener('change', refreshCreationSubraces);
   byId('domain-create').elements.classKey.addEventListener('change', refreshCreationClassChoices);
+  byId('domain-create').elements.skillKeys.addEventListener('change', refreshRogueChoices);
+  byId('domain-create').elements.expertiseKeys.addEventListener('change', refreshRogueChoices);
   byId('domain-growth').elements.class.addEventListener('change', refreshGrowthCantrips);
   for (const field of [byId('domain-create').elements.cantripKeys, byId('domain-growth').elements.newCantrips])
     field.addEventListener('change', () => validateCantripCount(field));
@@ -2020,11 +2055,15 @@
     raceKey: ruleFromValue(values.raceKey).key, classKey: ruleFromValue(values.classKey).key,
     backgroundKey: ruleFromValue(values.backgroundKey).key,
     ...(values.fightingStyleKey ? {fightingStyleKey: ruleFromValue(values.fightingStyleKey).key} : {}),
+    ...(!form.elements.skillKeys.disabled ? {
+      skillKeys: Array.from(form.elements.skillKeys.selectedOptions, option => ruleFromValue(option.value).key),
+      expertiseKeys: Array.from(form.elements.expertiseKeys.selectedOptions, option => ruleFromValue(option.value).key),
+    } : {}),
     cantripKeys: Array.from(form.elements.cantripKeys.selectedOptions, option => ruleFromValue(option.value).key),
     ...(values.subraceKey ? {subraceKey: ruleFromValue(values.subraceKey).key} : {})}));
   domainForm('domain-profile', 'character-profile', (_, values) => ({characterId: values.characterId, name: values.name, kind: values.kind, active: values.active === 'on'}));
   characterForm('domain-growth', (form, values) => ({...baseCharacter('CHARACTER_ADVANCED'), hpChoice: values.hpChoice, targetClass: typedRule(values.class),
-    growthChoices: {type: 'character.GrowthChoices', subclass: typedRule(values.subclass), feat: typedRule(values.feat), fightingStyle: null,
+    growthChoices: {type: 'character.GrowthChoices', subclass: typedRule(values.subclass), feat: typedRule(values.feat), fightingStyle: null, expertise: [],
       abilityIncreases: values.ability ? [[values.ability, '2']] : [], proficiencyChoices: [], cantrips: multipleRules(form.elements.newCantrips)}}));
   characterForm('domain-resource', (_, values) => ({...baseCharacter(values.kind),
     resource: values.kind === 'RESOURCE_SPENT' ? typedRule(values.resource) : null,

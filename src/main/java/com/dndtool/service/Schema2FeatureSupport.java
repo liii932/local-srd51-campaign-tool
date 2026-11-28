@@ -2,6 +2,7 @@ package com.dndtool.service;
 
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.service.Schema2CharacterRuntime.ClassLevel;
+import com.dndtool.service.Schema2CharacterRuntime.ProficiencyState;
 import com.dndtool.service.Schema2CharacterRuntime.State;
 import com.dndtool.service.Schema2CharacterRuntime.SubclassState;
 import java.util.ArrayList;
@@ -43,6 +44,30 @@ public final class Schema2FeatureSupport {
                 && material.projection().rules().stream().anyMatch(row -> row.identity().equals(fighter));
     }
 
+    public static boolean hasCunningAction(ProductionSchema2Projection material, State state) {
+        return validate(material, state, "S2_COMBAT_FEATURE_UNSUPPORTED").cunningAction();
+    }
+
+    public static RuleIdentity rogueExpertiseFeature(ProductionSchema2Projection material, RuleIdentity characterClass) {
+        return rogueFeature(material, characterClass, ROGUE_EXPERTISE_ALGORITHM, "S2_ROGUE_EXPERTISE_CHOICES");
+    }
+
+    public static boolean isRogueExpertiseTarget(ProductionSchema2Projection material, RuleIdentity target) {
+        return material.projection().rules().stream().anyMatch(row -> row.enabled() && row.identity().equals(target)
+                && (row instanceof FinalProficiency skill && skill.definition().category() == ProficiencyCategory.SKILL
+                    || row instanceof FinalTool tool && target.ruleKey().equals(ROGUE_THIEVES_TOOLS_KEY)
+                        && tool.definition().category() == ToolCategory.KIT && tool.definition().sourcePage() == 70));
+    }
+
+    static void requireRogueExpertiseTargets(ProductionSchema2Projection material, List<ProficiencyState> proficiencies,
+            List<RuleIdentity> targets, String code) {
+        if (targets.size() != 2 || targets.get(0).equals(targets.get(1))
+                || targets.stream().filter(target -> target.ruleType().equals("character.tool")).count() > 1
+                || targets.stream().anyMatch(target -> !isRogueExpertiseTarget(material, target)
+                    || proficiencies.stream().noneMatch(fact -> fact.target().equals(target) && fact.acquiredAtTotalLevel() == 1)))
+            throw new IllegalArgumentException(code);
+    }
+
     public static RuleIdentity fightingStyleOption(ProductionSchema2Projection material, RuleIdentity characterClass) {
         return fighterFeature(material, characterClass, FIGHTER_DEFENSE_ALGORITHM, "S2_GROWTH_FIGHTING_STYLE_CHOICE");
     }
@@ -52,10 +77,17 @@ public final class Schema2FeatureSupport {
     }
 
     private record SupportedFeatures(boolean extraAttack, boolean improvedCritical, RuleIdentity secondWindResource,
-            boolean defense, RuleIdentity actionSurgeResource) { }
+            boolean defense, RuleIdentity actionSurgeResource, boolean cunningAction) { }
 
     private static RuleIdentity fighterFeature(ProductionSchema2Projection material, RuleIdentity owner, String algorithm, String code) {
-        if (!owner.ruleKey().equals("class.fighter")) return null;
+        return owner.ruleKey().equals("class.fighter") ? classFeature(material, owner, algorithm, code) : null;
+    }
+
+    private static RuleIdentity rogueFeature(ProductionSchema2Projection material, RuleIdentity owner, String algorithm, String code) {
+        return owner.ruleKey().equals("class.rogue") ? classFeature(material, owner, algorithm, code) : null;
+    }
+
+    private static RuleIdentity classFeature(ProductionSchema2Projection material, RuleIdentity owner, String algorithm, String code) {
         var options = material.projection().rules().stream().filter(FinalFeature.class::isInstance)
                 .map(FinalFeature.class::cast).filter(row -> row.enabled() && row.definition().owner().equals(owner)
                         && algorithm.equals(row.definition().executionAlgorithm())).map(FinalFeature::identity).toList();
@@ -70,6 +102,13 @@ public final class Schema2FeatureSupport {
             throw new IllegalArgumentException(code);
     }
 
+    private static void requireSingleClassRogue(State state, FeatureDefinition feature, String code) {
+        if (!feature.owner().ruleKey().equals("class.rogue") || !feature.owner().equals(state.characterClass())
+                || !state.classes().equals(List.of(new ClassLevel(feature.owner(), state.level())))
+                || state.level() < feature.level() || state.level() > 2)
+            throw new IllegalArgumentException(code);
+    }
+
     private static SupportedFeatures validate(ProductionSchema2Projection material, State state, String code) {
         if (!state.feats().isEmpty()) throw new IllegalArgumentException(code);
         Set<RuleIdentity> seen = new HashSet<>();
@@ -79,6 +118,7 @@ public final class Schema2FeatureSupport {
         RuleIdentity secondWindResource = null;
         RuleIdentity defense = null;
         RuleIdentity actionSurgeResource = null;
+        RuleIdentity expertise = null, cunningAction = null;
         for (var acquired : state.features()) {
             if (!seen.add(acquired.feature())) throw new IllegalArgumentException(code);
             var definitions = material.projection().rules().stream()
@@ -87,9 +127,26 @@ public final class Schema2FeatureSupport {
             if (definitions.size() != 1) throw new IllegalArgumentException(code);
             var feature = definitions.getFirst().definition();
             if (feature.kind() != FeatureKind.FEATURE || !feature.owner().equals(acquired.owner())
-                    || feature.level() != acquired.acquiredAtClassLevel()) throw new IllegalArgumentException(code);
+                    || feature.level() != acquired.acquiredAtClassLevel()
+                    || !ROGUE_EXPERTISE_ALGORITHM.equals(feature.executionAlgorithm()) && !acquired.expertise().isEmpty())
+                throw new IllegalArgumentException(code);
 
             switch (feature.executionAlgorithm()) {
+                case ROGUE_EXPERTISE_ALGORITHM -> {
+                    requireSingleClassRogue(state, feature, code);
+                    if (expertise != null || feature.executionMode() != FeatureExecution.CHOICE
+                            || feature.level() != 1 || feature.sourcePage() != 39)
+                        throw new IllegalArgumentException(code);
+                    requireRogueExpertiseTargets(material, state.proficiencies(), acquired.expertise(), code);
+                    expertise = feature.identity();
+                }
+                case ROGUE_CUNNING_ACTION_ALGORITHM -> {
+                    requireSingleClassRogue(state, feature, code);
+                    if (cunningAction != null || feature.executionMode() != FeatureExecution.AUTOMATIC
+                            || feature.level() != 2 || feature.sourcePage() != 40)
+                        throw new IllegalArgumentException(code);
+                    cunningAction = feature.identity();
+                }
                 case FIGHTER_DEFENSE_ALGORITHM -> {
                     requireSingleClassFighter(state, feature, code);
                     if (defense != null || feature.executionMode() != FeatureExecution.CHOICE
@@ -137,6 +194,11 @@ public final class Schema2FeatureSupport {
                 default -> throw new IllegalArgumentException(code);
             }
         }
+        RuleIdentity expectedExpertise = rogueFeature(material, state.characterClass(), ROGUE_EXPERTISE_ALGORITHM, code);
+        RuleIdentity expectedCunningAction = state.level() >= 2
+                ? rogueFeature(material, state.characterClass(), ROGUE_CUNNING_ACTION_ALGORITHM, code) : null;
+        if (!Objects.equals(expertise, expectedExpertise) || !Objects.equals(cunningAction, expectedCunningAction))
+            throw new IllegalArgumentException(code);
         if (!Objects.equals(defense, fighterFeature(material, state.characterClass(), FIGHTER_DEFENSE_ALGORITHM, code)))
             throw new IllegalArgumentException(code);
         boolean surgeExpected = state.level() >= 2
@@ -150,6 +212,7 @@ public final class Schema2FeatureSupport {
                 throw new IllegalArgumentException(code);
         }
         if (!castingFeatures.isEmpty()) Schema2SpellRules.requireSupportedCastingFeatures(material, state, castingFeatures, code);
-        return new SupportedFeatures(extraAttack, improvedCritical, secondWindResource, defense != null, actionSurgeResource);
+        return new SupportedFeatures(extraAttack, improvedCritical, secondWindResource, defense != null,
+                actionSurgeResource, cunningAction != null);
     }
 }

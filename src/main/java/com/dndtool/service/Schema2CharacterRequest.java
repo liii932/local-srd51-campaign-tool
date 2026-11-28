@@ -123,6 +123,11 @@ public record Schema2CharacterRequest(UUID operationId, Schema2PreparationIdenti
                 text(out, "S2_FIGHTING_STYLE_CHOICE_V1");
                 rule(out, choices.fightingStyle());
             }
+            if (!choices.expertise().isEmpty()) {
+                text(out, "S2_ROGUE_EXPERTISE_CHOICES_V1");
+                out.writeInt(choices.expertise().size());
+                for (RuleIdentity proficiency : choices.expertise()) rule(out, proficiency);
+            }
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException | NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }

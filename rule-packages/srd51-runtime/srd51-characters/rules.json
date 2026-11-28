@@ -139,6 +139,50 @@
     "identity": {
       "kind": "rule",
       "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.rogue"
+    },
+    "display_name": "Rogue (bounded application)",
+    "description": "Single-class Rogue at levels 1–2 with its starting proficiencies, Expertise and Cunning Action.",
+    "source_page": 39
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class_progression",
+      "rule_key": "progression.rogue"
+    },
+    "display_name": "Rogue bounded advancement",
+    "description": "Rogue d8 hit dice, starting proficiencies and single-class advancement through level 2.",
+    "source_page": 39,
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.rogue"
+    },
+    "hit_die_sides": 8,
+    "proficiency_bonus_profile": "1-4:2,5-8:3,9-12:4,13-16:5,17-20:6",
+    "supported_maximum_level": 2,
+    "advancement_scope": "CHARACTER_ADVANCEMENT",
+    "multiclass_prerequisite": {
+      "all_of": [
+        {
+          "any_of": [
+            {
+              "ability": "ability.dexterity",
+              "minimum": 13
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
       "rule_type": "character.subclass",
       "rule_key": "subclass.champion"
     },
@@ -272,6 +316,48 @@
     "feature_kind": "FEATURE",
     "execution_mode": "AUTOMATIC",
     "execution_algorithm": "SRD_2014_FIGHTER_EXTRA_ATTACK_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.rogue_expertise"
+    },
+    "display_name": "Expertise",
+    "description": "At Rogue level 1, choose two proficient skills or one proficient skill and thieves’ tools. Eligible checks with the chosen proficiencies double the proficiency bonus.",
+    "source_page": 39,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.rogue"
+    },
+    "level": 1,
+    "feature_kind": "FEATURE",
+    "execution_mode": "CHOICE",
+    "execution_algorithm": "SRD_2014_ROGUE_EXPERTISE_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.feature",
+      "rule_key": "feature.rogue_cunning_action"
+    },
+    "display_name": "Cunning Action",
+    "description": "At Rogue level 2, use the existing bonus action to Dash, Disengage or Hide on your active combat turn.",
+    "source_page": 40,
+    "owner": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.rogue"
+    },
+    "level": 2,
+    "feature_kind": "FEATURE",
+    "execution_mode": "AUTOMATIC",
+    "execution_algorithm": "SRD_2014_ROGUE_CUNNING_ACTION_V1"
   },
   {
     "identity": {
@@ -971,6 +1057,29 @@
       "module_key": "srd51_runtime",
       "rule_type": "character.tool",
       "rule_key": "tool.mason_tools"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.thieves_tools"
+    },
+    "display_name": "Thieves’ tools",
+    "description": "Tool item for the matching prepared-tool check. The one-hand location is the application’s preparation abstraction.",
+    "source_page": 70,
+    "kind": "TOOL",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 1,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.thieves_tools"
     },
     "algorithm": "SRD_2014_EQUIPMENT_V1"
   },

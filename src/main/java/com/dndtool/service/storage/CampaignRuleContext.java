@@ -12,6 +12,7 @@ import com.dndtool.service.Schema2PreparationIdentity;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,14 +25,22 @@ import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Read-only rule consumers share this verified campaign binding and frozen projection. */
 public final class CampaignRuleContext {
-    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V6";
-    static final List<String> INITIAL_CLASSES = List.of("fighter", "cleric", "wizard");
+    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V7";
     static final List<String> INITIAL_BACKGROUNDS = List.of("acolyte", "custom_artisan");
     private final ProductionSchema2Projection projection;
     private final Schema2RulesBinding binding;
     private final CheckDefinition checkDefinition;
     record CreationAncestry(RuleIdentity race, RuleIdentity subrace) { }
     private final List<CreationAncestry> creationAncestries;
+    private final RogueCreation rogueCreation;
+
+    public record RogueCreation(RuleIdentity owner, List<RuleIdentity> skillOptions, List<RuleIdentity> fixedSkills,
+            RuleIdentity thievesTools) {
+        public RogueCreation {
+            skillOptions = List.copyOf(skillOptions);
+            fixedSkills = List.copyOf(fixedSkills);
+        }
+    }
 
     CampaignRuleContext(ProductionSchema2Projection projection, CheckDefinition checkDefinition) {
         this.projection = projection;
@@ -48,6 +57,8 @@ public final class CampaignRuleContext {
             ancestries.add(new CreationAncestry(dwarf.identity(), hill.identity()));
         }
         this.creationAncestries = List.copyOf(ancestries);
+        var rogue = optionalSource("character.class", "class.rogue");
+        this.rogueCreation = rogue == null ? null : rogueCreation(rogue.identity());
     }
 
     public String interpretation() { return INTERPRETATION; }
@@ -56,6 +67,44 @@ public final class CampaignRuleContext {
     public RuleIdentity checkRule() { return checkDefinition.identity(); }
     CheckDefinition checkDefinition() { return checkDefinition; }
     List<CreationAncestry> creationAncestries() { return creationAncestries; }
+    List<String> initialClasses() {
+        return rogueCreation == null ? List.of("fighter", "cleric", "wizard") : List.of("fighter", "cleric", "wizard", "rogue");
+    }
+
+    private RuleIdentity progression(RuleIdentity owner) {
+        return projection.projection().rules().stream().filter(FinalClassProgression.class::isInstance)
+                .map(FinalClassProgression.class::cast).filter(FinalClassProgression::enabled)
+                .filter(row -> row.definition().ownerClass().equals(owner)).map(FinalRule::identity)
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("STORAGE_RULE_UNAVAILABLE"));
+    }
+
+    private RogueCreation rogueCreation(RuleIdentity owner) {
+        var progression = progression(owner);
+        var skills = slot(progression, "starting_proficiencies", "skills");
+        var grant = projection.projection().entries().stream().map(FinalEntry::entry).filter(entry -> entry.identity().equals(skills))
+                .map(GrowthProficiencyGrantEntry.class::cast).findFirst().orElseThrow().grant();
+        if (!(grant instanceof ChoiceGrowthGrant choice) || choice.count() != 4)
+            throw new IllegalArgumentException("S2_ROGUE_SKILL_CHOICES");
+        var options = projection.projection().entries().stream().filter(FinalEntry::enabled).map(FinalEntry::entry)
+                .filter(entry -> entry.identity().rule().equals(choice.candidates()))
+                .filter(ProficiencyMemberEntry.class::isInstance).map(ProficiencyMemberEntry.class::cast)
+                .map(ProficiencyMemberEntry::proficiency).toList();
+        var enabledSkills = projection.projection().rules().stream().filter(FinalRule::enabled)
+                .filter(FinalProficiency.class::isInstance).map(FinalProficiency.class::cast)
+                .filter(row -> row.definition().category() == ProficiencyCategory.SKILL).map(FinalRule::identity)
+                .collect(Collectors.toUnmodifiableSet());
+        var fixed = projection.projection().entries().stream().filter(FinalEntry::enabled).map(FinalEntry::entry)
+                .filter(entry -> entry.identity().rule().equals(progression) && entry.identity().collectionKey().equals("starting_proficiencies"))
+                .map(GrowthProficiencyGrantEntry.class::cast).map(GrowthProficiencyGrantEntry::grant)
+                .filter(FixedGrowthGrant.class::isInstance).map(FixedGrowthGrant.class::cast)
+                .map(FixedGrowthGrant::target).filter(enabledSkills::contains).distinct().toList();
+        var selectable = options.stream().filter(skill -> !fixed.contains(skill)).toList();
+        if (selectable.size() < choice.count() || !enabledSkills.containsAll(options)
+                || java.util.stream.Stream.concat(selectable.stream(), fixed.stream()).map(RuleIdentity::ruleKey).distinct().count()
+                        != selectable.size() + fixed.size())
+            throw new IllegalArgumentException("S2_ROGUE_SKILL_CHOICES");
+        return new RogueCreation(owner, selectable, fixed, rule("character.tool", ROGUE_THIEVES_TOOLS_KEY));
+    }
 
     private CharacterSourceDefinition optionalSource(String type, String key) {
         var matches = projection.projection().rules().stream()
@@ -126,31 +175,54 @@ public final class CampaignRuleContext {
     /** A supplied list names only spells. The selected class supplies the authoritative source. */
     public GrowthChoices initialChoices(String classKey, List<String> cantripKeys) {
         String chosen = classKey(classKey);
-        List<String> skills = switch (chosen) {
+        if (chosen.equals("rogue"))
+            return choices(chosen, cantripKeys, rogueCreation.skillOptions().subList(0, 4),
+                    List.of(rogueCreation.skillOptions().getFirst(), rogueCreation.thievesTools()));
+        var skills = switch (chosen) {
             case "fighter" -> List.of("athletics", "perception");
             case "cleric" -> List.of("history", "medicine");
             case "wizard" -> List.of("arcana", "investigation");
             default -> throw new IllegalArgumentException("STORAGE_CLASS_UNAVAILABLE");
         };
-        RuleIdentity startingClass = rule("character.class", "class." + chosen);
-        RuleIdentity owner = projection.projection().rules().stream().filter(FinalClassProgression.class::isInstance)
-                .map(FinalClassProgression.class::cast).filter(FinalClassProgression::enabled)
-                .filter(row -> row.definition().ownerClass().equals(startingClass)).map(FinalRule::identity)
-                .findFirst().orElseThrow(() -> new IllegalArgumentException("STORAGE_RULE_UNAVAILABLE"));
-        return new GrowthChoices(chosen.equals("cleric") ? rule("character.subclass", "subclass.life") : null,
-                Map.of(), null, Map.of(slot(owner, "starting_proficiencies", "skills"),
-                        skills.stream().map(skill -> rule("character.proficiency", "proficiency.skill." + skill)).toList()),
-                initialCantrips(startingClass, cantripKeys))
-                .withFightingStyle(Schema2FeatureSupport.fightingStyleOption(projection, startingClass));
+        return choices(chosen, cantripKeys, skills.stream().map(skill -> rule("character.proficiency", "proficiency.skill." + skill)).toList(), List.of());
     }
 
-    /** A Host creation request must name the enabled style selected for this class. */
-    GrowthChoices creationChoices(String classKey, List<String> cantripKeys, String fightingStyleKey) {
-        GrowthChoices choices = initialChoices(classKey, cantripKeys);
+    private GrowthChoices choices(String chosen, List<String> cantripKeys, List<RuleIdentity> skills, List<RuleIdentity> expertise) {
+        RuleIdentity startingClass = rule("character.class", "class." + chosen);
+        return new GrowthChoices(chosen.equals("cleric") ? rule("character.subclass", "subclass.life") : null,
+                Map.of(), null, Map.of(slot(progression(startingClass), "starting_proficiencies", "skills"), skills),
+                initialCantrips(startingClass, cantripKeys))
+                .withFightingStyle(Schema2FeatureSupport.fightingStyleOption(projection, startingClass)).withExpertise(expertise);
+    }
+
+    GrowthChoices creationChoices(String classKey, List<String> cantripKeys, String fightingStyleKey,
+            List<String> skillKeys, List<String> expertiseKeys) {
+        String chosen = classKey(classKey);
+        GrowthChoices choices;
+        if (chosen.equals("rogue")) {
+            var skills = selectedOptions(rogueCreation.skillOptions(), skillKeys, 4, "S2_ROGUE_SKILL_CHOICES");
+            var eligible = new LinkedHashSet<>(skills);
+            eligible.addAll(rogueCreation.fixedSkills());
+            eligible.add(rogueCreation.thievesTools());
+            choices = choices(chosen, cantripKeys, skills, selectedOptions(List.copyOf(eligible), expertiseKeys, 2, "S2_ROGUE_EXPERTISE_CHOICES"));
+        } else {
+            if (skillKeys != null || expertiseKeys != null) throw new IllegalArgumentException("S2_ROGUE_CHOICES_UNAVAILABLE");
+            choices = initialChoices(chosen, cantripKeys);
+        }
         RuleIdentity style = choices.fightingStyle();
         if (!Objects.equals(fightingStyleKey, style == null ? null : style.ruleKey()))
             throw new IllegalArgumentException("S2_FIGHTING_STYLE_CHOICE");
         return choices;
+    }
+
+    private static List<RuleIdentity> selectedOptions(List<RuleIdentity> pool, List<String> keys, int count, String error) {
+        if (keys == null || keys.size() != count || new HashSet<>(keys).size() != count)
+            throw new IllegalArgumentException(error);
+        return keys.stream().map(key -> {
+            var matches = pool.stream().filter(candidate -> candidate.ruleKey().equals(key)).toList();
+            if (matches.size() != 1) throw new IllegalArgumentException(error);
+            return matches.getFirst();
+        }).toList();
     }
 
     private List<RuleIdentity> initialCantrips(RuleIdentity owner, List<String> keys) {
@@ -185,6 +257,8 @@ public final class CampaignRuleContext {
                     "ability.intelligence", 8, "ability.wisdom", 15, "ability.charisma", 12);
             case "wizard" -> Map.of("ability.strength", 8, "ability.dexterity", 14, "ability.constitution", 13,
                     "ability.intelligence", 15, "ability.wisdom", 12, "ability.charisma", 10);
+            case "rogue" -> Map.of("ability.strength", 8, "ability.dexterity", 15, "ability.constitution", 14,
+                    "ability.intelligence", 13, "ability.wisdom", 12, "ability.charisma", 10);
             default -> throw new IllegalArgumentException("STORAGE_CLASS_UNAVAILABLE");
         };
     }
@@ -197,9 +271,9 @@ public final class CampaignRuleContext {
         return matches.getFirst();
     }
 
-    private static String classKey(String value) {
+    private String classKey(String value) {
         String key = value != null && value.startsWith("class.") ? value.substring(6) : value;
-        if (key == null || !INITIAL_CLASSES.contains(key))
+        if (key == null || !initialClasses().contains(key))
             throw new IllegalArgumentException("STORAGE_CLASS_UNAVAILABLE");
         return key;
     }
@@ -230,7 +304,7 @@ public final class CampaignRuleContext {
         }
     }
     public record Metadata(String displayName, String scope, String interpretation, Schema2RulesBinding binding,
-                           List<CatalogEntry> catalog, List<String> limitations) {
+                           List<CatalogEntry> catalog, RogueCreation rogueCreation, List<String> limitations) {
         public Metadata { catalog = List.copyOf(catalog); limitations = List.copyOf(limitations); }
     }
 
@@ -259,7 +333,7 @@ public final class CampaignRuleContext {
                 .filter(FinalClassProgression.class::isInstance).map(FinalClassProgression.class::cast)
                 .map(FinalClassProgression::definition).collect(Collectors.toUnmodifiableMap(
                         ClassProgressionDefinition::ownerClass, ClassProgressionDefinition::supportedMaximumLevel));
-        for (String key : INITIAL_CLASSES) {
+        for (String key : initialClasses()) {
             var owner = rule("character.class", "class." + key);
             var profile = projection.classCantrips(owner).orElse(null);
             cantripCounts.put(owner, IntStream.rangeClosed(1, classProgressions.get(owner))
@@ -293,7 +367,7 @@ public final class CampaignRuleContext {
             boolean creationChoice = row.enabled() && switch (row.identity().ruleType()) {
                 case "character.race" -> creationAncestries.stream().anyMatch(a -> row.identity().equals(a.race()));
                 case "character.subrace" -> creationAncestries.stream().anyMatch(a -> row.identity().equals(a.subrace()));
-                case "character.class" -> INITIAL_CLASSES.stream().anyMatch(key -> row.identity().ruleKey().equals("class." + key));
+                case "character.class" -> initialClasses().stream().anyMatch(key -> row.identity().ruleKey().equals("class." + key));
                 case "character.background" -> INITIAL_BACKGROUNDS.stream().anyMatch(key -> row.identity().ruleKey().equals("background." + key));
                 case "character.feature" -> fightingStyle;
                 default -> false;
@@ -302,7 +376,8 @@ public final class CampaignRuleContext {
             boolean executable = row.enabled()
                     && !(definition instanceof SpellDefinition spell && spell.algorithm().contains("_METADATA_"))
                     && !(definition instanceof FeatureDefinition feature && (feature.kind() != FeatureKind.FEATURE
-                            || feature.executionMode() != FeatureExecution.AUTOMATIC && !fightingStyle))
+                            || feature.executionMode() != FeatureExecution.AUTOMATIC && !fightingStyle
+                            && !ROGUE_EXPERTISE_ALGORITHM.equals(feature.executionAlgorithm())))
                     && !(definition instanceof ResourceDefinition resource && resource.executionMode() == ResourceExecution.BLOCKED)
                     && !(definition instanceof FeatDefinition)
                     && !(Set.of("character.race", "character.subrace", "character.class", "character.background").contains(row.identity().ruleType()) && !creationChoice)
@@ -325,9 +400,9 @@ public final class CampaignRuleContext {
                             && monster.statBlock().traits().stream().anyMatch(trait -> trait.isNimbleEscape(row.identity()))));
         }
         return new Metadata("SRD 5.1 finite current-application rules", "FINITE_APPLICATION_SCHEMA_2",
-                interpretation(), binding, catalog, List.of(
+                interpretation(), binding, catalog, rogueCreation, List.of(
                     "Standard-array application characters; racial ability increases and full racial traits are unavailable.",
-                    "Fighter levels 1–6, Life-domain cleric level 1, Wizard levels 1–5; this is not complete SRD class support.",
+                    "Class levels depend on the frozen progression: Fighter up to 6, Rogue up to 2, Life-domain cleric up to 1 and Wizard up to 5.",
                     "A fighter choosing Defense gains +1 AC while wearing armor. From level 2, Action Surge grants one additional action on the fighter's turn per completed short or long rest.",
                     "An acquired Fighter Extra Attack allows up to two weapon attacks within the Attack action on that fighter's turn.",
                     "An acquired Fighter Second Wind spends its own use as a bonus action on that fighter's active turn and heals 1d10 plus Fighter level.",

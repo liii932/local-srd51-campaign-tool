@@ -159,7 +159,8 @@ public final class CampaignParticipationCommands {
         var battle = current.current();
         boolean sharedScene = state.participation().shared(actor.memberId(), ShareKind.SCENE, battle.combatId());
         if (command.kind() == Schema2CombatState.Kind.SET_OBSERVATION_CELL
-                || (command.kind() == Schema2CombatState.Kind.HIDE || command.kind() == Schema2CombatState.Kind.SEARCH) && !sharedScene)
+                || (command.kind() == Schema2CombatState.Kind.HIDE || command.kind() == Schema2CombatState.Kind.CUNNING_HIDE
+                    || command.kind() == Schema2CombatState.Kind.SEARCH) && !sharedScene)
             throw playerPermissionDenied();
         switch (command.kind()) {
             case DECLARE_COUNTERSPELL -> {
@@ -222,6 +223,7 @@ public final class CampaignParticipationCommands {
                 Schema2CombatState.Kind.GRAPPLE, Schema2CombatState.Kind.SHOVE_PRONE, Schema2CombatState.Kind.SHOVE_PUSH,
                 Schema2CombatState.Kind.ESCAPE_GRAPPLE, Schema2CombatState.Kind.RELEASE_GRAPPLE,
                 Schema2CombatState.Kind.SECOND_WIND, Schema2CombatState.Kind.ACTION_SURGE,
+                Schema2CombatState.Kind.CUNNING_DASH, Schema2CombatState.Kind.CUNNING_DISENGAGE, Schema2CombatState.Kind.CUNNING_HIDE,
                 Schema2CombatState.Kind.END_CONCENTRATION).contains(command.kind()))
             throw playerPermissionDenied();
     }

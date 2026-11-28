@@ -140,7 +140,15 @@ class Schema2CompositionParsingTest {
     @Test
     void n28AggregateDefinitionEntryAndChangeBudgetsApplyAcrossFiles() {
         var p=packages();var original=row(json(p,0,"rules.json"),0);var rows=new JsonArray();
-        for(int i=0;i<65;i++){var value=original.deepCopy();value.getAsJsonObject("identity").addProperty("rule_key","language.x"+i);rows.add(value);}put(p,0,"rules.json",rows);rejected("S2_BUDGET","PARSE",p);
+        var remaining = new JsonArray();
+        for (int i = 0; i < 81; i++) {
+            var value = original.deepCopy();
+            value.getAsJsonObject("identity").addProperty("rule_key", "language.x" + i);
+            (i < 40 ? rows : remaining).add(value);
+        }
+        put(p, 0, "rules.json", rows);
+        register(p, 0, "second-definitions.json", "definitions", remaining);
+        rejected("S2_BUDGET", "PARSE", p);
         p=packages();original=row(json(p,0,"members.json"),0);rows=new JsonArray();
         for(int i=0;i<129;i++){var value=original.deepCopy();value.getAsJsonObject("identity").addProperty("entry_key","x"+i);rows.add(value);}put(p,0,"members.json",rows);rejected("S2_BUDGET","PARSE",p);
         p=packages();original=row(json(p,1,"changes.json"),0);rows=new JsonArray();var second=new JsonArray();
@@ -150,7 +158,13 @@ class Schema2CompositionParsingTest {
     @Test
     void exactAggregateRowLimitsRemainReadable() {
         var p=packages();var definitions=json(p,0,"rules.json").getAsJsonArray();var template=definitions.get(0).getAsJsonObject();
-        for(int i=0;i<61;i++){var value=template.deepCopy();value.getAsJsonObject("identity").addProperty("rule_key","language.extra"+i);definitions.add(value);}put(p,0,"rules.json",definitions);reads(p);
+        for (int i = definitions.size(); i < 80; i++) {
+            var value = template.deepCopy();
+            value.getAsJsonObject("identity").addProperty("rule_key", "language.extra" + i);
+            definitions.add(value);
+        }
+        put(p, 0, "rules.json", definitions);
+        assertEquals(80, KERNEL.read(p.getFirst()).definitions().size());
         p=packages();var entry=row(json(p,0,"members.json"),0);var entries=new JsonArray();
         for(int i=0;i<128;i++){var value=entry.deepCopy();value.getAsJsonObject("identity").addProperty("entry_key","x"+i);entries.add(value);}put(p,0,"members.json",entries);reads(p);
         p=packages();var change=row(json(p,1,"changes.json"),0);var first=new JsonArray();var second=new JsonArray();

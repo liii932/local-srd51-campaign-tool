@@ -664,6 +664,7 @@ public final class Schema2CombatHistory {
         boolean checkAction = Schema2ObservationRules.checkAction(kind);
         require(current.checks().size() == prior.checks().size() + (checkAction ? 1 : 0)
                 && current.checks().subList(0, prior.checks().size()).equals(prior.checks()));
+        if (kind == Kind.CUNNING_DASH || kind == Kind.CUNNING_DISENGAGE) validateCunningMovement(event);
         if (!checkAction) return;
         ObservationCheck check = current.checks().getLast();
         UUID actorId = event.command().actorId();
@@ -672,12 +673,13 @@ public final class Schema2CombatHistory {
                 && event.resolution().healthChanges().isEmpty() && event.resolution().ammunitionUses().isEmpty());
         Combatant actor = member(before, actorId);
         require(actor.position().equals(check.position()));
-        boolean nimble = check.nimbleEscape();
-        require(nimble ? actor.bonusActionsRemaining() > 0 : actor.actionAvailable());
-        Combatant paid = nimble ? actor.spendBonusAction() : actor.spendAction();
+        boolean bonusAction = Schema2ObservationRules.paysBonusAction(kind);
+        require(bonusAction ? actor.bonusActionsRemaining() > 0 : actor.actionAvailable());
+        require(kind != Kind.CUNNING_HIDE || !before.surprised(actorId));
+        Combatant paid = bonusAction ? actor.spendBonusAction() : actor.spendAction();
         Combatant expected = kind == Kind.NIMBLE_DISENGAGE ? paid.withDisengaged() : paid;
         require(after.combatants().equals(before.combatants().stream().map(a -> a.equals(actor) ? expected : a).toList())
-                && event.resolution().facts().contains(new CombatFact(kind.name(), actorId, event.operationId(), nimble ? "BONUS_ACTION" : null)));
+                && event.resolution().facts().contains(new CombatFact(kind.name(), actorId, event.operationId(), bonusAction ? "BONUS_ACTION" : null)));
         List<Roll> rolls = new ArrayList<>();
         if (check.roll() != null) {
             String purpose = Schema2ObservationRules.hiding(kind) ? "OBSERVATION_STEALTH" : "OBSERVATION_PERCEPTION";
@@ -685,6 +687,30 @@ public final class Schema2CombatHistory {
             if (check.roll().secondD20() != null) rolls.add(new Roll(purpose + "_SECOND", actorId, 20, check.roll().secondD20()));
         }
         require(event.resolution().rolls().equals(rolls));
+    }
+
+    private static void validateCunningMovement(Event event) {
+        Battle before = event.before(), after = event.after();
+        UUID actorId = event.command().actorId();
+        Kind kind = event.command().kind();
+        Resolution resolution = event.resolution();
+        require(before != null && before.status() == Status.ACTIVE && before.activeFlow() == null
+                && before.activeActor().equals(actorId) && !before.surprised(actorId)
+                && !Schema2MonsterRules.isMonster(before, actorId) && before.observation().equals(after.observation())
+                && resolution.rolls().isEmpty() && resolution.healthChanges().isEmpty() && resolution.ammunitionUses().isEmpty()
+                && resolution.facts().contains(new CombatFact(kind.name(), actorId, before.combatId(), "BONUS_ACTION")));
+        Combatant actor = member(before, actorId), successor = member(after, actorId);
+        require(actor.bonusActionsRemaining() > 0);
+        Combatant paid = actor.spendBonusAction();
+        if (kind == Kind.CUNNING_DASH) {
+            int addedFeet = successor.movementBonus() - actor.movementBonus();
+            require(addedFeet >= 0 && addedFeet <= 120 && addedFeet % 5 == 0);
+        }
+        var expected = kind == Kind.CUNNING_DISENGAGE ? paid.withDisengaged()
+                : new Combatant(paid.characterId(), paid.position(), paid.side(), paid.actionsRemaining(),
+                        paid.bonusActionsRemaining(), paid.reactionAvailable(), paid.movementSpentHalfFeet(), successor.movementBonus(),
+                        paid.disengaged(), paid.dodging(), paid.sequence(), paid.prone(), paid.actionSurged());
+        require(after.combatants().equals(before.combatants().stream().map(a -> a.equals(actor) ? expected : a).toList()));
     }
 
     private static void validateAttackObservationTransition(Event event) {

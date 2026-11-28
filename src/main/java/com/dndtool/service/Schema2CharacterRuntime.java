@@ -60,7 +60,13 @@ public final class Schema2CharacterRuntime {
     public record ClassLevel(RuleIdentity characterClass, int level) { }
     public record HitDicePool(int sides, int current, int maximum) { }
     public record SubclassState(RuleIdentity characterClass, RuleIdentity subclass, int acquiredAtClassLevel) { }
-    public record FeatureState(RuleIdentity feature, RuleIdentity owner, int acquiredAtClassLevel) { }
+    public record FeatureState(RuleIdentity feature, RuleIdentity owner, int acquiredAtClassLevel,
+            List<RuleIdentity> expertise) {
+        public FeatureState(RuleIdentity feature, RuleIdentity owner, int acquiredAtClassLevel) {
+            this(feature, owner, acquiredAtClassLevel, List.of());
+        }
+        public FeatureState { expertise = expertiseChoices(expertise); }
+    }
     public record FeatState(RuleIdentity feat, RuleIdentity characterClass, int acquiredAtClassLevel) { }
     public record ProficiencyState(EntryIdentity sourceSlot, RuleIdentity target, int acquiredAtTotalLevel) { }
     public record RestAttempt(RuleIdentity rule, String kind, long startMinute, int hitPointsAtStart,
@@ -175,10 +181,13 @@ public final class Schema2CharacterRuntime {
         }
         public int hitDice() { return hitDicePools.stream().mapToInt(HitDicePool::current).sum(); }
         public int maximumHitDice() { return hitDicePools.stream().mapToInt(HitDicePool::maximum).sum(); }
+        public List<RuleIdentity> expertise() {
+            return features.stream().flatMap(feature -> feature.expertise().stream()).sorted(RULE_ORDER).toList();
+        }
     }
     public record GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
             Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices, List<RuleIdentity> cantrips,
-            RuleIdentity fightingStyle) {
+            RuleIdentity fightingStyle, List<RuleIdentity> expertise) {
         public static final GrowthChoices EMPTY = new GrowthChoices(null, Map.of(), null, Map.of());
         public GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
                 Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices) {
@@ -188,10 +197,18 @@ public final class Schema2CharacterRuntime {
                 Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices, List<RuleIdentity> cantrips) {
             this(subclass, abilityIncreases, feat, proficiencyChoices, cantrips, null);
         }
+        public GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
+                Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices, List<RuleIdentity> cantrips, RuleIdentity fightingStyle) {
+            this(subclass, abilityIncreases, feat, proficiencyChoices, cantrips, fightingStyle, List.of());
+        }
         public GrowthChoices withFightingStyle(RuleIdentity style) {
-            return new GrowthChoices(subclass, abilityIncreases, feat, proficiencyChoices, cantrips, style);
+            return new GrowthChoices(subclass, abilityIncreases, feat, proficiencyChoices, cantrips, style, expertise);
+        }
+        public GrowthChoices withExpertise(List<RuleIdentity> choices) {
+            return new GrowthChoices(subclass, abilityIncreases, feat, proficiencyChoices, cantrips, fightingStyle, choices);
         }
         public GrowthChoices {
+            expertise = expertiseChoices(expertise);
             if (fightingStyle != null && !validRule(fightingStyle, "character.feature"))
                 throw new IllegalArgumentException("S2_GROWTH_FIGHTING_STYLE_CHOICE");
             if (abilityIncreases == null || proficiencyChoices == null || subclass != null && !validRule(subclass, "character.subclass")
@@ -222,6 +239,13 @@ public final class Schema2CharacterRuntime {
             cantrips = cantrips.stream().sorted(RULE_ORDER).toList();
         }
     }
+    private static List<RuleIdentity> expertiseChoices(List<RuleIdentity> expertise) {
+        if (expertise == null || expertise.size() > 2 || expertise.stream().anyMatch(target -> !validProficiency(target))
+                || new HashSet<>(expertise).size() != expertise.size())
+            throw new IllegalArgumentException("S2_ROGUE_EXPERTISE_CHOICES");
+        return expertise.stream().sorted(RULE_ORDER).toList();
+    }
+
     public record CheckInput(RuleIdentity rule, String kind, String abilityKey, RuleIdentity proficiency,
             int difficultyClass, boolean advantage, boolean disadvantage, String adjudication, String subject) {
         public static final String GENERAL = "GENERAL", STONEWORK_ORIGIN = "STONEWORK_ORIGIN";
@@ -252,7 +276,14 @@ public final class Schema2CharacterRuntime {
 
     public record CheckResult(Integer firstD20, Integer secondD20, Integer selectedD20, int abilityModifier,
             int proficiencyBonus, int total, boolean success, boolean effectiveAdvantage, boolean effectiveDisadvantage,
-            int baseProficiencyBonus, RuleIdentity stonecunningRule, Integer passiveBaseScore, Integer passiveAdjustment) {
+            int baseProficiencyBonus, RuleIdentity stonecunningRule, Integer passiveBaseScore, Integer passiveAdjustment,
+            RuleIdentity expertiseRule) {
+        public CheckResult(Integer firstD20, Integer secondD20, Integer selectedD20, int abilityModifier,
+                int proficiencyBonus, int total, boolean success, boolean effectiveAdvantage, boolean effectiveDisadvantage,
+                int baseProficiencyBonus, RuleIdentity stonecunningRule, Integer passiveBaseScore, Integer passiveAdjustment) {
+            this(firstD20, secondD20, selectedD20, abilityModifier, proficiencyBonus, total, success, effectiveAdvantage,
+                    effectiveDisadvantage, baseProficiencyBonus, stonecunningRule, passiveBaseScore, passiveAdjustment, null);
+        }
         public CheckResult(int firstD20, Integer secondD20, int selectedD20, int abilityModifier,
                 int proficiencyBonus, int total, boolean success, boolean effectiveAdvantage, boolean effectiveDisadvantage,
                 int baseProficiencyBonus, RuleIdentity stonecunningRule) {
@@ -279,11 +310,17 @@ public final class Schema2CharacterRuntime {
             }
             if (!validScore)
                 throw new IllegalArgumentException("S2_CHARACTER_CHECK_RESULT");
-            boolean validProficiency = stonecunningRule == null ? proficiencyBonus == 0 || proficiencyBonus == baseProficiencyBonus
-                    : validRule(stonecunningRule, "character.stonecunning")
+            boolean validProficiency;
+            if (stonecunningRule != null) {
+                validProficiency = expertiseRule == null && validRule(stonecunningRule, "character.stonecunning")
                         && proficiencyBonus >= baseProficiencyBonus * STONECUNNING_MIN_MULTIPLIER
                         && proficiencyBonus <= baseProficiencyBonus * STONECUNNING_MAX_MULTIPLIER
                         && proficiencyBonus % baseProficiencyBonus == 0;
+            } else if (expertiseRule != null) {
+                validProficiency = validRule(expertiseRule, "character.feature") && proficiencyBonus == 2 * baseProficiencyBonus;
+            } else {
+                validProficiency = proficiencyBonus == 0 || proficiencyBonus == baseProficiencyBonus;
+            }
             if (!validProficiency)
                 throw new IllegalArgumentException("S2_CHARACTER_CHECK_RESULT");
         }
@@ -292,8 +329,14 @@ public final class Schema2CharacterRuntime {
     }
 
     static int ordinaryCheckProficiency(State state, RuleIdentity proficiency) {
-        return proficiency != null && state.proficiencies().stream()
-                .anyMatch(fact -> fact.target().equals(proficiency)) ? state.proficiencyBonus() : 0;
+        if (proficiency == null || state.proficiencies().stream().noneMatch(fact -> fact.target().equals(proficiency))) return 0;
+        return checkExpertiseSource(state, proficiency) == null ? state.proficiencyBonus() : 2 * state.proficiencyBonus();
+    }
+
+    static RuleIdentity checkExpertiseSource(State state, RuleIdentity proficiency) {
+        if (proficiency == null) return null;
+        return state.features().stream().filter(feature -> feature.expertise().contains(proficiency))
+                .map(FeatureState::feature).findFirst().orElse(null);
     }
 
     public record EquipmentInput(UUID itemId, RuleIdentity item, String location, String adjudication) {
@@ -448,12 +491,12 @@ public final class Schema2CharacterRuntime {
     private static long stateRows(State state) {
         return 1L + state.classes().size() + state.hitDicePools().size() + state.subclasses().size() + state.features().size()
                 + state.feats().size() + state.proficiencies().size() + state.resources().size() + state.equipment().size()
-                + state.knownCantrips().size()
+                + state.knownCantrips().size() + state.features().stream().mapToInt(feature -> feature.expertise().size()).sum()
                 + (state.spellbook() == null ? 0 : state.spellbook().learned().size() + state.spellbook().prepared().size());
     }
     private static long commandRows(Command command) {
         return command.growthChoices().abilityIncreases().size() + command.growthChoices().cantrips().size()
-                + (command.growthChoices().fightingStyle() == null ? 0 : 1)
+                + (command.growthChoices().fightingStyle() == null ? 0 : 1) + command.growthChoices().expertise().size()
                 + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum()
                 + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size() + command.restInput().recoveredSpellSlots().size())
                 + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1)
@@ -559,8 +602,11 @@ public final class Schema2CharacterRuntime {
                             ? Math.max(result.firstD20(), result.secondD20()) : Math.min(result.firstD20(), result.secondD20());
                     require(result.selectedD20() == selected);
                 }
-                require(result.stonecunningRule() == null ? result.proficiencyBonus() == ordinaryCheckProficiency(before, input.proficiency())
-                        : input.subject().equals(CheckInput.STONEWORK_ORIGIN));
+                require(result.stonecunningRule() == null
+                        ? result.proficiencyBonus() == ordinaryCheckProficiency(before, input.proficiency())
+                            && Objects.equals(result.expertiseRule(), checkExpertiseSource(before, input.proficiency()))
+                        : input.subject().equals(CheckInput.STONEWORK_ORIGIN)
+                            && result.proficiencyBonus() >= ordinaryCheckProficiency(before, input.proficiency()));
                 require(result.abilityModifier() == Math.floorDiv(before.abilities().get(input.abilityKey()) - 10, 2)
                         && result.baseProficiencyBonus() == before.proficiencyBonus() && result.success() == (result.total() >= input.difficultyClass()));
             } else if (restKind(event.kind())) {

@@ -182,10 +182,14 @@ public final class Schema2ObservationRules {
     }
 
     static boolean checkAction(Kind kind) {
-        return kind == Kind.HIDE || kind == Kind.SEARCH || kind == Kind.NIMBLE_HIDE || kind == Kind.NIMBLE_DISENGAGE;
+        return hiding(kind) || kind == Kind.SEARCH || kind == Kind.NIMBLE_DISENGAGE;
     }
 
-    static boolean hiding(Kind kind) { return kind == Kind.HIDE || kind == Kind.NIMBLE_HIDE; }
+    static boolean hiding(Kind kind) { return kind == Kind.HIDE || kind == Kind.NIMBLE_HIDE || kind == Kind.CUNNING_HIDE; }
+
+    static boolean paysBonusAction(Kind kind) {
+        return kind == Kind.NIMBLE_HIDE || kind == Kind.NIMBLE_DISENGAGE || kind == Kind.CUNNING_HIDE;
+    }
 
     static boolean openingHide(Kind kind) { return kind == Kind.START || kind == Kind.REENTER_COMBAT; }
 
@@ -260,12 +264,13 @@ public final class Schema2ObservationRules {
     }
 
     static Plan prepare(Map<UUID, Context> roster, Battle battle, Combatant actor, Kind kind) {
-        boolean nimble = kind == Kind.NIMBLE_HIDE || kind == Kind.NIMBLE_DISENGAGE;
         UUID id = actor.characterId();
         RuleIdentity nimbleSource = null;
-        if (nimble) {
+        if (kind == Kind.NIMBLE_HIDE || kind == Kind.NIMBLE_DISENGAGE) {
             nimbleSource = Schema2MonsterRules.nimbleEscapeSource(roster, battle, id);
             if (nimbleSource == null) throw invalid("S2_NIMBLE_ESCAPE_UNAVAILABLE");
+        }
+        if (paysBonusAction(kind)) {
             if (actor.bonusActionsRemaining() == 0) throw invalid("S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
         } else if (!actor.actionAvailable()) throw invalid("S2_COMBAT_ACTION_UNAVAILABLE");
         if (battle.observation().checks().size() >= Schema2CombatHistory.MAX_EVENTS) throw invalid("S2_OBSERVATION_LIMIT");
@@ -324,7 +329,7 @@ public final class Schema2ObservationRules {
 
     static Battle resolve(Battle battle, Combatant actor, Kind kind, UUID operation, Plan plan, Draw draws) {
         boolean nimble = plan.nimbleSource() != null;
-        Combatant paid = nimble ? actor.spendBonusAction() : actor.spendAction();
+        Combatant paid = paysBonusAction(kind) ? actor.spendBonusAction() : actor.spendAction();
         if (kind == Kind.NIMBLE_DISENGAGE) paid = paid.withDisengaged();
         battle = Schema2CombatRules.replaceActor(battle, paid);
         ObservationState state = battle.observation();
@@ -437,6 +442,7 @@ public final class Schema2ObservationRules {
         boolean hide = hideCheck(check.kind());
         String skill = hide ? STEALTH : PERCEPTION;
         boolean monster = "adventure.monster".equals(check.rule().ruleType());
+        require(check.kind() != Kind.CUNNING_HIDE || !monster);
         ObservationRoll roll = check.roll();
         require(roll != null && (monster ? check.skill() == null && skill.equals(check.monsterSkill()) && !roll.disadvantage()
                 : "adventure.check".equals(check.rule().ruleType()) && check.monsterSkill() == null && check.skill() != null

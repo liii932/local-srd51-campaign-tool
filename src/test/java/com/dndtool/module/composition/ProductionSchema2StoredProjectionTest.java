@@ -143,6 +143,25 @@ class ProductionSchema2StoredProjectionTest {
         chains.set(0, new FieldChain(chain.target(), chain.field(), steps)); return chains;
     }
 
+    @Test void restoresEightyOriginalDefinitionsIncludingTheLastTracedSource() {
+        var packages = Schema2ProgressionFixtures.packages();
+        Schema2GrantFixtures.edit(packages, 0, "rules.json", root -> {
+            var rows = root.getAsJsonArray();
+            var template = rows.get(2).getAsJsonObject();
+            for (int index = rows.size(); index < 80; index++) {
+                var source = template.deepCopy();
+                source.getAsJsonObject("identity").addProperty("rule_key", "class.additional_" + index);
+                rows.add(source);
+            }
+        });
+        var original = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(packages));
+        var restored = restore(original, original.projection().rules(), original.projection().chains());
+        assertTrue(restored.projection().chains().stream().anyMatch(chain ->
+                chain.target().equals(new RuleIdentity(Schema2ProgressionFixtures.BASE, "character.class", "class.additional_79"))
+                && chain.steps().getFirst().authorLocation().pointer().equals("/79/display_name")));
+        assertEquals(original.projection().rules(), restored.projection().rules());
+    }
+
     @Test void canonicalByteBudgetRejectsBoundedTypedRowsBeforeAllocatingCanonicalArrays() {
         String raw = "a".repeat(64), logical = "b".repeat(64), body = "😀".repeat(1000), name = "😀".repeat(120);
         String pointer = "/" + "a".repeat(4090);

@@ -241,6 +241,18 @@
     "identity": {
       "kind": "rule",
       "module_key": "srd51_runtime",
+      "rule_type": "character.tool",
+      "rule_key": "tool.thieves_tools"
+    },
+    "display_name": "Thieves’ tools",
+    "description": "Tool proficiency for ability checks using prepared thieves’ tools.",
+    "source_page": 70,
+    "category": "KIT"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
       "rule_type": "catalog.tool_set",
       "rule_key": "tool_set.dwarven"
     },
@@ -734,6 +746,42 @@
     "identity": {
       "kind": "rule",
       "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.simple"
+    },
+    "display_name": "Simple weapon proficiency",
+    "description": "Class proficiency in simple weapons. Playable weapons also carry a specific proficiency binding.",
+    "source_page": 65,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.hand_crossbow"
+    },
+    "display_name": "Hand crossbow proficiency",
+    "description": "Specific hand crossbow proficiency granted by the Rogue class.",
+    "source_page": 66,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.shortsword"
+    },
+    "display_name": "Shortsword proficiency",
+    "description": "Specific shortsword proficiency granted by the Rogue class.",
+    "source_page": 66,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
       "rule_type": "catalog.proficiency_set",
       "rule_key": "proficiency_set.fighter_skills"
     },
@@ -762,6 +810,17 @@
     "display_name": "Wizard skill candidates",
     "category": "SKILL",
     "minimum_enabled_members": 6
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_runtime",
+      "rule_type": "catalog.proficiency_set",
+      "rule_key": "proficiency_set.rogue_skills"
+    },
+    "display_name": "Rogue skill candidates",
+    "category": "SKILL",
+    "minimum_enabled_members": 11
   },
   {
     "identity": {

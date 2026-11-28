@@ -22,7 +22,9 @@
 
 借机攻击要求反应者在跨格前看得见离开触及的敌人。闪避对武器攻击的影响、远程攻击的近身劣势、预备动作的可感知触发和反制的施法见证同样按各自观察者判定。护盾术暂停后沿用攻击发起时的视线、掩护、瞄准格和原选骰重判。范围效果与敏捷豁免使用各自的效果合同。[借机攻击](../references/srd-5.1/pages/page-095.md) · [施法与反应](schema-2-spells.md)
 
-## 地精与保存
+## 附赠躲藏与保存
+
+取得[灵巧动作](schema-2-rogue.md)的游荡者可用 `CUNNING_HIDE` 花一次附赠动作躲藏。仍需在可躲藏格掷一次真实隐匿检定，按观察者分别判定。角色的隐匿、被动察觉与搜索都会应用对应技能的专精。
 
 标准魔法包的地精使用自己的弯刀、短弓、隐匿 +6 和被动察觉 9。其 `nimble_escape` 条目授予灵巧逃脱（Nimble Escape）。地精在本人回合可以花一个附赠动作合法躲藏（`NIMBLE_HIDE`）或撤离（`NIMBLE_DISENGAGE`）。付过一次后该回合无法再用另一项，普通动作可以留给攻击。[地精属性块](../references/srd-5.1/pages/page-315.md) · [独立作者场景](../../rule-packages/srd51-runtime/scenarios/README.md#observer-hiding)
 

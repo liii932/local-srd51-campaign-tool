@@ -18,7 +18,7 @@
 | 事实类型 | 保存内容与形状 |
 | --- | --- |
 | `CHECK_RESOLVED` 或 `PASSIVE_CHECK_RESOLVED` / `CheckInput` | 完整 `adventure.check` 身份、`ABILITY/SKILL/TOOL`、六属性之一、适用的完整熟练身份、题材 `subject`（`GENERAL` 或 `STONEWORK_ORIGIN`）、DC 0—30、原始优势/劣势布尔裁定及说明；ABILITY 不携带熟练，SKILL 仅 `character.proficiency`，TOOL 仅 `character.tool` |
-| `CheckResult` | 依命令保存原骰及选中骰，或被动基础分与有符号调整。两者共用属性修正、基础熟练加值 `baseProficiencyBonus`、实际熟练贡献 `proficiencyBonus`、可空的石工知识来源 `stonecunningRule`、总值、成败，以及独立保存的 `effectiveAdvantage/effectiveDisadvantage`；不能覆盖原输入的裁定 |
+| `CheckResult` | 依命令保存原骰及选中骰，或被动基础分与有符号调整。两者共用属性修正、基础熟练加值 `baseProficiencyBonus`、实际熟练贡献 `proficiencyBonus`、适用的石工知识来源 `stonecunningRule` 或专精来源 `expertiseRule`、总值、成败及实际优劣势 `effectiveAdvantage/effectiveDisadvantage`。原输入的裁定另行保留。 |
 | `ITEM_ACQUIRED` / `EquipmentInput` | UUIDv4 实例、完整 `equipment.item` 身份、`CARRIED` 及说明；实例 UUID 等于本次操作 UUID，历史不能重复取得同一实例身份 |
 | `ITEM_EQUIPPED` | 实例、`WORN/MAIN_HAND/OFF_HAND/BOTH_HANDS` 之一及说明；输入不再次指定物品定义 |
 | `ITEM_REMOVED`、`ITEM_UNEQUIPPED` | 实例及说明；物品定义与目标位置输入均为空 |

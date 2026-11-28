@@ -14,13 +14,14 @@ const wolfName = '林地灰狼';
 async function main() {
   const [flag, storageRoot, scenario] = process.argv.slice(2);
   assert.ok(flag === '--fresh-root' && path.isAbsolute(storageRoot), 'Expected --fresh-root /absolute/disposable/player-store');
-  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise', '--cantrips', '--fighter'].includes(scenario),
-    'Expected --movement, --ranged, --observation, --surprise, --cantrips, or --fighter');
+  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise', '--cantrips', '--fighter', '--rogue'].includes(scenario),
+    'Expected --movement, --ranged, --observation, --surprise, --cantrips, --fighter, or --rogue');
   const ranged = scenario === '--ranged';
   const observation = scenario === '--observation';
   const surprise = scenario === '--surprise';
   const cantrips = scenario === '--cantrips';
   const fighterFeatures = scenario === '--fighter';
+  const rogueFeatures = scenario === '--rogue';
   const monsterName = fighterFeatures ? '林间地狱犬' : observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
   const root = await fs.realpath(storageRoot);
   const repo = await fs.realpath(path.join(__dirname, '../..'));
@@ -47,7 +48,7 @@ async function main() {
     const field = (form, name) => host.locator('#' + form).locator('[name="' + name + '"]');
     const submit = form => host.locator('#' + form + ' button').click();
     const hostAction = async (action, trigger) => {
-      if (!cantrips && !fighterFeatures) return (await observeStorageAction(host, action, trigger, {})).body;
+      if (!cantrips && !fighterFeatures && !rogueFeatures) return (await observeStorageAction(host, action, trigger, {})).body;
       // Participation polling can refresh the Host while a form submission is finishing.
       const [response] = await Promise.all([
         host.waitForResponse(response => response.url() === hostOrigin + '/api/host/storage/' + action
@@ -83,6 +84,15 @@ async function main() {
       assert.ok(value, ruleKey);
       await select.selectOption(value);
     }
+    async function selectRules(form, name, keys) {
+      const select = field(form, name);
+      const options = await select.locator('option').evaluateAll(rows => rows.map(row => row.value));
+      await select.selectOption(keys.map(key => {
+        const option = options.find(value => value.endsWith('/' + key));
+        assert.ok(option, key);
+        return option;
+      }));
+    }
     async function share(kind, id, audience, memberId) {
       const form = 'host-player-share-form';
       await field(form, 'kind').selectOption(kind);
@@ -91,20 +101,24 @@ async function main() {
       if (memberId) await host.locator('#host-player-share-members input[value="' + memberId + '"]').check();
       await governance('share', () => submit(form));
     }
-    async function playerCommand(label, page = attacker) {
+    async function clickPlayerCommand(page, button, label) {
       const [response] = await Promise.all([
-        page.waitForResponse(r => r.url() === playerOrigin + '/api/player/command'),
-        page.getByRole('button', {name: label}).click()
+        page.waitForResponse(r => r.url() === playerOrigin + '/api/player/command' && r.request().method() === 'POST'),
+        button.click()
       ]);
       const body = await response.json();
       assert.equal(response.status(), 200, `Player command ${label} returned HTTP ${response.status()} ${body.code || ''}`);
-      return body.receipt;
+      return {request: response.request().postDataJSON(), receipt: body.receipt};
+    }
+    async function playerCommand(label, page = attacker) {
+      return (await clickPlayerCommand(page, page.getByRole('button', {name: label}), label)).receipt;
     }
 
     await host.goto(hostOrigin + '/host/storage');
     await waitForStorageReady(host);
     assert.equal((await readHost()).storage.state, 'IDLE');
-    const campaignName = fighterFeatures ? '战士防御与动作如潮验收' : cantrips ? '已知戏法验收' : surprise ? '受惊与分组先攻验收'
+    const campaignName = rogueFeatures ? '游荡者专精与灵巧动作验收'
+      : fighterFeatures ? '战士防御与动作如潮验收' : cantrips ? '已知戏法验收' : surprise ? '受惊与分组先攻验收'
       : observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收';
     await field('storage-create', 'name').fill(campaignName);
     await hostAction('create', () => host.locator('#storage-create button[type="submit"]').click());
@@ -114,8 +128,11 @@ async function main() {
         {name: '巡林法师', owner: 'class.wizard', known: ['spell.fire_bolt', 'spell.mage_hand', 'spell.prestidigitation']},
         {name: '营地牧师', owner: 'class.cleric', known: ['spell.guidance', 'spell.light', 'spell.thaumaturgy']}
       ]
-      : ['巡林战士', '营地战士'].map(name => ({name, owner: 'class.fighter'}));
-    for (const {name, owner, known} of characters) {
+      : rogueFeatures ? [
+        {name: '巡林斥候', owner: 'class.rogue', expertise: ['proficiency.skill.stealth', 'tool.thieves_tools']},
+        {name: '营地斥候', owner: 'class.rogue', expertise: ['proficiency.skill.acrobatics', 'proficiency.skill.perception']}
+      ] : ['巡林战士', '营地战士'].map(name => ({name, owner: 'class.fighter'}));
+    for (const {name, owner, known, expertise} of characters) {
       await host.locator('[data-pane="people"]').click();
       await field('domain-create', 'name').fill(name);
       await selectRule('domain-create', 'classKey', owner);
@@ -138,6 +155,12 @@ async function main() {
           return option;
         }));
       }
+      if (expertise) {
+        await selectRule('domain-create', 'backgroundKey', 'background.acolyte');
+        await selectRules('domain-create', 'skillKeys', ['acrobatics', 'athletics', 'perception', 'stealth']
+          .map(skill => 'proficiency.skill.' + skill));
+        await selectRules('domain-create', 'expertiseKeys', expertise);
+      }
       const result = await domainAction('domain-create');
       const character = result.campaign.domain.characters.find(c => c.name === name);
       fighters.push(character.id);
@@ -151,9 +174,17 @@ async function main() {
         assert.equal(character.level, 1);
         assert.ok(!character.state.resources.some(resource => resource.identity.ruleKey === 'resource.fighter.action_surge'));
       }
+      if (expertise) {
+        assert.equal(character.level, 1);
+        assert.equal(character.state.features.some(feature => feature.feature.ruleKey === 'feature.rogue_cunning_action'), false);
+        const granted = character.state.features.find(feature => feature.feature.ruleKey === 'feature.rogue_expertise');
+        assert.deepEqual(granted.expertise.map(target => target.ruleKey).sort(), expertise.slice().sort());
+        assert.equal(character.expertise.length, 2);
+        assert.ok(character.expertise.every(entry => entry.proficiencyContribution === 4));
+      }
     }
     let weapon;
-    if (!cantrips) {
+    if (!cantrips && !rogueFeatures) {
       await host.locator('[data-pane="actions"]').click();
       await field('domain-equipment', 'characterId').selectOption(fighters[0]);
       await field('domain-equipment', 'kind').selectOption('ITEM_ACQUIRED');
@@ -178,6 +209,22 @@ async function main() {
     const card = (domain, id) => domain.characters.find(character => character.id === id);
     const surgeResource = (domain, id) => card(domain, id).state.resources
       .find(resource => resource.identity.ruleKey === 'resource.fighter.action_surge');
+    if (rogueFeatures) {
+      const [rogue] = fighters;
+      const initialExpertise = card((await readHost()).campaign.domain, rogue).expertise;
+      await showCharacter(host, 'RULE', rogue);
+      await host.locator('#character-browser-scroll [data-character-id="' + rogue + '"]')
+        .getByText(/专精：.*熟练贡献 \+4/).waitFor();
+      await host.locator('[data-pane="growth"]').click();
+      await field('domain-growth', 'characterId').selectOption(rogue);
+      await selectRule('domain-growth', 'class', 'class.rogue');
+      const advanced = card((await domainAction('domain-growth')).campaign.domain, rogue);
+      assert.equal(advanced.level, 2);
+      assert.equal(advanced.state.features.find(feature => feature.feature.ruleKey === 'feature.rogue_cunning_action')
+        .acquiredAtClassLevel, 2);
+      assert.deepEqual(advanced.expertise, initialExpertise);
+      await host.locator('[data-pane="world"]').click();
+    }
     if (fighterFeatures) {
       const [fighter] = fighters;
       const form = 'domain-equipment';
@@ -304,6 +351,159 @@ async function main() {
       for (let i = 0; i < battle().initiative.length && active() !== id; i++) await endTurn();
       assert.equal(active(), id);
     };
+    const setCell = async (x, y, {cover = 'NONE', hideAllowed = false, blocksSight = false}) => {
+      const form = 'domain-observation-cell';
+      await field(form, 'combatId').selectOption(scene);
+      await field(form, 'x').fill(String(x));
+      await field(form, 'y').fill(String(y));
+      await field(form, 'y').press('Tab');
+      await field(form, 'hideAllowed').setChecked(hideAllowed);
+      await field(form, 'blocksSight').setChecked(blocksSight);
+      await field(form, 'cover').selectOption(cover);
+      state = await domainAction(form);
+      const cell = battle().observation.cells.find(cell => cell.position.x === x && cell.position.y === y);
+      if (hideAllowed || blocksSight || cover !== 'NONE') assert.deepEqual(cell, {position: {x, y}, hideAllowed, blocksSight, cover});
+      else assert.equal(cell, undefined);
+    };
+    if (rogueFeatures) {
+      const [rogue, novice] = fighters;
+      const domain = () => state.campaign.domain;
+      const history = () => domain().combats.find(row => row.current.combatId === scene);
+      const lastEvent = () => history().events.at(-1);
+      const budget = async () => (await readPlayer(attacker)).view.cards.find(row => row.id === rogue).turnBudget;
+      const labels = async page => (await readPlayer(page)).view.candidates.map(candidate => candidate.label);
+      const cunningKinds = ['CUNNING_DASH', 'CUNNING_DISENGAGE', 'CUNNING_HIDE'];
+      async function rogueCommand(label) {
+        const title = attacker.locator('strong').and(attacker.getByText(label, {exact: true}));
+        const button = attacker.locator('#player-actions button:enabled').filter({has: title});
+        await button.waitFor();
+        return clickPlayerCommand(attacker, button, label);
+      }
+      async function postPlayer(page, action, input, connectionId) {
+        const {session} = await readPlayer(page);
+        return page.evaluate(async ({action, input, connectionId, csrf}) => {
+          const response = await fetch('/api/player/' + action, {method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'X-Player-Connection': connectionId},
+            body: JSON.stringify(input)});
+          const result = await response.json();
+          return {status: response.status, code: result.code, receipt: result.receipt};
+        }, {action, input, connectionId, csrf: session.csrf});
+      }
+      const roleCard = attacker.locator('#player-cards .character-card').filter({
+        has: attacker.getByRole('heading', {name: characters[0].name, exact: true})
+      });
+      const expertise = roleCard.locator('details').filter({has: attacker.locator('summary').filter({hasText: /^专精$/})});
+      await expertise.locator('summary').click();
+      const expertiseRows = expertise.locator('li');
+      await expertiseRows.nth(1).waitFor();
+      assert.deepEqual((await expertiseRows.allTextContents()).sort(), [
+        'Stealth（熟练贡献 +4）', 'Thieves’ tools（熟练贡献 +4）'
+      ]);
+      await setCell(1, 1, {hideAllowed: true});
+      await advanceTo(novice);
+      assert.deepEqual(history().cunningActions, []);
+      assert.ok(!(await labels(observer)).some(label => label.startsWith('灵巧动作')));
+      assert.ok(!(await labels(attacker)).some(label => label.startsWith('灵巧动作')));
+      const [takeover] = await Promise.all([
+        observer.waitForResponse(response => response.url() === playerOrigin + '/api/player/takeover'),
+        observer.locator('#player-takeover').click()
+      ]);
+      assert.equal(takeover.status(), 200);
+      const observerConnection = (await takeover.json()).connectionId;
+      await advanceTo(rogue);
+      assert.deepEqual(history().cunningActions, cunningKinds);
+      assert.ok((await labels(attacker)).includes('躲藏（动作）'));
+      const firstTurn = await budget();
+      const offeredHide = (await readPlayer(attacker)).view.candidates.find(candidate => candidate.label === '灵巧动作：躲藏');
+      assert.ok(offeredHide);
+      const stolen = {connectionId: observerConnection, candidateId: offeredHide.id,
+        precondition: offeredHide.precondition, requestId: await observer.evaluate(() => crypto.randomUUID())};
+      const denied = await postPlayer(observer, 'command', stolen, observerConnection);
+      assert.deepEqual({status: denied.status, code: denied.code}, {status: 409, code: 'PLAYER_VIEW_EXPIRED'});
+      assert.equal((await readHost()).campaign.domain.roots.length, domain().roots.length);
+      const {request: exact, receipt: hideReceipt} = await rogueCommand('灵巧动作：躲藏');
+      assert.equal(hideReceipt.state, 'ACCEPTED');
+      assert.equal(hideReceipt.outcome, 'COMPLETED');
+      const {connectionId, ...identity} = exact;
+      const stale = await postPlayer(attacker, 'command', exact, connectionId);
+      assert.deepEqual({status: stale.status, code: stale.code}, {status: 409, code: 'PLAYER_VIEW_EXPIRED'});
+      const original = await postPlayer(attacker, 'receipt', identity, connectionId);
+      assert.equal(original.status, 200);
+      assert.deepEqual(original.receipt, hideReceipt);
+      const otherReceipt = await postPlayer(observer, 'receipt', identity, observerConnection);
+      assert.equal(otherReceipt.status, 200);
+      assert.equal(otherReceipt.receipt.state, 'UNVERIFIED');
+      state = await readHost();
+      assert.equal(state.campaign.domain.roots.at(-1).actor.memberId, members[0]);
+      const hideEvent = lastEvent();
+      const hide = battle().observation.checks.at(-1);
+      assert.equal(hide.kind, 'CUNNING_HIDE');
+      assert.equal(hide.nimbleEscape, false);
+      assert.equal(hide.roll.skillBonus, 4);
+      assert.ok(Number.isInteger(hide.roll.firstD20) && hide.roll.firstD20 >= 1 && hide.roll.firstD20 <= 20);
+      assert.equal(hide.roll.total, hide.roll.selectedD20 + hide.roll.abilityModifier + 4);
+      assert.deepEqual(hideEvent.resolution.rolls, [
+        {purpose: 'OBSERVATION_STEALTH', subjectId: rogue, sides: 20, value: hide.roll.firstD20}
+      ]);
+      assert.equal(hide.contests.length, 1);
+      assert.equal(hide.contests[0].counterpartId, monster);
+      assert.equal(hide.contests[0].hiddenAfter, hide.roll.total > hide.contests[0].opposingScore);
+      assert.deepEqual(await budget(), {...firstTurn, bonusActionsRemaining: 0});
+      assert.deepEqual(history().cunningActions, []);
+
+      const beforeSave = domain();
+      await hostAction('save', () => host.locator('#storage-save').click());
+      const ended = await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      await host.locator('#storage-files').selectOption(ended.savedFile);
+      state = await hostAction('open', () => host.locator('#storage-open button[type="submit"]').click());
+      assert.deepEqual(domain(), beforeSave);
+      assert.deepEqual(lastEvent(), hideEvent);
+      await approvePlayers(members);
+      for (const [index, page] of seats.entries()) {
+        await page.locator('#player-table').waitFor();
+        assert.equal((await readPlayer(page)).session.playerKey, members[index]);
+      }
+      await attacker.locator('#player-takeover').click();
+      assert.deepEqual(await budget(), {...firstTurn, bonusActionsRemaining: 0});
+      await rogueCommand('疾走');
+      assert.deepEqual(await budget(), {...firstTurn, actionsRemaining: 0, bonusActionsRemaining: 0,
+        movementRemainingHalfFeet: firstTurn.movementRemainingHalfFeet * 2});
+
+      state = await readHost();
+      await host.locator('[data-pane="combat"]').click();
+      await endTurn();
+      await advanceTo(rogue);
+      const fresh = await budget();
+      assert.deepEqual(fresh, firstTurn);
+      await rogueCommand('灵巧动作：疾走');
+      assert.deepEqual(await budget(), {...fresh, bonusActionsRemaining: 0,
+        movementRemainingHalfFeet: fresh.movementRemainingHalfFeet * 2});
+      await rogueCommand('疾走');
+      assert.equal((await budget()).movementRemainingHalfFeet, fresh.movementRemainingHalfFeet * 3);
+
+      state = await readHost();
+      await endTurn();
+      await advanceTo(rogue);
+      await field('domain-combat', 'kind').selectOption('CUNNING_DISENGAGE');
+      state = await domainAction('domain-combat');
+      assert.equal(lastEvent().command.kind, 'CUNNING_DISENGAGE');
+      assert.deepEqual(lastEvent().resolution.rolls, []);
+      assert.equal(actor(rogue).disengaged, true);
+      assert.deepEqual(await budget(), {...fresh, bonusActionsRemaining: 0});
+      await field('domain-combat', 'kind').selectOption('MOVE');
+      await field('domain-combat', 'path').fill('0,1');
+      state = await domainAction('domain-combat');
+      assert.deepEqual(actor(rogue).position, {x: 0, y: 1});
+      assert.equal(battle().flows.at(-1).status, 'COMPLETED');
+      assert.equal(actor(monster).reactionAvailable, true);
+      await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({result: 'PASSED', playerSessions: seats.length, expertise: 4,
+        hideD20: hide.roll.firstD20, reopenedAndContinued: true, doubleDash: true, disengage: true}));
+      return;
+    }
     if (fighterFeatures) {
       const [fighter, otherFighter] = fighters;
       const domain = () => state.campaign.domain;
@@ -616,19 +816,6 @@ async function main() {
     if (observation) {
       const combatForm = 'domain-combat';
       const terrainForm = 'domain-observation-cell';
-      const setCell = async (x, y, {cover = 'NONE', hideAllowed = false, blocksSight = false}) => {
-        await field(terrainForm, 'combatId').selectOption(scene);
-        await field(terrainForm, 'x').fill(String(x));
-        await field(terrainForm, 'y').fill(String(y));
-        await field(terrainForm, 'y').press('Tab');
-        await field(terrainForm, 'hideAllowed').setChecked(hideAllowed);
-        await field(terrainForm, 'blocksSight').setChecked(blocksSight);
-        await field(terrainForm, 'cover').selectOption(cover);
-        state = await domainAction(terrainForm);
-        const cell = battle().observation.cells.find(cell => cell.position.x === x && cell.position.y === y);
-        if (hideAllowed || blocksSight || cover !== 'NONE') assert.deepEqual(cell, {position: {x, y}, hideAllowed, blocksSight, cover});
-        else assert.equal(cell, undefined);
-      };
       const targetOption = (form, id) => field(form, 'targetId').locator(`option[value="${id}"]`);
       async function verifyTotalCover(form, action, actorId, targetId, x, y) {
         await field(form, 'actorId').selectOption(actorId);

@@ -19,7 +19,8 @@ public final class PlayerCandidateFactory {
     }
     private static final int MAX_CHOICES = 1024;
     private static final List<Kind> TURN_ACTIONS = List.of(Kind.END_TURN, Kind.BEGIN_ATTACK, Kind.FORFEIT_ATTACKS,
-            Kind.DASH, Kind.DISENGAGE, Kind.DODGE, Kind.DROP_PRONE, Kind.STAND_UP, Kind.SECOND_WIND, Kind.ACTION_SURGE, Kind.END_CONCENTRATION);
+            Kind.DASH, Kind.DISENGAGE, Kind.DODGE, Kind.DROP_PRONE, Kind.STAND_UP, Kind.SECOND_WIND, Kind.ACTION_SURGE,
+            Kind.END_CONCENTRATION);
     private static final String[] DIRECTIONS = {"北", "东北", "东", "东南", "南", "西南", "西", "西北"};
     private static final int[][] STEPS = {{0,-1},{1,-1},{1,0},{1,1},{0,1},{-1,1},{-1,0},{-1,-1}};
 
@@ -95,8 +96,14 @@ public final class PlayerCandidateFactory {
             if (!roster.containsKey(actor)) continue;
             if (battle.status() == Status.ACTIVE && actor.equals(battle.activeActor())) {
                 TURN_ACTIONS.forEach(kind -> factory.add(Command.action(kind, actor), label(kind)));
+                boolean cunning = CampaignCombatView.mayOfferCunningActions(roster, battle);
+                if (cunning) {
+                    factory.add(Command.action(Kind.CUNNING_DASH, actor), label(Kind.CUNNING_DASH));
+                    factory.add(Command.action(Kind.CUNNING_DISENGAGE, actor), label(Kind.CUNNING_DISENGAGE));
+                }
                 if (sharedScene) {
                     factory.add(Command.action(Kind.HIDE, actor), "躲藏（动作）");
+                    if (cunning) factory.add(Command.action(Kind.CUNNING_HIDE, actor), label(Kind.CUNNING_HIDE));
                     factory.add(Command.action(Kind.SEARCH, actor), "搜索（动作）");
                     factory.cantrips(actor, visibleMonsters);
                 }
@@ -158,6 +165,7 @@ public final class PlayerCandidateFactory {
         case END_TURN -> "结束我的回合"; case BEGIN_ATTACK -> "开始攻击动作"; case FORFEIT_ATTACKS -> "放弃剩余攻击";
         case DASH -> "疾走"; case DISENGAGE -> "撤离"; case DODGE -> "闪避";
         case DROP_PRONE -> "主动卧倒"; case STAND_UP -> "起身";
+        case CUNNING_DASH -> "灵巧动作：疾走"; case CUNNING_DISENGAGE -> "灵巧动作：撤离"; case CUNNING_HIDE -> "灵巧动作：躲藏";
         case ACTION_SURGE -> "动作如潮"; case SECOND_WIND -> "回气（附赠动作）"; case END_CONCENTRATION -> "结束专注"; default -> "继续行动";
     }; }
     private static final class BattleChoices {

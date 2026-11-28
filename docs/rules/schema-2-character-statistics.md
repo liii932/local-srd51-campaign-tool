@@ -69,7 +69,7 @@
 页码和备注字段；子职业、特性、专长键分别使用 `subclass.`、`feature.`、`feat.`。
 
 特性执行状态为 `AUTOMATIC`、`CHOICE`、`DM_ADJUDICATION` 或 `BLOCKED`。基础算法白名单见
-[职业特性合同](class-features-v2.md)，当前 `CHOICE` 专属一级战士防御。特性消费者按各自的攻击、法术或叙事规则使用已取得的事实。
+[职业特性合同](class-features-v2.md)，当前 `CHOICE` 支持一级战士防御及[一级游荡者专精](schema-2-rogue.md)。特性消费者按各自的攻击、法术或叙事规则使用已取得的事实。
 schema 2 的法师 `SRD_2014_WIZARD_ARCANE_RECOVERY_V1` 另按[奥术回想合同](schema-2-arcane-recovery.md)
 支持准确的 AUTOMATIC 声明及真实短休消费者；同算法 BLOCKED 仍不执行，两种声明不自动转换。
 战士 `SRD_2014_FIGHTER_EXTRA_ATTACK_V1` 另按[额外攻击合同](schema-2-extra-attack.md)校验
