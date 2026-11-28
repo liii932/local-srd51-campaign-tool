@@ -281,7 +281,7 @@ public final class Schema2CombatState {
             if (castingRule == null || spell == null || targets == null || targets.size() > 3
                     || (coneDirection==null?targets.isEmpty():!targets.isEmpty()||coneDirection<0||coneDirection>=8))
                 throw invalid("S2_SPELL_COMMAND");
-            if(slotLevel<1 || slotLevel>9)throw invalid("S2_SPELL_COMMAND");
+            if(slotLevel<0 || slotLevel>9)throw invalid("S2_SPELL_COMMAND");
             targets = List.copyOf(targets);
             if (new HashSet<>(targets).size() != targets.size()) throw invalid("S2_SPELL_TARGET");
             targets.forEach(Schema2CombatState::uuid); if (materialItemId != null) uuid(materialItemId); if(targetCastFrameKey!=null)uuid(targetCastFrameKey);
@@ -294,7 +294,15 @@ public final class Schema2CombatState {
     public record CastAttempt(UUID frameKey, UUID actorId, RuleIdentity castingRule, RuleIdentity spell,
             List<UUID> targets, RuleIdentity slotResource, int slotLevel, UUID materialItemId,
             List<Integer> healingDice, int healingModifier, int requestedHealing, int appliedHealing, UUID effectKey,
-            CastStatus status, UUID targetCastFrameKey, UUID readyKey, Integer coneDirection) {
+            CastStatus status, UUID targetCastFrameKey, UUID readyKey, Integer coneDirection,
+            SacredFlameOutcome sacredFlame) {
+        public CastAttempt(UUID frameKey, UUID actorId, RuleIdentity castingRule, RuleIdentity spell,
+                List<UUID> targets, RuleIdentity slotResource, int slotLevel, UUID materialItemId,
+                List<Integer> healingDice, int healingModifier, int requestedHealing, int appliedHealing, UUID effectKey,
+                CastStatus status, UUID targetCastFrameKey, UUID readyKey, Integer coneDirection) {
+            this(frameKey,actorId,castingRule,spell,targets,slotResource,slotLevel,materialItemId,healingDice,
+                    healingModifier,requestedHealing,appliedHealing,effectKey,status,targetCastFrameKey,readyKey,coneDirection,null);
+        }
         public CastAttempt(UUID frameKey, UUID actorId, RuleIdentity castingRule, RuleIdentity spell,
                 List<UUID> targets, RuleIdentity slotResource, int slotLevel, UUID materialItemId,
                 List<Integer> healingDice, int healingModifier, int requestedHealing, int appliedHealing, UUID effectKey,
@@ -308,6 +316,7 @@ public final class Schema2CombatState {
         }
         public CastAttempt { targets = List.copyOf(targets); healingDice = List.copyOf(healingDice); }
     }
+    public record SacredFlameOutcome(BatchCheck savingThrow, AttackDamageComponent damage) { }
     public record ReadyTrigger(TriggerKind kind, UUID subjectId, Position position) {
         public ReadyTrigger {if(kind==null)throw invalid("S2_READY_TRIGGER");uuid(subjectId);if((position!=null)!=(kind==TriggerKind.CREATURE_ENTER_CELL_AFTER))throw invalid("S2_READY_TRIGGER");}
     }
@@ -503,11 +512,26 @@ public final class Schema2CombatState {
             boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
             UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
             MonsterAttackEvidence monsterAttack, RangedAttackEvidence rangedAttack, boolean attackerSeesTarget,
-            boolean targetSeesAttacker, Cover targetCover, Position aimedPosition, boolean targetAtAimedPosition) {
+            boolean targetSeesAttacker, Cover targetCover, Position aimedPosition, boolean targetAtAimedPosition,
+            SpellAttackEvidence spellAttack) {
+        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
+                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
+                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
+                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
+                UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
+                MonsterAttackEvidence monsterAttack, RangedAttackEvidence rangedAttack, boolean attackerSeesTarget,
+                boolean targetSeesAttacker, Cover targetCover, Position aimedPosition, boolean targetAtAimedPosition) {
+            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,
+                    selectedD20,abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,
+                    damageAmount,blessingEffectKey,blessingD4,status,initialHit,finalArmorClass,monsterAttack,rangedAttack,
+                    attackerSeesTarget,targetSeesAttacker,targetCover,aimedPosition,targetAtAimedPosition,null);
+        }
         public AttackAttempt { damageDice = List.copyOf(damageDice); }
     }
     public record RangedAttackEvidence(int distanceFeet, int normalRangeFeet, int longRangeFeet, boolean closeEnemy,
             UUID ammunitionItemId) { }
+    public record SpellAttackEvidence(UUID castFrameKey, AttackDamageComponent damage, boolean unseenDeadAtAim,
+            boolean targetDeadBeforeDamage) { }
     public record MonsterAttackEvidence(EntryIdentity action, int hitBonus, int reachFeet, List<UUID> packTacticsAllies,
             List<AttackDamageComponent> damageComponents, MonsterAttackOnHitEvidence onHit) {
         public MonsterAttackEvidence {

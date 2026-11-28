@@ -889,6 +889,19 @@ public final class Schema2CombatRules {
             Schema2FeatureSupport.requireSupportedFeatures(source.material(),source.character(),"ACTION_FLOW_FROZEN_DATA_INVALID");
             var definitions=source.material().projection().rules().stream().filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast).filter(r->r.enabled()&&r.identity().equals(cast.spell())).toList();
             if(definitions.size()!=1)throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");String algorithm=definitions.getFirst().definition().algorithm();
+            if (cast.slotLevel() == 0) {
+                Schema2SpellRules.knownCantrip(source,cast.castingRule(),cast.spell(),"ACTION_FLOW_FROZEN_DATA_INVALID");
+                var attacks = flow.attacks().stream().filter(attack -> attack.spellAttack() != null
+                        && attack.spellAttack().castFrameKey().equals(cast.frameKey())).toList();
+                boolean resolved = cast.status() == CastStatus.RESOLVED;
+                if (FIRE_BOLT_ALGORITHM.equals(algorithm)) {
+                    if (cast.sacredFlame()!=null || attacks.size()>1 || resolved && attacks.size()!=1)
+                        throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+                } else if (!attacks.isEmpty() || resolved != (cast.sacredFlame()!=null)) {
+                    throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+                }
+                continue;
+            }
             if(cast.castingRule().ruleType().equals("character.spellcasting")) {
                 var profiles=source.material().projection().rules().stream().filter(FinalSpellcasting.class::isInstance).map(FinalSpellcasting.class::cast).filter(r->r.enabled()&&r.identity().equals(cast.castingRule())).toList();
                 if(profiles.size()!=1)throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");var profile=profiles.getFirst().definition();

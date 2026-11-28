@@ -162,9 +162,23 @@ public final class CampaignParticipationCommands {
                 || (command.kind() == Schema2CombatState.Kind.HIDE || command.kind() == Schema2CombatState.Kind.SEARCH) && !sharedScene)
             throw playerPermissionDenied();
         switch (command.kind()) {
+            case DECLARE_COUNTERSPELL -> {
+                var cast = command.castInput();
+                if (cast == null || cast.targets().size() != 1) throw playerPermissionDenied();
+                requireSeenCharacters(state, actor.memberId(), battle, character, cast.targets());
+            }
             case CAST -> {
-                if (command.castInput() == null) throw playerPermissionDenied();
-                requireSeenCharacters(state, actor.memberId(), battle, character, command.castInput().targets());
+                var cast = command.castInput();
+                if (cast == null || cast.castingRule() == null) throw playerPermissionDenied();
+                if ("character.class_cantrips".equals(cast.castingRule().ruleType())) {
+                    if (!sharedScene || cast.targets().size() != 1) throw playerPermissionDenied();
+                    UUID target = cast.targets().getFirst();
+                    if ((!PlayerCampaignProjection.visible(state, actor.memberId()).contains(target)
+                            && !visibleMonsters(state, actor.memberId(), battle.combatId()).contains(target))
+                            || Schema2ObservationRules.knownPosition(battle, character, target) == null) throw playerPermissionDenied();
+                } else {
+                    requireSeenCharacters(state, actor.memberId(), battle, character, cast.targets());
+                }
             }
             case GRAPPLE, SHOVE_PRONE, SHOVE_PUSH -> {
                 if (command.targetId() == null) throw playerPermissionDenied();

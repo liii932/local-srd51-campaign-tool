@@ -14,11 +14,12 @@ const wolfName = '林地灰狼';
 async function main() {
   const [flag, storageRoot, scenario] = process.argv.slice(2);
   assert.ok(flag === '--fresh-root' && path.isAbsolute(storageRoot), 'Expected --fresh-root /absolute/disposable/player-store');
-  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise'].includes(scenario),
-    'Expected --movement, --ranged, --observation, or --surprise');
+  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise', '--cantrips'].includes(scenario),
+    'Expected --movement, --ranged, --observation, --surprise, or --cantrips');
   const ranged = scenario === '--ranged';
   const observation = scenario === '--observation';
   const surprise = scenario === '--surprise';
+  const cantrips = scenario === '--cantrips';
   const monsterName = observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
   const root = await fs.realpath(storageRoot);
   const repo = await fs.realpath(path.join(__dirname, '../..'));
@@ -44,7 +45,20 @@ async function main() {
     const host = await newPage(), attacker = await newPage(), observer = await newPage();
     const field = (form, name) => host.locator('#' + form).locator('[name="' + name + '"]');
     const submit = form => host.locator('#' + form + ' button').click();
-    const hostAction = async (action, trigger) => (await observeStorageAction(host, action, trigger, {})).body;
+    const hostAction = async (action, trigger) => {
+      if (!cantrips) return (await observeStorageAction(host, action, trigger, {})).body;
+      // Participation polling can refresh the Host while a form submission is finishing.
+      const [response] = await Promise.all([
+        host.waitForResponse(response => response.url() === hostOrigin + '/api/host/storage/' + action
+          && response.request().method() === 'POST', {timeout: 120000}),
+        trigger()
+      ]);
+      const body = await response.json();
+      assert.equal(response.status(), 200, body.code);
+      assert.equal(body.status, 'OK');
+      await waitForStorageReady(host);
+      return body;
+    };
     const domainAction = form => hostAction('domain', () => submit(form));
     const readHost = () => host.evaluate(async () => (await fetch('/api/host/storage/state')).json());
     const readPlayer = page => page.evaluate(async () => (await fetch('/api/player/state')).json());
@@ -82,32 +96,59 @@ async function main() {
     await host.goto(hostOrigin + '/host/storage');
     await waitForStorageReady(host);
     assert.equal((await readHost()).storage.state, 'IDLE');
-    await field('storage-create', 'name').fill(surprise ? '受惊与分组先攻验收' : observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收');
+    const campaignName = cantrips ? '已知戏法验收' : surprise ? '受惊与分组先攻验收'
+      : observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收';
+    await field('storage-create', 'name').fill(campaignName);
     await hostAction('create', () => host.locator('#storage-create button[type="submit"]').click());
     const fighters = [];
-    for (const name of ['巡林战士', '营地战士']) {
+    const characters = cantrips
+      ? [
+        {name: '巡林法师', owner: 'class.wizard', known: ['spell.fire_bolt', 'spell.mage_hand', 'spell.prestidigitation']},
+        {name: '营地牧师', owner: 'class.cleric', known: ['spell.guidance', 'spell.light', 'spell.thaumaturgy']}
+      ]
+      : ['巡林战士', '营地战士'].map(name => ({name, owner: 'class.fighter'}));
+    for (const {name, owner, known} of characters) {
       await host.locator('[data-pane="people"]').click();
       await field('domain-create', 'name').fill(name);
-      await selectRule('domain-create', 'classKey', 'class.fighter');
+      await selectRule('domain-create', 'classKey', owner);
+      if (known) {
+        const select = field('domain-create', 'cantripKeys');
+        await select.waitFor();
+        const pool = await select.locator('option').evaluateAll(options => options.map(option => option.value));
+        assert.ok(pool.length >= 4);
+        await select.selectOption(known.map(key => {
+          const option = pool.find(value => value.endsWith('/' + key));
+          assert.ok(option, key);
+          return option;
+        }));
+      }
       const result = await domainAction('domain-create');
-      fighters.push(result.campaign.domain.characters.find(c => c.name === name).id);
+      const character = result.campaign.domain.characters.find(c => c.name === name);
+      fighters.push(character.id);
+      if (known) {
+        assert.deepEqual(character.state.knownCantrips.map(entry => entry.spell.ruleKey).sort(), known.slice().sort());
+        assert.ok(character.state.knownCantrips.every(entry => entry.characterClass.ruleKey === owner));
+      }
     }
-    await host.locator('[data-pane="actions"]').click();
-    await field('domain-equipment', 'characterId').selectOption(fighters[0]);
-    await field('domain-equipment', 'kind').selectOption('ITEM_ACQUIRED');
-    const weaponKey = ranged ? 'item.shortbow' : 'item.longsword';
-    await selectRule('domain-equipment', 'item', weaponKey);
-    const acquired = await domainAction('domain-equipment');
-    const fighter = acquired.campaign.domain.characters.find(c => c.id === fighters[0]);
-    const weapon = fighter.state.equipment.find(i => i.item.ruleKey === weaponKey).itemId;
-    await field('domain-equipment', 'kind').selectOption('ITEM_EQUIPPED');
-    await field('domain-equipment', 'itemId').selectOption(weapon);
-    await field('domain-equipment', 'location').selectOption(ranged ? 'BOTH_HANDS' : 'MAIN_HAND');
-    await domainAction('domain-equipment');
-    if (ranged) for (let i = 0; i < 2; i++) {
+    let weapon;
+    if (!cantrips) {
+      await host.locator('[data-pane="actions"]').click();
+      await field('domain-equipment', 'characterId').selectOption(fighters[0]);
       await field('domain-equipment', 'kind').selectOption('ITEM_ACQUIRED');
-      await selectRule('domain-equipment', 'item', 'item.arrow');
+      const weaponKey = ranged ? 'item.shortbow' : 'item.longsword';
+      await selectRule('domain-equipment', 'item', weaponKey);
+      const acquired = await domainAction('domain-equipment');
+      const fighter = acquired.campaign.domain.characters.find(c => c.id === fighters[0]);
+      weapon = fighter.state.equipment.find(i => i.item.ruleKey === weaponKey).itemId;
+      await field('domain-equipment', 'kind').selectOption('ITEM_EQUIPPED');
+      await field('domain-equipment', 'itemId').selectOption(weapon);
+      await field('domain-equipment', 'location').selectOption(ranged ? 'BOTH_HANDS' : 'MAIN_HAND');
       await domainAction('domain-equipment');
+      if (ranged) for (let i = 0; i < 2; i++) {
+        await field('domain-equipment', 'kind').selectOption('ITEM_ACQUIRED');
+        await selectRule('domain-equipment', 'item', 'item.arrow');
+        await domainAction('domain-equipment');
+      }
     }
 
     const world = await createNode(host, hostAction, '林地');
@@ -117,7 +158,8 @@ async function main() {
     await selectRule('domain-monster-create', 'monster', observation ? 'monster.goblin' : ranged ? 'monster.skeleton' : 'monster.wolf');
     const created = await domainAction('domain-monster-create');
     const monster = created.campaign.domain.space.monsters.find(m => m.name === monsterName).id;
-    const placements = observation ? [[fighters[0], 1, 1, 0], [monster, 3, 1, 1], [fighters[1], 1, 3, 0]]
+    const placements = cantrips ? [[fighters[0], 1, 1, 0], [monster, 4, 1, 1], [fighters[1], 1, 3, 0]]
+      : observation ? [[fighters[0], 1, 1, 0], [monster, 3, 1, 1], [fighters[1], 1, 3, 0]]
       : ranged ? [[fighters[0], 1, 1, 0], [monster, 18, 1, 1], [fighters[1], 1, 2, 0]]
         : [[fighters[0], 1, 1, 0], [monster, 2, 1, 1], [fighters[1], 3, 3, 0]];
     const secondWolfName = '营地灰狼';
@@ -164,7 +206,7 @@ async function main() {
     }
     assert.notEqual(members[0], members[1]);
     await attacker.locator('#player-takeover').click();
-    if (surprise) await observer.locator('#player-takeover').click();
+    if (surprise || cantrips) await observer.locator('#player-takeover').click();
     await host.getByText('共享给谁看', {exact: true}).click();
     await share('SCENE', scene, 'ALL');
     await share('MONSTER', monster, 'SELECTED', members[0]);
@@ -193,6 +235,94 @@ async function main() {
       for (let i = 0; i < battle().initiative.length && active() !== id; i++) await endTurn();
       assert.equal(active(), id);
     };
+    if (cantrips) {
+      const [wizard, cleric] = fighters;
+      const ownCard = page => page.locator('#player-cards .character-card');
+      const wizardCard = ownCard(attacker), clericCard = ownCard(observer);
+      const spellName = 'Fire Bolt', otherSpell = 'Sacred Flame', label = spellName + ' · ' + monsterName;
+      await wizardCard.getByText('已知戏法', {exact: true}).click();
+      await wizardCard.getByText(/Fire Bolt.*可施放/).waitFor();
+      await wizardCard.getByText(/Mage Hand.*仅记录/).waitFor();
+      await clericCard.getByText('已知戏法', {exact: true}).click();
+      await clericCard.getByText(/Guidance.*仅记录/).waitFor();
+      assert.equal(await clericCard.getByText(otherSpell, {exact: false}).count(), 0);
+
+      await advanceTo(cleric);
+      await observer.locator('#player-actions button:enabled').filter({hasText: '结束我的回合'}).waitFor();
+      await host.locator('#domain-cantrip').waitFor({state: 'hidden'});
+      assert.ok(!(await readPlayer(observer)).view.candidates.some(candidate => candidate.label.includes(otherSpell)));
+
+      const character = (domain, id) => domain.characters.find(entry => entry.id === id);
+      const monsterHp = domain => domain.space.monsters.find(entry => entry.id === monster).hitPoints;
+      let outcome, attempts = 0;
+      while (attempts < 12 && outcome?.outcome !== 'HIT') {
+        attempts++;
+        await advanceTo(wizard);
+        await host.locator('#domain-cantrip').waitFor();
+        await selectRule('domain-cantrip', 'spell', 'spell.fire_bolt');
+        assert.deepEqual(await field('domain-cantrip', 'spell').locator('option').allTextContents(), [spellName]);
+        await field('domain-cantrip', 'targetId').selectOption(monster);
+        const before = state.campaign.domain;
+        const slots = character(before, wizard).state.resources;
+        assert.ok(slots.some(resource => resource.identity.ruleKey === 'resource.wizard.slot1' && resource.current > 0));
+        outcome = (await playerCommand(label)).cantripResult;
+        assert.deepEqual(Object.keys(outcome).sort(), ['damage', 'dropped', 'outcome', 'spell']);
+        assert.ok(['HIT', 'MISS'].includes(outcome.outcome));
+        assert.equal(outcome.spell, spellName);
+        await attacker.locator('#player-receipt').filter({hasText: `${spellName} · ${outcome.outcome === 'HIT' ? '命中' : '未命中'} · 实际伤害 ${outcome.damage}`}).waitFor();
+        await wizardCard.locator('.cantrip-result').filter({hasText: spellName}).waitFor();
+        state = await readHost();
+        const after = state.campaign.domain;
+        const flow = battle().flows.at(-1), cast = flow.casts[0], attack = flow.attacks[0];
+        assert.equal(cast.spell.ruleKey, 'spell.fire_bolt');
+        assert.equal(cast.slotLevel, 0);
+        assert.equal(cast.actorId, wizard);
+        assert.deepEqual(cast.targets, [monster]);
+        assert.equal(attack.hit, outcome.outcome === 'HIT');
+        assert.equal(attack.damageAmount, outcome.damage);
+        assert.equal(actor(wizard).actionsRemaining, 0);
+        assert.equal(monsterHp(after), Math.max(0, monsterHp(before) - outcome.damage));
+        assert.equal(outcome.dropped, monsterHp(after) === 0);
+        assert.deepEqual(character(after, wizard).state.resources, slots);
+        assert.equal(after.roots.length, before.roots.length + 1);
+        assert.equal(after.roots.at(-1).actor.memberId, members[0]);
+        await waitForHistoryCount(host, after.roots.length);
+        const privateView = JSON.stringify((await readPlayer(observer)).view);
+        assert.ok(!/Fire Bolt|cantripResult|lastCantrip|spellAttack|selectedD20|finalArmorClass/.test(privateView));
+        await observer.locator('#player-receipt').waitFor({state: 'hidden'});
+        await assertMonsterHiddenFromObserver();
+        if (outcome.outcome === 'MISS') await endTurn();
+      }
+      assert.ok(outcome?.outcome === 'HIT' && outcome.damage > 0, 'Expected a server-rolled damaging Fire Bolt hit');
+      await endTurn();
+      await advanceTo(wizard);
+      const dmTarget = outcome.dropped ? cleric : monster;
+      const beforeDmCast = state.campaign.domain;
+      assert.equal(actor(wizard).actionsRemaining, 1);
+      await host.locator('#domain-cantrip').waitFor();
+      await selectRule('domain-cantrip', 'spell', 'spell.fire_bolt');
+      await field('domain-cantrip', 'targetId').selectOption(dmTarget);
+      state = await domainAction('domain-cantrip');
+      const afterDmCast = state.campaign.domain;
+      assert.equal(afterDmCast.roots.length, beforeDmCast.roots.length + 1);
+      const dmRoot = afterDmCast.roots.at(-1);
+      assert.equal(dmRoot.kind, 'combat-command');
+      assert.deepEqual(dmRoot.actor, {kind: 'DM', memberId: null, representedMemberId: members[0], characterId: wizard});
+      const dmEvent = afterDmCast.combats.find(history => history.current.combatId === scene).events.at(-1);
+      assert.equal(dmEvent.operationId, dmRoot.operationId);
+      assert.equal(dmEvent.command.kind, 'CAST');
+      assert.equal(dmEvent.command.castInput.slotLevel, 0);
+      assert.equal(dmEvent.command.castInput.spell.ruleKey, 'spell.fire_bolt');
+      assert.deepEqual(dmEvent.command.castInput.targets, [dmTarget]);
+      assert.equal(actor(wizard).actionsRemaining, 0);
+      assert.deepEqual(character(afterDmCast, wizard).state.resources, character(beforeDmCast, wizard).state.resources);
+
+      await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({result: 'PASSED', playerSessions: seats.length, attempts, cantripResult: outcome, dmCast: true}));
+      return;
+    }
     if (surprise) {
       const combat = 'domain-combat', kind = field(combat, 'kind');
       const openingOptions = host.locator('#domain-opening');

@@ -4,6 +4,8 @@ import com.dndtool.service.CampaignDomainEngine;
 import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
+import com.dndtool.service.Schema2CharacterRuntime.RestInput;
+import com.dndtool.service.Schema2CharacterRuntime.SpellbookInput;
 import com.dndtool.service.Schema2CombatHistory;
 import com.dndtool.service.Schema2PreparationIdentity;
 import com.google.gson.*;
@@ -88,6 +90,83 @@ class PlayerProjectionAndCandidatesTest {
         assertTrue(pending.get("own").getAsBoolean());
         assertTrue(pending.get("description").getAsString().contains("移动怪物（5, 3）"));
         assertDoesNotThrow(() -> requireExecutionPermission(visible, fixture.player, passCurrentReaction(visible, fixture.second)));
+    }
+
+    @Test void counterspellCandidateTargetsTheSharedCantripCasterAndRevocationRejectsDirectSubmission() {
+        var snapshot = CampaignRuleFixtures.snapshot(UUID.randomUUID().toString(), "戏法反制");
+        snapshot = apply(snapshot, "node-create", json("name", "营地"));
+        UUID world = subject(snapshot);
+        snapshot = apply(snapshot, "focus-set", CampaignSpaceFixtures.target(CampaignSpaceData.Ref.world(world)));
+        snapshot = apply(snapshot, "character-create",
+                json("name", "反制法师", "kind", "PC", "classKey", "wizard", "backgroundKey", "acolyte"));
+        UUID wizard = subject(snapshot);
+        snapshot = apply(snapshot, "position", json("characterId", wizard.toString(), "nodeId", world.toString()));
+        var rules = snapshot.domains().material().restore();
+        snapshot = prepareCounterspell(snapshot, wizard, rules);
+
+        snapshot = apply(snapshot, "character-create",
+                json("name", "施法牧师", "kind", "NPC", "classKey", "cleric", "backgroundKey", "acolyte"));
+        UUID caster = subject(snapshot);
+        snapshot = apply(snapshot, "position", json("characterId", caster.toString(), "nodeId", world.toString()));
+        snapshot = apply(snapshot, "member-add", json("name", "反制玩家"));
+        UUID player = subject(snapshot);
+        snapshot = apply(snapshot, "control-set", json("characterId", wizard.toString(), "memberId", player.toString(), "controlVersion", "0"));
+        snapshot = apply(snapshot, "scene-create", json("name", "相遇", "nodeId", world.toString(),
+                "width", "10", "height", "10", "resolution", "RULES"));
+        UUID scene = subject(snapshot);
+        JsonObject enter = json("sceneId", scene.toString());
+        JsonArray placements = new JsonArray();
+        placements.add(json("id", wizard.toString(), "version", "0", "x", "2", "y", "2", "side", "0"));
+        placements.add(json("id", caster.toString(), "version", "0", "x", "4", "y", "2", "side", "1"));
+        enter.add("subjects", placements);
+        snapshot = apply(snapshot, "scene-enter", enter);
+        var battle = CampaignSpaceCommands.currentBattle(snapshot.domains()).current();
+        snapshot = apply(snapshot, "combat-command", combatInput(battle, Command.reenter(wizard, List.of(wizard, caster))));
+        snapshot = apply(snapshot, "share-set", shareInput(player, ShareKind.SCENE, scene));
+        battle = CampaignSpaceCommands.currentBattle(snapshot.domains()).current();
+        assertEquals(wizard, battle.activeActor());
+        snapshot = apply(snapshot, "combat-command", combatInput(battle, Command.action(Kind.END_TURN, wizard)));
+        battle = CampaignSpaceCommands.currentBattle(snapshot.domains()).current();
+        var sacredFlame = rules.rule("adventure.spell", "spell.sacred_flame");
+        var cantrip = Command.cast(caster, new CastInput(rules.rule("character.class_cantrips", "cantrips.cleric"),
+                sacredFlame, List.of(wizard), null, 0, null));
+        snapshot = apply(snapshot, "combat-command", combatInput(battle, cantrip));
+        var flow = CampaignSpaceCommands.currentBattle(snapshot.domains()).current().activeFlow();
+        assertEquals(CastStatus.PENDING, flow.casts().getFirst().status());
+        assertEquals(sacredFlame, flow.casts().getFirst().spell());
+        assertEquals(TriggerKind.CAST_BEFORE_COMPLETION, flow.windows().getFirst().trigger().kind());
+        assertEquals(ReactionKind.COUNTERSPELL, flow.windows().getFirst().opportunities().getFirst().options().getFirst().kind());
+        assertTrue(counterspellCandidates(access(snapshot), player).isEmpty());
+
+        snapshot = apply(snapshot, "share-set", shareInput(player, ShareKind.CHARACTER, caster));
+        var shared = access(snapshot);
+        var candidates = counterspellCandidates(shared, player);
+        assertEquals(1, candidates.size());
+        var option = candidates.getFirst();
+        var counter = CampaignDomainCodec.fromJson(option.input().get("command"), Command.class);
+        assertEquals(wizard, counter.actorId());
+        assertEquals(List.of(caster), counter.castInput().targets());
+        assertEquals(flow.rootFrameKey(), counter.castInput().targetCastFrameKey());
+        assertEquals(flow.leafFrameKey(), counter.leafKey());
+        assertEquals(3, counter.castInput().slotLevel());
+        assertDoesNotThrow(() -> requireExecutionPermission(shared, player, counter));
+
+        var retract = shareInput(player, ShareKind.CHARACTER, caster);
+        retract.addProperty("shareId", subject(snapshot).toString());
+        retract.addProperty("shareVersion", "1");
+        retract.addProperty("active", false);
+        var revoked = access(apply(snapshot, "share-set", retract));
+        assertTrue(counterspellCandidates(revoked, player).isEmpty());
+        assertDirectTargetForbidden(revoked, player, counter);
+
+        var resolved = new CampaignDomainCommands().apply(shared.snapshot(), option.action(), option.input(),
+                UUID.randomUUID(), "0".repeat(64), sides -> fail("Counterspell automatically counters a cantrip"),
+                Actor.player(player, wizard));
+        var resolvedFlow = CampaignSpaceCommands.currentBattle(resolved).current().activeFlow();
+        assertEquals(CastStatus.COUNTERED, resolvedFlow.casts().getFirst().status());
+        assertEquals(CastStatus.RESOLVED, resolvedFlow.casts().getLast().status());
+        assertEquals(1, characterHistory(resolved, wizard).current().resources().stream()
+                .filter(resource -> resource.identity().ruleKey().equals("resource.wizard.slot3")).findFirst().orElseThrow().current());
     }
 
     @Test void aSharedManualCardOutsideTheObservationRosterDoesNotChangeMovementCandidates() {
@@ -349,6 +428,45 @@ class PlayerProjectionAndCandidatesTest {
 
     private static Schema2CharacterRuntime.History characterHistory(CampaignDomainData.State domain, UUID id) {
         return domain.characters().stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow().history();
+    }
+    private static List<PlayerCandidateFactory.Candidate> counterspellCandidates(CampaignStorageService.AccessSnapshot access, UUID player) {
+        return PlayerCandidateFactory.candidates(access, player).stream()
+                .filter(option -> option.action().equals("combat-command"))
+                .filter(option -> CampaignDomainCodec.fromJson(option.input().get("command"), Command.class).kind()==Kind.DECLARE_COUNTERSPELL)
+                .toList();
+    }
+    private static CampaignData.Snapshot prepareCounterspell(CampaignData.Snapshot snapshot, UUID wizard, CampaignRuleContext rules) {
+        var profile = rules.rule("character.wizard_spellcasting", "spellcasting.wizard");
+        var prepared = rules.initialWizardPrepared();
+        snapshot = applyCharacter(snapshot, wizard, Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",
+                new SpellbookInput(profile, rules.initialWizardBook(), prepared)));
+        var learning = List.of(List.of("detect_magic", "disguise_self"), List.of("grease", "mage_armor"),
+                List.of("magic_missile", "sleep"), List.of("counterspell", "fog_cloud"));
+        for (int level = 2; level <= 5; level++) {
+            var subclass = level==2 ? rules.rule("character.subclass", "subclass.evocation") : null;
+            var increases = level==4 ? Map.of("ability.intelligence", 2) : Map.<String, Integer>of();
+            snapshot = applyCharacter(snapshot, wizard, new Schema2CharacterRuntime.Command("CHARACTER_ADVANCED", null, 0,
+                    null, "FIXED_AVERAGE", rules.rule("character.class", "class.wizard"),
+                    new GrowthChoices(subclass, increases, null, Map.of())));
+            var learned = learning.get(level-2).stream().map(spell -> rules.rule("adventure.spell", "spell." + spell)).toList();
+            snapshot = applyCharacter(snapshot, wizard, Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_ADVANCED",
+                    new SpellbookInput(profile, learned, prepared)));
+        }
+        snapshot = applyCharacter(snapshot, wizard, rest("REST_STARTED", new RestInput("LONG_REST", null, 0, 0, Map.of())));
+        snapshot = applyCharacter(snapshot, wizard, rest("TIME_ADVANCED", new RestInput(null, "SLEEP", 480, 0, Map.of())));
+        snapshot = applyCharacter(snapshot, wizard, rest("REST_COMPLETED", new RestInput(null, null, 0, 0, Map.of())));
+        return applyCharacter(snapshot, wizard, Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_PREPARED",
+                new SpellbookInput(profile, List.of(), List.of(rules.rule("adventure.spell", "spell.counterspell")))));
+    }
+    private static Schema2CharacterRuntime.Command rest(String kind, RestInput input) {
+        return new Schema2CharacterRuntime.Command(kind, null, 0, null, null, null, GrowthChoices.EMPTY, input);
+    }
+    private static CampaignData.Snapshot applyCharacter(CampaignData.Snapshot snapshot, UUID character,
+            Schema2CharacterRuntime.Command command) {
+        long version = characterHistory(snapshot.domains(), character).current().version();
+        var input = json("characterId", character.toString(), "characterVersion", Long.toString(version));
+        input.add("command", CampaignDomainCodec.toJson(command));
+        return apply(snapshot, "character-command", input);
     }
     private static CampaignData.Snapshot apply(CampaignData.Snapshot snapshot, String action, JsonObject input) {
         var state = new CampaignDomainCommands().apply(snapshot, action, CampaignSpaceFixtures.focused(snapshot.domains(), input),

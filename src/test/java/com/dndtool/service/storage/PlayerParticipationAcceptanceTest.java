@@ -514,6 +514,152 @@ class PlayerParticipationAcceptanceTest {
         }
     }
 
+    @Test void knownCantripsRemainPlayableAtZeroSlotsAndRestoreTheOwnersTurnAndResults() throws Exception {
+        var dice = new ScriptedDice();
+        var failAfterUpdate = new AtomicBoolean();
+        try (Fixture f = new Fixture("cantrip-battle", dice, boundary -> {
+            if (boundary == CampaignStorageService.Boundary.AFTER_CHARACTER_UPDATE && failAfterUpdate.getAndSet(false))
+                throw new IllegalStateException("cantrip transaction failure");
+        })) {
+            UUID wizard = f.character("火焰法师", "PC", "wizard");
+            UUID cleric = f.character("圣火牧师", "PC", "cleric");
+            f.characterCommand(wizard, Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",
+                    new Schema2CharacterRuntime.SpellbookInput(f.rules.rule("character.wizard_spellcasting", "spellcasting.wizard"),
+                            f.rules.initialWizardBook(), f.rules.initialWizardPrepared())));
+            UUID arrow = f.acquire(wizard, "item.arrow");
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, wizard, cleric);
+            for (var member : Map.of(wizard, "wizard", cleric, "cleric").entrySet()) {
+                var slot = f.rules.rule("character.resource", "resource." + member.getValue() + ".slot1");
+                long current = f.card(member.getKey()).resources().stream().filter(r -> r.identity().equals(slot))
+                        .findFirst().orElseThrow().current();
+                assertTrue(current > 0);
+                f.characterCommand(member.getKey(), new Schema2CharacterRuntime.Command("RESOURCE_SPENT", slot, current, null, null));
+            }
+            var wizardState = f.card(wizard);
+            var clericState = f.card(cleric);
+            assertEquals(0, f.wizardSlots(wizard));
+            assertEquals(3, wizardState.knownCantrips().size());
+            assertEquals(3, clericState.knownCantrips().size());
+            UUID wolf = f.wolf(REVEALED_WOLF);
+            UUID scene = f.createScene(world, "30", "8");
+            dice.add(20, 14, 1);
+            f.enterBattle(scene, List.of(new Deployment(wizard, new Position(1, 2), 0),
+                    new Deployment(cleric, new Position(13, 2), 0), new Deployment(wolf, new Position(25, 2), 1)));
+            Seat mage = f.approve("法师玩家"), priest = f.approve("牧师玩家");
+            f.assign(wizard, mage.member);
+            f.assign(cleric, priest.member);
+            f.share(ShareKind.SCENE, scene, true, mage.member, priest.member);
+            f.share(ShareKind.MONSTER, wolf, true, mage.member);
+            f.takeover(mage);
+            f.takeover(priest);
+            String fire = "Fire Bolt · " + REVEALED_WOLF, sacred = "Sacred Flame · " + REVEALED_WOLF;
+            assertAbsent(f.view(priest), REVEALED_WOLF, wolf, "Fire Bolt");
+            var before = f.storage.accessSnapshot();
+            var cast = f.command(mage, f.option(mage, fire));
+            var hostCommand = Command.cast(wizard, new CastInput(wizardState.knownCantrips().getFirst().cantripProfile(),
+                    f.rules.rule("adventure.spell", "spell.fire_bolt"), List.of(wolf), null, 0, null));
+            failAfterUpdate.set(true);
+            dice.add(17, 6);
+            var error = assertThrows(IllegalStateException.class, () -> f.storage.domainCommand(uuid(), before.epoch(),
+                    before.revision(), "combat-command", combatInput(before, hostCommand)));
+            assertEquals("cantrip transaction failure", error.getMessage());
+            assertEquals(before, f.storage.accessSnapshot());
+            assertTrue(dice.isEmpty());
+            dice.add(17, 6);
+            var receipt = f.post(mage, "command", cast).body().getAsJsonObject("receipt");
+            var hit = object("spell", "Fire Bolt", "outcome", "HIT");
+            hit.addProperty("damage", 6);
+            hit.addProperty("dropped", false);
+            assertEquals(hit, receipt.get("cantripResult"));
+            assertEquals(hit, f.view(mage).getAsJsonArray("cards").get(0).getAsJsonObject().get("lastCantrip"));
+            assertEquals(receipt, f.post(mage, "receipt", receiptIdentity(cast)).body().get("receipt"));
+            assertReceipt("UNVERIFIED", f.post(priest, "receipt", receiptIdentity(cast)));
+            assertAbsent(receipt, wolf, "armorClass", "hitPoints", "finalArmorClass", "d20");
+            assertEquals(List.of(new CampaignSpaceData.Die(20, 17), new CampaignSpaceData.Die(10, 6)), lastRoot(f).rolls());
+            assertFalse(f.actor(wizard).actionAvailable());
+            assertStale(f, mage, cast);
+            assertEquals(wizardState, f.card(wizard));
+            assertEquals(Set.of(arrow), f.arrowIds(wizard));
+            assertPlayerBudget(f.view(mage), f.actor(wizard));
+            f.endTurn();
+            assertTrue(labels(f.view(priest)).stream().noneMatch(l -> l.equals(sacred)));
+            f.share(ShareKind.MONSTER, wolf, true, mage.member, priest.member);
+            setObservationCell(f, new Position(20, 2), false, false, Cover.THREE_QUARTERS);
+            var options = labels(f.view(priest));
+            assertTrue(options.contains(sacred));
+            finishAndOpen(f);
+            f.invitation = f.host("invite", object()).get("invitation").getAsString();
+            var restored = f.approve("重新核对牧师", priest.member);
+            f.takeover(restored);
+            assertEquals(options, labels(f.view(restored)));
+            assertPlayerBudget(f.view(restored), f.actor(cleric));
+            assertEquals(wizardState, f.card(wizard));
+            assertEquals(clericState, f.card(cleric));
+            int hp = f.monster(wolf).hitPoints();
+            dice.add(2, 8);
+            var sacredCast = f.command(restored, f.option(restored, sacred));
+            var sacredReceipt = f.post(restored, "command", sacredCast).body().getAsJsonObject("receipt");
+            var failed = object("spell", "Sacred Flame", "outcome", "FAILED_SAVE");
+            failed.addProperty("damage", 8);
+            failed.addProperty("dropped", true);
+            assertEquals(failed, sacredReceipt.get("cantripResult"));
+            assertTrue(hp > 0 && hp <= 8);
+            assertEquals(0, f.monster(wolf).hitPoints());
+            assertEquals(List.of(new CampaignSpaceData.Die(20, 2), new CampaignSpaceData.Die(8, 8)), lastRoot(f).rolls());
+            assertFalse(f.actor(cleric).actionAvailable());
+            assertEquals(clericState, f.card(cleric));
+            assertTrue(dice.isEmpty());
+            finishAndOpen(f);
+            assertFalse(f.actor(cleric).actionAvailable());
+            f.invitation = f.host("invite", object()).get("invitation").getAsString();
+            var last = f.approve("核对已用动作", priest.member);
+            f.takeover(last);
+            assertEquals(failed, f.view(last).getAsJsonArray("cards").get(0).getAsJsonObject().get("lastCantrip"));
+            assertFalse(labels(f.view(last)).contains(sacred));
+        }
+    }
+
+    @Test void aDelayedFireBoltShowsTheCasterTheShieldResultAndKeepsTheOriginalReceipt() throws Exception {
+        var dice = new ScriptedDice();
+        try (Fixture f = new Fixture("cantrip-shield", dice)) {
+            UUID caster = f.character("火焰法师", "PC", "wizard"), defender = f.character("护盾法师", "PC", "wizard");
+            f.characterCommand(defender, Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",
+                    new Schema2CharacterRuntime.SpellbookInput(f.rules.rule("character.wizard_spellcasting", "spellcasting.wizard"),
+                            f.rules.initialWizardBook(), f.rules.initialWizardPrepared())));
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, caster, defender);
+            UUID scene = f.createScene(world);
+            dice.add(20, 1);
+            f.enterBattle(scene, List.of(new Deployment(caster, new Position(1, 2), 0),
+                    new Deployment(defender, new Position(3, 2), 1)));
+            var mage = f.approve("火焰玩家");
+            var guard = f.approve("护盾玩家");
+            f.assign(caster, mage.member);
+            f.assign(defender, guard.member);
+            f.share(ShareKind.SCENE, scene, true, mage.member, guard.member);
+            f.share(ShareKind.CHARACTER, defender, true, mage.member);
+            f.takeover(mage);
+            f.takeover(guard);
+            var request = f.command(mage, f.option(mage, "Fire Bolt · 护盾法师"));
+            dice.add(9);
+            var receipt = f.post(mage, "command", request).body().getAsJsonObject("receipt");
+            assertEquals("WAITING", receipt.get("outcome").getAsString());
+            assertFalse(receipt.has("cantripResult"));
+            assertFalse(f.actor(caster).actionAvailable());
+            assertTrue(dice.isEmpty());
+            assertReceipt("ACCEPTED", f.post(guard, "command", f.command(guard, f.option(guard, "Shield"))));
+            assertReceipt("ACCEPTED", f.post(mage, "command", f.command(mage, f.option(mage, "继续结算当前行动"))));
+            var miss = object("spell", "Fire Bolt", "outcome", "MISS");
+            miss.addProperty("damage", 0);
+            miss.addProperty("dropped", false);
+            assertEquals(miss, f.view(mage).getAsJsonArray("cards").get(0).getAsJsonObject().get("lastCantrip"));
+            assertFalse(f.view(guard).getAsJsonArray("cards").get(0).getAsJsonObject().has("lastCantrip"));
+            assertEquals(receipt, f.post(mage, "receipt", receiptIdentity(request)).body().get("receipt"));
+            assertReceipt("UNVERIFIED", f.post(guard, "receipt", receiptIdentity(request)));
+            f.share(ShareKind.CHARACTER, defender, false, mage.member);
+            assertFalse(f.view(mage).getAsJsonArray("cards").get(0).getAsJsonObject().has("lastCantrip"));
+        }
+    }
+
     @Test void goblinHideAndSearchKeepIndependentPlayerViewsThroughReopenAndRollback() throws Exception {
         var dice = new ScriptedDice();
         var failAfterUpdate = new AtomicBoolean();

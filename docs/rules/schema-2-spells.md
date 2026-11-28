@@ -3,9 +3,9 @@
 ## 采用范围与真实资格
 
 
-SQLite 场景支持 Bless、Cure Wounds、Shield、Counterspell、有限 Burning Hands、Ready attack／move／spell、
+SQLite 战斗中支持[法师火焰箭和牧师圣火术](schema-2-cantrips.md)。场景支持 Bless、Cure Wounds、Shield、Counterspell、有限 Burning Hands、Ready attack／move／spell、
 固定 DM 抗魔区域及战外持续效果。规则来自[冻结施法材料](schema-2-spell-authoring.md)，资格取实际成长、
-装备、学习和准备记录。共同事务和场景边界见[战斗合同](schema-2-combat.md)。
+装备、已知戏法、学习和准备记录。共同事务和场景边界见[战斗合同](schema-2-combat.md)。
 
 生命领域 profile 限一级单职业角色：实际取得指定子职业与自动特性后，Bless／Cure Wounds 始终准备。
 Wizard profile 限单职业 1—5 级，法术书初始化实际学习六个一级法术，每次升级实际学习两个当前法术位
@@ -24,6 +24,7 @@ Evocation Savant、Sculpt Spells 保留真实获得事实，其抄录和塑形�
 
 | 操作 | 真实前提与后果 |
 |---|---|
+| `CAST` Fire Bolt / Sacred Flame | 一个普通动作、V/S、零环。对一个合法生物分别进行远程法术攻击或敏捷豁免，使用真实职业已知记录。详见[戏法](schema-2-cantrips.md)。 |
 | `CAST` Bless | 一次 action、一个一级位；V/S/M，实际持有 profile 指定圣徽；选择 1—3 个三十尺内角色，建立一个专注来源及其全部目标应用。 |
 | `CAST` Cure Wounds | 一次 action、一个一级位；V/S，至少一只空手；五尺内一个角色；服务器掷 1d8，加 WIS 调整值及生命门徒的三点，受目标 HP 上限约束。 |
 | `CAST` Burning Hands | 仅[有限法术共享伤害合同](schema-2-spell-save-damage.md)允许的双手空闲、无对象/抗魔风险及未获得 Sculpt Spells 的活动战斗分支；方向由有限选择提供，实际目标由服务器完整枚举；真实一至三环位分别共享 3d6/4d6/5d6，DEX 半伤与后继进入共同批次。 |

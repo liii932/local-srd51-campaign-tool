@@ -11,6 +11,8 @@
 
 | 类型 | 规则键前缀 | 算法 | 原文页 |
 | --- | --- | --- | --- |
+| `character.class_cantrips` | `cantrips.*` | `SRD_2014_CLASS_CANTRIPS_V1` | 15、52 |
+| `adventure.spell` | `spell.fire_bolt` / `spell.sacred_flame` | `SRD_2014_FIRE_BOLT_V1` / `SRD_2014_SACRED_FLAME_V1` | 144、176 |
 | `adventure.spell` | `spell.*` | `SRD_2014_BLESS_V1` | 122 |
 | `adventure.spell` | `spell.*` | `SRD_2014_CURE_WOUNDS_V1` | 132 |
 | `character.spellcasting` | `spellcasting.*` | `LIFE_DOMAIN_LEVEL1_V1` | 16—17 |
@@ -19,7 +21,9 @@
 | `adventure.spell` | `spell.*` | `SRD_2014_COUNTERSPELL_V1` | 131 |
 | `adventure.environment` | `environment.*` | `DM_ANTIMAGIC_ZONE_V1` | 0，明确为 DM 环境家规 |
 
-`adventure.spell` 没有自由机制参数。算法完整拥有法术环位、施法时间、射程、组件、目标、
+战斗戏法带有封闭的 `cantrip_profile`，职业配置通过 `cantrips` 成员引用准确的零环法术。字段和已接入的消费者见[职业戏法](schema-2-cantrips.md)。
+
+有环法术的算法完整拥有法术环位、施法时间、射程、组件、目标、
 骰子、持续时间和专注要求，作者不能额外附加自由伤害、治疗、脚本或 handler。Bless 是 1 环、
 一个动作、30 feet、V/S/M、最多三个不同生物、专注至多一分钟的攻击检定与豁免 d4；
 Cure Wounds 是 1 环、一个动作、触碰、V/S、即时 `1d8 + Wisdom 修正` 治疗，

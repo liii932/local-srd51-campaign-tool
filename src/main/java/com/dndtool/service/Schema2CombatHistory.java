@@ -61,7 +61,11 @@ public final class Schema2CombatHistory {
                     .filter(knownCharacters::contains).forEach(expectedDependencies::add);
             require(expectedDependencies.equals(new HashSet<>(dependencies)));
             validateState(e.after(),currentMembers,knownCharacters,knownMonsters);
-            if(e.command().castInput()!=null)require(dependencies.containsAll(e.command().castInput().targets()));
+            if (e.command().castInput()!=null) {
+                CastInput input=e.command().castInput();
+                require(input.targets().stream().allMatch(target -> dependencies.contains(target)
+                        || input.slotLevel()==0 && e.after().monsters().stream().anyMatch(monster -> monster.monsterId().equals(target))));
+            }
             for(Dependency d:e.dependencies())require(d.version()>=0&&d.version()<Schema2CharacterRuntime.MAX_EVENTS);
             require(e.characterOperations().size()==e.resolution().healthChanges().size()+e.resolution().ammunitionUses().size()
                     && e.characterOperations().size()<=MAX_COMBATANTS * 2);
@@ -77,6 +81,7 @@ public final class Schema2CombatHistory {
                 require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
             }
             validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);validateMonsterAttackTransition(e);
+            validateCantripResults(e);
             validateRangedAttackTransition(e);validateOpeningTransition(e);validateObservationTransition(e);validateAttackObservationTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
             for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
@@ -94,13 +99,16 @@ public final class Schema2CombatHistory {
         List<CastAttempt> created=new ArrayList<>(),completedHealing=new ArrayList<>();Set<UUID> seen=new HashSet<>();
         for(Flow flow:event.after().flows())for(CastAttempt cast:flow.casts()) {
             require(seen.add(cast.frameKey()));CastAttempt old=retained.remove(cast.frameKey());
-            if(old==null)created.add(cast);
+            if(old==null) {
+                if (cast.slotLevel()==0) validateCantripDeclaration(event,cast);
+                else created.add(cast);
+            }
             else {
                 require(old.actorId().equals(cast.actorId())&&old.castingRule().equals(cast.castingRule())&&old.spell().equals(cast.spell())&&old.targets().equals(cast.targets())
-                        &&old.slotResource().equals(cast.slotResource())&&old.slotLevel()==cast.slotLevel()&&Objects.equals(old.materialItemId(),cast.materialItemId())
+                        &&Objects.equals(old.slotResource(),cast.slotResource())&&old.slotLevel()==cast.slotLevel()&&Objects.equals(old.materialItemId(),cast.materialItemId())
                         &&old.healingModifier()==cast.healingModifier()&&Objects.equals(old.targetCastFrameKey(),cast.targetCastFrameKey())&&Objects.equals(old.readyKey(),cast.readyKey())&&Objects.equals(old.coneDirection(),cast.coneDirection()));
                 if(old.status()==CastStatus.RESOLVED||old.status()==CastStatus.COUNTERED||old.status()==CastStatus.INTERRUPTED)require(old.equals(cast));
-                else require(cast.status()==old.status()||cast.status()==CastStatus.RESOLVED||cast.status()==CastStatus.COUNTERED||old.status()==CastStatus.PENDING&&(cast.status()==CastStatus.HELD||cast.coneDirection()!=null&&cast.status()==CastStatus.INTERRUPTED));
+                else require(cast.status()==old.status()||cast.status()==CastStatus.RESOLVED||cast.status()==CastStatus.COUNTERED||old.status()==CastStatus.PENDING&&(cast.status()==CastStatus.HELD||(cast.coneDirection()!=null||cast.slotLevel()==0)&&cast.status()==CastStatus.INTERRUPTED));
             }
             if(!cast.healingDice().isEmpty()&&(old==null||old.healingDice().isEmpty()))completedHealing.add(cast);
         }
@@ -124,6 +132,83 @@ public final class Schema2CombatHistory {
             var matches=healing.stream().filter(c->frames.contains(c.frameKey())).toList();require(matches.size()==1&&cast.targets().size()==1);
             var result=matches.getFirst();require(result.characterId().equals(cast.targets().getFirst())&&result.damageAmount()==cast.requestedHealing()
                     &&result.healthResult().dice().equals(cast.healingDice())&&result.healthResult().rolledAmount()==cast.requestedHealing()&&result.healthResult().appliedAmount()==cast.appliedHealing());
+        }
+    }
+
+    private static void validateCantripDeclaration(Event event, CastAttempt cast) {
+        Battle before = event.before();
+        Command command = event.command();
+        CastInput input = command.castInput();
+        require(before!=null && before.status()==Status.ACTIVE && before.activeFlow()==null
+                && command.kind()==Kind.CAST && cast.actorId().equals(command.actorId())
+                && cast.actorId().equals(before.activeActor()) && input!=null && input.slotLevel()==0
+                && input.castingRule().equals(cast.castingRule()) && input.spell().equals(cast.spell())
+                && input.targets().equals(cast.targets()));
+        Combatant prior = member(before,cast.actorId());
+        Combatant after = member(event.after(),cast.actorId());
+        boolean incapacitated = event.resolution().healthChanges().stream()
+                .anyMatch(change -> change.characterId().equals(cast.actorId()) && change.after().hitPoints()==0);
+        require(prior.actionAvailable() && after.actionsRemaining()==(incapacitated?0:prior.actionsRemaining()-1)
+                && after.bonusActionsRemaining()==(incapacitated?0:prior.bonusActionsRemaining())
+                && event.resolution().ammunitionUses().isEmpty());
+    }
+
+    private static void validateCantripResults(Event event) {
+        Map<UUID,CastAttempt> priorCasts = new HashMap<>();
+        Map<UUID,AttackAttempt> priorAttacks = new HashMap<>();
+        if (event.before()!=null) for (Flow flow : event.before().flows()) {
+            for (CastAttempt cast : flow.casts()) if (cast.slotLevel()==0) priorCasts.put(cast.frameKey(),cast);
+            for (AttackAttempt attack : flow.attacks()) if (attack.spellAttack()!=null) priorAttacks.put(attack.frameKey(),attack);
+        }
+        var expectedRolls = new ArrayList<Roll>();
+        int declared = 0;
+        for (Flow flow : event.after().flows()) {
+            for (CastAttempt cast : flow.casts()) {
+                if (cast.slotLevel()!=0) continue;
+                var old = priorCasts.get(cast.frameKey());
+                if (old==null) declared++;
+                if (cast.sacredFlame()==null || old!=null && old.sacredFlame()!=null) continue;
+                UUID target = cast.targets().getFirst();
+                var outcome = cast.sacredFlame();
+                var save = outcome.savingThrow();
+                String purpose = Schema2ActionFlowRules.SACRED_FLAME_DEX;
+                if (save.firstD20()!=null) expectedRolls.add(new Roll(purpose+"_D20",target,20,save.firstD20()));
+                if (save.secondD20()!=null) expectedRolls.add(new Roll(purpose+"_SECOND_D20",target,20,save.secondD20()));
+                if (save.blessingD4()!=null) expectedRolls.add(new Roll(purpose+"_BLESS_D4",target,4,save.blessingD4()));
+                validateCantripDamage(event,expectedRolls,"SACRED_FLAME_DAMAGE",cast.frameKey(),cast.actorId(),target,outcome.damage(),false);
+            }
+            for (AttackAttempt attack : flow.attacks()) {
+                if (attack.spellAttack()==null || attack.status()!=AttackStatus.RESOLVED) continue;
+                var old = priorAttacks.get(attack.frameKey());
+                if (old!=null && old.status()==AttackStatus.RESOLVED) continue;
+                validateCantripDamage(event,expectedRolls,"FIRE_BOLT_DAMAGE",attack.frameKey(),attack.actorId(),
+                        attack.targetId(),attack.spellAttack().damage(),attack.critical());
+            }
+        }
+        require(declared==(event.command().castInput()!=null && event.command().castInput().slotLevel()==0 ? 1 : 0));
+        require(event.resolution().rolls().stream().filter(roll -> roll.purpose().equals("FIRE_BOLT_DAMAGE")
+                || roll.purpose().startsWith("SACRED_FLAME_")).toList().equals(expectedRolls));
+    }
+
+    private static void validateCantripDamage(Event event, List<Roll> expectedRolls, String purpose, UUID frame,
+            UUID caster, UUID target, AttackDamageComponent damage, boolean critical) {
+        int amount = damage==null ? 0 : damage.effectiveDamage();
+        if (damage!=null)
+            for (int die : damage.dice()) expectedRolls.add(new Roll(purpose,caster,damage.diceSides(),die));
+        var changes = event.resolution().healthChanges().stream()
+                .filter(change -> change.frameKey().equals(frame)).toList();
+        if (event.dependencies().stream().anyMatch(dependency -> dependency.characterId().equals(target))) {
+            require(changes.size()==(amount>0?1:0));
+            if (amount>0) {
+                var change = changes.getFirst();
+                require(change.characterId().equals(target) && change.damageAmount()==amount && change.critical()==critical
+                        && change.resource()==null && !change.healing() && !change.deathSave() && !change.timeAdvance());
+            }
+        } else {
+            require(changes.isEmpty() && event.before()!=null);
+            var before = Schema2MonsterRules.instance(event.before(),target);
+            var after = Schema2MonsterRules.instance(event.after(),target);
+            require(after.hitPoints()==Math.max(0,before.hitPoints()-amount));
         }
     }
 
@@ -204,18 +289,21 @@ public final class Schema2CombatHistory {
                                 : option.monsterAttack().rule().equals(knownMonsters.get(o.actorId())));
                 }}}
             for(Movement m:f.movements()) {uuid(m.movementKey());require(members.contains(m.actorId())&&m.path().size()>=1&&m.path().size()<=64&&m.cursor()>=0&&m.cursor()<=m.path().size()&&m.spent()>=0&&m.status()!=null&&(m.stopReason()==null||token(m.stopReason())));}
-            for(AttackAttempt t:f.attacks())require(frames.containsKey(t.frameKey())&&members.contains(t.actorId())&&members.contains(t.targetId())&&!t.actorId().equals(t.targetId())&&t.firstD20()>=1&&t.firstD20()<=20&&(t.secondD20()==null||t.secondD20()>=1&&t.secondD20()<=20)&&t.selectedD20()>=1&&t.selectedD20()<=20&&t.damageDice().size()<=40&&t.damageDice().stream().allMatch(v->v!=null&&v>=1&&v<=12)&&t.damageAmount()>=0&&validBlessing(t.blessingEffectKey(),t.blessingD4()));
+            for(AttackAttempt t:f.attacks())require(frames.containsKey(t.frameKey())&&members.contains(t.actorId())&&members.contains(t.targetId())&&(t.spellAttack()!=null||!t.actorId().equals(t.targetId()))&&t.firstD20()>=1&&t.firstD20()<=20&&(t.secondD20()==null||t.secondD20()>=1&&t.secondD20()<=20)&&t.selectedD20()>=1&&t.selectedD20()<=20&&t.damageDice().size()<=40&&t.damageDice().stream().allMatch(v->v!=null&&v>=1&&v<=12)&&t.damageAmount()>=0&&validBlessing(t.blessingEffectKey(),t.blessingD4()));
             for (AttackAttempt attack : f.attacks()) {
                 var source = knownMonsters.get(attack.actorId());
-                require(source == null ? attack.itemId() != null && attack.monsterAttack() == null
+                require(source == null ? (attack.itemId()!=null||attack.spellAttack()!=null) && attack.monsterAttack() == null
                         : attack.monsterAttack() != null && source.equals(attack.monsterAttack().action().rule()));
                 require(Schema2CombatStateValidator.validAttackSource(attack));
+                if (attack.spellAttack()!=null)
+                    require(Schema2CombatStateValidator.validSpellAttackLink(f,frames.get(attack.frameKey()),attack));
             }
             Set<UUID> castFrames=new HashSet<>();
             for(CastAttempt cast:f.casts()) {
                 require(frames.containsKey(cast.frameKey()) && frames.get(cast.frameKey()).kind()==FrameKind.CAST && castFrames.add(cast.frameKey()) && members.contains(cast.actorId())
-                        && castingType(cast.castingRule()) && ruleType(cast.spell(),"adventure.spell") && ruleType(cast.slotResource(),"character.resource")
-                        && cast.slotLevel()>=1 && cast.slotLevel()<=9 && (cast.coneDirection()==null?!cast.targets().isEmpty():cast.targets().isEmpty()&&cast.coneDirection()>=0&&cast.coneDirection()<8&&cast.readyKey()==null) && cast.targets().size()<=MAX_COMBATANTS
+                        && (cast.slotLevel()!=0 || knownCharacters.contains(cast.actorId()))
+                        && Schema2CombatStateValidator.validCastSource(cast,frames.get(cast.frameKey())) && ruleType(cast.spell(),"adventure.spell")
+                        && (cast.coneDirection()==null?!cast.targets().isEmpty():cast.targets().isEmpty()&&cast.coneDirection()>=0&&cast.coneDirection()<8&&cast.readyKey()==null) && cast.targets().size()<=MAX_COMBATANTS
                         && new HashSet<>(cast.targets()).size()==cast.targets().size() && members.containsAll(cast.targets())
                         && cast.healingDice().size()<=20 && cast.healingDice().stream().allMatch(d->d!=null&&d>=1&&d<=12)
                         && cast.status()!=null && cast.healingModifier()>=-5 && cast.healingModifier()<=10 && cast.requestedHealing()>=0 && cast.requestedHealing()<=65535
@@ -264,13 +352,15 @@ public final class Schema2CombatHistory {
                             && old.disadvantage() == attack.disadvantage() && old.abilityModifier() == attack.abilityModifier()
                             && old.proficiencyBonus() == attack.proficiencyBonus() && old.armorClass() == attack.armorClass()
                             && Objects.equals(old.blessingD4(), attack.blessingD4())
-                            && Objects.equals(old.blessingEffectKey(), attack.blessingEffectKey()) && old.initialHit() == attack.initialHit());
+                            && Objects.equals(old.blessingEffectKey(), attack.blessingEffectKey()) && old.initialHit() == attack.initialHit()
+                            && (old.spellAttack()==null ? attack.spellAttack()==null : attack.spellAttack()!=null
+                                && old.spellAttack().castFrameKey().equals(attack.spellAttack().castFrameKey())));
                 continue;
             }
-            require(event.before() != null && attack.frameKey().equals(flow.rootFrameKey()));
+            require(event.before() != null && (attack.spellAttack()!=null || attack.frameKey().equals(flow.rootFrameKey())));
             Combatant source = member(event.before(), attack.actorId());
             require(source.position().distanceFeet(attack.aimedPosition()) == ranged.distanceFeet());
-            if (attack.monsterAttack() != null) continue;
+            if (attack.monsterAttack()!=null || attack.spellAttack()!=null) continue;
             require(++spent == 1 && uses.size() == 1 && event.command().kind() == Kind.ATTACK
                     && attack.actorId().equals(event.command().actorId()) && attack.targetId().equals(event.command().targetId())
                     && attack.itemId().equals(event.command().itemId()) && attack.actorId().equals(event.before().activeActor()));
@@ -589,10 +679,16 @@ public final class Schema2CombatHistory {
                 if (old.status() == AttackStatus.RESOLVED) require(old.equals(attack));
                 continue;
             }
-            if (!flow.rootFrameKey().equals(attack.frameKey()) && !attack.opportunityAttack()) continue;
+            if (!flow.rootFrameKey().equals(attack.frameKey()) && !attack.opportunityAttack() && attack.spellAttack()==null) continue;
             UUID sourceId = attack.actorId(), targetId = attack.targetId();
             Position aim = Schema2ObservationRules.knownPosition(before, sourceId, targetId);
             boolean present = member(before, targetId).position().equals(aim);
+            if (attack.spellAttack()!=null && attack.spellAttack().unseenDeadAtAim()) {
+                require(present && !Schema2ObservationRules.visible(before,sourceId,targetId));
+                var monster = before.monsters().stream().filter(subject -> subject.monsterId().equals(targetId)).findFirst();
+                if (monster.isPresent()) require(monster.orElseThrow().dead());
+                present = false;
+            }
             require(attack.aimedPosition().equals(aim) && attack.targetAtAimedPosition() == present
                     && attack.targetCover() == Schema2ObservationRules.cover(before, member(before, sourceId).position(), aim)
                     && attack.attackerSeesTarget() == (present && Schema2ObservationRules.visible(before, sourceId, targetId))
@@ -838,6 +934,12 @@ public final class Schema2CombatHistory {
         if(c.zoneInput()!=null)require(ruleType(c.zoneInput().rule(),"adventure.environment")&&c.zoneInput().center()!=null);
     }
     private static void validateCastInput(CastInput input) {
+        if (input.slotLevel()==0) {
+            require(ruleType(input.castingRule(),Schema2SpellRules.CLASS_CANTRIPS) && ruleType(input.spell(),"adventure.spell")
+                    && input.targets().size()==1 && input.materialItemId()==null && input.targetCastFrameKey()==null && input.coneDirection()==null);
+            uuid(input.targets().getFirst());
+            return;
+        }
         require(castingType(input.castingRule())&&ruleType(input.spell(),"adventure.spell")&&input.slotLevel()>=1&&input.slotLevel()<=9
                 &&(input.coneDirection()==null?!input.targets().isEmpty():input.targets().isEmpty()&&input.coneDirection()>=0&&input.coneDirection()<8)&&input.targets().size()<=MAX_COMBATANTS&&new HashSet<>(input.targets()).size()==input.targets().size());
         for(UUID target:input.targets())uuid(target);if(input.materialItemId()!=null)uuid(input.materialItemId());if(input.targetCastFrameKey()!=null)uuid(input.targetCastFrameKey());
@@ -846,7 +948,7 @@ public final class Schema2CombatHistory {
     private static void validateReadyInput(ReadyInput input) {
         require(input.trigger()!=null&&input.trigger().kind()!=null&&input.responseKind()!=null&&input.path().size()<=64);
         if(input.trigger().subjectId()!=null)uuid(input.trigger().subjectId());if(input.targetId()!=null)uuid(input.targetId());if(input.itemId()!=null)uuid(input.itemId());
-        require((input.spell()!=null)==(input.responseKind()==ReadyResponseKind.SPELL));if(input.spell()!=null) {validateCastInput(input.spell());require(input.spell().coneDirection()==null);}
+        require((input.spell()!=null)==(input.responseKind()==ReadyResponseKind.SPELL));if(input.spell()!=null) {validateCastInput(input.spell());require(input.spell().coneDirection()==null&&input.spell().slotLevel()>0);}
     }
     private static void validateOption(ReactionOption option) {
         require(option!=null&&option.kind()!=null && (option.kind()==ReactionKind.OPPORTUNITY_ATTACK || option.monsterAttack()==null));
@@ -864,7 +966,7 @@ public final class Schema2CombatHistory {
         if(effect==null)return die==null;uuid(effect);return die!=null&&die>=1&&die<=4;
     }
     private static boolean ruleType(RuleIdentity rule,String type) {
-        String prefix=switch(type) {case "character.spellcasting","character.wizard_spellcasting"->"spellcasting";case "adventure.environment"->"environment";case "adventure.spell"->"spell";case "character.resource"->"resource";default->"";};
+        String prefix=switch(type) {case "character.spellcasting","character.wizard_spellcasting"->"spellcasting";case Schema2SpellRules.CLASS_CANTRIPS->"cantrips";case "adventure.environment"->"environment";case "adventure.spell"->"spell";case "character.resource"->"resource";default->"";};
         return rule!=null && type.equals(rule.ruleType()) && rule.moduleKey()!=null && rule.moduleKey().matches("[a-z][a-z0-9_]{0,63}")
                 && rule.ruleKey()!=null && rule.ruleKey().length()<=128 && rule.ruleKey().matches(prefix+"[.][a-z][a-z0-9_]*([.][a-z0-9_]+)*");
     }
@@ -1004,6 +1106,7 @@ public final class Schema2CombatHistory {
             for (AttackAttempt attack : flow.attacks()) {
                 count += 1L + attack.damageDice().size();
                 if (attack.rangedAttack() != null) count++;
+                if (attack.spellAttack()!=null) count += 1L + damageFactCount(attack.spellAttack().damage());
                 var monster = attack.monsterAttack();
                 if (monster != null) {
                     count += 1L + monster.packTacticsAllies().size();
@@ -1012,7 +1115,10 @@ public final class Schema2CombatHistory {
                     if (monster.onHit() != null) count += monster.onHit().savingThrow() == null ? 1 : 2;
                 }
             }
-            for (CastAttempt cast : flow.casts()) count += 1L + cast.targets().size() + cast.healingDice().size();
+            for (CastAttempt cast : flow.casts()) {
+                count += 1L + cast.targets().size() + cast.healingDice().size();
+                if (cast.sacredFlame()!=null) count += 2L + damageFactCount(cast.sacredFlame().damage());
+            }
         }
         for (MonsterInstance monster : state.monsters()) count += 1L + monster.actionUses().size();
         for (SaveDamageBatch batch : state.saveDamageBatches()) {
@@ -1027,6 +1133,10 @@ public final class Schema2CombatHistory {
 
     private static long readyInputFactCount(ReadyInput input) {
         return 1L + input.path().size() + (input.spell() == null ? 0 : input.spell().targets().size());
+    }
+
+    private static long damageFactCount(AttackDamageComponent damage) {
+        return damage==null ? 0 : 1L+damage.dice().size()+damage.defenses().size();
     }
 
     private static boolean token(String value) {

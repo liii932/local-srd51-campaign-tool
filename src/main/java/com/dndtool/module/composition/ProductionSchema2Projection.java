@@ -2,6 +2,8 @@ package com.dndtool.module.composition;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
@@ -75,6 +77,26 @@ public final class ProductionSchema2Projection {
 
     public record StoredMember(String moduleKey, String releaseVersion, Role role,
                                String rawZipSha256, String logicalSha256) { }
+
+    public record ClassCantrips(ClassCantripsDefinition definition, List<SpellDefinition> options) {
+        public ClassCantrips { options = List.copyOf(options); }
+    }
+
+    public Optional<ClassCantrips> classCantrips(RuleIdentity ownerClass) {
+        return projection.rules().stream().filter(FinalRule::enabled)
+                .filter(FinalClassCantrips.class::isInstance).map(FinalClassCantrips.class::cast)
+                .map(FinalClassCantrips::definition).filter(profile -> profile.ownerClass().equals(ownerClass))
+                .findFirst().map(profile -> {
+                    var members = projection.entries().stream().filter(FinalEntry::enabled).map(FinalEntry::entry)
+                            .filter(CantripEntry.class::isInstance).map(CantripEntry.class::cast)
+                            .filter(entry -> entry.identity().rule().equals(profile.identity()))
+                            .map(CantripEntry::spell).collect(Collectors.toUnmodifiableSet());
+                    var options = projection.rules().stream().filter(FinalRule::enabled)
+                            .filter(FinalSpell.class::isInstance).map(FinalSpell.class::cast)
+                            .filter(row -> members.contains(row.identity())).map(FinalSpell::definition).toList();
+                    return new ClassCantrips(profile, options);
+                });
+    }
 
     public long canonicalByteLength() { return (long) configurationJson.length + finalRulesJson.length + chainsJson.length; }
     public List<StoredMember> members() { return members; }

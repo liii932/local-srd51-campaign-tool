@@ -114,6 +114,11 @@ public record Schema2CharacterRequest(UUID operationId, Schema2PreparationIdenti
                 out.writeInt(rest.recoveredSpellSlots().size());
                 for (var entry : rest.recoveredSpellSlots().entrySet()) { out.writeInt(entry.getKey()); out.writeInt(entry.getValue()); }
             }
+            if (!choices.cantrips().isEmpty()) {
+                text(out, "S2_KNOWN_CANTRIP_CHOICES_V1");
+                out.writeInt(choices.cantrips().size());
+                for (RuleIdentity spell : choices.cantrips()) rule(out, spell);
+            }
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException | NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }

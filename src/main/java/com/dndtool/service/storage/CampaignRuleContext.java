@@ -6,20 +6,23 @@ import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2InitialCharacterPlanService;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
 import com.dndtool.service.Schema2InitialProficiencyRules;
+import com.dndtool.service.Schema2KnownCantripRules;
 import com.dndtool.service.Schema2PreparationIdentity;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 
 /** Read-only rule consumers share this verified campaign binding and frozen projection. */
 public final class CampaignRuleContext {
-    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V4";
+    public static final String INTERPRETATION = "DND_CAMPAIGN_SCHEMA_2_V5";
     static final List<String> INITIAL_CLASSES = List.of("fighter", "cleric", "wizard");
     static final List<String> INITIAL_BACKGROUNDS = List.of("acolyte", "custom_artisan");
     private final ProductionSchema2Projection projection;
@@ -113,8 +116,13 @@ public final class CampaignRuleContext {
         return new Schema2InitialProficiencyRules.Request(sources, choices);
     }
 
-    /** Exact class skill slots and the required first-level Life-domain selection. */
+    /** Default creation template with class skills, subclass and known cantrips. */
     public GrowthChoices initialChoices(String classKey) {
+        return initialChoices(classKey, null);
+    }
+
+    /** A supplied list names only spells. The selected class supplies the authoritative source. */
+    public GrowthChoices initialChoices(String classKey, List<String> cantripKeys) {
         String chosen = classKey(classKey);
         List<String> skills = switch (chosen) {
             case "fighter" -> List.of("athletics", "perception");
@@ -129,7 +137,23 @@ public final class CampaignRuleContext {
                 .findFirst().orElseThrow(() -> new IllegalArgumentException("STORAGE_RULE_UNAVAILABLE"));
         return new GrowthChoices(chosen.equals("cleric") ? rule("character.subclass", "subclass.life") : null,
                 Map.of(), null, Map.of(slot(owner, "starting_proficiencies", "skills"),
-                        skills.stream().map(skill -> rule("character.proficiency", "proficiency.skill." + skill)).toList()));
+                        skills.stream().map(skill -> rule("character.proficiency", "proficiency.skill." + skill)).toList()),
+                initialCantrips(startingClass, cantripKeys));
+    }
+
+    private List<RuleIdentity> initialCantrips(RuleIdentity owner, List<String> keys) {
+        var profile = projection.classCantrips(owner).orElse(null);
+        if (keys == null) return profile == null ? List.of() : Schema2KnownCantripRules.initialDefaults(profile);
+        int count = profile == null ? 0 : profile.definition().knownCount(1);
+        if (keys.size() != count || new HashSet<>(keys).size() != count)
+            throw new IllegalArgumentException("S2_KNOWN_CANTRIP_CHOICES");
+        if (count == 0) return List.of();
+        return keys.stream().map(key -> {
+            var matches = profile.options().stream().map(SpellDefinition::identity)
+                    .filter(spell -> spell.ruleKey().equals(key)).toList();
+            if (matches.size() != 1) throw new IllegalArgumentException("S2_KNOWN_CANTRIP_CHOICES");
+            return matches.getFirst();
+        }).toList();
     }
 
     public List<RuleIdentity> initialWizardBook() {
@@ -182,8 +206,12 @@ public final class CampaignRuleContext {
                                boolean executable, String description, String abilityKey, String category,
                                Boolean allowAlternateSkillAbility,
                                RuleIdentity parentRace, boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
+                               List<String> cantripClasses, List<String> defaultCantripClasses, List<Integer> cantripCounts,
                                List<FieldOverride> overrides, List<MonsterAttackChoice> monsterAttacks, boolean nimbleEscape) {
         public CatalogEntry {
+            cantripClasses = List.copyOf(cantripClasses);
+            defaultCantripClasses = List.copyOf(defaultCantripClasses);
+            cantripCounts = List.copyOf(cantripCounts);
             overrides = List.copyOf(overrides);
             monsterAttacks = List.copyOf(monsterAttacks);
         }
@@ -211,6 +239,24 @@ public final class CampaignRuleContext {
                 .map(FinalEntry::entry).filter(SpellbookEntry.class::isInstance).map(SpellbookEntry.class::cast)
                 .filter(entry -> wizardProfiles.contains(entry.identity().rule())).map(SpellbookEntry::spell)
                 .collect(Collectors.toUnmodifiableSet());
+        Map<RuleIdentity, List<String>> cantripClasses = new LinkedHashMap<>();
+        Map<RuleIdentity, List<String>> defaultCantripClasses = new LinkedHashMap<>();
+        Map<RuleIdentity, List<Integer>> cantripCounts = new LinkedHashMap<>();
+        var classProgressions = projection.projection().rules().stream().filter(FinalRule::enabled)
+                .filter(FinalClassProgression.class::isInstance).map(FinalClassProgression.class::cast)
+                .map(FinalClassProgression::definition).collect(Collectors.toUnmodifiableMap(
+                        ClassProgressionDefinition::ownerClass, ClassProgressionDefinition::supportedMaximumLevel));
+        for (String key : INITIAL_CLASSES) {
+            var owner = rule("character.class", "class." + key);
+            var profile = projection.classCantrips(owner).orElse(null);
+            cantripCounts.put(owner, IntStream.rangeClosed(1, classProgressions.get(owner))
+                    .mapToObj(level -> profile == null ? 0 : profile.definition().knownCount(level)).toList());
+            if (profile == null) continue;
+            for (SpellDefinition option : profile.options())
+                cantripClasses.computeIfAbsent(option.identity(), ignored -> new ArrayList<>()).add(owner.ruleKey());
+            for (RuleIdentity spell : Schema2KnownCantripRules.initialDefaults(profile))
+                defaultCantripClasses.computeIfAbsent(spell, ignored -> new ArrayList<>()).add(owner.ruleKey());
+        }
         Set<RuleIdentity> secondWindResources = projection.projection().rules().stream()
                 .filter(FinalRule::enabled).filter(FinalFeature.class::isInstance).map(FinalFeature.class::cast)
                 .filter(row -> FIGHTER_SECOND_WIND_ALGORITHM.equals(row.definition().executionAlgorithm()))
@@ -252,6 +298,9 @@ public final class CampaignRuleContext {
                     definition instanceof CheckDefinition check ? check.allowAlternateSkillAbility() : null,
                     definition instanceof CharacterSourceDefinition source ? source.parentRace() : null,
                     creationChoice, spellbookChoice, directResourceSpend,
+                    cantripClasses.getOrDefault(row.identity(), List.of()),
+                    defaultCantripClasses.getOrDefault(row.identity(), List.of()),
+                    cantripCounts.getOrDefault(row.identity(), List.of()),
                     overrides.getOrDefault(row.identity(), List.of()),
                     executable ? monsterAttacks.getOrDefault(row.identity(), List.of()) : List.of(),
                     executable && definition instanceof MonsterDefinition monster
@@ -265,7 +314,8 @@ public final class CampaignRuleContext {
                     "An acquired Fighter Second Wind spends its own use as a bonus action on that fighter's active turn and heals 1d10 plus Fighter level.",
                     "Background sources currently grant languages/tools, without background skills, features or starting gear.",
                     "Unimplemented fighter features, Evocation Savant and Sculpt Spells remain catalog-only OPTION metadata and are not acquired; Grappler is blocked acquisition metadata.",
-                    "Only Bless, Cure Wounds, Shield, Counterspell and Burning Hands have bounded casting consumers; other spells are metadata.",
+                    "Fire Bolt and Sacred Flame are executable class cantrips. Other cantrip options are recorded as known.",
+                    "Bless, Cure Wounds, Shield, Counterspell and Burning Hands have bounded leveled casting consumers.",
                     "Multiclass growth acquisition does not authorize combined-caster slot semantics or unsupported multiclass casting.",
                     "Wolf and Hell Hound bites, Hell Hound Fire Breath, Skeleton and Goblin weapons use frozen monster actions. A Goblin with Nimble Escape can hide or disengage as a bonus action.",
                     "The antimagic area and direct vital effects are explicit DM house rules."));
@@ -296,6 +346,7 @@ public final class CampaignRuleContext {
             case SpellDefinition d -> d.description();
             case SpellcastingDefinition d -> d.description();
             case WizardSpellcastingDefinition d -> d.description();
+            case ClassCantripsDefinition d -> d.description();
             case EnvironmentDefinition d -> d.description();
             case MonsterDefinition d -> d.description();
             case LanguageSetDefinition ignored -> "Finite language candidates; grants retain their exact source slots.";

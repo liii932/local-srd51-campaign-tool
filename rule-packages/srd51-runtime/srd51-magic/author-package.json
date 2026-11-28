@@ -1,7 +1,7 @@
 {
   "author_schema_version": 2,
   "module_key": "srd51_magic",
-  "release_version": "17",
+  "release_version": "18",
   "package_display_name": "SRD 5.1 — finite magic mechanisms",
   "role": "extension",
   "dependencies": [

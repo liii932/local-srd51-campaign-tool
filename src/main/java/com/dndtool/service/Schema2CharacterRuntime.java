@@ -5,6 +5,7 @@ import com.dndtool.module.composition.Schema2CompositionKernel.RuleIdentity;
 import java.text.Normalizer;
 import java.util.*;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.CLASS_CANTRIPS_TYPE;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MAX_PASSIVE_ADVANTAGE_ADJUSTMENT;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MAX_PASSIVE_BASE_SCORE;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MIN_PASSIVE_BASE_SCORE;
@@ -30,6 +31,7 @@ public final class Schema2CharacterRuntime {
     public static final int MAX_CLASSES = 20, MAX_HIT_DICE_POOLS = 4, MAX_FEATURES = 64, MAX_FEATS = 20, MAX_GRANTS = 64;
     public static final int MAX_HISTORY_CHILD_ROWS = 32768;
     public static final int MAX_EQUIPMENT = 32, MAX_HEALTH_DICE = 20;
+    private static final int MAX_CANTRIP_CHOICES = 4, MAX_KNOWN_CANTRIPS = 20;
     private static final Set<String> EQUIPMENT_LOCATIONS = Set.of("CARRIED", "WORN", "MAIN_HAND", "OFF_HAND", "BOTH_HANDS");
 
     public record EquipmentItem(UUID itemId, RuleIdentity item, String location, UUID groundCombatId, Integer groundX, Integer groundY) {
@@ -102,6 +104,15 @@ public final class Schema2CharacterRuntime {
     public record LearnedSpell(RuleIdentity spell, int acquiredAtClassLevel) {
         public LearnedSpell { if (!validRule(spell,"adventure.spell") || acquiredAtClassLevel<1 || acquiredAtClassLevel>5) throw new IllegalArgumentException("S2_SPELLBOOK_STATE"); }
     }
+    public record KnownCantrip(RuleIdentity spell, RuleIdentity characterClass, RuleIdentity cantripProfile, int acquiredAtClassLevel) {
+        public KnownCantrip {
+            if (!validRule(spell, "adventure.spell") || !validRule(characterClass, "character.class")
+                    || !validRule(cantripProfile, CLASS_CANTRIPS_TYPE) || acquiredAtClassLevel < 1 || acquiredAtClassLevel > 20)
+                throw new IllegalArgumentException("S2_KNOWN_CANTRIP_STATE");
+        }
+    }
+    static final Comparator<KnownCantrip> CANTRIP_ORDER = Comparator.comparing(KnownCantrip::characterClass, RULE_ORDER)
+            .thenComparing(KnownCantrip::spell, RULE_ORDER);
     public record SpellbookState(RuleIdentity castingRule, int learnedThroughLevel, List<LearnedSpell> learned,
             List<RuleIdentity> prepared, Long preparedAtRestMinute, Integer preparedAtRestSecond, Long lastArcaneRecoveryDay) {
         public SpellbookState(RuleIdentity castingRule, int learnedThroughLevel, List<LearnedSpell> learned,
@@ -138,14 +149,14 @@ public final class Schema2CharacterRuntime {
             long hitPoints, long maximumHitPoints, List<ClassLevel> classes, List<HitDicePool> hitDicePools,
             List<SubclassState> subclasses, List<FeatureState> features, List<FeatState> feats,
             List<ProficiencyState> proficiencies, long version, List<ResourceState> resources, RestState rest,
-            List<EquipmentItem> equipment, HealthState health, SpellbookState spellbook) {
+            List<EquipmentItem> equipment, HealthState health, SpellbookState spellbook, List<KnownCantrip> knownCantrips) {
         public State(Schema2PreparationIdentity identity, UUID campaignId, UUID characterId, UUID preparationOperationId, RuleIdentity characterClass,
                 Map<String,Integer> abilities,int level,int proficiencyBonus,long hitPoints,long maximumHitPoints,
                 List<ClassLevel> classes,List<HitDicePool> hitDicePools,List<SubclassState> subclasses,List<FeatureState> features,
                 List<FeatState> feats,List<ProficiencyState> proficiencies,long version,List<ResourceState> resources,RestState rest,
                 List<EquipmentItem> equipment,HealthState health) {
             this(identity,campaignId,characterId,preparationOperationId,characterClass,abilities,level,proficiencyBonus,hitPoints,maximumHitPoints,
-                classes,hitDicePools,subclasses,features,feats,proficiencies,version,resources,rest,equipment,health,null);
+                classes,hitDicePools,subclasses,features,feats,proficiencies,version,resources,rest,equipment,health,null,List.of());
         }
         public State(Schema2PreparationIdentity identity, UUID campaignId, UUID characterId, UUID preparationOperationId, RuleIdentity characterClass,
                 Map<String, Integer> abilities, int level, int proficiencyBonus, long hitPoints, long maximumHitPoints,
@@ -158,13 +169,20 @@ public final class Schema2CharacterRuntime {
             abilities = Map.copyOf(abilities); classes = List.copyOf(classes); hitDicePools = List.copyOf(hitDicePools);
             subclasses = List.copyOf(subclasses); features = List.copyOf(features); feats = List.copyOf(feats);
             proficiencies = List.copyOf(proficiencies); resources = List.copyOf(resources); equipment = List.copyOf(equipment);
+            if (knownCantrips == null || knownCantrips.size() > MAX_KNOWN_CANTRIPS || knownCantrips.stream().anyMatch(Objects::isNull))
+                throw new IllegalArgumentException("S2_KNOWN_CANTRIP_STATE");
+            knownCantrips = List.copyOf(knownCantrips);
         }
         public int hitDice() { return hitDicePools.stream().mapToInt(HitDicePool::current).sum(); }
         public int maximumHitDice() { return hitDicePools.stream().mapToInt(HitDicePool::maximum).sum(); }
     }
     public record GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
-            Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices) {
+            Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices, List<RuleIdentity> cantrips) {
         public static final GrowthChoices EMPTY = new GrowthChoices(null, Map.of(), null, Map.of());
+        public GrowthChoices(RuleIdentity subclass, Map<String, Integer> abilityIncreases, RuleIdentity feat,
+                Map<EntryIdentity, List<RuleIdentity>> proficiencyChoices) {
+            this(subclass, abilityIncreases, feat, proficiencyChoices, List.of());
+        }
         public GrowthChoices {
             if (abilityIncreases == null || proficiencyChoices == null || subclass != null && !validRule(subclass, "character.subclass")
                     || feat != null && !validRule(feat, "character.feat") || abilityIncreases.size() > 2 || proficiencyChoices.size() > MAX_GRANTS)
@@ -188,6 +206,10 @@ public final class Schema2CharacterRuntime {
             }
             if (choices.values().stream().mapToInt(List::size).sum() > MAX_GRANTS) throw new IllegalArgumentException("S2_CHARACTER_CHOICES");
             proficiencyChoices = Collections.unmodifiableMap(choices);
+            if (cantrips == null || cantrips.size() > MAX_CANTRIP_CHOICES || cantrips.stream().anyMatch(spell -> !validRule(spell, "adventure.spell"))
+                    || new HashSet<>(cantrips).size() != cantrips.size())
+                throw new IllegalArgumentException("S2_KNOWN_CANTRIP_CHOICES");
+            cantrips = cantrips.stream().sorted(RULE_ORDER).toList();
         }
     }
     public record CheckInput(RuleIdentity rule, String kind, String abilityKey, RuleIdentity proficiency,
@@ -396,7 +418,8 @@ public final class Schema2CharacterRuntime {
     public static void checkCandidateCapacity(History previous, State candidate) { checkCandidateCapacity(previous, candidate, null); }
     public static void checkCandidateCapacity(History previous, State candidate, Command command) {
         validateState(candidate);
-        long rows = stateRows(candidate) + (previous == null ? 0 : stateRows(previous.current())) + (command == null ? MAX_GRANTS + 6 : commandRows(command));
+        long rows = stateRows(candidate) + (previous == null ? 0 : stateRows(previous.current()))
+                + (command == null ? MAX_GRANTS + MAX_CANTRIP_CHOICES + 6 : commandRows(command));
         if (previous != null) {
             require(previous.events().size() < MAX_EVENTS);
             for (Event event : previous.events()) rows += stateRows(event.after()) + (event.before() == null ? 0 : stateRows(event.before())) + eventRows(event);
@@ -412,8 +435,20 @@ public final class Schema2CharacterRuntime {
         long perEvent = stateRows(history.current()) * 2 + 2 + MAX_HEALTH_DICE;
         require(used + perEvent * additionalEvents <= MAX_HISTORY_CHILD_ROWS);
     }
-    private static long stateRows(State state) { return 1L + state.classes().size() + state.hitDicePools().size() + state.subclasses().size() + state.features().size() + state.feats().size() + state.proficiencies().size() + state.resources().size() + state.equipment().size() + (state.spellbook()==null?0:state.spellbook().learned().size()+state.spellbook().prepared().size()); }
-    private static long commandRows(Command command) { return command.growthChoices().abilityIncreases().size() + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum() + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size() + command.restInput().recoveredSpellSlots().size()) + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1) + (command.healthInput() == null ? 0 : 1 + MAX_HEALTH_DICE) + (command.combatInput() == null ? 0 : 1) + (command.spellbookInput()==null?0:1+command.spellbookInput().learned().size()+command.spellbookInput().prepared().size()); }
+    private static long stateRows(State state) {
+        return 1L + state.classes().size() + state.hitDicePools().size() + state.subclasses().size() + state.features().size()
+                + state.feats().size() + state.proficiencies().size() + state.resources().size() + state.equipment().size()
+                + state.knownCantrips().size()
+                + (state.spellbook() == null ? 0 : state.spellbook().learned().size() + state.spellbook().prepared().size());
+    }
+    private static long commandRows(Command command) {
+        return command.growthChoices().abilityIncreases().size() + command.growthChoices().cantrips().size()
+                + command.growthChoices().proficiencyChoices().values().stream().mapToInt(List::size).sum()
+                + (command.restInput() == null ? 0 : command.restInput().recoveredHitDice().size() + command.restInput().recoveredSpellSlots().size())
+                + (command.checkInput() == null ? 0 : 1) + (command.equipmentInput() == null ? 0 : 1)
+                + (command.healthInput() == null ? 0 : 1 + MAX_HEALTH_DICE) + (command.combatInput() == null ? 0 : 1)
+                + (command.spellbookInput() == null ? 0 : 1 + command.spellbookInput().learned().size() + command.spellbookInput().prepared().size());
+    }
     private static long eventRows(Event event) { return commandRows(event.command()) - (event.healthResult() == null ? 0 : MAX_HEALTH_DICE - event.healthResult().dice().size()); }
     public static void validate(History history) {
         require(history != null && !history.events().isEmpty() && history.events().size() <= MAX_EVENTS);
@@ -442,6 +477,7 @@ public final class Schema2CharacterRuntime {
         if (before == null) require(event.kind().equals("INITIALIZED") && after.version() == 0 && after.level() == 1 && event.hitDieRoll() == null && after.equipment().isEmpty() && after.health().equals(HealthState.INITIAL) && after.spellbook()==null);
         else {
             validateState(before); require(!event.kind().equals("INITIALIZED") && sameRoot(before, after) && before.characterClass().equals(after.characterClass()) && after.version() == before.version() + 1);
+            if (!advancement(event.kind())) require(before.knownCantrips().equals(after.knownCantrips()));
             if (!equipmentKind(event.kind()) && !Set.of("COMBAT_DAMAGE_APPLIED","COMBAT_ENVIRONMENT_HEALTH",COMBAT_AMMUNITION_SPENT).contains(event.kind())) require(before.equipment().equals(after.equipment()));
             if (!healthKind(event.kind()) && !Set.of("TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT").contains(event.kind())) require(before.health().equals(after.health()));
             boolean arcaneRecovery = command.restInput() != null && !command.restInput().recoveredSpellSlots().isEmpty();
@@ -463,7 +499,8 @@ public final class Schema2CharacterRuntime {
                         && Objects.equals(before.spellbook()==null?null:before.spellbook().lastArcaneRecoveryDay(), after.spellbook().lastArcaneRecoveryDay()));
             } else if (advancement(event.kind())) {
                 require(before.rest().equals(after.rest()));
-                require(after.level() == before.level() + 1 && after.features().containsAll(before.features()) && after.feats().containsAll(before.feats()) && after.subclasses().containsAll(before.subclasses()) && after.proficiencies().containsAll(before.proficiencies()));
+                require(after.level() == before.level() + 1 && after.features().containsAll(before.features()) && after.feats().containsAll(before.feats()) && after.subclasses().containsAll(before.subclasses()) && after.proficiencies().containsAll(before.proficiencies())
+                        && after.knownCantrips().containsAll(before.knownCantrips()));
                 RuleIdentity target = command.targetClass() == null ? before.characterClass() : command.targetClass();
                 Map<RuleIdentity, Integer> old = new HashMap<>(); before.classes().forEach(value -> old.put(value.characterClass(), value.level()));
                 for (ClassLevel value : after.classes()) require(value.level() == old.getOrDefault(value.characterClass(), 0) + (value.characterClass().equals(target) ? 1 : 0));
@@ -526,12 +563,12 @@ public final class Schema2CharacterRuntime {
     private static boolean sameCore(State before, State after) {
         return before.equals(new State(after.identity(), after.campaignId(), after.characterId(), after.preparationOperationId(), after.characterClass(),
                 after.abilities(), after.level(), after.proficiencyBonus(), before.hitPoints(), after.maximumHitPoints(), after.classes(), after.hitDicePools(),
-                after.subclasses(), after.features(), after.feats(), after.proficiencies(), before.version(), after.resources(), before.rest(), before.equipment(), before.health(), after.spellbook()));
+                after.subclasses(), after.features(), after.feats(), after.proficiencies(), before.version(), after.resources(), before.rest(), before.equipment(), before.health(), after.spellbook(), after.knownCantrips()));
     }
     private static boolean sameCoreExceptResources(State before, State after) {
         return before.equals(new State(after.identity(), after.campaignId(), after.characterId(), after.preparationOperationId(), after.characterClass(),
                 after.abilities(), after.level(), after.proficiencyBonus(), after.hitPoints(), after.maximumHitPoints(), after.classes(), after.hitDicePools(),
-                after.subclasses(), after.features(), after.feats(), after.proficiencies(), before.version(), before.resources(), after.rest(), after.equipment(), after.health(), after.spellbook()));
+                after.subclasses(), after.features(), after.feats(), after.proficiencies(), before.version(), before.resources(), after.rest(), after.equipment(), after.health(), after.spellbook(), after.knownCantrips()));
     }
     public static SpellbookState withArcaneRecoveryDay(SpellbookState book, Long day) {
         return new SpellbookState(book.castingRule(), book.learnedThroughLevel(), book.learned(), book.prepared(),
@@ -544,10 +581,10 @@ public final class Schema2CharacterRuntime {
     private static State withVersion(State state, long version) {
         return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(), state.characterClass(), state.abilities(),
                 state.level(), state.proficiencyBonus(), state.hitPoints(), state.maximumHitPoints(), state.classes(), state.hitDicePools(), state.subclasses(),
-                state.features(), state.feats(), state.proficiencies(), version, state.resources(), state.rest(), state.equipment(), state.health(), state.spellbook());
+                state.features(), state.feats(), state.proficiencies(), version, state.resources(), state.rest(), state.equipment(), state.health(), state.spellbook(), state.knownCantrips());
     }
     public static State withSpellbook(State s,long version,SpellbookState book) {
-        return new State(s.identity(),s.campaignId(),s.characterId(),s.preparationOperationId(),s.characterClass(),s.abilities(),s.level(),s.proficiencyBonus(),s.hitPoints(),s.maximumHitPoints(),s.classes(),s.hitDicePools(),s.subclasses(),s.features(),s.feats(),s.proficiencies(),version,s.resources(),s.rest(),s.equipment(),s.health(),book);
+        return new State(s.identity(),s.campaignId(),s.characterId(),s.preparationOperationId(),s.characterClass(),s.abilities(),s.level(),s.proficiencyBonus(),s.hitPoints(),s.maximumHitPoints(),s.classes(),s.hitDicePools(),s.subclasses(),s.features(),s.feats(),s.proficiencies(),version,s.resources(),s.rest(),s.equipment(),s.health(),book,s.knownCantrips());
     }
     private static void validateState(State state) {
         require(state != null && state.identity() != null); uuid(state.campaignId()); uuid(state.characterId()); uuid(state.preparationOperationId());
@@ -585,6 +622,12 @@ public final class Schema2CharacterRuntime {
         Map<RuleIdentity, Integer> levels = new HashMap<>(); RuleIdentity previousClass = null; int total = 0;
         for (ClassLevel value : state.classes()) { require(value != null && validRule(value.characterClass(), "character.class") && value.level() >= 1 && value.level() <= 20 && (previousClass == null || RULE_ORDER.compare(previousClass, value.characterClass()) < 0)); levels.put(value.characterClass(), value.level()); previousClass = value.characterClass(); total += value.level(); }
         require(total == state.level() && levels.containsKey(state.characterClass()));
+        KnownCantrip previousCantrip = null;
+        for (KnownCantrip cantrip : state.knownCantrips()) {
+            require(cantrip.acquiredAtClassLevel() <= levels.getOrDefault(cantrip.characterClass(), 0)
+                    && (previousCantrip == null || CANTRIP_ORDER.compare(previousCantrip, cantrip) < 0));
+            previousCantrip = cantrip;
+        }
         int previousSides = 0, maximumDice = 0;
         for (HitDicePool pool : state.hitDicePools()) { require(pool != null && Set.of(6, 8, 10, 12).contains(pool.sides()) && pool.sides() > previousSides && pool.maximum() >= 1 && pool.maximum() <= 20 && pool.current() >= 0 && pool.current() <= pool.maximum()); previousSides = pool.sides(); maximumDice += pool.maximum(); }
         require(maximumDice == total);

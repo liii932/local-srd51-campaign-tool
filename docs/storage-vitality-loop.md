@@ -101,7 +101,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 |---|---|
 | `srd51_runtime@13` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
 | `srd51_characters@14` | extension，直接依赖 `srd51_runtime@13`，声明短弓、箭、武器熟练与攻击配置，以及战士 Second Wind/Extra Attack 和勇士 Improved Critical |
-| `srd51_magic@17` | extension，直接依赖前两包，含骷髅短剑和短弓、地精弯刀和短弓以及灵巧逃脱 |
+| `srd51_magic@18` | extension，直接依赖前两包，含骷髅短剑和短弓、地精弯刀和短弓、灵巧逃脱，以及法师和牧师的戏法来源和法术参数 |
 | `dm_runtime_house_rules@25` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@13` |
 | `dm_runtime_house_rules@27` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@14` |
 
@@ -118,7 +118,7 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 或局部键合并外部内容。新建与文件打开按绑定的原包重组。标准组合使用应用随附字节，自定义组合使用本机接受的原包。打开时逐项比对全部冻结材料。
 最多两份上下文缓存以完整不可变材料为键，损坏规则行或链不能借相同摘要绕过校验。
 改变成员、版本或规则解释必须新建战役，不在历史上热改规则。
-冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V4`；读取时拒绝不匹配的解释标识和缺失字段。
+冻结材料使用解释标识 `DND_CAMPAIGN_SCHEMA_2_V5`；读取时拒绝不匹配的解释标识和缺失字段。
 数据来源、许可、确定性构建和完整限制见[包指南](../rule-packages/srd51-runtime/package-guide.md)。
 
 Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级。`character-create` 默认用
@@ -147,8 +147,9 @@ Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级�
 Arcane Recovery 和一级 Life profile 由各自施法和休息消费者解释。
 Grappler 仅保留阻断元数据，不允许在当前 SQLite 运行中获得；缺少执行 owner 的自动影响失败关闭。
 
-施法只支持 Bless、Cure Wounds、Shield、Counterspell 和 Burning Hands 的有界算法；
-其余 Wizard 法术只可作为学习/准备元数据。多施法职业共享槽不得由独立资源拼凑。
+战斗中可按职业已知记录施放 Fire Bolt 与 Sacred Flame。两者消耗一个动作，法术位、准备名单和箭支保持原值。[已知戏法](rules/schema-2-cantrips.md)
+
+有环法术支持 Bless、Cure Wounds、Shield、Counterspell 和 Burning Hands 的有界算法。其余 Wizard 有环法术只可作为学习/准备元数据。多施法职业共享槽不得由独立资源拼凑。
 骷髅可在本人回合选短弓射击，或用短剑近战。射击时把距离、长短射程界限和近身敌人条件写入动作流。角色射击另在同一事务写入箭支消耗，护盾术继续与完整文件重开沿用原骰与原攻击序号。[短弓与远程攻击](rules/schema-2-ranged-attacks.md)
 
 地狱犬的火焰吐息使用独立充能。啮咬读取战役冻结的近战动作条目，普通动作或反应各自扣费，窗口、触及、盟友、原骰和分量伤害随场景保存。狼啮咬还保留力量豁免证据、倒地裁定和免疫来源；怪物的姿态随战役实例离场再返。[怪物攻击合同](rules/schema-2-monster-attacks.md)

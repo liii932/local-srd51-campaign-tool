@@ -67,6 +67,6 @@ class Schema2ExtraAttackRulesTest {
                 state.characterClass(), state.abilities(), state.level(), state.proficiencyBonus(), state.hitPoints(),
                 state.maximumHitPoints(), state.classes(), state.hitDicePools(), state.subclasses(), features,
                 state.feats(), state.proficiencies(), state.version(), state.resources(), state.rest(), state.equipment(),
-                state.health(), state.spellbook());
+                state.health(), state.spellbook(), state.knownCantrips());
     }
 }

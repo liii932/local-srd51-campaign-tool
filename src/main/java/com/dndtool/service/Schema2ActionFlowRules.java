@@ -9,6 +9,7 @@ import com.dndtool.service.Schema2CombatState.Stage;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+import static com.dndtool.module.composition.Schema2CompositionKernel.FIRE_BOLT_ALGORITHM;
 import static com.dndtool.service.Schema2CombatState.*;
 
 /** The single typed continuation graph for attack, movement, casting and prepared reactions. */
@@ -16,6 +17,7 @@ final class Schema2ActionFlowRules {
     private static final String MOVEMENT_INTERRUPTED = "ACTOR_INACTIVE_OR_NO_MOVEMENT";
     private static final String DRAG_ENDED = "GRAPPLE_ENDED";
     static final String MONSTER_HIT_STR = "MONSTER_HIT_STR";
+    static final String SACRED_FLAME_DEX = "SACRED_FLAME_DEX";
     interface Roller { int draw(String purpose,UUID subject,int sides); }
     private final Schema2CombatRules combat;
     private final Schema2SpellRules spells=new Schema2SpellRules();
@@ -30,6 +32,14 @@ final class Schema2ActionFlowRules {
         if(b.activeFlow()!=null)for(CastAttempt cast:b.activeFlow().casts())if(cast.status()==CastStatus.PENDING&&cast.coneDirection()!=null
                 &&areaInterruption(roster,b,cast)==null&&b.saveDamageBatches().stream().noneMatch(v->v.spellSource()!=null&&v.spellSource().castFrameKey().equals(cast.frameKey())))
             Schema2SaveDamageRules.prepareSpell(roster,b,cast.actorId(),new CastInput(cast.castingRule(),cast.spell(),List.of(),null,cast.slotLevel(),null,cast.coneDirection()),knownPositions);
+        if (b.activeFlow() != null) for (CastAttempt cast : b.activeFlow().casts()) {
+            if (cast.status() != CastStatus.PENDING || cast.slotLevel() != 0
+                    || spellAttackStarted(b.activeFlow(), cast.frameKey())) continue;
+            var source = Schema2SpellRules.knownCantrip(roster.get(cast.actorId()), cast.castingRule(), cast.spell(),
+                    "ACTION_FLOW_FROZEN_DATA_INVALID");
+            if (cantripInterruption(roster, b, cast, source.spell()) == null)
+                prepareCantripTarget(roster, b, cast.actorId(), cast.targets().getFirst(), source.spell());
+        }
         if(continuation(c.kind())) {
             Flow f=b.activeFlow(); require(f!=null&&f.flowKey().equals(c.flowKey())&&Objects.equals(f.leafFrameKey(),c.leafKey()),"ACTION_FLOW_TARGET_MISMATCH");
             for (AttackAttempt attack : f.attacks()) {
@@ -38,6 +48,13 @@ final class Schema2ActionFlowRules {
                     var profile = Schema2MonsterRules.attack(roster, b, attack.actorId(), attack.monsterAttack().action(), attack.opportunityAttack());
                     validateRetainedRange(attack, profile.normalRangeFeet(), profile.longRangeFeet());
                     prepareMonsterOnHit(roster, b, attack.targetId(), profile.onHit());
+                } else if (attack.spellAttack()!=null) {
+                    var cast=Schema2SpellRules.findCast(b,attack.spellAttack().castFrameKey());
+                    var source=Schema2SpellRules.knownCantrip(roster.get(cast.actorId()),cast.castingRule(),cast.spell(),
+                            "ACTION_FLOW_FROZEN_DATA_INVALID");
+                    int range=source.spell().cantripProfile().rangeFeet();
+                    validateRetainedRange(attack,range,range);
+                    if (!targetDead(roster,b,attack.targetId())) prepareTargetHealth(roster,b,attack.targetId());
                 } else if (attack.rangedAttack() != null) {
                     var profile = combat.launchedRangedWeapon(roster.get(attack.actorId()), attack.itemId());
                     validateRetainedRange(attack, profile.normalRangeFeet(), profile.longRangeFeet());
@@ -87,7 +104,14 @@ final class Schema2ActionFlowRules {
                 prepareMonsterAttack(roster, b, c.actorId(), c.targetId(), c.monsterAttackInput().action(), false);
             }
             case MOVE -> {require(c.targetId()==null&&c.itemId()==null&&c.castInput()==null&&c.readyInput()==null,"S2_COMBAT_COMMAND");prepareMove(roster,b,c.actorId(),c.path(),false,dragPlan(b,c),knownPositions);}
-            case CAST -> {require(c.targetId()==null&&c.itemId()==null&&c.path().isEmpty()&&c.castInput()!=null&&c.readyInput()==null,"S2_COMBAT_COMMAND");require(b.status()==Status.EXPLORATION||actor.actionAvailable(),"S2_COMBAT_ACTION_UNAVAILABLE");spells.prepare(roster,b,c.actorId(),c.castInput(),false,knownPositions);if(b.status()==Status.EXPLORATION)Schema2ExplorationRules.requireTimeSafe(roster,6);}
+            case CAST -> {
+                require(c.targetId()==null&&c.itemId()==null&&c.path().isEmpty()&&c.castInput()!=null&&c.readyInput()==null,"S2_COMBAT_COMMAND");
+                require(b.status()==Status.EXPLORATION||actor.actionAvailable(),"S2_COMBAT_ACTION_UNAVAILABLE");
+                var prepared = spells.prepare(roster,b,c.actorId(),c.castInput(),false,knownPositions);
+                if (prepared.spell().cantripProfile() != null)
+                    prepareCantripTarget(roster, b, c.actorId(), c.castInput().targets().getFirst(), prepared.spell());
+                if(b.status()==Status.EXPLORATION)Schema2ExplorationRules.requireTimeSafe(roster,6);
+            }
             case READY_ATTACK,READY_MOVE,READY_SPELL -> {
                 require(c.targetId()==null&&c.itemId()==null&&c.path().isEmpty()&&c.castInput()==null&&c.readyInput()!=null,"S2_COMBAT_COMMAND");
                 require(actor.actionAvailable(),"S2_COMBAT_ACTION_UNAVAILABLE");ReadyInput r=c.readyInput();validateTrigger(b,r.trigger());
@@ -101,7 +125,12 @@ final class Schema2ActionFlowRules {
                     if(targetAtAim(b,c.actorId(),r.targetId()))prepareTargetHealth(roster,b,r.targetId());
                 }
                 if(c.kind()==Kind.READY_MOVE) {require(r.responseKind()==ReadyResponseKind.MOVE&&r.spell()==null&&r.targetId()==null&&r.itemId()==null,"S2_READY_COMMAND");prepareMove(roster,b,c.actorId(),r.path(),true,null,knownPositions);}
-                if(c.kind()==Kind.READY_SPELL) {require(r.responseKind()==ReadyResponseKind.SPELL&&r.spell()!=null&&r.targetId()==null&&r.itemId()==null&&r.path().isEmpty(),"S2_READY_COMMAND");require(r.spell().coneDirection()==null,"S2_SPELL_READY_AREA_UNSUPPORTED");spells.prepare(roster,b,c.actorId(),r.spell());}
+                if(c.kind()==Kind.READY_SPELL) {
+                    require(r.responseKind()==ReadyResponseKind.SPELL&&r.spell()!=null&&r.targetId()==null&&r.itemId()==null&&r.path().isEmpty(),"S2_READY_COMMAND");
+                    require(r.spell().slotLevel()!=0,"S2_SPELL_READY_CANTRIP_UNSUPPORTED");
+                    require(r.spell().coneDirection()==null,"S2_SPELL_READY_AREA_UNSUPPORTED");
+                    spells.prepare(roster,b,c.actorId(),r.spell());
+                }
             }
             default -> throw invalid("S2_COMBAT_COMMAND");
         }
@@ -110,6 +139,54 @@ final class Schema2ActionFlowRules {
     private void prepareTargetHealth(Map<UUID,Context> roster,Battle b,UUID target) {
         if(roster.containsKey(target))health.prepareDamage(roster.get(target).material(),roster.get(target).character());
         else {var m=Schema2MonsterRules.instance(b,target);Schema2MonsterRules.definition(roster,m.monster());if(m.dead())throw invalid("S2_HEALTH_DEAD");}
+    }
+    private void prepareCantripTarget(Map<UUID,Context> roster, Battle battle, UUID source, UUID target,
+            SpellDefinition spell) {
+        int range = spell.cantripProfile().rangeFeet();
+        if (FIRE_BOLT_ALGORITHM.equals(spell.algorithm())) {
+            Combatant attacker = actor(battle, source);
+            AttackAim aim = attackAim(battle, attacker, actor(battle, target));
+            require(attacker.position().distanceFeet(aim.position()) <= range, "S2_COMBAT_OUT_OF_RANGE");
+            if (!aim.targetAtPosition() || unseenDeadAtAim(roster,battle,target,aim)) return;
+            Context defender = roster.get(target);
+            if (defender != null) equipment.derive(defender.material(), defender.character());
+        } else {
+            require(Schema2SpellRules.directTargetAvailable(battle, source, target, range), "S2_SPELL_TARGET");
+            Schema2SavingThrowRules.prepare(roster, battle, creatureRef(roster, target), "ability.dexterity");
+        }
+        prepareTargetHealth(roster, battle, target);
+    }
+
+    private static boolean spellAttackStarted(Flow flow, UUID castFrame) {
+        return flow.attacks().stream().anyMatch(attack -> attack.spellAttack() != null
+                && attack.spellAttack().castFrameKey().equals(castFrame));
+    }
+
+    private static String cantripInterruption(Map<UUID,Context> roster, Battle battle, CastAttempt cast,
+            SpellDefinition spell) {
+        UUID source = cast.actorId(), target = cast.targets().getFirst();
+        if (!Schema2MonsterRules.living(roster, battle, source)) return "CASTER_INCAPACITATED";
+        var attacker = actor(battle, source);
+        var defender = actor(battle, target);
+        boolean fireBolt = FIRE_BOLT_ALGORITHM.equals(spell.algorithm());
+        Position aim = fireBolt ? Schema2ObservationRules.knownPosition(battle, source, target) : defender.position();
+        if (aim == null || attacker.position().distanceFeet(aim) > spell.cantripProfile().rangeFeet()
+                || Schema2ObservationRules.cover(battle, attacker.position(), aim) == Cover.TOTAL
+                || !fireBolt && !Schema2ObservationRules.visible(battle, source, target))
+            return "TARGET_UNAVAILABLE";
+        if (aim.equals(defender.position()) && Schema2ObservationRules.visible(battle,source,target)
+                && targetDead(roster,battle,target))
+            return "TARGET_UNAVAILABLE";
+        return null;
+    }
+
+    private static boolean unseenDeadAtAim(Map<UUID,Context> roster, Battle battle, UUID target, AttackAim aim) {
+        return aim.targetAtPosition() && !aim.attackerSeesTarget() && targetDead(roster,battle,target);
+    }
+
+    private static boolean targetDead(Map<UUID,Context> roster, Battle battle, UUID target) {
+        Context defender = roster.get(target);
+        return defender!=null ? defender.character().health().dead() : Schema2MonsterRules.instance(battle,target).dead();
     }
     int batchAfterCost(Map<UUID,Context> roster,Battle b,UUID source) {return b==null?0:readyCost(roster,b,TriggerKind.MONSTER_ACTION_COMPLETED,source,null);}
     Resolution afterBatch(UUID operation,Map<UUID,Context> roster,Battle b,UUID source,UUID frame,Roller dice) {
@@ -289,15 +366,19 @@ final class Schema2ActionFlowRules {
         Map<UUID,Integer> needed=new HashMap<>();for(UUID actor:roster.keySet())needed.put(actor,0);
         Flow active=b.activeFlow();if(active!=null) {
             for(AttackAttempt attack:active.attacks())if(attack.status()==AttackStatus.HIT_PENDING_DAMAGE)needed.merge(attack.targetId(),1,Integer::sum);
-            for(CastAttempt cast:active.casts())if(cast.status()==CastStatus.PENDING&&cast.readyKey()==null&&isAlgorithm(roster,cast.actorId(),cast.spell(),Schema2SpellRules.CURE_WOUNDS))needed.merge(cast.targets().getFirst(),1,Integer::sum);
+            for(CastAttempt cast:active.casts())if(cast.status()==CastStatus.PENDING&&cast.readyKey()==null
+                    && (cast.slotLevel()==0 ? !spellAttackStarted(active,cast.frameKey())
+                            : isAlgorithm(roster,cast.actorId(),cast.spell(),Schema2SpellRules.CURE_WOUNDS)))
+                needed.merge(cast.targets().getFirst(),1,Integer::sum);
             if(b.status()==Status.EXPLORATION) {
                 var root=active.casts().stream().filter(c->c.frameKey().equals(active.rootFrameKey())).findFirst();if(root.isPresent()&&Set.of(CastStatus.PENDING,CastStatus.COUNTERED).contains(root.get().status()))for(UUID actor:roster.keySet())needed.merge(actor,1,Integer::sum);
             }
         }
         switch(command.kind()) {
             case CAST,READY_SPELL,DECLARE_SHIELD,DECLARE_COUNTERSPELL -> {
-                needed.merge(command.actorId(),1,Integer::sum);CastInput input=command.kind()==Kind.READY_SPELL?command.readyInput().spell():command.castInput();
-                if(command.kind()==Kind.CAST&&isAlgorithm(roster,command.actorId(),input.spell(),Schema2SpellRules.CURE_WOUNDS))needed.merge(input.targets().getFirst(),1,Integer::sum);
+                CastInput input=command.kind()==Kind.READY_SPELL?command.readyInput().spell():command.castInput();
+                if (input.slotLevel()!=0) needed.merge(command.actorId(),1,Integer::sum);
+                if(command.kind()==Kind.CAST&&(input.slotLevel()==0 || isAlgorithm(roster,command.actorId(),input.spell(),Schema2SpellRules.CURE_WOUNDS)))needed.merge(input.targets().getFirst(),1,Integer::sum);
                 if(command.kind()==Kind.CAST&&b.status()==Status.EXPLORATION)for(UUID actor:roster.keySet())needed.merge(actor,1,Integer::sum);
             }
             case ATTACK -> {
@@ -327,6 +408,11 @@ final class Schema2ActionFlowRules {
     private void requireStructureCapacity(Map<UUID,Context> roster,Battle b,Command command) {
         Flow flow=b.activeFlow();int suffix=mandatorySuffix(roster,b,command);
         int created=Set.of(Kind.DECLARE_OPPORTUNITY_ATTACK,Kind.DECLARE_SHIELD,Kind.DECLARE_COUNTERSPELL).contains(command.kind())?1:command.kind()==Kind.RELEASE_READY?2:flow==null&&Set.of(Kind.ATTACK,Kind.MONSTER_ATTACK,Kind.MOVE,Kind.CAST,Kind.READY_SPELL).contains(command.kind())?1:0;
+        if (flow == null && command.kind() == Kind.CAST
+                && isAlgorithm(roster,command.actorId(),command.castInput().spell(),FIRE_BOLT_ALGORITHM)) created++;
+        if (flow != null) created += (int) flow.casts().stream().filter(cast -> cast.status() == CastStatus.PENDING
+                && !spellAttackStarted(flow, cast.frameKey())
+                && isAlgorithm(roster,cast.actorId(),cast.spell(),FIRE_BOLT_ALGORITHM)).count();
         require((flow==null?0:flow.frames().size())+created+suffix<=1024&&(flow==null?0:flow.windows().size())+suffix<=1024,"ACTION_FLOW_LIMIT_EXCEEDED");
     }
     /** Complete suppression-episode frontier, proved without consuming dice or mutating a persisted graph. */
@@ -375,6 +461,8 @@ final class Schema2ActionFlowRules {
                 } else if(frame.kind()==FrameKind.CAST&&frame.stage()!=Stage.READY_TRIGGER_AFTER) {
                     CastAttempt cast=flow.casts().stream().filter(v->v.frameKey().equals(frame.frameKey())).findFirst().orElseThrow();result+=readyCost(roster,b,TriggerKind.CAST_COMPLETED,cast.actorId(),null);
                     if(cast.coneDirection()!=null&&cast.status()==CastStatus.PENDING)result++;
+                    if(cast.status()==CastStatus.PENDING&&!spellAttackStarted(flow,cast.frameKey()))
+                        result+=pendingFireBoltCost(roster,b,cast.actorId(),cast.spell(),cast.targets());
                 } else if(frame.kind()==FrameKind.MOVEMENT) {
                     Movement move=flow.movements().stream().filter(v->v.movementKey().equals(frame.ownerKey())).findFirst().orElseThrow();
                     if (move.drag()!=null && flow.windows().stream().anyMatch(window -> window.status()!=WindowStatus.CONSUMED
@@ -395,7 +483,13 @@ final class Schema2ActionFlowRules {
             result+=readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,command.actorId(),null);
             if(command.kind()==Kind.MONSTER_ATTACK)result+=readyCost(roster,b,TriggerKind.MONSTER_ACTION_COMPLETED,command.actorId(),null);
         }
-        else if(command.kind()==Kind.CAST||command.kind()==Kind.READY_SPELL)result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null)+(command.castInput()!=null&&command.castInput().coneDirection()!=null?1:0);
+        else if(command.kind()==Kind.CAST||command.kind()==Kind.READY_SPELL) {
+            result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null);
+            if (command.castInput()!=null) {
+                if (command.castInput().coneDirection()!=null) result++;
+                result+=pendingFireBoltCost(roster,b,command.actorId(),command.castInput().spell(),command.castInput().targets());
+            }
+        }
         else if(command.kind()==Kind.DECLARE_OPPORTUNITY_ATTACK) {
             Window w=window(flow,command.windowKey());result+=windowCost(shieldCandidates(roster,b,w.trigger().subjectId()))+readyCost(roster,b,TriggerKind.ATTACK_COMPLETED,command.actorId(),null);
         } else if(command.kind()==Kind.DECLARE_SHIELD||command.kind()==Kind.DECLARE_COUNTERSPELL)result+=windowCost(counterCandidates(roster,b,command.actorId()))+readyCost(roster,b,TriggerKind.CAST_COMPLETED,command.actorId(),null);
@@ -407,6 +501,12 @@ final class Schema2ActionFlowRules {
             }
         }
         return result;
+    }
+    private int pendingFireBoltCost(Map<UUID,Context> roster, Battle battle, UUID caster, RuleIdentity spell,
+            List<UUID> targets) {
+        if (!isAlgorithm(roster,caster,spell,FIRE_BOLT_ALGORITHM)) return 0;
+        return windowCost(shieldCandidates(roster,battle,targets.getFirst()))
+                + readyCost(roster,battle,TriggerKind.ATTACK_COMPLETED,caster,null);
     }
     private int readyCost(Map<UUID,Context> roster,Battle b,TriggerKind kind,UUID subject,Position position) {
         TriggerFact t=new TriggerFact(key(subject,"frontier-trigger"),kind,subject,subject,null,position,0);
@@ -555,7 +655,7 @@ final class Schema2ActionFlowRules {
             var ranged = profile.ranged() ? rangedEvidence(attacker, aim.position(), profile.normalRangeFeet(), profile.longRangeFeet(),
                     Schema2CombatRules.ammunition(source, profile).itemId()) : null;
             rollAttack(subject,target,item,sequence,parent,invocation,oa,ability,pb,
-                    equipment.derive(source.material(),source.character()).physicalCheckDisadvantage(),null,ranged,aim);
+                    equipment.derive(source.material(),source.character()).physicalCheckDisadvantage(),null,ranged,aim,null);
         }
         void beginMonsterAttack(UUID subject, UUID target, EntryIdentity action, UUID parent, Invocation invocation) {
             boolean opportunity = invocation == Invocation.REACTION;
@@ -566,7 +666,7 @@ final class Schema2ActionFlowRules {
             var evidence = new MonsterAttackEvidence(action,profile.hitBonus(),profile.reachFeet(),allies,List.of(),null);
             var ranged = profile.ranged()
                     ? rangedEvidence(attacker, aim.position(), profile.normalRangeFeet(), profile.longRangeFeet(), null) : null;
-            rollAttack(subject,target,null,null,parent,invocation,opportunity,0,0,false,evidence,ranged,aim);
+            rollAttack(subject,target,null,null,parent,invocation,opportunity,0,0,false,evidence,ranged,aim,null);
         }
         private RangedAttackEvidence rangedEvidence(Combatant source, Position aim, int normalRange, int longRange, UUID ammunition) {
             boolean closeEnemy = b.combatants().stream().anyMatch(enemy -> enemy.side() != source.side()
@@ -592,7 +692,7 @@ final class Schema2ActionFlowRules {
         }
         void rollAttack(UUID subject, UUID target, UUID item, AttackSequence sequence, UUID parent, Invocation invocation,
                 boolean oa, int ability, int proficiency, boolean equipmentDisadvantage, MonsterAttackEvidence monster,
-                RangedAttackEvidence ranged, AttackAim aim) {
+                RangedAttackEvidence ranged, AttackAim aim, SpellAttackEvidence spellAttack) {
             UUID id=next("attack");addFrame(FrameKind.ATTACK,id,parent,invocation,Stage.ATTACK_HIT_BEFORE_DAMAGE);
             if (ranged != null && ranged.ammunitionItemId() != null) {
                 spendAmmunition(subject, id, ranged.ammunitionItemId());
@@ -608,7 +708,7 @@ final class Schema2ActionFlowRules {
             boolean dodging=aim.targetSeesAttacker()&&t.dodging()&&!targetDown&&combat.speed(roster,b,target)>0;
             boolean disadvantage=!aim.attackerSeesTarget()||equipmentDisadvantage||dodging
                     ||aim.targetAtPosition()&&t.prone()&&distance>5||a.prone()||rangedDisadvantage;
-            int criticalThreshold=criticalMinimum(subject,monster);
+            int criticalThreshold=criticalMinimum(subject,monster,spellAttack);
             int first=dice.draw("ATTACK_D20",subject,20);Integer second=advantage!=disadvantage?dice.draw("ATTACK_D20_SECOND",subject,20):null;int selected=second==null?first:advantage?Math.max(first,second):Math.min(first,second);
             OngoingEffect blessing=monster==null?Schema2SpellRules.blessing(snapshot(),subject):null;
             Integer d4=blessing==null?null:dice.draw("BLESS_ATTACK",subject,4);
@@ -619,12 +719,12 @@ final class Schema2ActionFlowRules {
             attacks.add(new AttackAttempt(id,subject,target,item,sequence==null?null:sequence.sequenceKey(),sequence==null?0:sequence.performed(),
                     oa,first,second,selected,ability,proficiency,ac,advantage,disadvantage,critical,hit,List.of(),0,
                     blessing==null?null:blessing.effectKey(),d4,hit?AttackStatus.HIT_PENDING_DAMAGE:AttackStatus.RESOLVED,hit,ac,monster,ranged,
-                    aim.attackerSeesTarget(),aim.targetSeesAttacker(),aim.cover(),aim.position(),aim.targetAtPosition()));
+                    aim.attackerSeesTarget(),aim.targetSeesAttacker(),aim.cover(),aim.position(),aim.targetAtPosition(),spellAttack));
             b=Schema2ObservationRules.revealAttack(b,subject);
             if(hit&&open(id,TriggerKind.ATTACK_HIT_BEFORE_DAMAGE,subject,target,null,0,0))return;settleAttack(id);
         }
-        private int criticalMinimum(UUID subject, MonsterAttackEvidence monster) {
-            if (monster != null) return 20;
+        private int criticalMinimum(UUID subject, MonsterAttackEvidence monster, SpellAttackEvidence spell) {
+            if (monster != null || spell != null) return 20;
             Context source=roster.get(subject);
             return Schema2FeatureSupport.weaponCriticalMinimum(source.material(),source.character());
         }
@@ -641,9 +741,9 @@ final class Schema2ActionFlowRules {
         void settleAttack(UUID id) {
             AttackAttempt a=attack(id);
             int ac=a.targetAtAimedPosition()?armor(a.targetId())+a.targetCover().armorClassBonus():a.armorClass();
-            Context dest=roster.get(a.targetId());
             MonsterAttackEvidence monster=a.monsterAttack();
-            boolean criticalRoll=a.selectedD20()>=criticalMinimum(a.actorId(),monster);
+            SpellAttackEvidence spellAttack=a.spellAttack();
+            boolean criticalRoll=a.selectedD20()>=criticalMinimum(a.actorId(),monster,spellAttack);
             boolean hit=a.initialHit()&&attackHits(a.selectedD20(),criticalRoll,attackBonus(a.abilityModifier(),a.proficiencyBonus(),a.blessingD4(),monster),ac);
             int distance=a.rangedAttack()==null
                     ? Schema2ActionFlowRules.actor(b,a.actorId()).position().distanceFeet(Schema2ActionFlowRules.actor(b,a.targetId()).position())
@@ -654,7 +754,18 @@ final class Schema2ActionFlowRules {
             MonsterOnHitSave onHit = null;
             int amount = 0;
             if(hit) {
-                if (monster == null) {
+                if (spellAttack != null) {
+                    var cast=cast(spellAttack.castFrameKey());
+                    var source=Schema2SpellRules.knownCantrip(roster.get(a.actorId()),cast.castingRule(),cast.spell(),
+                            "ACTION_FLOW_FROZEN_DATA_INVALID");
+                    if (targetDead(roster,b,a.targetId())) {
+                        spellAttack=new SpellAttackEvidence(cast.frameKey(),null,false,true);
+                    } else {
+                        var damageResult=cantripDamage(a.actorId(),a.targetId(),source.spell(),critical,"FIRE_BOLT_DAMAGE");
+                        spellAttack=new SpellAttackEvidence(cast.frameKey(),damageResult,false,false);
+                        amount=damageResult.effectiveDamage();
+                    }
+                } else if (monster == null) {
                     Context source = roster.get(a.actorId());
                     var profile = a.rangedAttack() == null ? combat.weapon(source, a.itemId()) : combat.launchedRangedWeapon(source, a.itemId());
                     for(int i=0;i<profile.diceCount()*(critical?2:1);i++)damage.add(dice.draw("DAMAGE",a.actorId(),profile.diceSides()));
@@ -667,16 +778,7 @@ final class Schema2ActionFlowRules {
                     onHit = profile.onHit();
                 }
             }
-            if(amount>0) {
-                if(dest==null) {
-                    b=Schema2MonsterRules.damage(b,a.targetId(),amount);
-                    if (targetHp(a.targetId())==0) interruptMovement(a.targetId());
-                } else {
-                    var result=health.applyDamage(dest.material(),dest.character(),amount,critical);State after=result.state().hitPoints()==0?Schema2CombatEquipmentFacts.drop(result.state(),b.combatId(),Schema2ActionFlowRules.actor(b,a.targetId()).position()):result.state();
-                    change(new HealthChange(a.targetId(),dest.character(),after,id,amount,critical,new HealthResult(List.of(),null,null,amount,result.appliedAmount()),false));afterDamage(id,a.targetId(),amount);
-                }
-                if(targetHp(a.targetId())==0) actor(Schema2ActionFlowRules.actor(b,a.targetId()).incapacitated());
-            }
+            if(amount>0) applyDamage(id,a.targetId(),amount,critical);
             if (monster != null) {
                 var onHitResult = onHit == null ? null : resolveMonsterOnHit(a.targetId(), onHit);
                 monster = new MonsterAttackEvidence(monster.action(), monster.hitBonus(), monster.reachFeet(),
@@ -685,9 +787,37 @@ final class Schema2ActionFlowRules {
             attack(new AttackAttempt(a.frameKey(),a.actorId(),a.targetId(),a.itemId(),a.sequenceKey(),a.attackOrdinal(),a.opportunityAttack(),
                     a.firstD20(),a.secondD20(),a.selectedD20(),a.abilityModifier(),a.proficiencyBonus(),a.armorClass(),a.advantage(),
                     a.disadvantage(),critical,hit,damage,amount,a.blessingEffectKey(),a.blessingD4(),AttackStatus.RESOLVED,a.initialHit(),ac,monster,a.rangedAttack(),
-                    a.attackerSeesTarget(),a.targetSeesAttacker(),a.targetCover(),a.aimedPosition(),a.targetAtAimedPosition()));
+                    a.attackerSeesTarget(),a.targetSeesAttacker(),a.targetCover(),a.aimedPosition(),a.targetAtAimedPosition(),spellAttack));
             if (a.sequenceKey() != null && a.rangedAttack() == null) spendAttackOrdinal(a.actorId());
             afterAttack(id, null);
+        }
+        private AttackDamageComponent cantripDamage(UUID actor, UUID target, SpellDefinition spell, boolean critical,
+                String purpose) {
+            var profile = spell.cantripProfile();
+            int count = profile.diceCount(roster.get(actor).character().level());
+            var damage = new ArrayList<Integer>();
+            for (int i = 0; i < count * (critical ? 2 : 1); i++)
+                damage.add(dice.draw(purpose, actor, profile.damageDiceSides()));
+            int raw = damage.stream().mapToInt(Integer::intValue).sum();
+            var defenses = Schema2MonsterRules.damageDefenses(roster,b,target,profile.damageType(),false);
+            return new AttackDamageComponent(profile.damageType(),count,profile.damageDiceSides(),0,damage,raw,
+                    Schema2SaveDamageRules.damage(raw,false,defenses),defenses);
+        }
+
+        private void applyDamage(UUID frame, UUID target, int amount, boolean critical) {
+            Context destination = roster.get(target);
+            if (destination == null) {
+                b=Schema2MonsterRules.damage(b,target,amount);
+                if (targetHp(target)==0) interruptMovement(target);
+            } else {
+                var result=health.applyDamage(destination.material(),destination.character(),amount,critical);
+                State after=result.state().hitPoints()==0 ? Schema2CombatEquipmentFacts.drop(result.state(),b.combatId(),
+                        Schema2ActionFlowRules.actor(b,target).position()) : result.state();
+                change(new HealthChange(target,destination.character(),after,frame,amount,critical,
+                        new HealthResult(List.of(),null,null,amount,result.appliedAmount()),false));
+                afterDamage(frame,target,amount);
+            }
+            if(targetHp(target)==0) actor(Schema2ActionFlowRules.actor(b,target).incapacitated());
         }
         private MonsterAttackOnHitEvidence resolveMonsterOnHit(UUID target, MonsterOnHitSave onHit) {
             Combatant defender = Schema2ActionFlowRules.actor(b, target);
@@ -813,7 +943,10 @@ final class Schema2ActionFlowRules {
         void stopMovement(UUID id,String reason) {Movement m=move(id);move(m.stopped(reason));facts.add(new CombatFact("MOVEMENT_STOPPED",m.actorId(),id,reason));finish(id,Stage.MOVEMENT_STOPPED);}
         void beginCast(UUID subject,CastInput input,UUID parent,Invocation invocation,UUID readyKey) {
             var prepared=spells.prepare(roster,snapshot(),subject,input,invocation==Invocation.REACTION);UUID id=next("cast");addFrame(FrameKind.CAST,id,parent,invocation,Stage.CAST_BEFORE_COMPLETION);
-            State paid=spells.spend(prepared);change(new HealthChange(subject,prepared.caster(),paid,id,0,false,null,false,false,0,prepared.slotResource(),1,false));
+            if (prepared.slotResource() != null) {
+                State paid=spells.spend(prepared);
+                change(new HealthChange(subject,prepared.caster(),paid,id,0,false,null,false,false,0,prepared.slotResource(),1,false));
+            }
             if(invocation==Invocation.ROOT&&b.status()==Status.ACTIVE)spendAction(subject);
             if(prepared.concentration()||readyKey!=null)endConcentration(subject,"REPLACED_BY_CONCENTRATION");
             casts.add(new CastAttempt(id,subject,prepared.castingIdentity(),input.spell(),input.targets(),prepared.slotResource(),input.slotLevel(),input.materialItemId(),List.of(),prepared.concentration()?0:prepared.healingModifier(),0,0,null,CastStatus.PENDING,input.targetCastFrameKey(),readyKey,input.coneDirection()));
@@ -839,6 +972,9 @@ final class Schema2ActionFlowRules {
             }
             if(c.status()==CastStatus.COUNTERED) {
                 if(c.readyKey()!=null) {ReadyPreparation r=Schema2ActionFlowRules.ready(b,c.readyKey());ready(new ReadyPreparation(r.readyKey(),r.actorId(),r.declaredTurnNumber(),r.expiresAtTurnNumber(),r.input(),ReadyStatus.LOST,r.heldCastFrameKey(),"COUNTERED"));endConcentration(c.actorId(),"COUNTERED");}
+            } else if (c.slotLevel() == 0) {
+                completeCantrip(c);
+                return;
             } else if(c.readyKey()!=null&&!release) {
                 ReadyPreparation r=Schema2ActionFlowRules.ready(b,c.readyKey());
                 if(r.status()==ReadyStatus.PREPARING) {cast(castResult(c,CastStatus.HELD,List.of(),0,0,null));ready(new ReadyPreparation(r.readyKey(),r.actorId(),r.declaredTurnNumber(),r.expiresAtTurnNumber(),r.input(),ReadyStatus.ARMED,r.heldCastFrameKey(),null));}
@@ -850,7 +986,44 @@ final class Schema2ActionFlowRules {
             }
             else applySpell(c,release?id:id);
             if(release)return;
-            if(open(id,TriggerKind.CAST_COMPLETED,c.actorId(),null,null,0,0))return;finish(id,Stage.CAST_RESOLVED);
+            finishCast(c);
+        }
+        private void completeCantrip(CastAttempt cast) {
+            UUID actorId = cast.actorId(), target = cast.targets().getFirst();
+            Context caster = roster.get(actorId);
+            var source = Schema2SpellRules.knownCantrip(caster,cast.castingRule(),cast.spell(),"ACTION_FLOW_FROZEN_DATA_INVALID");
+            String interrupted = cantripInterruption(roster,snapshot(),cast,source.spell());
+            if (interrupted != null) {
+                cast(castResult(cast,CastStatus.INTERRUPTED,List.of(),0,0,null));
+                facts.add(new CombatFact("CAST_INTERRUPTED",actorId,cast.frameKey(),interrupted));
+                finishCast(cast);
+                return;
+            }
+            int modifier = mod(caster.character(),source.abilityKey()), proficiency = caster.character().proficiencyBonus();
+            if (FIRE_BOLT_ALGORITHM.equals(source.spell().algorithm())) {
+                Combatant attacker = Schema2ActionFlowRules.actor(b,actorId);
+                var aim = attackAim(b,attacker,Schema2ActionFlowRules.actor(b,target));
+                boolean unseenDead = unseenDeadAtAim(roster,b,target,aim);
+                if (unseenDead) aim = new AttackAim(aim.position(),aim.cover(),false,false,false);
+                int range = source.spell().cantripProfile().rangeFeet();
+                rollAttack(actorId,target,null,null,cast.frameKey(),Invocation.CONTINUATION,false,modifier,proficiency,
+                        false,null,rangedEvidence(attacker,aim.position(),range,range,null),aim,
+                        new SpellAttackEvidence(cast.frameKey(),null,unseenDead,false));
+                return;
+            }
+            var basis = Schema2SavingThrowRules.prepare(roster,b,creatureRef(roster,target),"ability.dexterity");
+            var save = Schema2SavingThrowRules.resolve(basis,0,SACRED_FLAME_DEX,target,8+modifier+proficiency,dice);
+            var damage = save.success() ? null : cantripDamage(actorId,target,source.spell(),false,"SACRED_FLAME_DAMAGE");
+            if (damage != null && damage.effectiveDamage() > 0)
+                applyDamage(cast.frameKey(),target,damage.effectiveDamage(),false);
+            cast(new CastAttempt(cast.frameKey(),actorId,cast.castingRule(),cast.spell(),cast.targets(),null,0,null,
+                    List.of(),0,0,0,null,CastStatus.RESOLVED,null,null,null,new SacredFlameOutcome(save,damage)));
+            reconcileBoundary();
+            finishCast(cast);
+        }
+        private void finishCast(CastAttempt cast) {
+            UUID id = cast.frameKey();
+            if (!open(id,TriggerKind.CAST_COMPLETED,cast.actorId(),null,null,0,0)) finish(id,Stage.CAST_RESOLVED);
         }
         void beginSpellBatch(CastAttempt cast) {
             UUID frame=next("spell-save-damage");
@@ -979,6 +1152,14 @@ final class Schema2ActionFlowRules {
             if(current.parentFrameKey()==null) {leaf=null;flowStatus=FlowStatus.COMPLETED;return;}
             Frame parent=get(current.parentFrameKey());
             if(parent.kind()==FrameKind.REACTION_SELECTION) {Window w=window(flow(),parent.windowKey());Opportunity o=w.opportunities().stream().filter(v->v.opportunityKey().equals(parent.opportunityKey())).findFirst().orElseThrow();completeOpportunity(w,o,OpportunityStatus.COMPLETED,id,null);}
+            else if (current.kind()==FrameKind.ATTACK && parent.kind()==FrameKind.CAST
+                    && attack(id).spellAttack()!=null && attack(id).spellAttack().castFrameKey().equals(parent.frameKey())) {
+                CastAttempt cast=cast(parent.frameKey());
+                cast(castResult(cast,CastStatus.RESOLVED,List.of(),0,0,null));
+                leaf=parent.frameKey();
+                stage(parent.frameKey(),FrameStatus.RUNNABLE,Stage.CAST_RESOLVED,null,null);
+                finishCast(cast);
+            }
             else if(parent.kind()==FrameKind.READY_RELEASE)finishRelease(parent.frameKey(),"RELEASED");else throw invalid("ACTION_FLOW_STAGE_INVALID");
         }
     }

@@ -58,7 +58,9 @@ public final class CampaignRuleSupport {
         if (enabled(rules, FinalSubclass.class).stream().anyMatch(row -> row.definition().ownerClass().equals(cleric)
                 && !row.identity().equals(lifeSubclass))) throw unsupported("LIFE_SUBCLASS");
         validateFeatures(rules, progressions.get(fighter), life, prepared);
-        validateSpells(projection, life, prepared, progressions.get(wizard).supportedMaximumLevel());
+        int wizardMaximum = progressions.get(wizard).supportedMaximumLevel();
+        validateCantrips(projection, cleric, wizard, wizardMaximum);
+        validateSpells(projection, life, prepared, wizardMaximum);
         validateCreation(context);
         return context;
     }
@@ -135,6 +137,7 @@ public final class CampaignRuleSupport {
         for (var spell : spells.values()) {
             if (spell.algorithm().contains("_METADATA_") || spell.identity().equals(life.bless())
                     || spell.identity().equals(life.cureWounds())) continue;
+            if (Set.of(FIRE_BOLT_ALGORITHM, SACRED_FLAME_ALGORITHM).contains(spell.algorithm())) continue;
             if (!WIZARD_CASTS.contains(spell.algorithm()) || !listed.contains(spell.identity())
                     || spellLevel(spell.algorithm()) > (maximumLevel + 1) / 2) throw unsupported("SPELL_OWNER");
         }
@@ -142,6 +145,24 @@ public final class CampaignRuleSupport {
             int rank = (level + 1) / 2;
             long learnable = listed.stream().map(spells::get).filter(spell -> spellLevel(spell.algorithm()) <= rank).count();
             if (learnable < 6 + 2L * (level - 1)) throw unsupported("SPELLBOOK_CHOICES");
+        }
+    }
+
+    private static void validateCantrips(ProductionSchema2Projection projection, RuleIdentity cleric,
+            RuleIdentity wizard, int wizardMaximum) {
+        var profiles = enabled(projection.projection().rules(), FinalClassCantrips.class).stream()
+                .map(row -> row.definition().ownerClass()).toList();
+        if (profiles.size() != 2 || !Set.copyOf(profiles).equals(Set.of(cleric, wizard))) throw unsupported("CANTRIP_OWNER");
+        for (RuleIdentity owner : List.of(cleric, wizard)) {
+            var profile = projection.classCantrips(owner).orElseThrow();
+            boolean isWizard = owner.equals(wizard);
+            String executable = isWizard ? FIRE_BOLT_ALGORITHM : SACRED_FLAME_ALGORITHM;
+            if (profile.definition().knownCount(1) != 3
+                    || profile.options().size() < Math.max(4, profile.definition().knownCount(isWizard ? wizardMaximum : 1))
+                    || profile.options().stream().map(spell -> spell.identity().ruleKey()).distinct().count() != profile.options().size()
+                    || profile.options().stream().anyMatch(spell -> spellLevel(spell.algorithm()) != 0
+                            || !spell.algorithm().contains("_METADATA_") && !executable.equals(spell.algorithm())))
+                throw unsupported("CANTRIP_CHOICES");
         }
     }
 

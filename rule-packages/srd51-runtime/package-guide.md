@@ -21,7 +21,7 @@ application that supports the saved mechanisms.
 | --- | --- | --- | --- |
 | `srd51_runtime` version `13` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
 | `srd51_characters` version `14` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, melee and ranged weapon attacks, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `17` | extension | `srd51_runtime=13`, `srd51_characters=14` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Goblin and Skeleton |
+| `srd51_magic` version `18` | extension | `srd51_runtime=13`, `srd51_characters=14` | Selected spells, Cleric and Wizard cantrip choices, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Goblin and Skeleton |
 | `dm_runtime_house_rules` version `25` | extension | `srd51_runtime=13` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
@@ -148,6 +148,22 @@ learning, preparation, ranks 1–3 and actual short-rest Arcane Recovery use the
 real consumers. Other cataloged Wizard spells are **metadata only**, usable for
 book learning/preparation but rejected by casting consumers.
 
+The class cantrip sources use `character.class_cantrips` and a dedicated
+`cantrips` entry collection. Clerics choose three of Guidance, Light, Sacred
+Flame and Thaumaturgy at first level. Wizards choose three of Fire Bolt, Light,
+Mage Hand and Prestidigitation at first level, and a fourth at class level 4.
+Each entry references an exact level-zero spell definition. Fire Bolt and
+Sacred Flame can be cast when known and use no spell slot. Other cantrip options
+are catalog metadata. Cantrip choices stay independent of the Wizard spellbook.
+
+The Fire Bolt and Sacred Flame definitions each declare a complete
+`cantrip_profile`. The supported profiles fix range, die sides, damage type,
+the character level 5 increase from one to two dice, and whether cover can add
+to a saving throw. Fire Bolt is a ranged spell attack against a creature within
+120 feet using a d10 and fire damage. Sacred Flame requires a visible creature
+within 60 feet and deals d8 radiant damage on a failed Dexterity save. Cover
+adds no bonus to that save. Both use one action and verbal and somatic components.
+
 Hell Hound Bite uses a +5 melee attack at 5 feet and deals 1d8 + 3 piercing
 plus 2d6 fire on a hit. Its typed attack profile also supplies the hound's
 opportunity attack. Pack Tactics uses a non-incapacitated ally within 5 feet
@@ -193,7 +209,7 @@ explicit DM house rule, separate from the SRD Antimagic Field spell.
 
 This selection does not supply racial ability increases, complete racial
 traits, dwarf poison defenses, background
-skill/feature effects, starting equipment packages, cantrips, general cleric
+skill/feature effects, starting equipment packages, general cleric
 preparation, spell transcription, versatile/thrown weapon modes or full class
 feature execution. Fighter Fighting Style and Action Surge are catalog-only
 `OPTION` metadata. The Action Surge resource tracks uses and recovery without

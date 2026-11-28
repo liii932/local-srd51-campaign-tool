@@ -11,6 +11,7 @@ import static com.dndtool.service.Schema2CombatState.*;
 
 /** Finite Life Domain and Wizard execution owner. Knowledge, costs and effects come from frozen and acquired facts. */
 public final class Schema2SpellRules {
+    public static final String CLASS_CANTRIPS = "character.class_cantrips";
     public static final String CASTING_ALGORITHM = "LIFE_DOMAIN_LEVEL1_V1";
     public static final String BLESS = "SRD_2014_BLESS_V1", CURE_WOUNDS = "SRD_2014_CURE_WOUNDS_V1", SHIELD="SRD_2014_SHIELD_V1", COUNTERSPELL="SRD_2014_COUNTERSPELL_V1";
     public static final String BURNING_HANDS="SRD_2014_BURNING_HANDS_V1";
@@ -96,6 +97,17 @@ public final class Schema2SpellRules {
         if (context==null || input==null) throw invalid("S2_SPELL_COMMAND");
         State caster=context.character(); Schema2FeatureSupport.requireSupportedFeatures(context.material(),caster,"S2_SPELL_EFFECT_UNSUPPORTED");
         Schema2OngoingEffectRules.requireCastingAllowed(roster,battle,actor);
+        if (input.slotLevel() == 0 || CLASS_CANTRIPS.equals(input.castingRule().ruleType())) {
+            if (reaction || battle.status() != Status.ACTIVE || input.slotLevel() != 0 || input.coneDirection() != null
+                    || input.targetCastFrameKey() != null || input.targets().size() != 1)
+                throw invalid("S2_SPELL_UNAVAILABLE");
+            var source = knownCantrip(context, input.castingRule(), input.spell(), "S2_SPELL_UNAVAILABLE");
+            if (caster.hitPoints() == 0 || caster.health().dead()) throw invalid("S2_COMBAT_ACTOR_INACTIVE");
+            if (new Schema2CharacterEquipmentRules().derive(context.material(), caster).castingForbidden())
+                throw invalid("S2_SPELL_ARMOR");
+            if (input.materialItemId() != null || !anyHandFree(battle, caster)) throw invalid("S2_SPELL_COMPONENT");
+            return new Prepared(input.castingRule(), null, source.abilityKey(), source.spell(), input, caster, 0, false);
+        }
         if(input.castingRule().ruleType().equals("character.wizard_spellcasting"))return prepareWizard(roster,battle,actor,input,reaction,knownPositions);
         if(reaction || input.slotLevel()!=1 || input.targetCastFrameKey()!=null || input.coneDirection()!=null)throw invalid("S2_SPELL_UNAVAILABLE");
         var profiles=context.material().projection().rules().stream().filter(FinalSpellcasting.class::isInstance)
@@ -176,6 +188,28 @@ public final class Schema2SpellRules {
         return new Prepared(input.castingRule(),resource,profile.abilityKey(),spells.getFirst().definition(),input,caster,0,false);
     }
 
+    record KnownCantripSource(String abilityKey, SpellDefinition spell) { }
+
+    static KnownCantripSource knownCantrip(Context context, RuleIdentity castingRule, RuleIdentity spell, String error) {
+        State caster = context.character();
+        var classCantrips = context.material().classCantrips(caster.characterClass()).orElseThrow(() -> invalid(error));
+        var profile = classCantrips.definition();
+        if (!profile.identity().equals(castingRule) || caster.classes().size() != 1
+                || !caster.classes().getFirst().characterClass().equals(profile.ownerClass())
+                || caster.knownCantrips().stream().noneMatch(known -> known.spell().equals(spell)
+                    && known.characterClass().equals(profile.ownerClass()) && known.cantripProfile().equals(castingRule)))
+            throw invalid(error);
+        var definitions = classCantrips.options().stream()
+                .filter(definition -> definition.identity().equals(spell)).toList();
+        if (definitions.size() != 1) throw invalid(error);
+        var definition = definitions.getFirst();
+        var effect = definition.cantripProfile();
+        if (effect == null || !Set.of(FIRE_BOLT_ALGORITHM, SACRED_FLAME_ALGORITHM).contains(definition.algorithm())
+                || effect.ignoresSaveCover() != SACRED_FLAME_ALGORITHM.equals(definition.algorithm()))
+            throw invalid(error);
+        return new KnownCantripSource(profile.abilityKey(), definition);
+    }
+
     static boolean directTargetAvailable(Battle battle, UUID caster, UUID target, int rangeFeet) {
         return Schema2ObservationRules.visible(battle,caster,target)
                 && member(battle,caster).position().distanceFeet(member(battle,target).position())<=rangeFeet;
@@ -214,6 +248,7 @@ public final class Schema2SpellRules {
         return Schema2CompositionKernel.spellLevel(s.getFirst().definition().algorithm());
     }
     public State spend(Prepared p) {
+        if (p.slotResource() == null) return p.caster();
         List<ResourceState> resources=p.caster().resources().stream().map(r -> r.identity().equals(p.slotResource())
                 ?new ResourceState(r.identity(),r.current()-1,r.maximum(),r.unlimited()):r).toList();
         return copy(p.caster(),p.caster().hitPoints(),p.caster().health(),p.caster().version()+1,resources);
@@ -221,7 +256,7 @@ public final class Schema2SpellRules {
     public static State copy(State s,long hp,HealthState health,long version,List<ResourceState> resources) {
         return new State(s.identity(),s.campaignId(),s.characterId(),s.preparationOperationId(),s.characterClass(),s.abilities(),s.level(),
                 s.proficiencyBonus(),hp,s.maximumHitPoints(),s.classes(),s.hitDicePools(),s.subclasses(),s.features(),s.feats(),s.proficiencies(),
-                version,resources,s.rest(),s.equipment(),health,s.spellbook());
+                version,resources,s.rest(),s.equipment(),health,s.spellbook(),s.knownCantrips());
     }
     public static long second(State state) { return state.rest().minute()*60+state.rest().second(); }
     public static OngoingEffect blessing(Battle battle, UUID target) {

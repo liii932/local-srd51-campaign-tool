@@ -31,10 +31,11 @@ final class Schema2GrowthRules {
             grants.add(new ProficiencyState(grant.slot(), grant.target(), 1));
         grants = proficiencyGrants(catalog, progression.identity(), "starting_proficiencies", 1, grants, choices.proficiencyChoices());
         long hp = Math.max(1, progression.hitDieSides() + modifier(abilities, "ability.constitution")) + subraceHitPointBonus;
+        List<KnownCantrip> knownCantrips = Schema2KnownCantripRules.acquire(material, starting, 1, choices.cantrips(), List.of());
         State state = new State(initial.character().identity(), initial.campaignId(), initial.characterId(), preparation,
                 starting, abilities, 1, 2, hp, hp, classes, List.of(new HitDicePool(progression.hitDieSides(), 1, 1)),
                 subclasses, features(catalog, classes, subclasses), List.of(), grants, 0,
-                resources(catalog, classes, abilities, Map.of()), RestState.INITIAL);
+                resources(catalog, classes, abilities, Map.of()), RestState.INITIAL, List.of(), HealthState.INITIAL, null, knownCantrips);
         return validate(material, state);
     }
 
@@ -92,11 +93,12 @@ final class Schema2GrowthRules {
         if (before.maximumHitPoints() + maximum > 65_535) fail("S2_GROWTH_HIT_POINT_LIMIT");
         Map<RuleIdentity, ResourceState> oldResources = new HashMap<>();
         before.resources().forEach(resource -> oldResources.put(resource.identity(), resource));
+        List<KnownCantrip> knownCantrips = Schema2KnownCantripRules.acquire(material, targetClass, next, choices.cantrips(), before.knownCantrips());
         State candidate = new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(),
                 before.characterClass(), abilities, targetLevel, 2 + (targetLevel - 1) / 4,
                 before.hitPoints() + minimum, before.maximumHitPoints() + minimum, classes, dice, subclasses,
                 features(catalog, classes, subclasses), feats, grants, before.version() + 1,
-                resources(catalog, classes, abilities, oldResources), before.rest(), before.equipment(), before.health(), before.spellbook());
+                resources(catalog, classes, abilities, oldResources), before.rest(), before.equipment(), before.health(), before.spellbook(), knownCantrips);
         validate(material, candidate);
         return new Prepared(candidate, target.hitDieSides(), constitution, minimum, maximum);
     }
@@ -117,6 +119,7 @@ final class Schema2GrowthRules {
             if (level.level() > progression.supportedMaximumLevel()) fail("S2_GROWTH_STATE");
             maximumDice.merge(progression.hitDieSides(), level.level(), Integer::sum);
         }
+        Schema2KnownCantripRules.validate(material, state);
         if (state.hitDicePools().size() != maximumDice.size()) fail("S2_GROWTH_STATE");
         int lastSides = 0;
         for (HitDicePool pool : state.hitDicePools()) {

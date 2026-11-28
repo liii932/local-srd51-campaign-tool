@@ -39,6 +39,25 @@ class Schema2CharacterRequestDigestTest {
                 assertThrows(IllegalArgumentException.class, () -> skillCheck(id(1), -1)).getMessage());
     }
 
+    @Test void chosenCantripsBindTheirExactIdentitiesInCanonicalOrder() {
+        var fireBolt = new RuleIdentity("srd51_magic", "adventure.spell", "spell.fire_bolt");
+        var light = new RuleIdentity("srd51_magic", "adventure.spell", "spell.light");
+        var otherLight = new RuleIdentity("other_magic", light.ruleType(), light.ruleKey());
+        assertEquals(advanceWithCantrips(List.of(fireBolt, light)), advanceWithCantrips(List.of(light, fireBolt)));
+        assertNotEquals(advanceWithCantrips(List.of(fireBolt, light)), advanceWithCantrips(List.of(fireBolt, otherLight)));
+        assertNotEquals(advanceWithCantrips(List.of(fireBolt, light)), advanceWithCantrips(List.of()));
+    }
+
+    private static String advanceWithCantrips(List<RuleIdentity> cantrips) {
+        var request = skillCheck(id(1), 257);
+        var owner = new RuleIdentity("srd51_characters", "character.class", "class.wizard");
+        var choices = new GrowthChoices(null, Map.of(), null, Map.of(), cantrips);
+        var command = new Command("CHARACTER_ADVANCED", null, 0, null, "FIXED_AVERAGE", owner, choices);
+        return new Schema2CharacterRequest(request.operationId(), request.identity(), request.campaignId(),
+                request.characterId(), request.preparationOperationId(), request.rules(), request.expectedVersion(),
+                command, Map.of()).digest();
+    }
+
     private static Schema2CharacterRequest skillCheck(UUID operation, long version) {
         return skillCheck(operation, version, Schema2CharacterRuntime.ROLLED_CHECK);
     }
