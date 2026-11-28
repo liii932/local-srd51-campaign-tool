@@ -253,20 +253,15 @@ public final class CampaignDomainEngine {
             resolution = combatRules.resolve(prepared, Objects.requireNonNull(dice));
         }
         List<UUID> children = new ArrayList<>();
+        for (var use : resolution.ammunitionUses()) {
+            var childCommand = Schema2CombatCharacterFacts.ammunitionCommand(combatId, operationId, use);
+            appendCombatChild(material, campaign, operationId, histories, children, childCommand, use.before(), use.after(), null);
+        }
         for (var change : resolution.healthChanges()) {
-            UUID child = Schema2CombatCharacterFacts.childOperation(operationId, change.characterId(), children.size());
             var childCommand = Schema2CombatCharacterFacts.command(material, combatId, operationId,
                     command.actorId() == null ? change.characterId() : command.actorId(), change);
-            var before = change.before();
-            Schema2CharacterRequest childRequest = new Schema2CharacterRequest(child, before.identity(), campaign, change.characterId(),
-                    before.preparationOperationId(), Schema2RulesBinding.from(material), before.version(), childCommand, Map.of());
-            if (!Schema2CombatCharacterFacts.verify(material, before, childCommand, change.healthResult(), change.after()).equals(change.after()))
-                throw rejected("S2_COMBAT_HEALTH_RESULT");
-            var history = histories.get(change.characterId());
-            if (history == null || !history.current().equals(before)) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
-            history = append(history, new Event(child, childRequest.digest(), childCommand, null, before,
-                    change.after(), null, change.healthResult()));
-            histories.put(change.characterId(), history); children.add(child);
+            appendCombatChild(material, campaign, operationId, histories, children, childCommand, change.before(),
+                    change.after(), change.healthResult());
         }
         var dependencies = members.stream().map(m -> new Dependency(m.characterId(), versions.get(m.characterId()))).toList();
         var event = new Schema2CombatHistory.Event(operationId, request.digest(), command,
@@ -279,6 +274,22 @@ public final class CampaignDomainEngine {
         try { Schema2CombatHistory.validate(combat); }
         catch (Schema2RuntimeFactsException invalid) { throw rejected(invalid.getMessage()); }
         return new CombatResult(combat, updated, elapsedSeconds(resolution));
+    }
+
+    private void appendCombatChild(ProductionSchema2Projection material, UUID campaign, UUID operationId,
+            Map<UUID, History> histories, List<UUID> children, Schema2CharacterRuntime.Command command,
+            State before, State after, HealthResult result) {
+        UUID character = before.characterId();
+        UUID child = Schema2CombatCharacterFacts.childOperation(operationId, character, children.size());
+        var request = new Schema2CharacterRequest(child, before.identity(), campaign, character, before.preparationOperationId(),
+                Schema2RulesBinding.from(material), before.version(), command, Map.of());
+        if (!Schema2CombatCharacterFacts.verify(material, before, command, result, after).equals(after))
+            throw rejected(Schema2CharacterRuntime.COMBAT_AMMUNITION_SPENT.equals(command.kind())
+                    ? "S2_COMBAT_CHARACTER_FACT" : "S2_COMBAT_HEALTH_RESULT");
+        var history = histories.get(character);
+        if (history == null || !history.current().equals(before)) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
+        histories.put(character, append(history, new Event(child, request.digest(), command, null, before, after, null, result)));
+        children.add(child);
     }
 
     private static int elapsedSeconds(Resolution resolution) {
@@ -432,18 +443,29 @@ public final class CampaignDomainEngine {
         if (!request.digest().equals(event.requestDigest())) throw rejected("S2_COMBAT_REQUEST_HISTORY");
         combatRules.verify(event.operationId(), request.combatId(), request.campaignId(), roster, event.before(),
                 event.command(), event.resolution());
-        for (int i=0;i<event.resolution().healthChanges().size();i++) {
-            var change=event.resolution().healthChanges().get(i);
-            UUID child=Schema2CombatCharacterFacts.childOperation(event.operationId(),change.characterId(),i);
-            if (!event.characterOperations().get(i).equals(child)) throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
-            var actual=histories.get(change.characterId()).events().get(Math.toIntExact(change.after().version()));
+        int ordinal = 0;
+        for (var use : event.resolution().ammunitionUses()) {
+            var childCommand = Schema2CombatCharacterFacts.ammunitionCommand(request.combatId(), event.operationId(), use);
+            verifyCombatChild(event, histories, versions, ordinal++, childCommand, use.before(), use.after(), null);
+        }
+        for (var change : event.resolution().healthChanges()) {
             var childCommand=Schema2CombatCharacterFacts.command(material,request.combatId(),event.operationId(),
                     event.command().actorId()==null?change.characterId():event.command().actorId(),change);
-            if (!actual.operationId().equals(child)||!actual.command().equals(childCommand)||!actual.before().equals(change.before())
-                    ||!actual.after().equals(change.after())||!Objects.equals(actual.healthResult(),change.healthResult()))
-                throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
-            versions.put(change.characterId(),change.after().version());
+            verifyCombatChild(event, histories, versions, ordinal++, childCommand, change.before(), change.after(),
+                    change.healthResult());
         }
+    }
+    private static void verifyCombatChild(Schema2CombatHistory.Event event, Map<UUID, History> histories,
+            Map<UUID, Long> versions, int ordinal, Schema2CharacterRuntime.Command command, State before, State after,
+            HealthResult result) {
+        UUID character = before.characterId();
+        UUID child = Schema2CombatCharacterFacts.childOperation(event.operationId(), character, ordinal);
+        var actual = histories.get(character).events().get(Math.toIntExact(after.version()));
+        if (!event.characterOperations().get(ordinal).equals(child) || !actual.operationId().equals(child)
+                || !actual.command().equals(command) || !actual.before().equals(before) || !actual.after().equals(after)
+                || !Objects.equals(actual.healthResult(), result))
+            throw rejected("S2_COMBAT_CHARACTER_REFERENCE");
+        versions.put(character, after.version());
     }
     void reserve(Schema2CombatHistory.History previous,Schema2CombatRules.Prepared prepared,
             Map<UUID,Schema2CharacterRuntime.History> histories,Map<UUID,Schema2CombatRules.Context> contexts,Schema2CombatRequest request) {

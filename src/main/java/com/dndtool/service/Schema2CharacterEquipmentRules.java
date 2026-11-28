@@ -75,6 +75,7 @@ public final class Schema2CharacterEquipmentRules {
             if (!ids.add(instance.itemId())) throw invalid("S2_EQUIPMENT_STATE");
             ItemDefinition definition = definition(material, instance.item());
             if (Set.of("CARRIED","GROUND").contains(instance.location())) continue;
+            if (definition.kind() == EquipmentKind.AMMUNITION) throw invalid("S2_EQUIPMENT_LOCATION");
             boolean bodyArmor = armor(definition.kind());
             if (bodyArmor) {
                 if (!instance.location().equals("WORN") || ++armor > 1) throw invalid("S2_EQUIPMENT_LOCATION");
@@ -156,7 +157,7 @@ public final class Schema2CharacterEquipmentRules {
         return state.equipment().stream().filter(value -> Set.of("MAIN_HAND","OFF_HAND","BOTH_HANDS").contains(value.location()))
                 .map(value -> definition(material, value.item())).anyMatch(value -> value.kind() == EquipmentKind.TOOL && value.proficiency().equals(proficiency));
     }
-    private static ItemDefinition definition(ProductionSchema2Projection material, RuleIdentity identity) {
+    static ItemDefinition definition(ProductionSchema2Projection material, RuleIdentity identity) {
         var matches = material.projection().rules().stream().filter(FinalItem.class::isInstance).map(FinalItem.class::cast)
                 .filter(row -> row.identity().equals(identity) && row.enabled()).toList();
         if (matches.size() != 1 || !matches.getFirst().definition().algorithm().equals("SRD_2014_EQUIPMENT_V1")) throw invalid("S2_EQUIPMENT_RULE_UNSUPPORTED");

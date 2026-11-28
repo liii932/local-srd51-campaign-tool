@@ -2,13 +2,13 @@
 
 SRD 5.1 的战士从职业 5 级起，在自己回合执行 Attack 动作时可攻击两次。SRD 在职业
 11、20 级还会增加次数。当前应用支持单职业战士 1–6 级，其中 5–6 级的额外攻击接入
-现有近战武器和[擒抱、推撞替代一击](schema-2-melee-control.md)流程。SRD 的更高等级、其他职业的额外攻击和多职业规则属于独立范围。
+近战武器、[短弓](schema-2-ranged-attacks.md)和[擒抱、推撞替代一击](schema-2-melee-control.md)流程。SRD 的更高等级、其他职业的额外攻击和多职业规则属于独立范围。
 [SRD 第 25 页](../references/srd-5.1/pages/page-025.md) ·
 [战士语义](../semantics/srd-5.1/classes-fighter-monk.md#srd51-class-fighter-extra-attack)
 
 ## 声明、组合与授予
 
-内置角色包 `srd51_characters@13` 声明
+内置角色包 `srd51_characters@14` 声明
 `(srd51_characters, character.feature, feature.fighter_extra_attack)`。
 它使用现有特性类型和字段链，必需 `feature_kind=FEATURE`、`execution_mode=AUTOMATIC`、
 `execution_algorithm=SRD_2014_FIGHTER_EXTRA_ATTACK_V1`、`source_page=25`、`level=5`，
@@ -37,7 +37,7 @@ SRD 5.1 的战士从职业 5 级起，在自己回合执行 Attack 动作时可�
 
 `BEGIN_ATTACK` 在当前角色自己的合法回合消费一个动作，由 `Schema2CombatRules`
 从经验证的特性和冻结规则确定 `AttackSequence.limit`。后续每次 `ATTACK` 使用既有
-单击输入、武器和目标校验及反应窗口；第二击可以独立选择合法目标。移动沿用当前回合的
+单击输入、武器和目标校验及反应窗口；每一击可以独立选择合法武器和目标。短弓在发射时消耗一支箭并占用该击，护盾术继续时沿用原序号。移动沿用当前回合的
 移动额度，允许发生在两击之间。次数用完、主动放弃或回合结束时，既有战斗序列关闭。
 失去行动资格时拒绝后续攻击。Ready 和借机攻击分别沿用各自的单击结算。
 [战斗合同](schema-2-combat.md)

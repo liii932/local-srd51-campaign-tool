@@ -1048,5 +1048,87 @@
     },
     "proficiency_multiplier": 2,
     "algorithm": "SRD_2014_DWARF_STONECUNNING_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.shortbow"
+    },
+    "display_name": "Shortbow proficiency",
+    "description": "Specific proficiency with the shortbow, a simple ranged weapon.",
+    "source_page": 66,
+    "category": "WEAPON"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.shortbow"
+    },
+    "display_name": "Shortbow",
+    "description": "Simple ranged weapon with the ammunition and two-handed properties.",
+    "source_page": 66,
+    "kind": "RANGED_WEAPON",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 2,
+    "proficiency": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.proficiency",
+      "rule_key": "proficiency.weapon.shortbow"
+    },
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.arrow"
+    },
+    "display_name": "Arrow",
+    "description": "One arrow for a compatible ranged weapon.",
+    "source_page": 69,
+    "kind": "AMMUNITION",
+    "armor_class": 0,
+    "strength_minimum": 0,
+    "stealth_disadvantage": false,
+    "hands": 0,
+    "algorithm": "SRD_2014_EQUIPMENT_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.shortbow"
+    },
+    "display_name": "Shortbow Attack",
+    "description": "Dexterity attack with one arrow and a two-handed shortbow.",
+    "source_page": 66,
+    "item": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.shortbow"
+    },
+    "ability_policy": "DEXTERITY",
+    "dice_count": 1,
+    "dice_sides": 6,
+    "damage_type": "PIERCING",
+    "normal_range_feet": 80,
+    "long_range_feet": 320,
+    "ammunition": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.item",
+      "rule_key": "item.arrow"
+    },
+    "algorithm": "SRD_2014_RANGED_WEAPON_ATTACK_V1"
   }
 ]

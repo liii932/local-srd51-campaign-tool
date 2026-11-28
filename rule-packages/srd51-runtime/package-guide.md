@@ -20,12 +20,12 @@ application that supports the saved mechanisms.
 | Module | Role | Exact direct dependencies | Content |
 | --- | --- | --- | --- |
 | `srd51_runtime` version `13` | base | none | Language/tool catalogs, bounded race/background sources, proficiencies, skill candidate sets, base walking speed, racial heavy-armor speed policy and rests |
-| `srd51_characters` version `13` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, ordinary combat, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
-| `srd51_magic` version `15` | extension | `srd51_runtime=13`, `srd51_characters=13` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters |
+| `srd51_characters` version `14` | extension | `srd51_runtime=13` | Dwarf Stonecunning, Hill Dwarf Dwarven Toughness, Fighter/cleric/wizard growth, resources, equipment, shared heavy-armor movement penalty, rolled, passive, group and opposed checks, health, melee and ranged weapon attacks, Fighter Second Wind and Extra Attack, and Champion Improved Critical |
+| `srd51_magic` version `16` | extension | `srd51_runtime=13`, `srd51_characters=14` | Selected spells, Life-domain/Wizard profiles, Arcane Recovery and selected monsters, including Skeleton |
 | `dm_runtime_house_rules` version `25` | extension | `srd51_runtime=13` | Explicit DM antimagic area and fixed direct vital effects |
 
 The standard combination uses the order above. The check variant keeps the
-first three members and selects `dm_runtime_house_rules` version `26` as its
+first three members and selects `dm_runtime_house_rules` version `27` as its
 fourth member. Each reference retains its complete module and rule identity.
 Resolve references in the campaign's frozen `CampaignRuleContext`.
 
@@ -52,11 +52,11 @@ combat entry point rejects this action.
 
 Normal fighter advancement to class level 5 grants the frozen Extra Attack
 feature. A single-class fighter at level 5 or 6 with that grant can make up to
-two supported melee attacks in one Attack action on the fighter's own turn.
+two supported weapon attacks in one Attack action on the fighter's own turn.
 
 A single-class fighter gains Improved Critical by choosing Champion at class
-level 3. Through level 6, the feature applies to supported melee weapon attacks,
-including opportunity attacks and attacks released from Ready. A selected d20
+level 3. Through level 6, the feature applies to supported weapon attacks,
+including melee opportunity attacks and melee attacks released from Ready. A selected d20
 of 19 or 20 scores a critical hit. Under this project's interpretation, a
 selected 19 automatically hits even if the total falls short of the target's
 Armor Class, including any Shield bonus. Critical hits roll twice the weapon
@@ -131,6 +131,17 @@ impose Stealth disadvantage. Melee profiles are rapier 1d8 piercing/finesse,
 dagger 1d4 piercing/finesse, mace 1d6 bludgeoning, longsword one-hand 1d8
 slashing and greatsword two-hand 2d6 slashing, all with 5-foot reach.
 
+A ranged `equipment.weapon_attack` declares `SRD_2014_RANGED_WEAPON_ATTACK_V1`,
+`ability_policy` `DEXTERITY`, physical damage dice, `normal_range_feet`,
+`long_range_feet` and an `ammunition` rule reference. Both ranges use positive
+five-foot increments through 600 feet, and long range exceeds normal range.
+Use `set_field` with `normal_range_feet` to override its threshold. The weapon
+item has kind `RANGED_WEAPON`, two hands and a weapon proficiency. The referenced
+ammunition item has kind `AMMUNITION`, zero hands and no proficiency. The shortbow
+uses 1d6 piercing damage, range 80/320 feet and one arrow per attack roll.
+Fighters gain its specific proficiency at first level or when multiclassing
+into Fighter. Clerics gain it when Cleric is their starting class.
+
 Bless, Cure Wounds, Shield, Counterspell and Burning Hands use their registered
 bounded runtime algorithms. Life-domain casting covers its two always-prepared
 first-level spells and Disciple of Life. Wizard spellbook initialization,
@@ -150,6 +161,13 @@ attack at 5 feet, deals 2d4 + 2 piercing damage on a hit and calls for a DC 11
 Strength saving throw to avoid becoming prone. Its `attack_profile.on_hit` is
 optional and accepts only `ability_key: "ability.strength"`, an integer `dc`
 from 1 to 30 and `fail_outcome: "PRONE"`.
+
+Skeleton has two weapon actions. Shortsword uses the melee profile with 5-foot
+reach. Shortbow uses mode `RANGED_ATTACK_V1` and mechanism
+`MONSTER_RANGED_ATTACK_V1`. Its `attack_profile` has a frozen `hit_bonus` of +4,
+`normal_range_feet` 80, `long_range_feet` 320 and a `damage` row of 1d6 + 2
+piercing. The Shortsword and Shortbow each use the same frozen hit bonus and
+damage. To change a monster action, replace its entire `action_profile`.
 
 The `dm-runtime-monster-variant` and `dm-runtime-wolf-variant` author examples
 replace the full Bite profile for Hell Hound or Wolf after the standard
@@ -191,9 +209,9 @@ compares the expected archive bytes with the checked-in resources without writes
 
 Numeric material is selected from local SRD pages 3–5 (race sources and Dwarven Toughness), 15–17
 (cleric/Life), 24–25 (fighter), 52–54 (Wizard), 56–58 (advancement/multiclass/
-Grappler), 59–61 (languages/backgrounds), 63–66/70 (equipment/tools), 77–85
+Grappler), 59–61 (languages/backgrounds), 63–69/70 (equipment/tools), 77–85
 (checks/ability mappings), 87 (rests), 90–99 (combat/health), the spell-specific
 pages recorded in the author rows, 321–322 (Hell Hound), 333–334 (Mummy) and
-398 (Commoner). The character-source page field is currently limited to 3–74;
+346 (Skeleton), 393 (Wolf) and 398 (Commoner). The character-source page field is currently limited to 3–74;
 skill declarations use page 56 for advancement proficiency and record the
 78–85 ability-mapping reference in their author notes.

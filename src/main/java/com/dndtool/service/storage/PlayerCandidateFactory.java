@@ -91,14 +91,7 @@ public final class PlayerCandidateFactory {
             if (!roster.containsKey(actor)) continue;
             if (battle.status() == Status.ACTIVE && actor.equals(battle.activeActor())) {
                 TURN_ACTIONS.forEach(kind -> factory.add(Command.action(kind, actor), label(kind)));
-                for (UUID target : visible) if (!target.equals(actor) && roster.containsKey(target))
-                    factory.attacks(actor, target, PlayerCampaignProjection.characterName(domain, target));
-                for (var target : battle.combatants()) {
-                    UUID id = target.characterId();
-                    if (visibleMonsters.contains(id))
-                        factory.attacks(actor, id, PlayerCampaignProjection.monsterName(domain, id)
-                                + "（" + target.position().x() + ", " + target.position().y() + "）");
-                }
+                factory.attacks(actor, visible, visibleMonsters);
                 factory.attackReplacements(actor, visible);
                 factory.moves(actor); factory.spells(actor, visible);
             } else if (battle.status() == Status.EXPLORATION) {
@@ -219,9 +212,34 @@ public final class PlayerCandidateFactory {
             }
         }
 
-        void attacks(UUID actor, UUID target, String name) {
-            for (var item : roster.get(actor).character().equipment())
-                add(Command.attack(actor, target, item.itemId()), "攻击 " + name + " · " + PlayerCampaignProjection.ruleName(domain, item.item()));
+        void attacks(UUID actor, Set<UUID> visible, Set<UUID> visibleMonsters) {
+            var source = battle.combatants().stream().filter(c -> actor.equals(c.characterId())).findFirst().orElseThrow();
+            if (source.sequence() == null || source.sequence().closed()) return;
+            var context = roster.get(actor);
+            for (var item : context.character().equipment()) {
+                if (!Set.of("MAIN_HAND", "OFF_HAND", "BOTH_HANDS").contains(item.location())) continue;
+                WeaponAttackDefinition weapon;
+                try { weapon = rules.weapon(context, item.itemId()); }
+                catch (IllegalArgumentException unavailable) { continue; }
+                if (weapon.ranged() && !sharedScene) continue;
+                for (var target : battle.combatants()) {
+                    UUID id = target.characterId();
+                    if (id.equals(actor)) continue;
+                    String name;
+                    if (visibleMonsters.contains(id))
+                        name = PlayerCampaignProjection.monsterName(domain, id) + "（" + target.position().x() + ", " + target.position().y() + "）";
+                    else if (visible.contains(id) && roster.containsKey(id)) name = PlayerCampaignProjection.characterName(domain, id);
+                    else continue;
+                    String label = (weapon.ranged() ? "射击 " : "攻击 ") + name + " · " + PlayerCampaignProjection.ruleName(domain, item.item());
+                    if (weapon.ranged()) {
+                        int feet = source.position().distanceFeet(target.position());
+                        var band = Schema2CombatRules.rangedDistance(feet, weapon.normalRangeFeet(), weapon.longRangeFeet());
+                        if (band == Schema2CombatRules.RangedDistance.OUT_OF_RANGE) continue;
+                        label += " · " + feet + " 尺（" + (band == Schema2CombatRules.RangedDistance.LONG ? "长射程" : "正常射程") + "）";
+                    }
+                    add(Command.attack(actor, id, item.itemId()), label);
+                }
+            }
         }
 
         void attackReplacements(UUID actor, Set<UUID> visible) {

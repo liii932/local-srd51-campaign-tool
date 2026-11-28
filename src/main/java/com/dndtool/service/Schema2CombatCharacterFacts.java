@@ -6,8 +6,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
+import static com.dndtool.service.Schema2CharacterRuntime.COMBAT_AMMUNITION_SPENT;
+import static com.dndtool.service.Schema2CharacterRuntime.RANGED_WEAPON_ADJUDICATION;
 
-/** Typed causal child of a combat operation; resources and health remain in the character history. */
+/** Typed causal child of a combat operation, retained in the character history. */
 final class Schema2CombatCharacterFacts {
     private Schema2CombatCharacterFacts() { }
 
@@ -28,9 +30,25 @@ final class Schema2CombatCharacterFacts {
                 new CombatInput(combatId, operationId, change.frameKey(), actorId, change.damageAmount(), change.critical(),change.seconds()));
     }
 
+    static Command ammunitionCommand(UUID combatId, UUID operationId, Schema2CombatState.AmmunitionUse use) {
+        EquipmentItem item = Schema2CombatEquipmentFacts.carried(use.before(), use.itemId());
+        return new Command(COMBAT_AMMUNITION_SPENT, null, 0, null, null, null, GrowthChoices.EMPTY, null, null,
+                new EquipmentInput(item.itemId(), item.item(), item.location(), RANGED_WEAPON_ADJUDICATION), null,
+                new CombatInput(combatId, operationId, use.frameKey(), use.characterId(), 0, false));
+    }
+
     static State verify(ProductionSchema2Projection material, State before, Command command, HealthResult result, State savedAfter) {
         if (before == null || command.combatInput() == null)
             throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+        if (COMBAT_AMMUNITION_SPENT.equals(command.kind())) {
+            EquipmentInput input = command.equipmentInput();
+            EquipmentItem item = Schema2CombatEquipmentFacts.carried(before, input.itemId());
+            if (result != null || before.hitPoints() == 0 || !command.combatInput().actorId().equals(before.characterId())
+                    || !input.item().equals(item.item())
+                    || Schema2CharacterEquipmentRules.definition(material, item.item()).kind() != EquipmentKind.AMMUNITION)
+                throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");
+            return Schema2CombatEquipmentFacts.spendAmmunition(before, input.itemId());
+        }
         if (command.kind().equals("COMBAT_RESOURCE_SPENT")) {
             if (result != null || command.healthInput() != null || command.amount() != 1)
                 throw new IllegalArgumentException("S2_COMBAT_CHARACTER_FACT");

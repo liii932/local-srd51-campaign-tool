@@ -20,13 +20,14 @@ DM 入口的 `/` 和 `/host` 均返回 `303`，转到 `/host/storage`。操作�
 - 单职业战士 1 级正常取得[回气](docs/rules/schema-2-second-wind.md)，在本人战斗回合用附赠动作恢复 `1d10＋战士等级` HP，次数随标准短休或长休恢复；
 - 五级战士可在同一回合抓住对手、用第二击推倒，再拖带移动。目标可选择防守技能并在自己的回合挣脱。[近战控制玩法](docs/rules/schema-2-melee-control.md)
 - 单职业战士正常升到 5 级取得[额外攻击](docs/rules/schema-2-extra-attack.md)，自己回合的每个 Attack 动作可攻击两次，6 级保持；首击后的余数随完整文件保存恢复；
-- 单职业战士 3 级选择勇士后取得[精通重击](docs/rules/schema-2-improved-critical.md)，3–6 级已支持的近战武器攻击选中 19 或 20 时重击，普通攻击、借机攻击和 Ready 共用结算；
+- 单职业战士 3 级选择勇士后取得[精通重击](docs/rules/schema-2-improved-critical.md)，3–6 级的普通近战、短弓和近战借机或 Ready 攻击选中 19 或 20 时重击。
 - 由现有纯规则消费者执行已接入的成长/ASI/多职业、熟练、检定、装备、健康、休息与资源命令；
 - 使用有限普通战斗、移动、机会攻击、反应/继续、Bless、Cure Wounds、Shield、Counterspell、Burning Hands、法师书/准备和奥术回想；
 - 在工作台按规则怪物的步速逐格移动，玩家可对向本人揭示的怪物借机攻击或放弃。角色卡和主持端可核对普通动作、附赠动作、反应和剩余移动。[回合与移动](docs/rules/schema-2-combat.md)
 - 规则角色可在探索中或本人战斗回合[主动卧倒、双倍成本爬行和起身](docs/rules/schema-2-prone.md)；探索卧倒不耗时，移动与起身各推进六秒，战斗起身花半速；复用倒地攻防、OA 与 Ready 移动，姿态和未决路径随完整文件恢复；
 - 建立世界节点、路线及有界网格场景，显式入退场、旅行与切换唯一执行焦点；后台时钟、角色、效果与未决动作冻结；
 - 在[战役工作台](./docs/storage-vitality-loop.md#战役工作台)左栏管理规则库与玩家，中栏主持当前场景，右栏翻阅角色卡。
+- 角色可双手持短弓，逐支用箭。骷髅可在自己的回合射击。射程、近身敌人和护盾术都实际参与命中判定。[短弓与远程攻击](docs/rules/schema-2-ranged-attacks.md)
 - 狼与地狱犬都可在本人回合或借机时啮咬。狼命中后目标做 DC 11 力量豁免，失败倒地。主持人可在借机或护盾术窗口保存重开，在战役记录查看原骰和姿态。[怪物近战与借机攻击](docs/rules/schema-2-monster-attacks.md)
 - 保存有限怪物吐息/充能、持续效果、DM 抗魔区域、唯一安置、简单物品、角色状态与消息根历史；
 - 管理独立的 DM-managed 自由卡、基础字段、职业等级和熟练，为 MANUAL/SAVING_THROW 检定设置有序后果，
@@ -87,7 +88,7 @@ DM-managed 自由卡与有限规则角色各自校验，不自动互相转换；
 
 DM 通过本机 loopback 操作。SQLite 的可选玩家原型使用独立 HTTPS 入口，支持邀请审批、
 PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操作收据查证。玩家可在共享场景中
-用近战武器攻击向本人揭示的规则怪物，看到命中、实际伤害和击倒结果。Host 接口与完整战役文件
+用近战武器或短弓攻击向本人揭示的规则怪物，看到命中、实际伤害和击倒结果。Host 接口与完整战役文件
 仅对 DM 开放。监听需要显式配置，应用不会自行创建 Connector。
 使用范围见[运行合同](./docs/storage-vitality-loop.md)，边界见[安全说明](./docs/security.md)，
 隔离验证见[测试指南](./docs/testing.md#玩家参与原型验证)。真实局域网部署、证书信任和外部设备验收
@@ -143,13 +144,13 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 ## 构建与测试
 
 从源码生成应用 WAR 可在仓库根目录运行 `mvn -DskipTests package`，产物为
-`target/dnd-tool-se-0.7.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
+`target/dnd-tool-se-0.8.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
 JUnit 用例，例如启动逻辑用 `mvn '-Dtest=StorageApplicationListenerTest' test`。
 
 可运行规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
 
 ```sh
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.7.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.8.0.war \
   --case weapon-damage rule-packages/srd51-runtime/scenarios/standard.json
 ```
 
@@ -225,7 +226,7 @@ tracks semantic drafting and source review separately from implementation.
 | [schema 2 检定、装备与健康作者来源](./docs/rules/schema-2-foundation-authoring.md) | 四类类型化定义、字段和引用、负修正、清空、纯组合与真实来源边界 |
 | [schema 2 角色事实存储](./docs/rules/schema-2-character-fact-storage.md) | 准确镜像、检定/装备/健康输入与结果、前后状态、历史预算及仓储直接恢复 |
 | [schema 2 检定、装备与健康基础](./docs/rules/schema-2-character-foundations.md) | 真实检定、装备实例、健康变化、命令幂等、完整局部历史与直接恢复 |
-| [schema 2 战斗作者来源](./docs/rules/schema-2-combat-authoring.md) | 战斗算法、近战武器及步行的类型化来源 |
+| [schema 2 战斗作者来源](./docs/rules/schema-2-combat-authoring.md) | 战斗算法、近战与远程武器及步行的类型化来源 |
 | [schema 2 内部战斗与动作继续](./docs/rules/schema-2-combat.md) | 真实攻击/移动/机会攻击、回合、倒地/掉落、共享秒时钟、完整历史与恢复 |
 | [schema 2 施法作者来源](./docs/rules/schema-2-spell-authoring.md) | 生命领域与法师来源、学习名单、固定抗魔环境 |
 | [schema 2 有限施法与持续效果](./docs/rules/schema-2-spells.md) | 真实成本/法术书、Shield/Counterspell/Ready、独立压制、专注/到期及探索转移 |

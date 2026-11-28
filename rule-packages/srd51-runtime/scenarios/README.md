@@ -7,7 +7,7 @@
 编辑 `rule-packages/srd51-runtime/srd51-characters/` 后，从作者源构建候选 ZIP。在 Bash 中执行以下整段即可验证一击巨剑伤害。其余三个成员取自 WAR，保留组合顺序。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" srd51-characters
@@ -22,7 +22,7 @@ verify_character_package() {
 verify_character_package "$candidates/srd51-characters.zip" --case weapon-damage
 ```
 
-核对 `MODULE srd51_characters@13` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
+核对 `MODULE srd51_characters@14` 一行的外部 ZIP 绝对路径和 SHA-256。入口将实际读入的原包摘要与运行时组合中相同位置的成员摘要逐一比对。同一版本的两份候选也可区分。只传场景清单时，所有成员都取自 WAR。
 
 多项装备声明同时改动时，在同一个命令中重复 `--case`。这些用例共用一次解包、驱动编译、引擎 JVM 启动和规则组合。每项自行准备角色、场景和骰流，按传入的次序执行。省略 `--case` 时按清单次序执行全部用例。任何失败都使整批退出非零。输出分别给出准备、组合与通过用例的耗时，可用 shell 的 `time` 测整条命令。
 
@@ -36,7 +36,7 @@ verify_character_package "$candidates/srd51-characters.zip" \
 标准组合验证智力（历史）检定辨认石工来历时的双倍熟练贡献。第四成员换为检定变体后，相同题材按三倍熟练结算。体质（历史）按普通检定结算，指定石工来历题材时则在输入校验中拒绝。通过 `--module` 指定外部候选，核对输出的实际加载路径与成员身份。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" srd51-characters dm-runtime-check-variant
@@ -53,7 +53,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
 用兼容 WAR 的标准组合运行 `dwarf-heavy-armor-speed`。场景创建力量均为 8 的一级矮人和人类法师，穿同种板甲后验证矮人步行 25 尺、人类步行 20 尺，以及对应的移动上限、疾走增量和起身成本。两人仍承担板甲的隐匿劣势，以及未受训穿甲造成的施法限制和力量、敏捷检定劣势。
 
 ```bash
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.7.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.8.0.war \
   --case dwarf-heavy-armor-speed rule-packages/srd51-runtime/scenarios/standard.json
 ```
 
@@ -62,7 +62,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 两条用例共用同一个兼容 WAR。第一个候选只把矮人的 `walk_speed_feet` 从 25 改为 30，验证穿板甲后仍可移动 30 尺，疾走额外获得 30 尺，起身花费 15 尺，人类对照仍为 20 尺。第二组候选交换种族策略，将共享减速改为 5 尺，并将板甲力量要求改为 14。低力量矮人降至 20 尺，低力量人类保持 30 尺，力量正好为 14 的矮人保持 25 尺。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" srd51-runtime srd51-characters
@@ -115,7 +115,7 @@ verify_movement_candidate "$candidates/armor-policy.zip" "$candidates/armor-pena
 `hill-dwarf-toughness` 在标准组合中创建同属性的两名矮人战士。只有选择山丘矮人的角色在一级和每次升级多得 1 点 HP。场景在受伤后依次执行固定值和掷骰升级，检查当前和最大 HP 的增量、生命骰和属性。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
   --case hill-dwarf-toughness "$scenarios/standard.json"
@@ -124,7 +124,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
 以下命令使用同一 WAR，另造一份只覆盖强韧两个参数的临时候选。一级额外增加 2 点 HP，后续升级额外增加 0 点。场景核对两个覆盖的准确来源和真实成长结果。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-house-rules
@@ -150,8 +150,8 @@ with ZipFile(directory / "dm-runtime-house-rules.zip") as source, ZipFile(direct
         data = source.read(member)
         if member.filename == "author-package.json":
             manifest = json.loads(data)
-            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["13"]})
-            manifest["compatible_combinations"][0]["srd51_characters"] = "13"
+            manifest["dependencies"].append({"module_key": "srd51_characters", "supported_versions": ["14"]})
+            manifest["compatible_combinations"][0]["srd51_characters"] = "14"
             manifest["files"].append({"kind": "changes", "path": "changes.json"})
             data = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
         target.writestr(member, data)
@@ -169,7 +169,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
 家规包占第四个位置。两种组合均验证默认属性的运动检定，标准组合使用力量，检定变体使用感知。标准组合在预检中拒绝体质（运动）。检定变体接受体质（运动），用一级战士和牧师对照熟练与未熟练时的加值、总值和成败。两种组合均核对冻结开关及其来源，检定变体另验证定额伤害。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
@@ -202,7 +202,7 @@ with ZipFile(directory / "dm-runtime-check-variant.zip") as good, ZipFile(direct
             data = json.dumps(rules).encode()
         bad.writestr(entry, data)
 PYTHON
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.7.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.8.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/wrong-damage.zip" --case fixed-damage \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -220,7 +220,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 主动检定对照在两种组合中都掷得 4 和 11，取高后合计 14，达到 DC。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
@@ -236,7 +236,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
 两个场景都通过 DM 领域命令为两名规则角色执行对抗，核对最小获胜分差的包来源、两方原骰、修正、总值与共同裁定。16 对 15 时标准包判领先方胜，家规保持现状。平分时都保持现状，应对方领先 2 分时都判应对方胜。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case contest-check "$scenarios/standard.json"
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case contest-check-variant "$scenarios/check-variant.json"
@@ -247,7 +247,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case con
 标准和家规使用四名角色、同一 DC、同一组原骰，恰好两人成功。标准包要求两人，变体要求三人。第五人加入后，三人成功仍通过标准门槛，家规需四人。场景分别核对成员原骰、个人成败、冻结字段来源、团队成败和选中的叙事。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case group-check "$scenarios/standard.json"
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case group-check-variant "$scenarios/check-variant.json"
@@ -273,10 +273,26 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case gro
 用同一 WAR 运行两个场景。两组使用正常升级的五级战士，首击以原骰 10、14 得到 16 对 15。标准组合须建立擒抱，检定变体须保持原状。双方都保留第二击，再实际推倒目标。场景核对每击序号、原骰、总值、冻结门槛、结论及当前关系。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case melee-control "$scenarios/standard.json"
 python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case melee-control-variant "$scenarios/check-variant.json"
+```
+
+<a id="ranged-weapons"></a>
+## 短弓的候选、箭支和射程
+
+在同一 WAR 上让持弓战士从 85 尺外射击骷髅。标准短弓正常射程 80 尺，玩家候选显示长射程，原骰 15、6 取 6，攻击未命中。第五个成员只把角色短弓的正常射程改为 100 尺，候选改为正常射程，原骰 15 命中并造成 5 点伤害。两组均消费一支实际箭。骷髅的短弓保有自己的 80/320 尺，两组均在长射程回击并造成 5 点伤害。
+
+```bash
+war=target/dnd-tool-se-0.8.0.war
+scenarios=rule-packages/srd51-runtime/scenarios
+candidate_modules="$(mktemp -d)"
+python3 -B rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidate_modules" dm-runtime-range-variant
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case ranged-weapons "$scenarios/standard.json"
+python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
+  --module @srd51-runtime --module @srd51-characters --module @srd51-magic --module @dm-runtime-house-rules \
+  --module "$candidate_modules/dm-runtime-range-variant.zip" "$scenarios/ranged-weapons-variant.json"
 ```
 
 <a id="monster-turn-movement"></a>
@@ -285,7 +301,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" --case mel
 标准组合的 `monster-turn-movement` 让持长剑的战士守在一只步速 40 尺的狼旁。狼尝试走 45 尺时整条路线被拒绝。合法路线先付一格的费用，在离开战士触及前暂停。固定原骰使借机攻击未命中，主持端继续同一条路线，狼走满八格并保留普通动作。再次申请走一格时余额已经用尽。
 
 ```bash
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.7.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.8.0.war \
   --case monster-turn-movement rule-packages/srd51-runtime/scenarios/standard.json
 ```
 
@@ -295,7 +311,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-s
 在同一份候选 WAR 上对 AC 12 的规则角色实际发动啮咬。原 d20 为 6 时，标准 +5 未命中，变体 +7 命中。另以原 d20 为 12 使两者均命中，核对两类伤害原骰及真实 HP。扩展 ZIP 只需放入私有临时目录。
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidate_modules="$(mktemp -d)"
 python3 -B rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidate_modules" dm-runtime-monster-variant
@@ -313,7 +329,7 @@ python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" \
 两份组合都从目标狼的力量 12 得到 +1。自定义目标若在 `saving_throws` 显式声明力量豁免，所填整数是包含属性和熟练的总加值。冻结规则支持检查会在启战取骰前核对它与属性、挑战等级的关系。[怪物近战作者字段](../../../docs/rules/schema-2-monster-attacks.md#模组作者字段)
 
 ```bash
-war=target/dnd-tool-se-0.7.0.war
+war=target/dnd-tool-se-0.8.0.war
 scenarios=rule-packages/srd51-runtime/scenarios
 candidate_modules="$(mktemp -d)"
 python3 -B rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidate_modules" dm-runtime-wolf-variant

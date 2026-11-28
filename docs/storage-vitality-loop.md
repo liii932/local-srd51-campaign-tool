@@ -71,10 +71,10 @@ DM 在工作台开放邀请、核对申请并批准设备，再分配 PC、共�
 
 在工作台的“共享给谁看”中，先共享场景，再选择“规则怪物实例”和接收成员。玩家同时获准查看
 两者时，场景显示该怪物的名称、格位和可见参战者的相对先攻顺序。怪物继续由 DM 控制。
-轮到玩家时，先开始攻击动作，再用已持用的近战武器选择触及内的已揭示敌人。战斗移动方向
+轮到玩家时，先开始攻击动作，再选择触及内的近战攻击，或用双手持用的短弓射击射程内的已揭示敌人。射击按钮显示距离及正常或长射程档位，需有一支实际携带的箭。战斗移动方向
 按玩家可知的占位生成。提交时服务端检查完整场景，遇阻整次拒绝，玩家只收到通用反馈。
 
-普通近战与借机攻击的本人收据显示是否命中、经过防御修正后的伤害点数，以及本次攻击是否使怪物降至零 HP。
+普通近战、短弓与借机攻击的本人收据显示是否命中、经过防御修正后的伤害点数，以及本次攻击是否使怪物降至零 HP。
 怪物的剩余 HP、最大 HP 和 AC 仅在主持端可见。撤回场景或实例共享、转交角色控制后，旧候选失效。
 同一运行内查回已接受的攻击收据时，返回该击当时的结果。
 
@@ -98,12 +98,12 @@ runtime 的作者源在 `rule-packages/srd51-runtime/`，资源在
 | 包 | 角色与直接依赖 |
 |---|---|
 | `srd51_runtime@13` | base，语言、工具、熟练、角色来源、步行速度与休息等基础 |
-| `srd51_characters@13` | extension，直接依赖 `srd51_runtime@13`，声明战士 Second Wind/Extra Attack 与勇士 Improved Critical |
-| `srd51_magic@15` | extension，直接依赖前两包 |
+| `srd51_characters@14` | extension，直接依赖 `srd51_runtime@13`，声明短弓、箭、武器熟练与攻击配置，以及战士 Second Wind/Extra Attack 和勇士 Improved Critical |
+| `srd51_magic@16` | extension，直接依赖前两包，含骷髅短剑和短弓动作 |
 | `dm_runtime_house_rules@25` | 标准组合的第四成员，extension，直接依赖 `srd51_runtime@13` |
-| `dm_runtime_house_rules@26` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@13` |
+| `dm_runtime_house_rules@27` | 家规组合的第四成员，extension，直接依赖 `srd51_runtime@13` 与 `srd51_characters@14` |
 
-标准组合选择家规 @25，变体选择 @26。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
+标准组合选择家规 @25，变体选择 @27。变体允许运动等技能临时搭配其他属性，并把运动的默认属性改为感知。
 同一变体把石工知识从双倍熟练改为三倍、固定直接伤害从 6 改为 3、工匠背景固定语言从矮人语改为侏儒语。说明见[变体指南](../rule-packages/srd51-runtime/dm-runtime-check-variant/package-guide.md)。
 
 一个专属包缺失或与清单不符时，依赖它的内置组合返回 `BUNDLED_RULES_UNAVAILABLE`。三个共享包中任一损坏会影响两组。
@@ -137,16 +137,18 @@ Fighter 支持到职业 6 级、Life-domain cleric 到 1 级、Wizard 到 5 级�
 未受训穿甲的限制分别生效。种族属性提升、完整背景技能和起始装备整包均超出该范围。
 单职业战士从一级取得[回气](rules/schema-2-second-wind.md)，在本人战斗回合使用附赠动作
 恢复 `1d10＋战士等级` HP，消耗准确一次/休息资源；原骰、成本和治疗随完整文件保留。勇士 3–6 级的
-[精通重击](rules/schema-2-improved-critical.md)由真实子职业授予驱动，普通近战、OA 与 Ready
+[精通重击](rules/schema-2-improved-critical.md)由真实子职业授予驱动，普通近战与短弓，以及近战 OA 与 Ready
 选中 19 或 20 时重击；未决反应与原骰沿完整文件保留。战士正常升到职业 5 级
 获得[额外攻击](rules/schema-2-extra-attack.md)，单职业战士可在自己回合的一个 Attack 动作内
-执行至多两次有界近战攻击。其余未接入的 Fighter 特性和 Evocation Savant/Sculpt Spells
+执行至多两次已支持的武器或替代攻击。其余未接入的 Fighter 特性和 Evocation Savant/Sculpt Spells
 保留为 `OPTION` 目录，选择的 Champion/Evocation 身份仍保留。Wizard Spellcasting、
 Arcane Recovery 和一级 Life profile 由各自施法和休息消费者解释。
 Grappler 仅保留阻断元数据，不允许在当前 SQLite 运行中获得；缺少执行 owner 的自动影响失败关闭。
 
 施法只支持 Bless、Cure Wounds、Shield、Counterspell 和 Burning Hands 的有界算法；
 其余 Wizard 法术只可作为学习/准备元数据。多施法职业共享槽不得由独立资源拼凑。
+骷髅可在本人回合选短弓射击，或用短剑近战。射击时把距离、长短射程界限和近身敌人条件写入动作流。角色射击另在同一事务写入箭支消耗，护盾术继续与完整文件重开沿用原骰与原攻击序号。[短弓与远程攻击](rules/schema-2-ranged-attacks.md)
+
 地狱犬的火焰吐息使用独立充能。啮咬读取战役冻结的近战动作条目，普通动作或反应各自扣费，窗口、触及、盟友、原骰和分量伤害随场景保存。狼啮咬还保留力量豁免证据、倒地裁定和免疫来源；怪物的姿态随战役实例离场再返。[怪物攻击合同](rules/schema-2-monster-attacks.md)
 DM 抗魔区域及固定直接生命效果是显式家规，不称作 SRD 法术或物品。
 

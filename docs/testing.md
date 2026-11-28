@@ -87,7 +87,7 @@ python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```bash
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.7.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.8.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -250,7 +250,7 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    源的一致性及 DRAFT 作者向量。以下为 Bash 示例，Windows 使用对应候选路径及本机 Python。
 
    ```bash
-   war=target/dnd-tool-se-0.7.0.war
+   war=target/dnd-tool-se-0.8.0.war
    scenarios=rule-packages/srd51-runtime/scenarios
    python3 rule-packages/srd51-runtime/build-bundles.py --check
    python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
@@ -411,7 +411,7 @@ ZIP 原始身份和 SQLite 冻结投影。纯规则、应用消费者和独立�
 生产代码或打包资源变化后，从候选对应源码的根目录运行。使用 Python 3.11+ 和环境中的 JDK 21+（`java`、`javac`、`jdeps`）。
 
 ```bash
-python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.7.0.war
+python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.8.0.war
 ```
 
 保存命令、退出码及 JSON 输出，记录字节数、SHA-256、全部 ZIP 条目数、应用类和嵌套 JAR 数。
@@ -759,6 +759,14 @@ node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable
 ```bash
 node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/movement-store --movement
 ```
+
+在新的隔离根以 `--ranged` 运行同一脚本。DM 和两名玩家通过各自页面进入战斗。DM 令骷髅射击，持弓玩家从 85 尺外向已揭示的骷髅射出一箭。核对命中收据与主持端战果、实际箭支消耗，以及另一名玩家的视图。
+
+```bash
+node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/ranged-store --ranged
+```
+
+`Schema2RangedAttackRulesTest` 检查射程边界、近身敌人、手位、原骰及反应。SQLite 用例 `approvedArcherPaysBeforeShieldAndReceivesOnlyPublicMonsterOutcomes` 和 `monsterShortbowUsesCloseEnemyDisadvantageAndNeitherBowProvidesOpportunityAttacks` 覆盖箭支事务回滚、重发、护盾术停点保存重开、真实双方攻击和借机选项。标准包和单字段射程变体还须用同一候选 WAR 分别验证。[独立作者命令](../rule-packages/srd51-runtime/scenarios/README.md#ranged-weapons)
 
 `PlayerParticipationAcceptanceTest` 用交付规则包、固定骰和两名独立成员检验攻击与放弃两条路径。用例在未决窗口和决定后的继续点保存、结束并重开，核对决定者、原骰、未走路径、两侧预算、撤权与重复提交。`Schema2MonsterAttackRulesTest` 核对冻结怪物步速、倒地收费、疾走、撤离及被借机攻击击倒后的停点。`Schema2SecondWindRulesTest` 和 `CampaignSecondWindIntegrationTest` 核对附赠动作与职业资源分别耗尽和恢复。
 

@@ -37,22 +37,29 @@ final class Schema2MonsterRules {
         if(entries.size()!=1||!identity.collectionKey().equals("actions"))throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
         return entries.getFirst();
     }
-    static MonsterAttackProfile meleeAttack(Map<UUID, Context> roster, Battle battle, UUID source, EntryIdentity action) {
+    static MonsterAttackProfile attack(Map<UUID, Context> roster, Battle battle, UUID source, EntryIdentity action,
+            boolean opportunity) {
         MonsterInstance monster = instance(battle, source);
         if (!monster.monster().equals(action.rule())) throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
         var material = material(roster);
-        return validateMeleeAction(actionEntry(material, action).actionProfile(), definition(material, monster.monster()).statBlock());
+        var profile = validateAttackAction(actionEntry(material, action).actionProfile(), definition(material, monster.monster()).statBlock());
+        if (opportunity && profile.ranged()) throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
+        return profile;
     }
-    private static MonsterAttackProfile validateMeleeAction(MonsterActionProfile profile, MonsterStatBlock block) {
-        if (profile.mode() != MonsterActionMode.MELEE_ATTACK_V1
-                || !MONSTER_MELEE_ATTACK_MECHANISM.equals(profile.mechanism()) || profile.attackProfile() == null)
+    private static MonsterAttackProfile validateAttackAction(MonsterActionProfile profile, MonsterStatBlock block) {
+        MonsterAttackProfile attack = profile.attackProfile();
+        if (attack == null || !(switch (profile.mode()) {
+            case MELEE_ATTACK_V1 -> !attack.ranged() && MONSTER_MELEE_ATTACK_MECHANISM.equals(profile.mechanism());
+            case RANGED_ATTACK_V1 -> attack.ranged() && MONSTER_RANGED_ATTACK_MECHANISM.equals(profile.mechanism());
+            default -> false;
+        }))
             throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
         if (block.traits().stream().anyMatch(trait -> switch (trait.scope()) {
             case ATTACK_ROLL_PACK_TACTICS_ONLY -> !trait.key().equals("pack_tactics");
             case PERCEPTION_HEARING_SMELL_ONLY -> false;
             default -> true;
         })) throw invalid("S2_MONSTER_TRAIT_UNSUPPORTED");
-        return profile.attackProfile();
+        return attack;
     }
     private static List<MonsterActionEntry> actions(ProductionSchema2Projection material, RuleIdentity monster) {
         return material.projection().entries().stream().filter(FinalEntry::enabled).map(FinalEntry::entry)
@@ -63,17 +70,22 @@ final class Schema2MonsterRules {
         var material = material(roster);
         List<MonsterActionEntry> melee = new ArrayList<>();
         var block = definition(material, monster.monster()).statBlock();
+        boolean ranged = false;
         for (MonsterActionEntry entry : actions(material, monster.monster())) {
             switch (entry.actionProfile().mode()) {
                 case MELEE_ATTACK_V1 -> {
-                    validateMeleeAction(entry.actionProfile(), block);
+                    validateAttackAction(entry.actionProfile(), block);
                     melee.add(entry);
+                }
+                case RANGED_ATTACK_V1 -> {
+                    validateAttackAction(entry.actionProfile(), block);
+                    ranged = true;
                 }
                 case SAVE_DAMAGE_BATCH_V1 -> validateAction(entry.actionProfile());
                 case BLOCKED_METADATA -> throw invalid("S2_MONSTER_REACTION_UNSUPPORTED");
             }
         }
-        if (melee.isEmpty()) throw invalid("S2_MONSTER_REACTION_UNSUPPORTED");
+        if (melee.isEmpty() && !ranged) throw invalid("S2_MONSTER_REACTION_UNSUPPORTED");
         return melee;
     }
     static List<UUID> packTacticsAllies(Map<UUID, Context> roster, Battle battle, UUID source, UUID target) {
@@ -106,8 +118,9 @@ final class Schema2MonsterRules {
             validateScope(monster.definition().statBlock());
             initialActions(material, monster.identity());
             for (MonsterActionEntry entry : actions(material, monster.identity()))
-                if (entry.actionProfile().mode() == MonsterActionMode.MELEE_ATTACK_V1)
-                    validateMeleeAction(entry.actionProfile(), monster.definition().statBlock());
+                if (Set.of(MonsterActionMode.MELEE_ATTACK_V1, MonsterActionMode.RANGED_ATTACK_V1)
+                        .contains(entry.actionProfile().mode()))
+                    validateAttackAction(entry.actionProfile(), monster.definition().statBlock());
         }
     }
     static MonsterInstance initial(Map<UUID,Context> roster,MonsterDeployment deployment) {

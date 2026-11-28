@@ -3,6 +3,7 @@ package com.dndtool.service;
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackDamage;
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackProfile;
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterOnHitSave;
+import static com.dndtool.module.composition.Schema2CompositionKernel.MAX_WEAPON_RANGE_FEET;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_MAX_BONUS;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_MIN_BONUS;
 import static com.dndtool.module.composition.Schema2CompositionKernel.MONSTER_ATTACK_REACH_FEET;
@@ -176,23 +177,22 @@ final class Schema2CombatStateValidator {
 
     static boolean validAttackSource(AttackAttempt attack) {
         var source = attack.monsterAttack();
-        if (source == null) return attack.itemId() != null;
+        var ranged = attack.rangedAttack();
+        if (ranged != null && !validRangedAttack(attack, ranged)) return false;
+        if (source == null) return attack.itemId() != null && (ranged == null || validD20Selection(attack));
         if (attack.itemId() != null || attack.sequenceKey() != null || attack.attackOrdinal() != 0
                 || !attack.damageDice().isEmpty() || attack.abilityModifier() != 0 || attack.proficiencyBonus() != 0
                 || !Schema2CombatHistory.validAction(source.action()) || source.packTacticsAllies().size() > 63
                 || new HashSet<>(source.packTacticsAllies()).size() != source.packTacticsAllies().size()
                 || source.packTacticsAllies().contains(attack.actorId()) || source.packTacticsAllies().contains(attack.targetId())
                 || !source.packTacticsAllies().isEmpty() && !attack.advantage()) return false;
-        if ((attack.secondD20() != null) != (attack.advantage() != attack.disadvantage())) return false;
-        int selected = attack.firstD20();
-        if (attack.secondD20() != null) selected = attack.advantage()
-                ? Math.max(selected, attack.secondD20()) : Math.min(selected, attack.secondD20());
-        if (selected != attack.selectedD20()) return false;
+        if (!validD20Selection(attack)) return false;
+        int selected = attack.selectedD20();
         int total = selected + source.hitBonus() + (attack.blessingD4() == null ? 0 : attack.blessingD4());
         if (attack.initialHit() != (selected == 20 || selected != 1 && total >= attack.armorClass())
                 || attack.hit() != (selected == 20 || selected != 1 && total >= attack.finalArmorClass())) return false;
         if (source.hitBonus() < MONSTER_ATTACK_MIN_BONUS || source.hitBonus() > MONSTER_ATTACK_MAX_BONUS
-                || !MONSTER_ATTACK_REACH_FEET.contains(source.reachFeet())) return false;
+                || (ranged == null ? !MONSTER_ATTACK_REACH_FEET.contains(source.reachFeet()) : source.reachFeet() != 0)) return false;
         boolean settled = attack.hit() && attack.status() == AttackStatus.RESOLVED;
         if (!settled) return source.damageComponents().isEmpty() && attack.damageAmount() == 0 && source.onHit() == null;
         var onHit = source.onHit();
@@ -201,7 +201,8 @@ final class Schema2CombatStateValidator {
         try {
             for (var component : source.damageComponents())
                 profile.add(new MonsterAttackDamage(component.damageType(), component.diceCount(), component.diceSides(), component.modifier()));
-            new MonsterAttackProfile(source.hitBonus(), source.reachFeet(), profile,
+            new MonsterAttackProfile(source.hitBonus(), source.reachFeet(), ranged == null ? 0 : ranged.normalRangeFeet(),
+                    ranged == null ? 0 : ranged.longRangeFeet(), profile,
                     onHit == null ? null : new MonsterOnHitSave(onHit.difficultyClass()));
         } catch (IllegalArgumentException invalidProfile) {
             return false;
@@ -219,6 +220,27 @@ final class Schema2CombatStateValidator {
         return damage == attack.damageAmount();
     }
 
+    private static boolean validD20Selection(AttackAttempt attack) {
+        if ((attack.secondD20() != null) != (attack.advantage() != attack.disadvantage())) return false;
+        int selected = attack.firstD20();
+        if (attack.secondD20() != null) selected = attack.advantage()
+                ? Math.max(selected, attack.secondD20()) : Math.min(selected, attack.secondD20());
+        return selected == attack.selectedD20();
+    }
+
+    private static boolean validRangedAttack(AttackAttempt attack, RangedAttackEvidence ranged) {
+        if (attack.opportunityAttack() || ranged.distanceFeet() <= 0 || ranged.distanceFeet() % 5 != 0
+                || ranged.normalRangeFeet() < 5 || ranged.normalRangeFeet() % 5 != 0
+                || ranged.longRangeFeet() <= ranged.normalRangeFeet() || ranged.longRangeFeet() % 5 != 0
+                || ranged.longRangeFeet() > MAX_WEAPON_RANGE_FEET || ranged.distanceFeet() > ranged.longRangeFeet()
+                || (ranged.closeEnemy() || ranged.distanceFeet() > ranged.normalRangeFeet()) && !attack.disadvantage())
+            return false;
+        UUID ammunition = ranged.ammunitionItemId();
+        return attack.monsterAttack() != null ? ammunition == null : attack.sequenceKey() != null
+                && ammunition != null && ammunition.version() == 4 && ammunition.variant() == 2
+                && !ammunition.equals(attack.itemId());
+    }
+
     private static boolean validMonsterOnHit(MonsterAttackOnHitEvidence evidence) {
         BatchCheck save = evidence.savingThrow();
         if (evidence.immunitySource() != null && !"adventure.monster".equals(evidence.immunitySource().ruleType()))
@@ -233,26 +255,27 @@ final class Schema2CombatStateValidator {
     }
 
     private static void validateAttackSequences(Battle battle) {
-        record Ordinal(UUID actorId, int ordinal, boolean completed) { }
+        record Ordinal(UUID actorId, int ordinal, boolean spent) { }
         for (Combatant actor : battle.combatants()) {
             AttackSequence sequence = actor.sequence();
             if (sequence == null) continue;
             List<Ordinal> attempts = new ArrayList<>(battle.flows().stream().flatMap(flow -> flow.attacks().stream())
                     .filter(attack -> sequence.sequenceKey().equals(attack.sequenceKey()))
-                    .map(attack -> new Ordinal(attack.actorId(),attack.attackOrdinal(),attack.status()==AttackStatus.RESOLVED)).toList());
+                    .map(attack -> new Ordinal(attack.actorId(), attack.attackOrdinal(),
+                            attack.rangedAttack() != null || attack.status() == AttackStatus.RESOLVED)).toList());
             for (MeleeContest contest:battle.meleeControl().contests())
                 if (sequence.sequenceKey().equals(contest.sequenceKey()))
                     attempts.add(new Ordinal(contest.actorId(),contest.attackOrdinal(),contest.outcome()!=null));
             attempts.sort(Comparator.comparingInt(Ordinal::ordinal));
             check(attempts.size() <= sequence.limit());
-            int completed = 0;
+            int spent = 0;
             for (int ordinal = 0; ordinal < attempts.size(); ordinal++) {
                 Ordinal attack = attempts.get(ordinal);
                 check(attack.actorId().equals(actor.characterId()) && attack.ordinal() == ordinal);
-                if (attack.completed()) completed++;
+                if (attack.spent()) spent++;
                 else check(!sequence.closed() && ordinal == sequence.performed() && ordinal == attempts.size() - 1);
             }
-            check(completed == sequence.performed() && attempts.size() - completed <= 1);
+            check(spent == sequence.performed() && attempts.size() - spent <= 1);
         }
     }
 

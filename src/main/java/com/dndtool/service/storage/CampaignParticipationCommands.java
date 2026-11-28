@@ -1,5 +1,6 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.util.*;
@@ -155,10 +156,17 @@ public final class CampaignParticipationCommands {
         if (!action.equals("combat-command") || current == null) throw playerPermissionDenied();
         var command = CampaignDomainCodec.fromJson(input.get("command"), Schema2CombatState.Command.class);
         var battle = current.current();
-        if (command.kind() == Schema2CombatState.Kind.ATTACK
-                && battle.monsters().stream().anyMatch(monster -> monster.monsterId().equals(command.targetId()))
-                && !visibleMonsters(state, actor.memberId(), battle.combatId()).contains(command.targetId()))
-            throw playerPermissionDenied();
+        if (command.kind() == Schema2CombatState.Kind.ATTACK) {
+            boolean monster = battle.monsters().stream().anyMatch(m -> m.monsterId().equals(command.targetId()));
+            Set<UUID> targets = monster ? visibleMonsters(state, actor.memberId(), battle.combatId())
+                    : PlayerCampaignProjection.visible(state, actor.memberId());
+            if (!targets.contains(command.targetId())) throw playerPermissionDenied();
+            if (!state.participation().shared(actor.memberId(), ShareKind.SCENE, battle.combatId())) {
+                var source = state.characters().stream().filter(c -> character.equals(c.id())).findFirst().orElseThrow();
+                var context = new Schema2CombatRules.Context(state.material().restore().projection(), source.initial(), source.history().current());
+                if (new Schema2CombatRules().weapon(context, command.itemId()).ranged()) throw playerPermissionDenied();
+            }
+        }
         if (battle.activeFlow() != null) {
             var window = battle.activeFlow().windows().stream().filter(w -> w.windowKey().equals(command.windowKey())).findFirst().orElse(null);
             UUID mover = opportunityMonster(battle, window);

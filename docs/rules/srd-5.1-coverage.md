@@ -50,7 +50,7 @@ runtime support.
 | <a id="rest"></a>休息/时间 | [标准休息](schema-2-character-rest.md) | `Schema2CharacterRestRules`；`CampaignArcaneRecoveryIntegrationTest`、`CampaignSecondWindIntegrationTest`。场景时钟见战斗和施法。 |
 | <a id="combat"></a>战斗/动作 | [战斗作者](schema-2-combat-authoring.md)、[战斗](schema-2-combat.md)、[动作继续协议](../design/v2/action-continuation-protocol.md) | `CampaignDomainEngine`、`Schema2CombatRules`、`Schema2ActionFlowRules`、`Schema2CombatTimeRules`；`CampaignDomainsCombatIntegrationTest`、`Schema2CombatRulesTest`。 |
 | <a id="spells"></a>施法/效果/探索 | [施法作者](schema-2-spell-authoring.md)、[有限施法](schema-2-spells.md)、[施法扩展目标](../design/v2/spellcasting-extension-contract.md)、[持续效果协议](../design/v2/ongoing-effect-protocol.md) | `Schema2SpellRules`、`Schema2WizardSpellbookRules`、`Schema2OngoingEffectRules`、`Schema2ExplorationRules`；`Schema2WizardSpellbookRulesTest`、`Schema2ExplorationRulesTest`、`CampaignDomainsCombatIntegrationTest`。 |
-| <a id="monsters"></a>怪物/共享伤害 | [有限怪物](schema-2-monster-breath.md)、[近战与借机攻击](schema-2-monster-attacks.md)、[多目标伤害合同](../design/v2/multi-target-save-damage.md) | `Schema2MonsterRules`、`Schema2MonsterRestRules`、`Schema2SaveDamageRules`。定向验证见 `Schema2MonsterAttackRulesTest`、`CampaignMonsterAttackIntegrationTest`、`Schema2MonsterBreathRulesTest`、`CampaignMonsterSpaceIntegrationTest`、`CampaignDomainsCombatIntegrationTest`。 |
+| <a id="monsters"></a>怪物/共享伤害 | [有限怪物](schema-2-monster-breath.md)、[怪物武器与借机攻击](schema-2-monster-attacks.md)、[多目标伤害合同](../design/v2/multi-target-save-damage.md) | `Schema2MonsterRules`、`Schema2MonsterRestRules`、`Schema2SaveDamageRules`。定向验证见 `Schema2MonsterAttackRulesTest`、`CampaignMonsterAttackIntegrationTest`、`Schema2MonsterBreathRulesTest`、`CampaignMonsterSpaceIntegrationTest`、`CampaignDomainsCombatIntegrationTest`。 |
 
 ## 角色构筑、种族、背景与成长
 
@@ -85,7 +85,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | Bard / Lore（[11—14](../references/srd-5.1/pages/page-011.md)） | Bardic Inspiration/Font of Inspiration 资源协议 | 激励授予及骰后使用、Jack of All Trades/Expertise、Song of Rest、Countercharm、Magical Secrets/已知法术、Superior Inspiration、Cutting Words/Peerless Skill 的真实反应/原骰修正未接入 | [成长](#growth)；[检定](#foundation)、[施法/动作流](#spells)尚缺对应贡献。 |
 | Cleric / Life（[15—18](../references/srd-5.1/pages/page-015.md)） | 一级单职业 Life、Bless/Cure Wounds、Disciple of Life 的有限类型化消费者；Channel Divinity 资源协议 | 完整准备/仪式、Domain Spells 各级、Turn/Destroy Undead、Preserve Life、Blessed Healer、Divine Strike、Supreme Healing、Divine Intervention 均缺；一级治疗分支不代表完整 Life | [施法](#spells)、[成长](#growth)局部闭环。 |
 | Druid / Land（[19—23](../references/srd-5.1/pages/page-019.md)） | Wild Shape 资源协议；其余旧元数据/获得 | 野兽目录选择、形态/装备/HP 替代、游泳飞行门限、施法与形态冲突；准备/仪式、Natural Recovery、Circle Spells、Land's Stride/Nature's Ward/Sanctuary 未闭合 | [成长](#growth)；变形、施法、环境 owner 尚缺实际接合。 |
-| Fighter / Champion（[24—25](../references/srd-5.1/pages/page-024.md)） | 单职业战士 5–6 级 Extra Attack 经正常成长授予，接入本人 Attack 两击与完整恢复；勇士 3–6 级 Improved Critical 真实授予和近战 19/20 重击，含 OA/Ready/Shield 后继续；一级 Second Wind 在 SQLite 本人战斗回合实际治疗并消费资源，标准休息恢复；Action Surge/Indomitable 资源协议 | Fighting Style 选择/贡献、其他 bonus action、额外 action、重掷及保存原骰、更高等级 Extra Attack、Superior Critical、Remarkable Athlete、Survivor 未执行 | [成长](#growth)、[战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md)。 |
+| Fighter / Champion（[24—25](../references/srd-5.1/pages/page-024.md)） | 单职业战士 5–6 级 Extra Attack 经正常成长授予，接入本人 Attack 两击与完整恢复；勇士 3–6 级 Improved Critical 真实授予和武器 19/20 重击，含普通短弓、近战 OA/Ready 及 Shield 后继续；一级 Second Wind 在 SQLite 本人战斗回合实际治疗并消费资源，标准休息恢复；Action Surge/Indomitable 资源协议 | Fighting Style 选择/贡献、其他 bonus action、额外 action、重掷及保存原骰、更高等级 Extra Attack、Superior Critical、Remarkable Athlete、Survivor 未执行 | [成长](#growth)、[战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md)。 |
 | Monk / Open Hand（[26—29](../references/srd-5.1/pages/page-026.md)） | Ki 资源协议 | Martial Arts/Flurry、无甲/移动、Patient Defense/Step、Deflect Missiles、Slow Fall、Stunning Strike、Ki 武器、Evasion/Diamond Soul、Empty Body/Perfect Self、Open Hand Technique/Wholeness/Tranquility/Quivering Palm 未闭合 | [成长](#growth)；动作、条件、豁免、防御和持续/延迟效果待接。 |
 | Paladin / Devotion（[30—34](../references/srd-5.1/pages/page-030.md)） | Divine Sense/Lay on Hands 资源协议 | 感知/分配治疗/祛病毒、Fighting Style、施法/Divine Smite、Divine Health、Channel Divinity、光环、Cleansing Touch、Sacred Weapon/Turn/圣光状态等未执行 | [成长](#growth)；[施法/效果](#spells)尚缺光环及目标类型 owner。 |
 | Ranger / Hunter（[35—38](../references/srd-5.1/pages/page-035.md)） | 旧元数据、解锁与有限成长选择 | Favored Enemy/Natural Explorer、施法、Fighting Style、Hunter's Prey/Defensive Tactics/Multiattack/Superior Defense 的具体选项、Primeval Awareness、地形/隐藏/感官和 Foe Slayer 未闭合 | [成长](#growth)遇未接选择须拒绝；战斗/冒险能力分别接入。 |
@@ -106,7 +106,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 共同工作（[79](../references/srd-5.1/pages/page-079.md)） | 原文；尚待接通 | 须核验协助者能否独立尝试、合作是否有效并将优势用于主检定 | [基础](#foundation) |
 | 被动检定、感知/隐藏关系（[78—79](../references/srd-5.1/pages/page-078.md)、[94](../references/srd-5.1/pages/page-094.md)） | 规则角色可对 DM 指定的 DC 执行[被动检定](schema-2-character-foundations.md#被动检定)。标准 10 + 适用修正，优势 +5、劣势 −5。基础分与幅度可由规则包覆盖；直接检定、分支后果和完整文件重开共用冻结规则 | 怪物被动察觉仍是元数据。自动隐蔽与发现、观察者和目标的感官与场景条件待接入 | [基础](#foundation)、[怪物](#monsters) |
 | 专精、半熟练、最低值、重掷/骰后替换（[12—14](../references/srd-5.1/pages/page-012.md)、[39—40](../references/srd-5.1/pages/page-039.md)） | 旧特性元数据；未接通 | 缺贡献去重/取整、原骰→重掷/替换关系、触发窗口、资源一次消费；Lucky/Reliable Talent/Indomitable 不因有 d20 工具而完成 | [成长](#growth)、[动作流](#combat) |
-| 奖励/惩罚骰、伤害骰与百分骰（[76](../references/srd-5.1/pages/page-076.md)、[96](../references/srd-5.1/pages/page-096.md)及具体条目） | 真实 Bless d4、健康声明 d4—d12、近战伤害与有限共享 d6；通用组合/百分骰机制未接入 | 已接分支局部闭环；缺每种规则批准的骰式、修正时点与独立审计，不能接受客户端任意骰式或结果 | [基础](#foundation)、[施法](#spells)、[怪物](#monsters) |
+| 奖励/惩罚骰、伤害骰与百分骰（[76](../references/srd-5.1/pages/page-076.md)、[96](../references/srd-5.1/pages/page-096.md)及具体条目） | 真实 Bless d4、健康声明 d4—d12、近战与短弓伤害及有限共享 d6；通用组合/百分骰机制未接入 | 已接分支局部闭环；缺每种规则批准的骰式、修正时点与独立审计，不能接受客户端任意骰式或结果 | [基础](#foundation)、[施法](#spells)、[怪物](#monsters) |
 | 灵感（[59—60](../references/srd-5.1/pages/page-059.md)） | 原文/旧元数据；未接入 | 缺授予/持有上限/转交、明确消耗时点与优势来源、并发和恢复；DM 优势布尔输入不是灵感资源 | [基础](#foundation)当前仅裁定检定情境 |
 
 ## 装备、经济与魔法物品
@@ -114,7 +114,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 机制族与原文 | 当前数据/执行 | 状态/恢复与具体缺口 | 依据 |
 |---|---|---|---|
 | 普通护甲/盾、工具、武器实例（[62—70](../references/srd-5.1/pages/page-062.md)） | 有限类型化；获得/移除/手位/穿脱、护甲 AC/熟练/力量/隐匿影响自动 | 局部闭环；不证明全部 SRD 物品目录已逐条收录。缺数量堆叠、容器、库存跨角色转移及战斗拾取 | [基础](#foundation) |
-| 武器属性、远程、投掷、弹药、装填、临时/银质/特殊武器（[64—65](../references/srd-5.1/pages/page-064.md)） | 普通近战 profile 有限类型化，真实手持/属性/熟练和伤害；其余未接入 | 局部近战闭环；缺逐属性适用、近远距离、弹药扣除/回收、投掷实例位置、loading、improvised、net/lance、银质防御 gate | [战斗](#combat)、[基础](#foundation) |
+| 武器属性、远程、投掷、弹药、装填、临时/银质/特殊武器（[64—65](../references/srd-5.1/pages/page-064.md)） | 普通近战与短弓按真实手位、熟练和属性结算。短弓按冻结射程选骰，发射扣一支实际携带的箭 | [短弓合同](schema-2-ranged-attacks.md)。弹药回收、投掷实例位置、装填、临时与特殊武器、银质防御仍待接入 | [战斗](#combat)、[基础](#foundation) |
 | 货币换算、获得/买卖、财宝/服务/生活费用（[62](../references/srd-5.1/pages/page-062.md)、[72—74](../references/srd-5.1/pages/page-072.md)） | 原文；无经济消费者 | 缺精确金额、数量/售价规则、交易双方与库存同事务、费用/时间/服务有界裁定及历史恢复 | 未建经济 owner；不能用 ITEM_ACQUIRED 当作已付款 |
 | 重量、携带/推拉/举起、负重变体（[69](../references/srd-5.1/pages/page-069.md)、[79—80](../references/srd-5.1/pages/page-079.md)） | 当前库存位置不是负重模型 | 缺重量/数量/容器容量、STR 与体型倍率、速度/检定贡献、变体选择、丢弃/转移的真实后果 | [基础](#foundation)仅实例 owner；负重消费者未建 |
 | 冒险装备、装备包、容器、消耗品（[66—69](../references/srd-5.1/pages/page-066.md)） | 工具和少量材料物件协议；无完整 gear 使用目录 | 缺装备包展开、容量/装填、点燃/光源/绳索/攀爬/治疗包等各族的使用动作、消耗及生成对象 | [基础](#foundation)、[战斗](#combat)须分别接成本与效果 |
@@ -148,11 +148,11 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 |---|---|---|---|
 | 遭遇/先攻/同值/回合/轮次（[90—91](../references/srd-5.1/pages/page-090.md)） | 有限类型化；警觉可见角色及有限怪物，服务器先攻、同值有限排列 | 局部闭环；缺突袭、完整遭遇 roster、阵营变化、非参战生物与 XP 工作流 | [战斗](#combat)、[怪物](#monsters) |
 | action/bonus action/reaction、回合重置（[90—91](../references/srd-5.1/pages/page-090.md)） | 规则角色与怪物共用普通动作、附赠动作、反应和移动预算。本人新回合刷新，其他人的余额保留。战士两击共付一次普通动作，回气另付一次附赠动作和一次特性使用次数 | 局部闭环。其余附赠动作来源、额外普通动作、其他额外攻击来源及每回合施法限制仍待接入 | [战斗](#combat)、[回气](schema-2-second-wind.md)、[施法](#spells) |
-| 普通近战 Attack、命中/暴击/伤害（[93—97](../references/srd-5.1/pages/page-093.md)） | 普通手持近战 profile、单击结算；Attack 序列按冻结规则与真实授予为一次或两次；真实属性/熟练/AC、原骰及健康 | 局部闭环；缺非致命击倒、徒手/天然武器及其他属性/多个伤害分量/特性修正；每种新 profile 须完整来源 | [战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md) |
-| 远程/投掷/双持（[93—95](../references/srd-5.1/pages/page-093.md)） | 未接入 | 缺射程与贴身劣势、遮蔽/弹药/投掷、附赠攻击手位和伤害规则；不能循环调用普通 ATTACK 绕过成本 | [战斗](#combat)当前明确边界 |
+| 普通武器 Attack、命中/暴击/伤害（[93—97](../references/srd-5.1/pages/page-093.md)） | 普通手持近战与双手短弓逐击结算；Attack 序列按冻结规则与真实授予为一次或两次；真实属性/熟练/AC、原骰及健康 | 局部闭环；缺非致命击倒、徒手/天然武器及其他属性/多个伤害分量/特性修正；每种新 profile 须完整来源 | [战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md) |
+| 远程/投掷/双持（[93—95](../references/srd-5.1/pages/page-093.md)） | 短弓与骷髅远程动作支持正常和长射程、贴身劣势、命中与护盾术。角色逐支扣箭 | 遮挡、弹药回收、投掷以及双持附赠攻击待接入 | [短弓与远程攻击](schema-2-ranged-attacks.md) |
 | Extra Attack（[25](../references/srd-5.1/pages/page-025.md)） | 单职业战士 5–6 级本人 Attack 两击；两击间移动、反应、换目标和放弃；完整文件保留原骰与序列进度 | 机会攻击和当前 Ready 响应仍为单击；更高等级、其他职业及多职业合并未接入 | [有限额外攻击合同](schema-2-extra-attack.md)、[真实链路验证](../testing.md#extra-attack-verification) |
 | Second Wind（[24](../references/srd-5.1/pages/page-024.md)） | 单职业战士 1–6 级真实一级授予，本人回合可先攻击再用附赠动作回气。额度、原骰、次数和 HP 同根。标准短长休恢复次数 | SQLite 完整文件及 Host/本人玩家候选已接合。多职业及战斗外执行仍待接入 | [有限回气合同](schema-2-second-wind.md)、[真实链路验证](../testing.md#second-wind-verification) |
-| Improved Critical（[25](../references/srd-5.1/pages/page-025.md)） | 单职业勇士 3–6 级正常取得，近战普通/OA/Ready 选中 19/20 重击，固定修正不加倍 | 反应暂停及原骰/授予/伤害随完整文件恢复；远程、投掷、多职业和 Superior Critical 未接入 | [有限精通重击合同](schema-2-improved-critical.md)、[真实链路验证](../testing.md#improved-critical-verification) |
+| Improved Critical（[25](../references/srd-5.1/pages/page-025.md)） | 单职业勇士 3–6 级正常取得，普通近战与短弓、近战 OA/Ready 选中 19/20 重击，固定修正不加倍 | 反应暂停及原骰/授予/伤害随完整文件恢复；投掷、多职业和 Superior Critical 未接入 | [有限精通重击合同](schema-2-improved-critical.md)、[真实链路验证](../testing.md#improved-critical-verification) |
 | Dash/Disengage/Dodge（[93](../references/srd-5.1/pages/page-093.md)） | 已接 action 成本及速度/本回合 OA 免除/攻击和 DEX save 贡献 | 局部闭环；新增失能、不可见、速度为零或特殊动作来源须消费真实贡献 | [战斗](#combat)、[怪物](#monsters) |
 | Help（[93](../references/srd-5.1/pages/page-093.md)） | 未接入 | 缺援助对象/任务/五尺敌人资格、下一次适用检定或攻击的单次优势、本人下回合期限及消费事实 | [战斗](#combat)、[检定](#foundation)待接 |
 | Hide/Search（[93—94](../references/srd-5.1/pages/page-093.md)） | 未接入；普通技能检定不足 | 缺隐藏关系/可被感知资格、主动搜索目标与被动值、观察者专属结果、失去隐藏和攻击影响 | 空间/感知/检定 owner 须共同接合 |
@@ -219,7 +219,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 |---|---|---|---|
 | 属性块/CR/XP/类型/感官/语言（[254—258](../references/srd-5.1/pages/page-254.md)、[261—357](../references/srd-5.1/pages/page-261.md)、[366—403](../references/srd-5.1/pages/page-366.md)） | 有限类型化 stat_block 协议、狼、地狱犬和木乃伊实例；不代表所有 SRD 属性块已收录 | 有限实例局部闭环；缺全目录逐项映射、更多体型/运动、感官/语言/telepathy 执行；显式 save bonus 不能再叠 PB/属性 | [怪物](#monsters) |
 | 部署/位置/先攻/HP/死亡（[254—259](../references/srd-5.1/pages/page-254.md)） | SMALL/MEDIUM 点格、有限真实 roster、怪物回合和零 HP 死亡 | 局部闭环；缺大体型、纯怪物场景、完整战外生物 roster、击败/俘获/战利品与 XP 奖励 | [怪物](#monsters)、[战斗](#combat) |
-| 普通近战/远程、天然武器、Multiattack（[259](../references/srd-5.1/pages/page-259.md)） | [狼和地狱犬啮咬](schema-2-monster-attacks.md)按冻结加值、触及和分量执行普通或借机攻击。狼最终命中后再做力量豁免，失败倒地 | 远程、Multiattack、Rotting Fist 的附加效果与其他未分类攻击仍待接入 | [怪物](#monsters) |
+| 普通近战/远程、天然武器、Multiattack（[259](../references/srd-5.1/pages/page-259.md)） | [狼和地狱犬啮咬](schema-2-monster-attacks.md)按冻结加值、触及和分量执行普通或借机攻击。狼最终命中后再做力量豁免，失败倒地。骷髅使用短剑或正常/长射程短弓 | Multiattack、Rotting Fist 的附加效果与其他未分类攻击仍待接入 | [怪物](#monsters) |
 | Wolf Bite 命中后豁免（[393](../references/srd-5.1/pages/page-393.md)） | 2d4+2 穿刺，生物做 DC 11 力量豁免，失败倒地。可冻结整项覆盖 DC。护盾术、昏迷、伤害免疫、倒地免疫和已经倒地均有各自结果 | 单目标、单次豁免、单格小型/中型怪物或规则角色。借机窗口、已付移动、原骰和姿态完整恢复 | [怪物攻击](schema-2-monster-attacks.md) |
 | Hell Hound Fire Breath / Recharge（[321—322](../references/srd-5.1/pages/page-321.md)） | 有限吐息动作，15 尺点锥、DEX12、共享 6d6、半伤、recharge5—6 | 完整目标证明/共享骰/分阶段健康与专注、真实回合 recharge 和怪物休息局部闭环；不泛化任意吐息或区域 | [怪物](#monsters) |
 | 其他 save 动作：凝视/恐惧/疾病毒素/死亡（[259](../references/srd-5.1/pages/page-259.md)及各属性块） | 元数据或原文；例如 Dreadful Glare/Rotting Fist 未执行 | 缺可见/距离/目标类型、豁免与重复、免疫期限、状态/最大 HP/疾病/诅咒及死亡后继，不能只登记 damage_profile | [怪物](#monsters)、条件/健康 owner 待接 |
@@ -251,7 +251,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 |---|---|---|
 | 其余法术位特殊恢复 | 角色服务、休息规则、法术书规则及角色仓储 | 以已接入的有限 Arcane Recovery 为基础，扩展其余准确恢复来源；Natural Recovery 等仍须自己的资格、休息/日界、位阶选择和原事实恢复，不能借同类算法自动开放。 |
 | 范围法术的其余完整语义 | 战斗服务、施法规则、共享伤害规则、场景仓储 | 以有限 Burning Hands 为基础，分别接通点燃对象、Sculpt 选择、抗魔区域、Ready 持有及探索施放的真实 owner；每个新法术仍须自己的授权、成本、目标/伤害参数、反应与恢复闭环。 |
-| 普通生物攻击与怪物 OA | 战斗规则/服务、怪物规则、动作流及装备/健康事实 | 已接入有限近战、逐步 OA 与狼啮咬的命中后豁免击倒。其余命中附带后果、远程和 Multiattack 仍需独立执行与恢复边界。 |
+| 普通生物攻击与怪物 OA | 战斗规则/服务、怪物规则、动作流及装备/健康事实 | 已接入有限近战、短弓、逐步近战 OA 与狼啮咬的命中后豁免击倒。其余命中附带后果和 Multiattack 仍需独立执行与恢复边界。 |
 | 通用 save/对抗与 Grapple/Shove | 检定规则、战斗规则/服务、角色/场景仓储 | 受支持的战斗角色已接入目标选技能、替代一击、手位、拖带及失能解除。狼啮咬采用力量豁免。通用豁免、其他体型及专长各需自己的规则来源。 |
 | 条件 producer 与贡献 | 持续效果、健康、战斗/检定、施法 owner | 先按逐状态表闭合一个真实 producer、免疫、叠加/期限及所有受影响消费者，再扩展内容；不能用通用条件名称集合代替语义。 |
 | 角色防御与伤害后反应 | 成长/来源、效果 owner、共享伤害与动作流 | 明确来源与 gate、同一 APPLY/CON cut、失败后有界选择、资源一次消费；Protection from Energy、Cutting Words、Evasion 等分别接入。 |

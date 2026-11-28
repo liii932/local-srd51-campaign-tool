@@ -1,6 +1,6 @@
-# Schema 2 战斗、近战武器与步行作者来源
+# Schema 2 战斗、武器与步行作者来源
 
-本合同约束战斗、近战武器攻击和步行的严格作者输入、纯组合与战役冻结。沿用[制品合同](schema-2-rule-artifacts.md)及[检定、装备与健康作者合同](schema-2-foundation-authoring.md)。
+本合同约束战斗、近战与远程武器攻击、步行的严格作者输入、组合与战役冻结。沿用[制品合同](schema-2-rule-artifacts.md)及[检定、装备与健康作者合同](schema-2-foundation-authoring.md)。
 
 ## 共同字段与身份
 
@@ -13,6 +13,7 @@
 | --- | --- | --- | --- |
 | `adventure.combat` | `combat.*` | `SRD_2014_COMBAT_V1` | 90—95 |
 | `equipment.weapon_attack` | `weapon_attack.*` | `SRD_2014_MELEE_WEAPON_ATTACK_V1` | 62—73 |
+| `equipment.weapon_attack` | `weapon_attack.*` | `SRD_2014_RANGED_WEAPON_ATTACK_V1` | 62—73 |
 | `character.movement` | `movement.*` | `SRD_2014_WALKING_SPEED_V1` | 3—74 |
 | `equipment.armor_movement` | `armor_movement.heavy_armor`（准确键） | `SRD_2014_HEAVY_ARMOR_MOVEMENT_V1` | 63 |
 
@@ -48,12 +49,18 @@
 武器熟练来自该物品准确 `proficiency` 和角色实际授予；命中与伤害的属性修正、熟练加值、AC、
 骰点和结果均由服务器派生，不是作者自由数值。装备实例必须真实存在并处于合法手位。
 
-本模型只登记普通近战攻击。单职业战士 5–6 级的攻击额度由独立的
+单职业战士 5–6 级的攻击额度由独立的
 [Extra Attack 特性声明](schema-2-extra-attack.md)及真实授予提供，不是武器 profile 的数值。
 勇士 3–6 级的 [Improved Critical](schema-2-improved-critical.md)同样来自实际特性授予，
 不在武器定义上保存第二份重击阈值；普通攻击、OA 与 Ready 共用该被动贡献。
-远程、弹药、投掷、双持、versatile、重型武器特殊影响、其他额外攻击来源、
+投掷、双持、versatile、重型武器特殊影响、其他额外攻击来源、
 重掷和魔法附加伤害须有自己的完整字段与消费者后才能开放，不能通过说明文字或环境健康效果冒充。
+
+## 远程武器定义
+
+`SRD_2014_RANGED_WEAPON_ATTACK_V1` 使用真实的双手 `RANGED_WEAPON` 物品、`DEXTERITY`、伤害骰及类型。`ammunition` 必须准确引用本组合的 `AMMUNITION` 物品。`normal_range_feet` 与 `long_range_feet` 取 5 至 600 之间的五尺倍数，长射程必须大于正常射程。远程格式使用这两个数字，近战格式使用 `reach_feet`。源定义和覆盖后的组合都按各自格式验证。
+
+标准 `weapon_attack.shortbow` 使用 80/320 尺、1d6 穿刺及 `item.arrow`。作者可用 `set_field` 单独修改正常射程。可运行对照和玩家行动证据见[独立作者场景](../../rule-packages/srd51-runtime/scenarios/README.md#ranged-weapons)。怪物通过自己的[动作条目](schema-2-monster-attacks.md#模组作者字段)给出射程、命中和完整伤害分量。
 
 ## 步行来源
 

@@ -700,5 +700,70 @@
         }
       ]
     }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.skeleton"
+    },
+    "display_name": "Skeleton",
+    "description": "Selected SRD stat block with Shortsword and Shortbow actions.",
+    "source_page": 346,
+    "stat_block": {
+      "size": "MEDIUM",
+      "creature_type": "UNDEAD",
+      "alignment": "lawful evil",
+      "armor_class": 13,
+      "armor_description": "armor scraps",
+      "hit_points": 13,
+      "hit_dice_count": 2,
+      "hit_dice_sides": 8,
+      "hit_dice_modifier": 4,
+      "walk_speed_feet": 30,
+      "abilities": {
+        "strength": 10,
+        "dexterity": 14,
+        "constitution": 15,
+        "intelligence": 6,
+        "wisdom": 8,
+        "charisma": 5
+      },
+      "saving_throws": [],
+      "skills": [],
+      "damage_defenses": [
+        {
+          "kind": "VULNERABILITY",
+          "damage_type": "BLUDGEONING",
+          "qualifier": "ALL"
+        },
+        {
+          "kind": "IMMUNITY",
+          "damage_type": "POISON",
+          "qualifier": "ALL"
+        }
+      ],
+      "condition_immunities": [
+        "exhaustion",
+        "poisoned"
+      ],
+      "darkvision_feet": 60,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 9,
+      "languages": [
+        {
+          "name": "The languages it knew in life",
+          "understands": true,
+          "speaks": false
+        }
+      ],
+      "challenge_numerator": 1,
+      "challenge_denominator": 4,
+      "experience_points": 50,
+      "traits": []
+    }
   }
 ]

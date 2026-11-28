@@ -19,7 +19,9 @@ public final class Schema2CharacterRuntime {
     public static final int MAX_EVENTS = 128, MAX_RESOURCES = 32;
     public static final List<String> ABILITIES = List.of("ability.strength", "ability.dexterity", "ability.constitution", "ability.intelligence", "ability.wisdom", "ability.charisma");
     public static final String ROLLED_CHECK = "CHECK_RESOLVED", PASSIVE_CHECK = "PASSIVE_CHECK_RESOLVED";
-    private static final Set<String> KINDS = Set.of("INITIALIZED", "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED", ROLLED_CHECK, PASSIVE_CHECK, "ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED", "HEALTH_EFFECT_RESOLVED", "DEATH_SAVE_RESOLVED", "COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED", "COMBAT_RESOURCE_SPENT", "COMBAT_HEALING_APPLIED", "COMBAT_ENVIRONMENT_HEALTH", "SPELLBOOK_INITIALIZED", "SPELLBOOK_ADVANCED", "SPELLBOOK_PREPARED");
+    public static final String COMBAT_AMMUNITION_SPENT = "COMBAT_AMMUNITION_SPENT";
+    static final String RANGED_WEAPON_ADJUDICATION = "Ranged weapon attack";
+    private static final Set<String> KINDS = Set.of("INITIALIZED", "CHARACTER_ADVANCED", "STATISTICS_ADVANCED", "RESOURCE_SPENT", "RESOURCES_RECOVERED", "TIME_ADVANCED", "REST_STARTED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED", ROLLED_CHECK, PASSIVE_CHECK, "ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED", "HEALTH_EFFECT_RESOLVED", "DEATH_SAVE_RESOLVED", "COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED", "COMBAT_RESOURCE_SPENT", COMBAT_AMMUNITION_SPENT, "COMBAT_HEALING_APPLIED", "COMBAT_ENVIRONMENT_HEALTH", "SPELLBOOK_INITIALIZED", "SPELLBOOK_ADVANCED", "SPELLBOOK_PREPARED");
     private static final Comparator<RuleIdentity> RULE_ORDER = Comparator.comparing(RuleIdentity::moduleKey).thenComparing(RuleIdentity::ruleType).thenComparing(RuleIdentity::ruleKey);
     public static final Comparator<EntryIdentity> SLOT_ORDER = Comparator.comparing(EntryIdentity::rule, RULE_ORDER)
             .thenComparing(EntryIdentity::collectionKey).thenComparing(EntryIdentity::moduleKey).thenComparing(EntryIdentity::entryKey);
@@ -347,13 +349,15 @@ public final class Schema2CharacterRuntime {
             if (checkKind(kind)) valid = resource == null && amount == 0 && recoveryTrigger == null && hpChoice == null
                     && targetClass == null && GrowthChoices.EMPTY.equals(growthChoices) && restInput == null && checkInput != null;
             else valid &= checkInput == null;
-            if (equipmentKind(kind)) {
+            if (equipmentKind(kind) || COMBAT_AMMUNITION_SPENT.equals(kind)) {
                 valid = resource == null && amount == 0 && recoveryTrigger == null && hpChoice == null && targetClass == null
                         && GrowthChoices.EMPTY.equals(growthChoices) && restInput == null && checkInput == null && equipmentInput != null && healthInput == null;
                 if (valid) valid = switch (kind) {
                     case "ITEM_ACQUIRED" -> equipmentInput.item() != null && "CARRIED".equals(equipmentInput.location());
                     case "ITEM_EQUIPPED" -> equipmentInput.item() == null && equipmentInput.location() != null && !equipmentInput.location().equals("CARRIED");
                     case "ITEM_REMOVED", "ITEM_UNEQUIPPED" -> equipmentInput.item() == null && equipmentInput.location() == null;
+                    case COMBAT_AMMUNITION_SPENT -> equipmentInput.item() != null && "CARRIED".equals(equipmentInput.location())
+                            && RANGED_WEAPON_ADJUDICATION.equals(equipmentInput.adjudication());
                     default -> false;
                 };
             } else valid &= equipmentInput == null;
@@ -361,7 +365,7 @@ public final class Schema2CharacterRuntime {
                     && GrowthChoices.EMPTY.equals(growthChoices) && restInput == null && checkInput == null && equipmentInput == null && healthInput != null
                     && (Set.of("HEALTH_EFFECT_RESOLVED","COMBAT_ENVIRONMENT_HEALTH").contains(kind) ? healthInput.effect() != null : healthInput.effect() == null && healthInput.temporaryChoice() == null);
             else valid &= healthInput == null;
-            if (combatKind(kind)) valid &= combatInput != null && ("COMBAT_RESOURCE_SPENT".equals(kind)
+            if (combatKind(kind)) valid &= combatInput != null && (!healthKind(kind)
                     ? healthInput == null && combatInput.damageAmount() == 0 && !combatInput.critical()
                     : healthInput != null && (kind.equals("COMBAT_ENVIRONMENT_HEALTH") ? healthInput.effect()!=null && !combatInput.critical() : healthInput.effect() == null && healthInput.temporaryChoice() == null))
                     && (!kind.equals("COMBAT_DEATH_SAVE_RESOLVED") || combatInput.damageAmount() == 0 && !combatInput.critical());
@@ -425,8 +429,8 @@ public final class Schema2CharacterRuntime {
     public static boolean checkKind(String kind) { return ROLLED_CHECK.equals(kind) || PASSIVE_CHECK.equals(kind); }
     public static boolean restKind(String kind) { return kind != null && Set.of("REST_STARTED", "TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT", "REST_ENDED").contains(kind); }
     public static boolean equipmentKind(String kind) { return kind != null && Set.of("ITEM_ACQUIRED", "ITEM_REMOVED", "ITEM_EQUIPPED", "ITEM_UNEQUIPPED").contains(kind); }
-    public static boolean combatKind(String kind) { return kind != null && Set.of("COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED", "COMBAT_RESOURCE_SPENT", "COMBAT_HEALING_APPLIED", "COMBAT_ENVIRONMENT_HEALTH").contains(kind); }
-    public static boolean healthKind(String kind) { return "HEALTH_EFFECT_RESOLVED".equals(kind) || "DEATH_SAVE_RESOLVED".equals(kind) || combatKind(kind) && !"COMBAT_RESOURCE_SPENT".equals(kind); }
+    public static boolean combatKind(String kind) { return kind != null && Set.of("COMBAT_DAMAGE_APPLIED", "COMBAT_DEATH_SAVE_RESOLVED", "COMBAT_TIME_ADVANCED", "COMBAT_RESOURCE_SPENT", COMBAT_AMMUNITION_SPENT, "COMBAT_HEALING_APPLIED", "COMBAT_ENVIRONMENT_HEALTH").contains(kind); }
+    public static boolean healthKind(String kind) { return "HEALTH_EFFECT_RESOLVED".equals(kind) || "DEATH_SAVE_RESOLVED".equals(kind) || combatKind(kind) && !"COMBAT_RESOURCE_SPENT".equals(kind) && !COMBAT_AMMUNITION_SPENT.equals(kind); }
     private static boolean advancement(String kind) { return kind.equals("CHARACTER_ADVANCED") || kind.equals("STATISTICS_ADVANCED"); }
     public static void validateEvent(Event event) {
         require(event != null && event.command() != null); uuid(event.operationId());
@@ -438,7 +442,7 @@ public final class Schema2CharacterRuntime {
         if (before == null) require(event.kind().equals("INITIALIZED") && after.version() == 0 && after.level() == 1 && event.hitDieRoll() == null && after.equipment().isEmpty() && after.health().equals(HealthState.INITIAL) && after.spellbook()==null);
         else {
             validateState(before); require(!event.kind().equals("INITIALIZED") && sameRoot(before, after) && before.characterClass().equals(after.characterClass()) && after.version() == before.version() + 1);
-            if (!equipmentKind(event.kind()) && !Set.of("COMBAT_DAMAGE_APPLIED","COMBAT_ENVIRONMENT_HEALTH").contains(event.kind())) require(before.equipment().equals(after.equipment()));
+            if (!equipmentKind(event.kind()) && !Set.of("COMBAT_DAMAGE_APPLIED","COMBAT_ENVIRONMENT_HEALTH",COMBAT_AMMUNITION_SPENT).contains(event.kind())) require(before.equipment().equals(after.equipment()));
             if (!healthKind(event.kind()) && !Set.of("TIME_ADVANCED", "REST_COMPLETED", "HIT_DIE_SPENT").contains(event.kind())) require(before.health().equals(after.health()));
             boolean arcaneRecovery = command.restInput() != null && !command.restInput().recoveredSpellSlots().isEmpty();
             if (arcaneRecovery) {
@@ -481,6 +485,12 @@ public final class Schema2CharacterRuntime {
                     } else require(old.equals(next));
                 }
                 require(spent);
+            } else if (COMBAT_AMMUNITION_SPENT.equals(event.kind())) {
+                EquipmentInput spent = command.equipmentInput();
+                require(event.hitDieRoll() == null && before.rest().active() == null && before.hitPoints() > 0
+                        && command.combatInput().actorId().equals(before.characterId())
+                        && before.equipment().contains(new EquipmentItem(spent.itemId(), spent.item(), spent.location()))
+                        && Schema2CombatEquipmentFacts.spendAmmunition(before, spent.itemId()).equals(after));
             } else if (equipmentKind(event.kind()) || healthKind(event.kind())) {
                 require(event.hitDieRoll() == null && before.rest().active() == null && sameCore(before, after));
                 if (equipmentKind(event.kind())) require(before.hitPoints() == after.hitPoints() && before.health().equals(after.health())

@@ -177,7 +177,7 @@ public final class CampaignRuleContext {
 
     public record FieldOverride(String field, String moduleKey, String releaseVersion,
                                 String collection, String entryKey) { }
-    public record MonsterAttackChoice(EntryIdentity action, String name) { }
+    public record MonsterAttackChoice(EntryIdentity action, String name, int reachFeet, int normalRangeFeet, int longRangeFeet) { }
     public record CatalogEntry(String moduleKey, String type, String key, String name, boolean enabled,
                                boolean executable, String description, String abilityKey, String category,
                                Boolean allowAlternateSkillAbility,
@@ -217,10 +217,12 @@ public final class CampaignRuleContext {
                 .map(row -> fighterSecondWindResource(row.definition().owner())).collect(Collectors.toUnmodifiableSet());
         Map<RuleIdentity, List<MonsterAttackChoice>> monsterAttacks = new LinkedHashMap<>();
         for (FinalEntry row : projection.projection().entries()) {
-            if (row.enabled() && row.entry() instanceof MonsterActionEntry action
-                    && action.actionProfile().mode() == MonsterActionMode.MELEE_ATTACK_V1)
+            if (row.enabled() && row.entry() instanceof MonsterActionEntry action && action.actionProfile().attackProfile() != null) {
+                var profile = action.actionProfile().attackProfile();
                 monsterAttacks.computeIfAbsent(action.identity().rule(), ignored -> new ArrayList<>())
-                        .add(new MonsterAttackChoice(action.identity(), action.actionProfile().displayName()));
+                        .add(new MonsterAttackChoice(action.identity(), action.actionProfile().displayName(), profile.reachFeet(),
+                                profile.normalRangeFeet(), profile.longRangeFeet()));
+            }
         }
         List<CatalogEntry> catalog = new ArrayList<>();
         for (FinalRule row : projection.projection().rules()) {
@@ -257,13 +259,14 @@ public final class CampaignRuleContext {
                 interpretation(), binding, catalog, List.of(
                     "Standard-array application characters; racial ability increases and full racial traits are unavailable.",
                     "Fighter levels 1–6, Life-domain cleric level 1, Wizard levels 1–5; this is not complete SRD class support.",
-                    "An acquired Fighter Extra Attack allows up to two melee attacks within the Attack action on that fighter's turn.",
+                    "An acquired Fighter Extra Attack allows up to two weapon attacks within the Attack action on that fighter's turn.",
                     "An acquired Fighter Second Wind spends its own use as a bonus action on that fighter's active turn and heals 1d10 plus Fighter level.",
                     "Background sources currently grant languages/tools, without background skills, features or starting gear.",
                     "Unimplemented fighter features, Evocation Savant and Sculpt Spells remain catalog-only OPTION metadata and are not acquired; Grappler is blocked acquisition metadata.",
                     "Only Bless, Cure Wounds, Shield, Counterspell and Burning Hands have bounded casting consumers; other spells are metadata.",
                     "Multiclass growth acquisition does not authorize combined-caster slot semantics or unsupported multiclass casting.",
-                    "Hell Hound Bite and Fire Breath execute as monster actions; the antimagic area and direct vital effects are explicit DM house rules."));
+                    "Wolf and Hell Hound bites, Hell Hound Fire Breath and the Skeleton's shortsword and shortbow use frozen monster actions.",
+                    "The antimagic area and direct vital effects are explicit DM house rules."));
     }
 
     private static String description(Definition value) {

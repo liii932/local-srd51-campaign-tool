@@ -83,6 +83,8 @@
 | `SHIELD` | 2 | 0 | 1 | `character.proficiency`，类别 `ARMOR` |
 | `TOOL` | 0 | 0 | 1 或 2 | `character.tool` |
 | `WEAPON` | 0 | 0 | 1 或 2 | `character.proficiency`，类别 `WEAPON` |
+| `RANGED_WEAPON` | 0 | 0 | 2 | `character.proficiency`，类别 `WEAPON` |
+| `AMMUNITION` | 0 | 0 | 0 | 必须省略。每支实际持有的弹药有独立库存身份 |
 | `HOLY_SYMBOL` | 0 | 0 | 1 | 必须省略 |
 
 力量要求为 0 表示无门槛。力量低于所穿重甲门槛时，按[步行来源及通用重甲规则](schema-2-combat-authoring.md#步行来源)结算减速。
@@ -92,7 +94,7 @@
 为 false 时必须省略该字段。盾、工具、武器和圣徽均为 false 且不携带 `stealth_skill`。
 应用不根据显示名称或自由规则键猜测技能身份。
 圣徽的真实持有与施法组件资格见[施法作者合同](schema-2-spell-authoring.md)；
-其余类别继续要求准确熟练引用，`proficiency` 仍不能用 `clear_field` 清空。
+弹药的持有与消耗见[短弓合同](schema-2-ranged-attacks.md)。需要熟练引用的装备不能用 `clear_field` 清空该字段。
 
 引用只能指向本包或加载在前的真实定义；外部原始所有者必须是本包的直接依赖。
 禁用装备仍须保留其类别要求的真实引用；启用装备的适用熟练与隐匿技能目标还必须启用。
