@@ -30,10 +30,14 @@ class Schema2SecondWindRulesTest {
         var resource = rules.rule("character.resource", "resource.fighter.second_wind");
         assertEquals(resource, Schema2FeatureSupport.secondWindResource(rules.projection(), fighter.history().current()));
         var dashed = apply(start(), Kind.DASH, actor);
-        assertFalse(dashed.history().current().combatants().stream().filter(member -> member.characterId().equals(actor)).findFirst().orElseThrow().actionAvailable());
+        Combatant before = Schema2CombatRules.combatant(dashed.history().current(), actor);
+        assertEquals(0, before.actionsRemaining());
+        assertEquals(1, before.bonusActionsRemaining());
         var result = apply(dashed, Kind.SECOND_WIND, actor, 10, 10);
         var event = result.history().events().getLast();
-        assertEquals(dashed.history().current().combatants(), event.after().combatants());
+        assertEquals(dashed.history().current().combatants().stream()
+                .map(member -> member.characterId().equals(actor) ? before.spendBonusAction() : member).toList(),
+                event.after().combatants());
         assertEquals(List.of(new Roll("SECOND_WIND_HEALING", actor, 10, 10)), event.resolution().rolls());
         var cost = event.resolution().healthChanges().getFirst();
         var heal = event.resolution().healthChanges().getLast();
@@ -41,9 +45,31 @@ class Schema2SecondWindRulesTest {
         assertEquals(1, cost.resourceAmount());
         assertEquals(cost.after(), heal.before());
         assertEquals(new Schema2CharacterRuntime.HealthResult(List.of(10), null, null, 11, 0), heal.healthResult());
-        rejected("S2_RESOURCE_INSUFFICIENT", () -> apply(result, Kind.SECOND_WIND, actor));
+        rejected("S2_COMBAT_BONUS_ACTION_UNAVAILABLE", () -> apply(result, Kind.SECOND_WIND, actor));
         rejected("S2_RESOURCE_FEATURE_OWNER_REQUIRED", () -> new Schema2CharacterProgressionRules()
                 .spendOrdinary(rules.projection(), fighter.history().current(), resource, 1));
+    }
+
+    @Test void remainingBonusAndFighterResourceAreIndependentPreflightRequirements() {
+        var started = start();
+        Battle battle = started.history().current();
+        Battle spentBonus = Schema2CombatRules.replaceActor(battle, Schema2CombatRules.combatant(battle, actor).spendBonusAction());
+        var unspentRoster = Map.of(actor, new Context(rules.projection(), fighter.initial(), fighter.history().current()),
+                opponent, new Context(rules.projection(), cleric.initial(), cleric.history().current()));
+        var command = Command.action(Kind.SECOND_WIND, actor);
+        rejected("S2_COMBAT_BONUS_ACTION_UNAVAILABLE", () ->
+                combat.preflight(UUID.randomUUID(), scene, campaign, unspentRoster, spentBonus, command));
+
+        var healed = apply(started, Kind.SECOND_WIND, actor, 10, 5);
+        var opponentTurn = apply(healed, Kind.END_TURN, actor);
+        assertEquals(0, Schema2CombatRules.combatant(opponentTurn.history().current(), actor).bonusActionsRemaining());
+        var nextTurn = apply(opponentTurn, Kind.END_TURN, opponent);
+        assertEquals(1, Schema2CombatRules.combatant(nextTurn.history().current(), actor).bonusActionsRemaining());
+        var spentRoster = nextTurn.characters().stream().collect(java.util.stream.Collectors.toMap(
+                record -> record.initial().characterId(), record -> new Context(rules.projection(), record.initial(),
+                        record.history().current(), SCENE_SECOND + nextTurn.elapsedSeconds())));
+        rejected("S2_RESOURCE_INSUFFICIENT", () ->
+                combat.preflight(UUID.randomUUID(), scene, campaign, spentRoster, nextTurn.history().current(), command));
     }
 
     @Test void higherDiceBelongOnlyToSecondWindAndRequireItsOriginalRecipientAndAmount() {

@@ -135,6 +135,11 @@ public final class CampaignParticipationCommands {
         }
         return Collections.unmodifiableSet(visible);
     }
+    static UUID opportunityMonster(Schema2CombatState.Battle battle, Schema2CombatState.Window window) {
+        if (window == null || window.trigger().kind() != Schema2CombatState.TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE) return null;
+        UUID mover = window.trigger().subjectId();
+        return battle.monsters().stream().anyMatch(monster -> monster.monsterId().equals(mover)) ? mover : null;
+    }
     public static void requireExecutionPermission(CampaignDomainData.State state, String action, JsonObject input, Actor actor) {
         if (actor.kind() != ActorKind.PLAYER) return;
         UUID character = actor.characterId();
@@ -154,7 +159,13 @@ public final class CampaignParticipationCommands {
                 && battle.monsters().stream().anyMatch(monster -> monster.monsterId().equals(command.targetId()))
                 && !visibleMonsters(state, actor.memberId(), battle.combatId()).contains(command.targetId()))
             throw playerPermissionDenied();
-        if (battle.activeFlow() != null) return; // Scene preflight accepts only the entitled current leaf.
+        if (battle.activeFlow() != null) {
+            var window = battle.activeFlow().windows().stream().filter(w -> w.windowKey().equals(command.windowKey())).findFirst().orElse(null);
+            UUID mover = opportunityMonster(battle, window);
+            if (mover != null && !visibleMonsters(state, actor.memberId(), battle.combatId()).contains(mover))
+                throw playerPermissionDenied();
+            return; // Scene preflight checks the exact leaf, deciding actor and reaction option.
+        }
         if (battle.status() == Schema2CombatState.Status.EXPLORATION) {
             String required = switch (command.kind()) {
                 case CAST -> "CHARACTER_COMMAND";

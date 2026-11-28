@@ -132,7 +132,7 @@ async function main() {
     assert.equal(attack.targetId, target);
     assert.equal(attack.opportunityAttack, false);
     assert.equal(attack.status, 'RESOLVED');
-    assert.equal(actor(wolf).actionAvailable, false);
+    assert.equal(actor(wolf).actionsRemaining, 0);
     assert.equal(actor(wolf).reactionAvailable, true);
     assert.equal(evidence.action.rule.ruleKey, 'monster.wolf');
     assert.equal(evidence.action.entryKey, 'bite');

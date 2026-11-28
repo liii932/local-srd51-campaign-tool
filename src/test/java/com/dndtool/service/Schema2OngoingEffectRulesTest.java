@@ -46,7 +46,7 @@ class Schema2OngoingEffectRulesTest {
                 List.of(new ConcentrationHolder(a,ConcentrationKind.BLESS_EFFECT,effects.getFirst().effectKey()),
                         new ConcentrationHolder(b,ConcentrationKind.BLESS_EFFECT,effects.getLast().effectKey())),List.of(),List.of());
     }
-    static Combatant actor(UUID id,Position position) {return new Combatant(id,position,0,true,true,0,0,false,false,null,false);}
+    static Combatant actor(UUID id,Position position) {return new Combatant(id,position,0,1,1,true,0,0,false,false,null,false);}
     void zones(EnvironmentZone...zones) {battle=copy(battle,battle.combatants(),List.of(zones));}
     void reconcile() {var result=Schema2OngoingEffectRules.reconcile(battle,UUID.randomUUID());battle=withCauses(battle,result.causes());validate(roster,battle);}
     static Battle copy(Battle b,List<Combatant> actors,List<EnvironmentZone> zones) {

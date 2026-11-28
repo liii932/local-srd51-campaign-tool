@@ -983,10 +983,14 @@
       text(box, 'h3', `${spaceName({kind: 'SCENE', id: battle.combatId})} · ${battleStatus(battle.status)} · ${executing ? '焦点' : '后台'}`);
       if (active && executing && battle.status === 'ACTIVE') text(box, 'p', `第 ${battle.round} 轮 · 当前 ${personName(active)}`);
       const grabbed = new Set(liveGrapples(battle).map(grapple => grapple.targetId));
-      table(box, ['参与者', '格位', '阵营', '姿态', '移动力已用', '动作', '反应', '攻击动作'], battle.combatants.map(actor => [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
-        (actor.prone ? '倒地' : '站立') + (grabbed.has(actor.characterId) ? ' · 受擒（速度 0）' : ''), `${actor.movementSpentHalfFeet / 2} 尺`,
-        actor.actionAvailable ? '可用' : '已用', actor.reactionAvailable ? '可用' : '已用',
-        actor.sequence ? `已攻击 ${actor.sequence.performed}/${actor.sequence.limit} · 剩余 ${actor.sequence.limit - actor.sequence.performed - actor.sequence.forfeited}${actor.sequence.forfeited ? ` · 已放弃 ${actor.sequence.forfeited}` : ''}` : '未开始']));
+      table(box, ['参与者', '格位', '阵营', '姿态', '剩余移动', '普通动作', '附赠动作', '反应', '攻击动作'], battle.combatants.map(actor => {
+        const budget = history.turnBudgets?.[actor.characterId];
+        return [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
+          (actor.prone ? '倒地' : '站立') + (grabbed.has(actor.characterId) ? ' · 受擒（速度 0）' : ''),
+          budget ? `${budget.movementRemainingHalfFeet / 2} 尺` : '—', budget?.actionsRemaining ?? '—', budget?.bonusActionsRemaining ?? '—',
+          budget ? (budget.reactionAvailable ? '可用' : '已用') : '—',
+          actor.sequence ? `已攻击 ${actor.sequence.performed}/${actor.sequence.limit} · 剩余 ${actor.sequence.limit - actor.sequence.performed - actor.sequence.forfeited}${actor.sequence.forfeited ? ` · 已放弃 ${actor.sequence.forfeited}` : ''}` : '未开始'];
+      }));
       renderGrapples(box, battle, executing);
       for (const effect of battle.ongoingEffects || []) text(box, 'p', `效果：${ruleName(effect.spell || effect.rule)} · ${effect.status === 'ACTIVE' ? '生效' : '已结束'}`);
       for (const zone of battle.environmentZones || []) if (!zone.endedOperationId) text(box, 'p', `环境区域：${ruleName(zone.rule)} · 中心 ${zone.center.x}, ${zone.center.y}`);
@@ -1139,10 +1143,10 @@
       : replacement ? `本次替代第 ${sequence.performed + 1} 次攻击。目标须选择防御检定。${destination ? `推开目的格为 (${destination.x},${destination.y})。` : ''}`
       : escape ? (grapples.length ? '选择要挣脱的擒抱关系及检定。尝试会消耗一次动作。' : '该行动者当前未被擒抱。')
       : drag ? (grapples.length ? '两条路径须逐格对应。被拖带者至少小两个体型级别时可按原速拖带，其余情况速度减半。' : '该行动者当前未擒抱其他生物。')
-      : kind === 'SECOND_WIND' ? '仅已取得回气的战士可在本人回合使用；消耗一次回气，以附赠动作恢复 1d10＋战士等级的生命值。短休或长休完成后恢复次数。'
+      : kind === 'SECOND_WIND' ? '战士消耗本回合的一次附赠动作和一次回气，恢复 1d10＋战士等级的生命值。回气次数在短休或长休后恢复。'
       : kind === 'DROP_PRONE' ? (battle.status === 'EXPLORATION' ? '角色可在探索中主动卧倒，不推进场景时钟。' : '角色可在本人回合主动卧倒，保留动作、反应与移动力。')
       : kind === 'STAND_UP' ? (battle.status === 'EXPLORATION' ? '倒地生物在探索中起身会推进场景时钟 6 秒。' : '倒地生物在本人回合起身时，消耗等于当前速度一半的移动力。')
-      : kind === 'MOVE' && actor?.prone ? '当前角色倒地，移动为匍匐，每格消耗 10 尺移动力。'
+      : kind === 'MOVE' ? (actor?.prone ? '倒地时每格匍匐消耗 10 尺移动力。' : '每格消耗 5 尺移动力。可一次填写连续路径，离开敌人触及时在跨格前处理借机反应。')
       : kind === 'EXPLORATION_MOVE' ? (actor?.prone ? '当前角色倒地，探索移动为匍匐，每格按 10 尺计入当前速度上限；每次推进场景时钟 6 秒。' : '探索移动每格按 5 尺计入当前速度上限；每次推进场景时钟 6 秒。')
       : battle.status === 'EXPLORATION' ? '当前为探索状态，可按角色状态卧倒、移动、起身、推进时间，或重新进入战斗。'
       : '按当前回合选择行动；移动时填写目的格，出现反应时先处理上方提示。';

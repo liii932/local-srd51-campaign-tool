@@ -86,7 +86,7 @@ class CampaignSecondWindIntegrationTest {
             assertEquals(committed, fixture.access());
             var changed = fixture.combatInput(Command.action(Kind.END_TURN, fighter));
             assertCode("IDEMPOTENCY_CONFLICT", () -> fixture.submit(request, before, changed));
-            fixture.rejectCombat(Command.action(Kind.SECOND_WIND, fighter), "S2_RESOURCE_INSUFFICIENT");
+            fixture.rejectCombat(Command.action(Kind.SECOND_WIND, fighter), "S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
 
             fixture.service.save(id(), committed.epoch(), committed.revision());
             String file = fixture.end();
@@ -248,6 +248,19 @@ class CampaignSecondWindIntegrationTest {
         roll.addProperty("value", "9");
         rootRoll.addProperty("value", "9");
         assertCode("INVALID_FILE", () -> service.importFile(resign(alteredRoll)));
+
+        var restoredBonus = CampaignJson.read(complete);
+        var combat = domains(restoredBonus).getAsJsonArray("combats").get(0).getAsJsonObject();
+        var last = combat.getAsJsonArray("events").asList().getLast().getAsJsonObject();
+        for (JsonObject state : List.of(combat.getAsJsonObject("current"),
+                last.getAsJsonObject("resolution").getAsJsonObject("after"))) {
+            var actor = state.getAsJsonArray("combatants").asList().stream().map(JsonElement::getAsJsonObject)
+                    .filter(member -> fighter.toString().equals(member.get("characterId").getAsString()))
+                    .findFirst().orElseThrow();
+            assertEquals("0", actor.get("bonusActionsRemaining").getAsString());
+            actor.addProperty("bonusActionsRemaining", "1");
+        }
+        assertCode("INVALID_FILE", () -> service.importFile(resign(restoredBonus)));
         assertEquals(before, service.status());
     }
 
@@ -472,7 +485,11 @@ class CampaignSecondWindIntegrationTest {
             assertEquals(before.version() + 2, card(fighter).version());
             assertEquals(event.before().version() + 1, event.after().version());
             assertEquals(new ResourceState(resourceRule(), 0, 1, false), resource(fighter));
-            assertEquals(combatant, actor(fighter));
+            assertEquals(1, combatant.bonusActionsRemaining());
+            assertEquals(new Combatant(combatant.characterId(), combatant.position(), combatant.side(),
+                    combatant.actionsRemaining(), 0, combatant.reactionAvailable(), combatant.movementSpentHalfFeet(),
+                    combatant.movementBonus(), combatant.disengaged(), combatant.dodging(), combatant.sequence(),
+                    combatant.prone()), actor(fighter));
             var events = history(fighter).events();
             var spent = events.get(events.size() - 2);
             var healed = events.getLast();

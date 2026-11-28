@@ -241,12 +241,12 @@ async function main() {
       await saveEndReopen();
       assertPrefix(mover, carried, hound, grappleKey);
       const moverPlace = position(mover), carriedPlace = position(carried);
-      const retainedAction = actor(hound).actionAvailable;
+      const retainedAction = actor(hound).actionsRemaining;
       await action('domain', () => biteChoice.click());
       opportunity = await assertBite(hound, mover, true);
       biteAttempts.push({d20: opportunity.firstD20, hit: opportunity.hit});
       assert.equal(actor(hound).reactionAvailable, false);
-      assert.equal(actor(hound).actionAvailable, retainedAction);
+      assert.equal(actor(hound).actionsRemaining, retainedAction);
       await action('domain', () => next.click());
       if (opportunity.hit) {
         assert.equal(card(moverName).hitPoints, 0);
@@ -274,7 +274,7 @@ async function main() {
     await field('domain-monster', 'targetId').selectOption(carried);
     await action('domain', () => button('domain-monster').click());
     const normal = await assertBite(hound, carried, false);
-    assert.equal(actor(hound).actionAvailable, false);
+    assert.equal(actor(hound).actionsRemaining, 0);
     assert.equal(actor(hound).reactionAvailable, oldReaction);
     await saveEndReopen();
     assert.deepEqual(attack(), normal);

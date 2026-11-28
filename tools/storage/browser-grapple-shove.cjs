@@ -134,7 +134,7 @@ async function main() {
     const result = assertContest(skill);
     assert.equal(result.contestKey, before.contestKey);
     assert.equal(actor(result.actorId).sequence.performed, before.attackOrdinal + 1);
-    assert.equal(actor(result.actorId).actionAvailable, false);
+    assert.equal(actor(result.actorId).actionsRemaining, 0);
     assert.equal(battle().flows.flatMap(flow => flow.attacks).length, attacks);
     await summary.locator('.melee-contest-result').filter({hasText: `已用第 ${before.attackOrdinal + 1} 次攻击`}).waitFor();
     return result;
@@ -144,7 +144,7 @@ async function main() {
     for (let attempt = 0; attempt < 10; attempt++) {
       await turnFor(fighter);
       const turnNumber = battle().turnNumber;
-      assert.equal(actor(fighter).actionAvailable, true);
+      assert.equal(actor(fighter).actionsRemaining, 1);
       assert.equal(actor(guard).prone, false);
       assert.equal(grapple(), undefined);
       await combat('BEGIN_ATTACK');
@@ -185,7 +185,7 @@ async function main() {
     assert.equal(active(), fighter);
     assert.equal(battle().turnNumber, pair.turnNumber);
     assert.deepEqual(actor(fighter).sequence, {...pair.sequence, performed: 2, closed: true});
-    assert.equal(actor(fighter).actionAvailable, false);
+    assert.equal(actor(fighter).actionsRemaining, 0);
     assert.equal(actor(guard).prone, true);
     assert.deepEqual(grapple(), pair.relation);
     const contests = battle().meleeControl.contests.filter(entry => entry.sequenceKey === pair.sequence.sequenceKey);
@@ -195,7 +195,7 @@ async function main() {
   async function establish(fighter, guard) {
     for (let attempt = 0; attempt < 16 && !grapple(); attempt++) {
       if (!actor(fighter).sequence || actor(fighter).sequence.closed) {
-        if (active() === fighter && !actor(fighter).actionAvailable) await combat('END_TURN');
+        if (active() === fighter && actor(fighter).actionsRemaining === 0) await combat('END_TURN');
         await turnFor(fighter);
         await combat('BEGIN_ATTACK');
       }
@@ -303,7 +303,7 @@ async function main() {
     await combat('ESCAPE_GRAPPLE', {grappleKey: relation.grappleKey, escapeSkill: 'ACROBATICS'});
     assert.equal(contest().kind, 'ESCAPE_GRAPPLE');
     assert.equal(contest().grappleKey, relation.grappleKey);
-    assert.equal(actor(guard).actionAvailable, false);
+    assert.equal(actor(guard).actionsRemaining, 0);
     const escape = assertContest('ACROBATICS');
     assert.equal(battle().meleeControl.grapples.find(value => value.grappleKey === relation.grappleKey).endReason,
       escape.outcome === 'INITIATOR_WINS' ? 'ESCAPED' : null);

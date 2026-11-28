@@ -129,7 +129,7 @@ class CampaignProneIntegrationTest {
             assertEquals(after, f.access());
             assertEquals(1L, f.state().roots().stream().filter(root -> root.operationId().toString().equals(request)).count());
             assertEquals(card, f.card(fighter));
-            assertEquals(new Combatant(fighter, cell(1, 1), 0, true, true, 0, 0, false, false, null, true),
+            assertEquals(new Combatant(fighter, cell(1, 1), 0, 1, 1, true, 0, 0, false, false, null, true),
                     f.actor(fighter));
             assertTrue(f.state().roots().getLast().rolls().isEmpty());
             assertEquals(List.of(new CombatFact("DROP_PRONE", fighter, f.battle().combatId(), null)),
@@ -213,7 +213,8 @@ class CampaignProneIntegrationTest {
             assertEquals(Status.EXPLORATION, f.battle().status());
             assertEquals(beforeStand.turnNumber(), f.battle().turnNumber());
             assertEquals(beforeStand.initiative(), f.battle().initiative());
-            assertEquals(new Combatant(prone.characterId(), prone.position(), prone.side(), prone.actionAvailable(),
+            assertEquals(new Combatant(prone.characterId(), prone.position(), prone.side(), prone.actionsRemaining(),
+                    prone.bonusActionsRemaining(),
                     prone.reactionAvailable(), prone.movementSpentHalfFeet(), prone.movementBonus(), prone.disengaged(),
                     prone.dodging(), prone.sequence(), false), f.actor(fighter));
             f.leave(fighter);

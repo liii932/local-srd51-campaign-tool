@@ -41,12 +41,20 @@ class Schema2CombatRulesTest {
 
     @Test void initiativeAndRealAttackConsumeOneActionAndOneHealthPacket() {
         start(new Position(0,0),new Position(1,0));
-        apply(Command.action(Kind.BEGIN_ATTACK,a));assertFalse(actor(a).actionAvailable());
+        assertEquals(1, actor(a).actionsRemaining());
+        assertEquals(1, actor(a).bonusActionsRemaining());
+        assertEquals(0, actor(b).actionsRemaining());
+        assertEquals(0, actor(b).bonusActionsRemaining());
+        apply(Command.action(Kind.BEGIN_ATTACK,a));
+        assertEquals(0, actor(a).actionsRemaining());
+        assertEquals(1, actor(a).bonusActionsRemaining());
         var result=apply(Command.attack(a,b,item(a)),20,3,4);
         AttackAttempt attack=battle.flows().getLast().attacks().getFirst();
         assertTrue(attack.critical());assertEquals(List.of(3,4),attack.damageDice());assertEquals(9,attack.damageAmount());
         assertEquals(2,roster.get(b).character().hitPoints());assertEquals(1,result.healthChanges().size());
         assertEquals(1,actor(a).sequence().performed());assertTrue(actor(a).sequence().closed());assertNull(battle.activeFlow());
+        assertEquals(0, actor(a).actionsRemaining());
+        assertEquals(1, actor(a).bonusActionsRemaining());
         assertThrows(IllegalArgumentException.class,()->rules.preflight(UUID.randomUUID(),combat,campaign,roster,battle,Command.attack(a,b,item(a))));
     }
     @Test void naturalOneMissHasNoDamageAndNoHealthMutation() {
@@ -73,6 +81,9 @@ class Schema2CombatRulesTest {
         start(new Position(0,0),new Position(0,1));apply(Command.move(a,List.of(new Position(1,0),new Position(2,0))));
         apply(pending(Kind.DECLARE_OPPORTUNITY_ATTACK,item(b)),20,5,5);
         assertEquals(0,roster.get(a).character().hitPoints());assertFalse(actor(b).reactionAvailable());assertEquals(new Position(1,0),actor(a).position());
+        assertEquals(0, actor(a).actionsRemaining());
+        assertEquals(0, actor(a).bonusActionsRemaining());
+        assertEquals(0, actor(a).remainingMovementHalfFeet(rules.speed(roster, battle, a)));
         apply(resume());assertNull(battle.activeFlow());assertEquals(new Position(1,0),actor(a).position());assertEquals(10,actor(a).movementSpentHalfFeet());
         assertEquals(MovementStatus.STOPPED,battle.flows().getLast().movement().status());assertEquals(1,battle.flows().getLast().attacks().size());
         assertTrue(actor(a).prone());assertEquals("GROUND",roster.get(a).character().equipment().getFirst().location());
@@ -146,7 +157,23 @@ class Schema2CombatRulesTest {
         apply(pending(Kind.DECLARE_OPPORTUNITY_ATTACK,item(b)),1);apply(resume());assertFalse(actor(b).reactionAvailable());
         apply(Command.action(Kind.END_TURN,c));assertEquals(a,battle.activeActor());assertFalse(actor(b).reactionAvailable());
         for(Context context:roster.values())assertEquals(6,context.character().rest().second());
-        apply(Command.action(Kind.END_TURN,a));assertTrue(actor(b).reactionAvailable());
+        apply(Command.action(Kind.END_TURN,a));
+        assertTrue(actor(b).reactionAvailable());
+        assertEquals(1, actor(b).actionsRemaining());
+        assertEquals(1, actor(b).bonusActionsRemaining());
+    }
+
+    @Test void malformedActionCountsAreRejectedAsFrozenData() {
+        start(new Position(0,0),new Position(2,0));
+        Combatant current = actor(a);
+        for (int[] counts : new int[][] { {-1, 1}, {2, 1}, {1, -1}, {1, 2} }) {
+            var invalidActor = new Combatant(a, current.position(), current.side(), counts[0], counts[1],
+                    current.reactionAvailable(), 0, 0, false, false, null, false);
+            Battle malformed = Schema2CombatRules.replaceActor(battle, invalidActor);
+            var rejected = assertThrows(IllegalArgumentException.class, () ->
+                    rules.preflight(UUID.randomUUID(), combat, campaign, roster, malformed, Command.action(Kind.DASH, a)));
+            assertEquals("ACTION_FLOW_FROZEN_DATA_INVALID", rejected.getMessage());
+        }
     }
     @Test void explicitAdvanceRecordsLostEligibilityAfterEarlierOpportunityIncapacitatesMover() {
         UUID c=UUID.randomUUID();roster.put(c,context(material,campaign,c));

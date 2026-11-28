@@ -53,9 +53,7 @@ class Schema2ExplorationRulesTest {
         files.getFirst().put("rules.json", definitions.toString().getBytes(StandardCharsets.UTF_8));
         var missingMovement = ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(files));
         Battle original = exploration();
-        var actors = original.combatants().stream().map(actor -> new Combatant(actor.characterId(), actor.position(),
-                actor.side(), actor.actionAvailable(), actor.reactionAvailable(), actor.movementSpentHalfFeet(),
-                actor.movementBonus(), actor.disengaged(), actor.dodging(), actor.sequence(), true)).toList();
+        var actors = original.combatants().stream().map(actor -> actor.withProne(true)).toList();
         Battle prone = Schema2ActionFlowRules.rebuild(original, actors, original.flows(), original.readyPreparations(),
                 original.triggerFacts(), original.shields(), original.concentrationHolders(), original.version());
         var context = context(missingMovement, fixture.campaign, fixture.a);

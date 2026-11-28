@@ -21,7 +21,7 @@ final class Schema2CombatStateValidator {
                         && b.activeOrdinal()>=0 && b.activeOrdinal()<b.initiative().size());
             Set<UUID> actors=new HashSet<>(),keys=new HashSet<>();Set<Position> positions=new HashSet<>();
             for(Combatant a:b.combatants()) {
-                id(a.characterId());check(actors.add(a.characterId())&&positions.add(a.position())&&a.side()>=0&&a.side()<16&&a.movementSpentHalfFeet()>=0&&a.movementSpentHalfFeet()<=480&&a.movementBonus()>=0&&a.movementBonus()<=120&&a.movementBonus()%5==0);
+                id(a.characterId());check(actors.add(a.characterId())&&positions.add(a.position())&&a.side()>=0&&a.side()<16&&validActionBudgets(a)&&a.movementSpentHalfFeet()>=0&&a.movementSpentHalfFeet()<=480&&a.movementBonus()>=0&&a.movementBonus()<=120&&a.movementBonus()%5==0);
                 AttackSequence s=a.sequence();if(s!=null) {
                     id(s.sequenceKey());check(keys.add(s.sequenceKey())&&!a.actionAvailable()
                             &&s.limit()>=1&&s.limit()<=2&&s.performed()>=0&&s.forfeited()>=0
@@ -113,6 +113,12 @@ final class Schema2CombatStateValidator {
             if(b.status()==Status.ENDED)check(b.concentrationHolders().isEmpty()&&b.shields().stream().noneMatch(e->e.status()==EffectStatus.ACTIVE)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING));
         } catch(NullPointerException|NoSuchElementException malformed) {throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");}
     }
+
+    static boolean validActionBudgets(Combatant actor) {
+        return actor.actionsRemaining() >= 0 && actor.actionsRemaining() <= Combatant.TURN_ACTIONS
+                && actor.bonusActionsRemaining() >= 0 && actor.bonusActionsRemaining() <= Combatant.TURN_BONUS_ACTIONS;
+    }
+
     private static void validateMovement(Battle battle, Movement movement, Frame frame, Set<UUID> actors, boolean live,
                                          List<TriggerFact> movementTriggers) {
         check(frame!=null&&frame.kind()==FrameKind.MOVEMENT&&frame.ownerKey().equals(movement.movementKey())

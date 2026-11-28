@@ -4,6 +4,7 @@ import com.dndtool.persistence.storage.*;
 import com.dndtool.persistence.storage.CampaignRepository.*;
 import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.module.composition.ProductionSchema2Projection.StoredMember;
+import com.dndtool.service.Schema2CombatState;
 import com.google.gson.*;
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -699,7 +700,21 @@ public final class CampaignStorageService implements AutoCloseable {
             card.add("state", json.toJsonTree(current)); card.add("initial", json.toJsonTree(c.initial())); card.add("history", json.toJsonTree(c.history()));
             characters.add(card);
         }
-        result.add("characters", characters); result.add("combats", json.toJsonTree(state.combats())); result.add("nodes", json.toJsonTree(state.nodes()));
+        var material = state.material().restore();
+        JsonArray combats = new JsonArray();
+        for (var history : state.combats()) {
+            JsonObject view = json.toJsonTree(history).getAsJsonObject();
+            var battle = history.current();
+            if (battle.status() == Schema2CombatState.Status.ACTIVE) {
+                var roster = CampaignCombatView.roster(state, battle, material.projection());
+                JsonObject budgets = new JsonObject();
+                for (var actor : battle.combatants())
+                    budgets.add(actor.characterId().toString(), CampaignCombatView.turnBudget(roster, battle, actor));
+                view.add("turnBudgets", budgets);
+            }
+            combats.add(view);
+        }
+        result.add("characters", characters); result.add("combats", combats); result.add("nodes", json.toJsonTree(state.nodes()));
         result.add("positions", json.toJsonTree(state.positions())); result.add("items", json.toJsonTree(state.items())); result.add("roots", json.toJsonTree(state.roots()));
         JsonObject manual = json.toJsonTree(state.manual()).getAsJsonObject();
         manual.add("catalog", json.toJsonTree(CampaignManualData.catalog())); result.add("manual", manual);
@@ -717,7 +732,7 @@ public final class CampaignStorageService implements AutoCloseable {
         }
         result.add("deadlines", deadlines);
         result.add("participation", json.toJsonTree(state.participation()));
-        result.add("rules", json.toJsonTree(state.material().restore().metadata())); return result;
+        result.add("rules", json.toJsonTree(material.metadata())); return result;
     }
 
     private Snapshot verifiedSnapshot(Connection c) throws SQLException {

@@ -241,13 +241,70 @@ public final class Schema2CombatState {
             int difficultyClass, int total, boolean success) { }
     public record Initiative(UUID characterId, int d20, int dexterityModifier, int total, int ordinal) { }
     public record AttackSequence(UUID sequenceKey, int limit, int performed, int forfeited, boolean closed) { }
-    public record Combatant(UUID characterId, Position position, int side, boolean actionAvailable,
-            boolean reactionAvailable, int movementSpentHalfFeet, int movementBonus, boolean disengaged,
-            boolean dodging, AttackSequence sequence, boolean prone) {
-        public Combatant(UUID characterId, Position position, int side, boolean actionAvailable,
-                boolean reactionAvailable, int movementSpentHalfFeet, int movementBonus, boolean disengaged,
-                boolean dodging, AttackSequence sequence) {
-            this(characterId,position,side,actionAvailable,reactionAvailable,movementSpentHalfFeet,movementBonus,disengaged,dodging,sequence,false);
+    public record Combatant(UUID characterId, Position position, int side, int actionsRemaining,
+            int bonusActionsRemaining, boolean reactionAvailable, int movementSpentHalfFeet, int movementBonus,
+            boolean disengaged, boolean dodging, AttackSequence sequence, boolean prone) {
+        static final int TURN_ACTIONS = 1;
+        static final int TURN_BONUS_ACTIONS = 1;
+
+        public boolean actionAvailable() {
+            return actionsRemaining > 0;
+        }
+
+        public int remainingMovementHalfFeet(int effectiveSpeedFeet) {
+            if (effectiveSpeedFeet <= 0) return 0;
+            return Math.max(0, 2 * (effectiveSpeedFeet + movementBonus) - movementSpentHalfFeet);
+        }
+
+        Combatant spendAction() {
+            if (!actionAvailable()) throw invalid("S2_COMBAT_ACTION_UNAVAILABLE");
+            return new Combatant(characterId, position, side, actionsRemaining - 1, bonusActionsRemaining,
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
+        }
+
+        Combatant spendBonusAction() {
+            if (bonusActionsRemaining <= 0) throw invalid("S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
+            return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining - 1,
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
+        }
+
+        Combatant spendReaction() {
+            return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining, false,
+                    movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
+        }
+
+        Combatant startTurn(boolean living, boolean isProne) {
+            return new Combatant(characterId, position, side, living ? TURN_ACTIONS : 0,
+                    living ? TURN_BONUS_ACTIONS : 0, true, 0, 0, false, false, null, isProne);
+        }
+
+        Combatant withPosition(Position destination) {
+            return withMovement(destination, movementSpentHalfFeet, prone);
+        }
+
+        Combatant withProne(boolean isProne) {
+            return withMovement(position, movementSpentHalfFeet, isProne);
+        }
+
+        Combatant withMovement(Position destination, int spentHalfFeet, boolean isProne) {
+            return new Combatant(characterId, destination, side, actionsRemaining, bonusActionsRemaining,
+                    reactionAvailable, spentHalfFeet, movementBonus, disengaged, dodging, sequence, isProne);
+        }
+
+        Combatant withSequence(AttackSequence next) {
+            return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining,
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, next, prone);
+        }
+
+        Combatant closeSequence() {
+            if (sequence == null || sequence.closed()) return this;
+            return withSequence(new AttackSequence(sequence.sequenceKey(), sequence.limit(), sequence.performed(),
+                    sequence.limit() - sequence.performed(), true));
+        }
+
+        Combatant incapacitated() {
+            return new Combatant(characterId, position, side, 0, 0, reactionAvailable, movementSpentHalfFeet,
+                    movementBonus, disengaged, false, sequence, true).closeSequence();
         }
     }
     public record Frame(UUID frameKey, UUID parentFrameKey, FrameKind kind, UUID ownerKey,

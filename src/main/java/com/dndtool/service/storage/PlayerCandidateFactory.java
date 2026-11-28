@@ -37,23 +37,21 @@ public final class PlayerCandidateFactory {
                     characterChoices(result, domain, material, character);
             return List.copyOf(result);
         }
-        Battle battle = history.current(); Map<UUID, Schema2CombatRules.Context> roster = new LinkedHashMap<>();
+        Battle battle = history.current();
         var scene = CampaignSpaceData.Ref.scene(battle.combatId());
         boolean sharedScene = PlayerCampaignProjection.shared(domain, player, CampaignParticipationData.ShareKind.SCENE, scene.id());
         Set<UUID> visibleMonsters = PlayerCampaignProjection.visibleMonsters(domain, player, scene.id());
         Set<UUID> knownPositions = new HashSet<>(own);
         if (sharedScene) knownPositions.addAll(visible);
         knownPositions.addAll(visibleMonsters);
-        long sceneSecond = domain.space().clock(scene).second();
-        Set<UUID> combatants = new HashSet<>(battle.combatants().stream().map(Combatant::characterId).toList());
-        domain.characters().stream()
-                .filter(c -> combatants.contains(c.id()) && CampaignSpaceCommands.focused(domain, c.id()))
-                .forEach(c -> roster.put(c.id(), new Schema2CombatRules.Context(material, c.initial(), c.history().current(), sceneSecond)));
+        var roster = CampaignCombatView.roster(domain, battle, material);
         var factory = new BattleChoices(result, domain, battle, roster, sharedScene, knownPositions);
         factory.relationChoices(own, visible);
         if (battle.activeFlow() != null) {
             Flow flow = battle.activeFlow(); Frame leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
             Window window = flow.windows().stream().filter(w -> Objects.equals(w.windowKey(), leaf.windowKey())).findFirst().orElse(null);
+            UUID mover = CampaignParticipationCommands.opportunityMonster(battle, window);
+            if (mover != null && !visibleMonsters.contains(mover)) return List.copyOf(result);
             if (leaf.kind() == FrameKind.DOMAIN_CHOICE) {
                 var contest = battle.meleeControl().contests().stream().filter(c -> leaf.ownerKey().equals(c.choiceKey()))
                         .findFirst().orElseThrow();

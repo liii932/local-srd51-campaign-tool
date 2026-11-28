@@ -110,7 +110,7 @@ async function main() {
     assert.equal(active(), fighter);
     await combat('DASH');
     const actorBefore = combatant(fighter);
-    assert.equal(actorBefore.actionAvailable, false);
+    assert.equal(actorBefore.actionsRemaining, 0);
     assert.ok(actorBefore.movementBonus > 0);
 
     await field('domain-combat', 'kind').selectOption({label: '回气（附赠动作）'});
@@ -141,7 +141,8 @@ async function main() {
     assert.equal(healing.healthResult.appliedAmount, applied);
     assert.equal(card(fighterName).hitPoints, wounded + applied);
     assert.equal(resource().current, 0);
-    assert.deepEqual(combatant(fighter), actorBefore);
+    assert.equal(actorBefore.bonusActionsRemaining, 1);
+    assert.deepEqual(combatant(fighter), {...actorBefore, bonusActionsRemaining: 0});
     const summary = form('domain-combat-summary').locator('.second-wind-result');
     await summary.filter({hasText: `d10=${roll.value} + 战士等级 1`}).filter({hasText: `实际恢复 ${applied}`})
       .filter({hasText: '使用次数 1 → 0/1'}).waitFor();
