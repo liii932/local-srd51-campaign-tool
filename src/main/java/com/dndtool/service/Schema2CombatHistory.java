@@ -83,6 +83,7 @@ public final class Schema2CombatHistory {
             }
             validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);validateMonsterAttackTransition(e);
             validateCantripResults(e);
+            validateSneakAttackTransition(e);
             validateRangedAttackTransition(e);validateOpeningTransition(e);validateObservationTransition(e);validateAttackObservationTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
             for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
@@ -345,6 +346,7 @@ public final class Schema2CombatHistory {
                         && save.success()==(save.total()>=save.difficultyClass()));
             }
         }
+        require(Schema2SneakAttackRules.validState(b));
         validateExtendedState(b,members);
         try {
             Schema2MeleeControlRules.validate(b);
@@ -746,6 +748,87 @@ public final class Schema2CombatHistory {
         require(retained.isEmpty());
     }
 
+    private static void validateSneakAttackTransition(Event event) {
+        Battle before = event.before();
+        Battle after = event.after();
+        Command command = event.command();
+        boolean decision = Schema2SneakAttackRules.decision(command.kind());
+        var prior = new HashMap<UUID, AttackAttempt>();
+        if (before != null) for (Flow flow : before.flows()) for (AttackAttempt attack : flow.attacks())
+            if (attack.sneakAttack() != null) prior.put(attack.frameKey(), attack);
+        AttackAttempt answered = null;
+        for (Flow flow : after.flows()) for (AttackAttempt attack : flow.attacks()) {
+            var evidence = attack.sneakAttack();
+            if (evidence == null) continue;
+            AttackAttempt old = prior.remove(attack.frameKey());
+            if (old == null) {
+                require(!decision && before != null && evidence.status() == SneakAttackStatus.PENDING
+                        && evidence.turnNumber() == before.turnNumber() && after.turnNumber() == before.turnNumber()
+                        && event.resolution().healthChanges().stream().noneMatch(change -> change.frameKey().equals(attack.frameKey()))
+                        && after.monsters().stream().noneMatch(monster ->
+                                monster.monsterId().equals(evidence.nearbyEnemyId()) && monster.dead()));
+            } else if (decision && attack.frameKey().equals(command.leafKey())) {
+                Flow active = before.activeFlow();
+                SneakAttackStatus expected = command.kind() == Kind.USE_SNEAK_ATTACK
+                        ? SneakAttackStatus.USED : SneakAttackStatus.DECLINED;
+                require(answered == null && active != null && active.flowKey().equals(command.flowKey())
+                        && active.leafFrameKey().equals(command.leafKey()) && flow.flowKey().equals(command.flowKey())
+                        && old.actorId().equals(command.actorId()) && old.sneakAttack().status() == SneakAttackStatus.PENDING
+                        && evidence.equals(new SneakAttackEvidence(expected, old.sneakAttack().turnNumber(),
+                                old.sneakAttack().nearbyEnemyId(), evidence.damageDice()))
+                        && attack.equals(old.withOutcome(old.finalArmorClass(), old.hit(), old.critical(),
+                                attack.damageDice(), attack.damageAmount(), AttackStatus.RESOLVED, null, null, evidence))
+                        && after.turnNumber() == before.turnNumber());
+                validateSneakAttackDamage(event, flow, attack);
+                answered = attack;
+            } else require(old.equals(attack));
+        }
+        require(prior.isEmpty() && decision == (answered != null));
+        if (!decision) require(event.resolution().rolls().stream().noneMatch(roll ->
+                roll.purpose().equals(Schema2SneakAttackRules.DAMAGE_ROLL)));
+    }
+
+    private static void validateSneakAttackDamage(Event event, Flow flow, AttackAttempt attack) {
+        var extra = attack.sneakAttack().damageDice();
+        var rolls = event.resolution().rolls();
+        require(rolls.size() >= attack.damageDice().size());
+        UUID actor = attack.actorId();
+        int weaponSides = rolls.getFirst().sides();
+        List<Roll> expected = new ArrayList<>();
+        attack.damageDice().forEach(die -> expected.add(new Roll("DAMAGE", actor, weaponSides, die)));
+        extra.forEach(die -> expected.add(new Roll(Schema2SneakAttackRules.DAMAGE_ROLL,
+                actor, Schema2SneakAttackRules.DAMAGE_DIE, die)));
+
+        var saves = flow.savingThrows().stream().filter(save -> save.frameKey().equals(attack.frameKey())).toList();
+        require(saves.size() <= 1);
+        UUID target = attack.targetId();
+        int amount = attack.damageAmount();
+        for (SavingThrowAttempt save : saves) {
+            require(amount > 0 && save.subjectId().equals(target) && save.kind().equals("CONCENTRATION")
+                    && save.difficultyClass() == Math.max(10, amount / 2));
+            expected.add(new Roll("CONCENTRATION_D20", target, 20, save.d20()));
+            if (save.blessingD4() != null) expected.add(new Roll("BLESS_CONCENTRATION", target, 4, save.blessingD4()));
+        }
+        require(rolls.equals(expected) && event.resolution().ammunitionUses().isEmpty());
+
+        int raw = Math.max(0, attack.abilityModifier() + attack.damageDice().stream().mapToInt(Integer::intValue).sum()
+                + extra.stream().mapToInt(Integer::intValue).sum());
+        var changes = event.resolution().healthChanges();
+        var monster = event.before().monsters().stream().filter(subject -> subject.monsterId().equals(target)).findFirst();
+        if (monster.isPresent()) {
+            require(changes.isEmpty() && saves.isEmpty()
+                    && (amount == 0 || amount == raw || amount == raw / 2 || amount == raw * 2 || amount == raw / 2 * 2)
+                    && event.after().monsters().stream().anyMatch(subject -> subject.monsterId().equals(target)
+                            && subject.hitPoints() == Math.max(0, monster.get().hitPoints() - amount)));
+        } else {
+            require(amount == raw && changes.size() == (amount > 0 ? 1 : 0));
+            for (HealthChange change : changes)
+                require(change.frameKey().equals(attack.frameKey()) && change.characterId().equals(target)
+                        && change.damageAmount() == amount && change.critical() == attack.critical()
+                        && change.resource() == null && !change.healing() && !change.timeAdvance() && !change.deathSave());
+        }
+    }
+
     private static void validateExtendedTransition(Event event) {
         Battle before=event.before(),after=event.after();Map<UUID,EnvironmentZone> zones=new HashMap<>();Map<UUID,SuppressionCause> causes=new HashMap<>();
         if(before!=null) {for(var z:before.environmentZones())zones.put(z.zoneKey(),z);for(var c:before.suppressionCauses())causes.put(c.causeKey(),c);}
@@ -930,6 +1013,11 @@ public final class Schema2CombatHistory {
             return;
         }
         require(c.observationCell() == null);
+        if (Schema2SneakAttackRules.decision(c.kind())) {
+            require(Schema2SneakAttackRules.validCommand(c));
+            uuid(c.actorId()); uuid(c.flowKey()); uuid(c.leafKey());
+            return;
+        }
         if (c.monsterAttackInput() != null) {
             var action = c.monsterAttackInput().action();
             require(validAction(action) && c.actorId() != null);
@@ -1154,6 +1242,7 @@ public final class Schema2CombatHistory {
             }
             for (AttackAttempt attack : flow.attacks()) {
                 count += 1L + attack.damageDice().size();
+                if (attack.sneakAttack() != null) count += 1L + attack.sneakAttack().damageDice().size();
                 if (attack.rangedAttack() != null) count++;
                 if (attack.spellAttack()!=null) count += 1L + damageFactCount(attack.spellAttack().damage());
                 var monster = attack.monsterAttack();

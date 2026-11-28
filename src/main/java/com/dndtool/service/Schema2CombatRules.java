@@ -308,6 +308,10 @@ public final class Schema2CombatRules {
         if (command.observationCell() != null) throw invalid("S2_COMBAT_COMMAND");
         if (command.opening() != null && !Schema2ObservationRules.openingHide(command.kind())) throw invalid("S2_COMBAT_COMMAND");
         for(UUID id:Arrays.asList(command.actorId(),command.targetId(),command.itemId(),command.flowKey(),command.leafKey(),command.windowKey(),command.opportunityKey(),command.readyKey(),command.zoneKey()))if(id!=null)uuid(id);
+        if (Schema2SneakAttackRules.decision(command.kind())) {
+            if (!Schema2SneakAttackRules.validCommand(command)) throw invalid("S2_COMBAT_COMMAND");
+            return;
+        }
         MonsterAttackInput monsterAttack = command.monsterAttackInput();
         if (command.kind() == Kind.MONSTER_ATTACK) {
             if (monsterAttack == null || command.actorId() == null || command.targetId() == null
@@ -388,11 +392,13 @@ public final class Schema2CombatRules {
         if (profile.ranged()) throw invalid("S2_COMBAT_MELEE_WEAPON_REQUIRED");
         return profile;
     }
-    WeaponAttackDefinition launchedRangedWeapon(Context context, UUID itemId) {
+    WeaponAttackDefinition launchedWeapon(Context context, UUID itemId, boolean ranged) {
         EquipmentItem instance = context.character().equipment().stream().filter(item -> item.itemId().equals(itemId))
                 .findFirst().orElseThrow(() -> invalid("ACTION_FLOW_FROZEN_DATA_INVALID"));
-        var profile = weaponProfile(context.material(), itemDefinition(context, instance));
-        if (!profile.ranged()) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+        var item = itemDefinition(context, instance);
+        if (!weaponKind(item.kind())) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+        var profile = weaponProfile(context.material(), item);
+        if (profile.ranged() != ranged) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
         return profile;
     }
     static EquipmentItem ammunition(Context context, WeaponAttackDefinition weapon) {

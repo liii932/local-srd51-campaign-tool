@@ -44,6 +44,10 @@ public final class Schema2FeatureSupport {
                 && material.projection().rules().stream().anyMatch(row -> row.identity().equals(fighter));
     }
 
+    public static boolean hasSneakAttack(ProductionSchema2Projection material, State state) {
+        return validate(material, state, "S2_COMBAT_FEATURE_UNSUPPORTED").sneakAttack();
+    }
+
     public static boolean hasCunningAction(ProductionSchema2Projection material, State state) {
         return validate(material, state, "S2_COMBAT_FEATURE_UNSUPPORTED").cunningAction();
     }
@@ -77,7 +81,7 @@ public final class Schema2FeatureSupport {
     }
 
     private record SupportedFeatures(boolean extraAttack, boolean improvedCritical, RuleIdentity secondWindResource,
-            boolean defense, RuleIdentity actionSurgeResource, boolean cunningAction) { }
+            boolean defense, RuleIdentity actionSurgeResource, boolean sneakAttack, boolean cunningAction) { }
 
     private static RuleIdentity fighterFeature(ProductionSchema2Projection material, RuleIdentity owner, String algorithm, String code) {
         return owner.ruleKey().equals("class.fighter") ? classFeature(material, owner, algorithm, code) : null;
@@ -118,7 +122,7 @@ public final class Schema2FeatureSupport {
         RuleIdentity secondWindResource = null;
         RuleIdentity defense = null;
         RuleIdentity actionSurgeResource = null;
-        RuleIdentity expertise = null, cunningAction = null;
+        RuleIdentity expertise = null, sneakAttack = null, cunningAction = null;
         for (var acquired : state.features()) {
             if (!seen.add(acquired.feature())) throw new IllegalArgumentException(code);
             var definitions = material.projection().rules().stream()
@@ -139,6 +143,13 @@ public final class Schema2FeatureSupport {
                         throw new IllegalArgumentException(code);
                     requireRogueExpertiseTargets(material, state.proficiencies(), acquired.expertise(), code);
                     expertise = feature.identity();
+                }
+                case ROGUE_SNEAK_ATTACK_ALGORITHM -> {
+                    requireSingleClassRogue(state, feature, code);
+                    if (sneakAttack != null || feature.executionMode() != FeatureExecution.AUTOMATIC
+                            || feature.level() != 1 || feature.sourcePage() != 39)
+                        throw new IllegalArgumentException(code);
+                    sneakAttack = feature.identity();
                 }
                 case ROGUE_CUNNING_ACTION_ALGORITHM -> {
                     requireSingleClassRogue(state, feature, code);
@@ -195,9 +206,11 @@ public final class Schema2FeatureSupport {
             }
         }
         RuleIdentity expectedExpertise = rogueFeature(material, state.characterClass(), ROGUE_EXPERTISE_ALGORITHM, code);
+        RuleIdentity expectedSneakAttack = rogueFeature(material, state.characterClass(), ROGUE_SNEAK_ATTACK_ALGORITHM, code);
         RuleIdentity expectedCunningAction = state.level() >= 2
                 ? rogueFeature(material, state.characterClass(), ROGUE_CUNNING_ACTION_ALGORITHM, code) : null;
-        if (!Objects.equals(expertise, expectedExpertise) || !Objects.equals(cunningAction, expectedCunningAction))
+        if (!Objects.equals(expertise, expectedExpertise) || !Objects.equals(sneakAttack, expectedSneakAttack)
+                || !Objects.equals(cunningAction, expectedCunningAction))
             throw new IllegalArgumentException(code);
         if (!Objects.equals(defense, fighterFeature(material, state.characterClass(), FIGHTER_DEFENSE_ALGORITHM, code)))
             throw new IllegalArgumentException(code);
@@ -213,6 +226,6 @@ public final class Schema2FeatureSupport {
         }
         if (!castingFeatures.isEmpty()) Schema2SpellRules.requireSupportedCastingFeatures(material, state, castingFeatures, code);
         return new SupportedFeatures(extraAttack, improvedCritical, secondWindResource, defense != null,
-                actionSurgeResource, cunningAction != null);
+                actionSurgeResource, sneakAttack != null, cunningAction != null);
     }
 }

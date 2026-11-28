@@ -33,6 +33,7 @@ public final class Schema2CompositionKernel {
     public static final String FIGHTER_DEFENSE_ALGORITHM = "SRD_2014_FIGHTER_DEFENSE_V1";
     public static final String FIGHTER_ACTION_SURGE_ALGORITHM = "SRD_2014_FIGHTER_ACTION_SURGE_V1";
     public static final String ROGUE_EXPERTISE_ALGORITHM = "SRD_2014_ROGUE_EXPERTISE_V1";
+    public static final String ROGUE_SNEAK_ATTACK_ALGORITHM = "SRD_2014_ROGUE_SNEAK_ATTACK_V1";
     public static final String ROGUE_CUNNING_ACTION_ALGORITHM = "SRD_2014_ROGUE_CUNNING_ACTION_V1";
     public static final String ROGUE_THIEVES_TOOLS_KEY = "tool.thieves_tools";
     public static final String WALKING_SPEED_ALGORITHM = "SRD_2014_WALKING_SPEED_V1";
@@ -1704,6 +1705,10 @@ public final class Schema2CompositionKernel {
                 && (kind != FeatureKind.FEATURE || level != 1 || page != 39
                     || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.rogue")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Expertise requires a first-level Rogue choice from SRD page 39", source);
+        if (ROGUE_SNEAK_ATTACK_ALGORITHM.equals(algorithm)
+                && (kind != FeatureKind.FEATURE || level != 1 || page != 39
+                    || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.rogue")))
+            throw fail("S2_TYPE", Stage.AUTHOR, "Sneak Attack requires a first-level Rogue feature from SRD page 39", source);
         if (ROGUE_CUNNING_ACTION_ALGORITHM.equals(algorithm)
                 && (kind != FeatureKind.FEATURE || level != 2 || page != 40
                     || !owner.ruleType().equals("character.class") || !owner.ruleKey().equals("class.rogue")))
@@ -1737,7 +1742,7 @@ public final class Schema2CompositionKernel {
             case AUTOMATIC -> Set.of("AUTOMATIC_RESOURCE_LIFECYCLE_V1", "LIFE_DOMAIN_LEVEL1_V1",
                     "SRD_2014_WIZARD_SPELLCASTING_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1",
                     FIGHTER_EXTRA_ATTACK_ALGORITHM, CHAMPION_IMPROVED_CRITICAL_ALGORITHM, FIGHTER_SECOND_WIND_ALGORITHM,
-                    FIGHTER_ACTION_SURGE_ALGORITHM, ROGUE_CUNNING_ACTION_ALGORITHM);
+                    FIGHTER_ACTION_SURGE_ALGORITHM, ROGUE_SNEAK_ATTACK_ALGORITHM, ROGUE_CUNNING_ACTION_ALGORITHM);
             case CHOICE -> Set.of(FIGHTER_DEFENSE_ALGORITHM, ROGUE_EXPERTISE_ALGORITHM);
             case DM_ADJUDICATION -> Set.of("BOUNDED_SUBCLASS_SELECTION_V1", "BOUNDED_FEATURE_SELECTION_V1", "BOUNDED_DM_ADJUDICATION_V1");
             case BLOCKED -> Set.of("BLOCKED_ISSUE_8_V1", "BLOCKED_SPELL_SYSTEM_V1", "BLOCKED_DOWNSTREAM_SYSTEM_V1", "SRD_2014_WIZARD_ARCANE_RECOVERY_V1", "SRD_2014_EVOCATION_SAVANT_V1", "SRD_2014_SCULPT_SPELLS_V1");
@@ -2660,7 +2665,7 @@ public final class Schema2CompositionKernel {
         int enabledRests = 0, enabledChecks = 0, enabledHealth = 0, enabledCombat = 0, enabledCasting=0;
         boolean extraAttackEnabled = false, improvedCriticalEnabled = false, secondWindEnabled = false;
         boolean defenseEnabled = false, actionSurgeEnabled = false;
-        boolean expertiseEnabled = false, cunningActionEnabled = false;
+        boolean expertiseEnabled = false, sneakAttackEnabled = false, cunningActionEnabled = false;
         Set<RuleIdentity> weaponItems=new HashSet<>(), movementOwners=new HashSet<>(), wizardOwners=new HashSet<>();
         boolean armorMovementEnabled = false, stonecunningEnabled = false;
         Set<RuleIdentity> subraceHitPointOwners = new HashSet<>();
@@ -2753,6 +2758,11 @@ public final class Schema2CompositionKernel {
                         if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Expertise requires its enabled Rogue", object.source);
                         if (expertiseEnabled) throw fail("S2_ROGUE_EXPERTISE_AMBIGUOUS", Stage.FINAL, "Only one Rogue Expertise may be enabled", object.source);
                         expertiseEnabled = true;
+                    }
+                    if (feature.enabled() && ROGUE_SNEAK_ATTACK_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
+                        if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Sneak Attack requires its enabled Rogue", object.source);
+                        if (sneakAttackEnabled) throw fail("S2_ROGUE_SNEAK_ATTACK_AMBIGUOUS", Stage.FINAL, "Only one Rogue Sneak Attack may be enabled", object.source);
+                        sneakAttackEnabled = true;
                     }
                     if (feature.enabled() && ROGUE_CUNNING_ACTION_ALGORITHM.equals(feature.definition().executionAlgorithm())) {
                         if (!enabled(owner)) throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Cunning Action requires its enabled Rogue", object.source);

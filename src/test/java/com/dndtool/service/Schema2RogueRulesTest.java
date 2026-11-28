@@ -6,10 +6,14 @@ import com.dndtool.module.composition.Schema2RulesBinding;
 import com.dndtool.service.Schema2CharacterRuntime.CheckResult;
 import com.dndtool.service.Schema2CharacterRuntime.Command;
 import com.dndtool.service.Schema2CharacterRuntime.Event;
+import com.dndtool.service.Schema2CharacterRuntime.FeatureState;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
 import com.dndtool.service.Schema2CharacterRuntime.History;
+import com.dndtool.service.Schema2CharacterRuntime.State;
 import com.dndtool.service.Schema2InitialCharacterPlanService.InitialPlan;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +29,7 @@ class Schema2RogueRulesTest {
     private static final RuleIdentity ROGUE = new RuleIdentity(BASE, "character.class", "class.rogue");
     private static final RuleIdentity PROGRESSION = new RuleIdentity(BASE, "character.class_progression", "progression.rogue");
     private static final RuleIdentity EXPERTISE = new RuleIdentity(BASE, "character.feature", "feature.rogue_expertise");
+    private static final RuleIdentity SNEAK_ATTACK = new RuleIdentity(BASE, "character.feature", "feature.rogue_sneak_attack");
     private static final RuleIdentity CUNNING_ACTION = new RuleIdentity(BASE, "character.feature", "feature.rogue_cunning_action");
     private static final RuleIdentity TOOL_EXPERTISE = new RuleIdentity(BASE, "character.tool", "tool.thieves_tools");
     private static final RuleIdentity THIEVES_TOOLS = new RuleIdentity(BASE, "equipment.item", "item.thieves_tools");
@@ -39,15 +44,20 @@ class Schema2RogueRulesTest {
     private final InitialPlan plan = roguePlan(material);
     private final UUID operation = UUID.randomUUID();
 
-    @Test void bindsExactLevelOneChoicesAndGrantsCunningActionAtLevelTwoOnly() {
+    @Test void grantsSneakAttackAtLevelOneAndCunningActionAtLevelTwo() {
         var initial = initialize(List.of(STEALTH, TOOL_EXPERTISE));
         var first = initial.current();
         assertEquals(initial.events().getFirst().command().growthChoices().expertise(), first.expertise());
+        var sneakAttack = new FeatureState(SNEAK_ATTACK, ROGUE, 1);
+        assertTrue(first.features().contains(sneakAttack));
+        assertTrue(Schema2FeatureSupport.hasSneakAttack(material, first));
         assertFalse(Schema2FeatureSupport.hasCunningAction(material, first));
         var second = engine.executeCharacter(material, plan, initial,
                 new Command("CHARACTER_ADVANCED", null, 0, null, "FIXED_AVERAGE", ROGUE, GrowthChoices.EMPTY),
                 UUID.randomUUID(), sides -> fail("Fixed HP drew d" + sides));
         assertTrue(Schema2FeatureSupport.hasCunningAction(material, second.current()));
+        assertTrue(second.current().features().contains(sneakAttack));
+        assertTrue(Schema2FeatureSupport.hasSneakAttack(material, second.current()));
         assertEquals(first.expertise(), second.current().expertise());
         engine.validateCharacter(material, plan, second);
         assertEquals("S2_GROWTH_LEVEL_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
@@ -141,6 +151,81 @@ class Schema2RogueRulesTest {
                 stored.chains()).projection().rules());
     }
 
+    @Test void sneakAttackRequiresItsPublishedShapeAndEnabledOwner() {
+        Map<String, JsonElement> wrongShape = Map.of(
+                "owner", jsonIdentity(CLASS), "source_page", new JsonPrimitive(40),
+                "level", new JsonPrimitive(2), "feature_kind", new JsonPrimitive("OPTION"),
+                "execution_mode", new JsonPrimitive("CHOICE"),
+                "execution_algorithm", new JsonPrimitive("SRD_2014_ROGUE_SNEAK_ATTACK_V2"));
+        for (var mutation : wrongShape.entrySet()) {
+            var packages = roguePackages();
+            Schema2GrantFixtures.edit(packages, 0, "rules.json", rows -> rows.getAsJsonArray().asList().stream()
+                    .map(JsonElement::getAsJsonObject).filter(row -> jsonIdentity(SNEAK_ATTACK).equals(row.get("identity")))
+                    .findFirst().orElseThrow().add(mutation.getKey(), mutation.getValue()));
+            assertEquals("S2_TYPE", assertThrows(Schema2Exception.class, () -> compose(packages), mutation.getKey())
+                    .diagnostic().code());
+        }
+
+        var wrongLevel = roguePackages();
+        featureChange(wrongLevel, SNEAK_ATTACK, "level", new JsonPrimitive(2));
+        assertEquals("S2_TYPE", assertThrows(Schema2Exception.class, () -> compose(wrongLevel)).diagnostic().code());
+
+        var disabledOwner = roguePackages();
+        featureChange(disabledOwner, EXPERTISE, null, new JsonPrimitive(false));
+        featureChange(disabledOwner, CUNNING_ACTION, null, new JsonPrimitive(false));
+        featureChange(disabledOwner, ROGUE, null, new JsonPrimitive(false));
+        assertEquals("S2_REFERENCE_MISSING",
+                assertThrows(Schema2Exception.class, () -> compose(disabledOwner)).diagnostic().code());
+
+        var duplicate = roguePackages();
+        Schema2GrantFixtures.edit(duplicate, 0, "rules.json", rows -> rows.getAsJsonArray().add(feature(
+                new RuleIdentity(BASE, "character.feature", "feature.duplicate_sneak_attack"),
+                1, 39, "AUTOMATIC", ROGUE_SNEAK_ATTACK_ALGORITHM)));
+        assertEquals("S2_ROGUE_SNEAK_ATTACK_AMBIGUOUS",
+                assertThrows(Schema2Exception.class, () -> compose(duplicate)).diagnostic().code());
+    }
+
+    @Test void sneakAttackRejectsForgedMissingAndDisabledGrants() {
+        State rogue = initialize(List.of(STEALTH, ACROBATICS)).current();
+        State guard = engine.initial(material, fullPlan(material, IDENTITY, CAMPAIGN, CHARACTER), PREPARATION,
+                fullAbilities(), INITIAL_CHOICES, operation).current();
+        assertFalse(Schema2FeatureSupport.hasSneakAttack(material, guard));
+
+        var grant = new FeatureState(SNEAK_ATTACK, ROGUE, 1);
+        var forgedGuard = withFeatures(guard, List.of(grant));
+        assertEquals("S2_COMBAT_FEATURE_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
+                () -> Schema2FeatureSupport.hasSneakAttack(material, forgedGuard)).getMessage());
+        var missing = withFeatures(rogue, rogue.features().stream().filter(fact -> !fact.equals(grant)).toList());
+        assertEquals("S2_COMBAT_FEATURE_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
+                () -> Schema2FeatureSupport.hasSneakAttack(material, missing)).getMessage());
+
+        var disabled = roguePackages();
+        featureChange(disabled, SNEAK_ATTACK, null, new JsonPrimitive(false));
+        var disabledMaterial = compose(disabled);
+        assertFalse(Schema2FeatureSupport.hasSneakAttack(disabledMaterial, missing));
+        assertEquals("S2_COMBAT_FEATURE_UNSUPPORTED", assertThrows(IllegalArgumentException.class,
+                () -> Schema2FeatureSupport.hasSneakAttack(disabledMaterial, rogue)).getMessage());
+    }
+
+    private static State withFeatures(State state, List<FeatureState> features) {
+        return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(),
+                state.characterClass(), state.abilities(), state.level(), state.proficiencyBonus(), state.hitPoints(),
+                state.maximumHitPoints(), state.classes(), state.hitDicePools(), state.subclasses(), features,
+                state.feats(), state.proficiencies(), state.version(), state.resources(), state.rest(), state.equipment(),
+                state.health(), state.spellbook(), state.knownCantrips());
+    }
+
+    private static void featureChange(List<Map<String, byte[]>> packages, RuleIdentity target, String field, JsonElement value) {
+        Schema2GrantFixtures.edit(packages, 1, "changes.json", rows -> {
+            var row = new JsonObject();
+            row.addProperty("op", field == null ? "set_enabled" : "set_field");
+            row.add("target", jsonIdentity(target));
+            if (field != null) row.addProperty("field", field);
+            row.add("value", value);
+            rows.getAsJsonArray().add(row);
+        });
+    }
+
     private History initialize(List<RuleIdentity> targets) {
         return engine.initial(material, plan, PREPARATION, fullAbilities(), CHOICES.withExpertise(targets), operation);
     }
@@ -171,6 +256,7 @@ class Schema2RogueRulesTest {
             progression.addProperty("supported_maximum_level", 2);
             definitions.add(progression);
             definitions.add(feature(EXPERTISE, 1, 39, "CHOICE", ROGUE_EXPERTISE_ALGORITHM));
+            definitions.add(feature(SNEAK_ATTACK, 1, 39, "AUTOMATIC", ROGUE_SNEAK_ATTACK_ALGORITHM));
             definitions.add(feature(CUNNING_ACTION, 2, 40, "AUTOMATIC", ROGUE_CUNNING_ACTION_ALGORITHM));
             var savingThrow = definition(DEXTERITY_SAVE, 39);
             savingThrow.addProperty("category", "SAVING_THROW");

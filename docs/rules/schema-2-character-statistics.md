@@ -81,6 +81,7 @@ schema 2 的法师 `SRD_2014_WIZARD_ARCANE_RECOVERY_V1` 另按[奥术回想合�
 [防御与动作如潮](schema-2-fighter-actions.md)分别使用 `SRD_2014_FIGHTER_DEFENSE_V1` 的一级显式选择，以及
 `SRD_2014_FIGHTER_ACTION_SURGE_V1` 的二级自动授予。选择绑定初始化命令、摘要和完整角色历史；
 动作如潮绑定准确职业资源，只有战斗入口可扣减。两者都要求单职业战士，最高支持 6 级。
+单职业游荡者从一级自动取得 `SRD_2014_ROGUE_SNEAK_ATTACK_V1`。成长保留该授予，战斗记录每回合是否已用。[偷袭合同](schema-2-rogue.md#命中后选择偷袭)
 专长当前仅允许 `BLOCKED`／`BLOCKED_DOWNSTREAM_SYSTEM_V1`：可验证前提并记录获得，不能
 执行未接入的效果。到期的非 `OPTION` 特性按其算法取得，`CHOICE` 要求准确选择。
 遇到到期非 OPTION 特性的 `BOUNDED_FEATURE_SELECTION_V1` 时，在 RNG 前拒绝整次成长。

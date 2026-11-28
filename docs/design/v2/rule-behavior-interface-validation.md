@@ -49,7 +49,7 @@
 | 样例 | 被验证的具体轨迹 | 原设计 | 修订后原轨迹 | 当前程序 |
 |---|---|---|---|---|
 | [V01](#v01) Bardic Inspiration | 攻击 d20 后、判定前选择消费灵感 | P，限攻击分支 | P | 未接入掷后选择 |
-| [V02](#v02) Sneak Attack | 命中后的额外骰、暴击与每 turn 用量 | P | P | 未接入 |
+| [V02](#v02) Sneak Attack | 命中后的额外骰、暴击与每 turn 用量 | P | P | 已接入单职业游荡者 1–2 级，5 级轨迹仍待采用 |
 | [V03](#v03) Divine Smite | 最终近战命中后选法术位，追加异类型伤害 | P | P | 未接入 |
 | [V04](#v04) Grapple + Extra Attack | 一击改为技能对抗，拖带与无动作释放 | U | P | 单格中型规则角色的攻击替代、对抗和拖带已接入[战斗领域](../../rules/schema-2-melee-control.md) |
 | [V05](#v05) Counterspell | 已知瞬时法术的嵌套反制及原前缀恢复 | P | P | 有限子集已接入 |
@@ -113,8 +113,8 @@
 放弃选择不占用次数；已消费实例保存来源、turn、原骰和伤害结果，重开不把额度改成每 round
 或仅自己 turn。已用额度或非法武器不产生新增特性骰。
 
-**程序。** `Schema2ActionFlowRules.settleAttack` 只处理当前单一武器 profile，未接此选择、
-附加骰来源和每 turn 限额。[实现](../../../src/main/java/com/dndtool/service/Schema2ActionFlowRules.java)
+程序已接入一至二级游荡者的最终命中选择。灵巧及远程武器可追加 1d6，重击时追加 2d6。
+同回合的后续命中、其他生物回合的借机攻击和待决重开共用同一用量记录。上列五级轨迹另需五级职业成长与对应的骰数。[当前规则](../../rules/schema-2-rogue.md#命中后选择偷袭)
 
 <a id="v03"></a>
 ### V03：Divine Smite 的命中后资源消费

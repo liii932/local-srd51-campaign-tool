@@ -73,8 +73,8 @@ SQLite 适配器按封闭类型编码，由领域模型校验结构、相邻前�
 `RULE_BOUND_CAMPAIGN` format 3。
 
 应用交付五个规则 ZIP 作为导入候选，标准与家规组合各含四个准确成员。两者按序共用
-`srd51_runtime@14`、`srd51_characters@16`、`srd51_magic@20`，第四个成员分别为
-`dm_runtime_house_rules@29` 与 `dm_runtime_house_rules@30`。绑定保留成员顺序、准确版本与
+`srd51_runtime@15`、`srd51_characters@17`、`srd51_magic@21`，第四个成员分别为
+`dm_runtime_house_rules@31` 与 `dm_runtime_house_rules@32`。绑定保留成员顺序、准确版本与
 原始 ZIP 和逻辑摘要，以及组合、最终规则和字段链摘要。DM 可选择经本机接受并满足当前支持
 范围的外部组合。角色创建、候选、展示、实际结算和
 历史校验共同使用所选战役的冻结规则上下文。标准被动基数为 10，优劣势调整幅度为 5。检定变体分别使用 12 和 3，运动默认以感知结算，允许 DM 为本次技能检定选择其他属性。变体的石工知识采用三倍熟练，自定义工匠获得侏儒语，DM 定额钝击伤害为 3 HP。作者和消费者的对应关系见[规则包指南](../../../rule-packages/srd51-runtime/package-guide.md)。

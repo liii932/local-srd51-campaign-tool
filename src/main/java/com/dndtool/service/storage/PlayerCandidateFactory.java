@@ -50,6 +50,15 @@ public final class PlayerCandidateFactory {
         factory.relationChoices(own, visible);
         if (battle.activeFlow() != null) {
             Flow flow = battle.activeFlow(); Frame leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
+            AttackAttempt sneakAttack = CampaignCombatView.pendingSneakAttack(flow, leaf);
+            if (sneakAttack != null) {
+                UUID actor = sneakAttack.actorId();
+                if (own.contains(actor)) {
+                    factory.add(Command.sneakAttack(Kind.USE_SNEAK_ATTACK, actor, flow.flowKey(), leaf.frameKey()), "使用偷袭");
+                    factory.add(Command.sneakAttack(Kind.DECLINE_SNEAK_ATTACK, actor, flow.flowKey(), leaf.frameKey()), "放弃偷袭");
+                }
+                return List.copyOf(result);
+            }
             Window window = flow.windows().stream().filter(w -> Objects.equals(w.windowKey(), leaf.windowKey())).findFirst().orElse(null);
             UUID mover = CampaignParticipationCommands.opportunityMonster(battle, window);
             if (mover != null && !PlayerCampaignProjection.canViewOpportunity(domain, player, battle, own, mover))

@@ -14,15 +14,16 @@ const wolfName = '林地灰狼';
 async function main() {
   const [flag, storageRoot, scenario] = process.argv.slice(2);
   assert.ok(flag === '--fresh-root' && path.isAbsolute(storageRoot), 'Expected --fresh-root /absolute/disposable/player-store');
-  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise', '--cantrips', '--fighter', '--rogue'].includes(scenario),
-    'Expected --movement, --ranged, --observation, --surprise, --cantrips, --fighter, or --rogue');
+  const scenarios = ['--movement', '--ranged', '--observation', '--surprise', '--cantrips', '--fighter', '--rogue', '--sneak-attack'];
+  assert.ok(scenario === undefined || scenarios.includes(scenario), 'Expected a scenario from ' + scenarios.join(', '));
   const ranged = scenario === '--ranged';
   const observation = scenario === '--observation';
   const surprise = scenario === '--surprise';
   const cantrips = scenario === '--cantrips';
   const fighterFeatures = scenario === '--fighter';
   const rogueFeatures = scenario === '--rogue';
-  const monsterName = fighterFeatures ? '林间地狱犬' : observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
+  const sneakAttack = scenario === '--sneak-attack';
+  const monsterName = fighterFeatures || sneakAttack ? '林间地狱犬' : observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
   const root = await fs.realpath(storageRoot);
   const repo = await fs.realpath(path.join(__dirname, '../..'));
   assert.ok(root !== repo && !root.startsWith(repo + path.sep));
@@ -48,7 +49,7 @@ async function main() {
     const field = (form, name) => host.locator('#' + form).locator('[name="' + name + '"]');
     const submit = form => host.locator('#' + form + ' button').click();
     const hostAction = async (action, trigger) => {
-      if (!cantrips && !fighterFeatures && !rogueFeatures) return (await observeStorageAction(host, action, trigger, {})).body;
+      if (!cantrips && !fighterFeatures && !rogueFeatures && !sneakAttack) return (await observeStorageAction(host, action, trigger, {})).body;
       // Participation polling can refresh the Host while a form submission is finishing.
       const [response] = await Promise.all([
         host.waitForResponse(response => response.url() === hostOrigin + '/api/host/storage/' + action
@@ -113,11 +114,29 @@ async function main() {
     async function playerCommand(label, page = attacker) {
       return (await clickPlayerCommand(page, page.getByRole('button', {name: label}), label)).receipt;
     }
+    async function postPlayer(page, action, input, connectionId) {
+      const {session} = await readPlayer(page);
+      return page.evaluate(async ({action, input, connectionId, csrf}) => {
+        const response = await fetch('/api/player/' + action, {method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'X-Player-Connection': connectionId},
+          body: JSON.stringify(input)});
+        const result = await response.json();
+        return {status: response.status, code: result.code, receipt: result.receipt};
+      }, {action, input, connectionId, csrf: session.csrf});
+    }
+    async function takeControl(page) {
+      const [response] = await Promise.all([
+        page.waitForResponse(reply => reply.url() === playerOrigin + '/api/player/takeover'),
+        page.locator('#player-takeover').click()
+      ]);
+      assert.equal(response.status(), 200);
+      return (await response.json()).connectionId;
+    }
 
     await host.goto(hostOrigin + '/host/storage');
     await waitForStorageReady(host);
     assert.equal((await readHost()).storage.state, 'IDLE');
-    const campaignName = rogueFeatures ? '游荡者专精与灵巧动作验收'
+    const campaignName = sneakAttack ? '游荡者偷袭验收' : rogueFeatures ? '游荡者专精与灵巧动作验收'
       : fighterFeatures ? '战士防御与动作如潮验收' : cantrips ? '已知戏法验收' : surprise ? '受惊与分组先攻验收'
       : observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收';
     await field('storage-create', 'name').fill(campaignName);
@@ -128,7 +147,7 @@ async function main() {
         {name: '巡林法师', owner: 'class.wizard', known: ['spell.fire_bolt', 'spell.mage_hand', 'spell.prestidigitation']},
         {name: '营地牧师', owner: 'class.cleric', known: ['spell.guidance', 'spell.light', 'spell.thaumaturgy']}
       ]
-      : rogueFeatures ? [
+      : rogueFeatures || sneakAttack ? [
         {name: '巡林斥候', owner: 'class.rogue', expertise: ['proficiency.skill.stealth', 'tool.thieves_tools']},
         {name: '营地斥候', owner: 'class.rogue', expertise: ['proficiency.skill.acrobatics', 'proficiency.skill.perception']}
       ] : ['巡林战士', '营地战士'].map(name => ({name, owner: 'class.fighter'}));
@@ -188,7 +207,7 @@ async function main() {
       await host.locator('[data-pane="actions"]').click();
       await field('domain-equipment', 'characterId').selectOption(fighters[0]);
       await field('domain-equipment', 'kind').selectOption('ITEM_ACQUIRED');
-      const weaponKey = ranged ? 'item.shortbow' : 'item.longsword';
+      const weaponKey = sneakAttack ? 'item.dagger' : ranged ? 'item.shortbow' : 'item.longsword';
       await selectRule('domain-equipment', 'item', weaponKey);
       const acquired = await domainAction('domain-equipment');
       const fighter = acquired.campaign.domain.characters.find(c => c.id === fighters[0]);
@@ -262,11 +281,12 @@ async function main() {
 
     if (fighterFeatures) await host.locator('[data-pane="world"]').click();
     await field('domain-monster-create', 'name').fill(monsterName);
-    const monsterKey = fighterFeatures ? 'monster.hell_hound' : observation ? 'monster.goblin' : ranged ? 'monster.skeleton' : 'monster.wolf';
+    const monsterKey = fighterFeatures || sneakAttack ? 'monster.hell_hound' : observation ? 'monster.goblin' : ranged ? 'monster.skeleton' : 'monster.wolf';
     await selectRule('domain-monster-create', 'monster', monsterKey);
     const created = await domainAction('domain-monster-create');
     const monster = created.campaign.domain.space.monsters.find(m => m.name === monsterName).id;
-    const placements = cantrips ? [[fighters[0], 1, 1, 0], [monster, 4, 1, 1], [fighters[1], 1, 3, 0]]
+    const placements = sneakAttack ? [[fighters[0], 1, 1, 0], [monster, 2, 1, 1], [fighters[1], 2, 2, 0]]
+      : cantrips ? [[fighters[0], 1, 1, 0], [monster, 4, 1, 1], [fighters[1], 1, 3, 0]]
       : observation ? [[fighters[0], 1, 1, 0], [monster, 3, 1, 1], [fighters[1], 1, 3, 0]]
       : ranged ? [[fighters[0], 1, 1, 0], [monster, 18, 1, 1], [fighters[1], 1, 2, 0]]
         : [[fighters[0], 1, 1, 0], [monster, 2, 1, 1], [fighters[1], 3, 3, 0]];
@@ -321,7 +341,8 @@ async function main() {
       await governance('control', () => submit('host-player-control-form'));
     }
     assert.notEqual(members[0], members[1]);
-    await attacker.locator('#player-takeover').click();
+    await takeControl(attacker);
+    const observerConnection = sneakAttack ? await takeControl(observer) : null;
     if (surprise || cantrips || fighterFeatures) await observer.locator('#player-takeover').click();
     await host.getByText('共享给谁看', {exact: true}).click();
     await share('SCENE', scene, 'ALL');
@@ -365,6 +386,180 @@ async function main() {
       if (hideAllowed || blocksSight || cover !== 'NONE') assert.deepEqual(cell, {position: {x, y}, hideAllowed, blocksSight, cover});
       else assert.equal(cell, undefined);
     };
+    if (sneakAttack) {
+      const [rogue, ally] = fighters;
+      const hp = () => battle().monsters.find(row => row.monsterId === monster).hitPoints;
+      const history = () => state.campaign.domain.combats.find(row => row.current.combatId === scene);
+      const attack = () => battle().flows.at(-1).attacks.find(row => row.actorId === rogue);
+      const update = async () => { state = await readHost(); };
+      const decisionLabels = ['使用偷袭', '放弃偷袭'];
+      const pendingPanel = host.locator('#domain-pending');
+      const decision = (page, label) => page.locator('#player-actions button:enabled').filter({hasText: label});
+      const receiptFor = (page, request, connectionId) => {
+        const {connectionId: ignored, ...identity} = request;
+        return postPlayer(page, 'receipt', identity, connectionId);
+      };
+      function hitSummary(activeAttack) {
+        return {attackTotal: activeAttack.selectedD20 + activeAttack.abilityModifier + activeAttack.proficiencyBonus
+          + (activeAttack.blessingD4 ?? 0), critical: activeAttack.critical};
+      }
+      async function checkPending(expectedAttack) {
+        await decision(attacker, decisionLabels[0]).waitFor();
+        await decision(attacker, decisionLabels[1]).waitFor();
+        await pendingPanel.getByRole('button', {name: decisionLabels[0], exact: true}).waitFor();
+        await pendingPanel.getByRole('button', {name: decisionLabels[1], exact: true}).waitFor();
+        assert.equal(await pendingPanel.getByRole('button', {name: /继续结算行动/}).count(), 0);
+        const flow = battle().flows.at(-1);
+        const leaf = flow.frames.find(row => row.frameKey === flow.leafFrameKey);
+        assert.equal(leaf.frameKey, expectedAttack.frameKey);
+        assert.deepEqual([leaf.kind, leaf.stage, leaf.status], ['ATTACK', 'SNEAK_ATTACK_CHOICE', 'WAITING_CHOICE']);
+        assert.equal(expectedAttack.sneakAttack.status, 'PENDING');
+        assert.equal(expectedAttack.sneakAttack.nearbyEnemyId, ally);
+        assert.deepEqual(expectedAttack.damageDice, []);
+        const attackerState = await readPlayer(attacker);
+        assert.deepEqual(attackerState.view.pending.sneakAttack, hitSummary(expectedAttack));
+        assert.equal(attackerState.view.pending.own, true);
+        assert.deepEqual(attackerState.view.candidates.map(row => row.label), decisionLabels);
+        assert.ok(!JSON.stringify(attackerState.view).includes(ally));
+        assert.ok(!JSON.stringify(attackerState.view).includes(characters[1].name));
+        const observerState = await readPlayer(observer);
+        assert.equal(observerState.view.pending.own, false);
+        assert.equal(observerState.view.pending.active, false);
+        assert.equal(Object.hasOwn(observerState.view.pending, 'sneakAttack'), false);
+        assert.deepEqual(observerState.view.candidates, []);
+        await assertMonsterHiddenFromObserver();
+        return attackerState.view.candidates[0];
+      }
+      let beforeHit;
+      for (let attempt = 0; attempt < 24; attempt++) {
+        await advanceTo(rogue);
+        await playerCommand(/开始攻击动作/);
+        beforeHit = hp();
+        const originalStrike = await playerCommand(new RegExp('攻击 ' + monsterName));
+        await update();
+        if (attack().sneakAttack?.status === 'PENDING') {
+          assert.equal(originalStrike.outcome, 'WAITING');
+          assert.equal(Object.hasOwn(originalStrike, 'sneakAttackResult'), false);
+          break;
+        }
+        assert.equal(attack().hit, false);
+        await endTurn();
+      }
+      const waitingAttack = attack();
+      assert.equal(hp(), beforeHit);
+      const staleCandidate = await checkPending(waitingAttack);
+      const oldRequest = {candidateId: staleCandidate.id, precondition: staleCandidate.precondition,
+        requestId: await observer.evaluate(() => crypto.randomUUID()), connectionId: observerConnection};
+      const denied = await postPlayer(observer, 'command', oldRequest, observerConnection);
+      assert.deepEqual([denied.status, denied.code], [409, 'PLAYER_VIEW_EXPIRED']);
+
+      const savedDomain = state.campaign.domain;
+      await hostAction('save', () => host.locator('#storage-save').click());
+      const ended = await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      await host.locator('#storage-files').selectOption(ended.savedFile);
+      state = await hostAction('open', () => host.locator('#storage-open button[type="submit"]').click());
+      assert.deepEqual(state.campaign.domain, savedDomain);
+      await approvePlayers(members);
+      for (const [index, page] of seats.entries()) {
+        await page.locator('#player-table').waitFor();
+        assert.equal((await readPlayer(page)).session.playerKey, members[index]);
+      }
+      const attackerWriter = await takeControl(attacker);
+      const observerWriter = await takeControl(observer);
+      await host.locator('[data-pane="combat"]').click();
+      await checkPending(attack());
+      const stale = await postPlayer(attacker, 'command', {...oldRequest, connectionId: attackerWriter}, attackerWriter);
+      assert.deepEqual([stale.status, stale.code], [409, 'PLAYER_VIEW_EXPIRED']);
+      assert.equal((await readHost()).campaign.domain.roots.length, savedDomain.roots.length);
+
+      const chosen = await clickPlayerCommand(attacker, decision(attacker, decisionLabels[0]), decisionLabels[0]);
+      await update();
+      const resolved = attack();
+      const used = {used: true, ...hitSummary(resolved), damage: resolved.damageAmount};
+      assert.equal(resolved.firstD20, waitingAttack.firstD20);
+      assert.equal(resolved.selectedD20, waitingAttack.selectedD20);
+      assert.equal(resolved.sneakAttack.status, 'USED');
+      const diceCount = resolved.critical ? 2 : 1;
+      assert.equal(resolved.damageDice.length, diceCount);
+      assert.equal(resolved.sneakAttack.damageDice.length, diceCount);
+      assert.equal(resolved.damageAmount, Math.max(0, [...resolved.damageDice, ...resolved.sneakAttack.damageDice]
+        .reduce((total, die) => total + die, resolved.abilityModifier)));
+      assert.deepEqual(chosen.receipt.sneakAttackResult, used);
+      assert.equal(hp(), beforeHit - used.damage);
+      const usedEvent = history().events.at(-1);
+      assert.equal(usedEvent.command.kind, 'USE_SNEAK_ATTACK');
+      assert.ok(usedEvent.resolution.rolls.every(row => row.sides !== 20));
+      assert.equal(usedEvent.resolution.rolls.filter(row => row.purpose === 'SNEAK_ATTACK_DAMAGE').length, diceCount);
+      assert.equal(state.campaign.domain.roots.length, savedDomain.roots.length + 1);
+      assert.equal(state.campaign.domain.roots.at(-1).actor.memberId, members[0]);
+      const repeated = await postPlayer(attacker, 'command', chosen.request, attackerWriter);
+      assert.deepEqual([repeated.status, repeated.code], [409, 'PLAYER_VIEW_EXPIRED']);
+      assert.deepEqual((await receiptFor(attacker, chosen.request, attackerWriter)).receipt, chosen.receipt);
+      assert.equal((await receiptFor(observer, chosen.request, observerWriter)).receipt.state, 'UNVERIFIED');
+      assert.equal((await readHost()).campaign.domain.roots.length, savedDomain.roots.length + 1);
+      await attacker.locator('#player-receipt').filter({hasText: `已使用偷袭 · 伤害合计 ${used.damage}`}).waitFor();
+      await host.locator('.sneak-attack-result').filter({hasText: `伤害合计 ${used.damage}`}).waitFor();
+
+      const moveMonster = async x => {
+        await field('domain-combat', 'kind').selectOption('MOVE');
+        await field('domain-combat', 'actorId').selectOption(monster);
+        await field('domain-combat', 'path').fill(`${x},1`);
+        state = await domainAction('domain-combat');
+      };
+      const finishMovement = async () => {
+        const pendingContinue = pendingPanel.getByRole('button', {name: '继续结算行动', exact: true});
+        while (battle().flows.at(-1).status === 'ACTIVE') {
+          state = await hostAction('domain', () => pendingContinue.click());
+        }
+        assert.equal(actor(monster).position.x, 3);
+      };
+      for (let attempt = 0; attempt < 24; attempt++) {
+        await advanceTo(monster);
+        if (actor(monster).position.x === 3) await moveMonster(2);
+        const hpBeforeOpportunity = hp();
+        await moveMonster(3);
+        await playerCommand(/借机攻击/);
+        await update();
+        assert.equal(attack().opportunityAttack, true);
+        assert.equal(actor(rogue).reactionAvailable, false);
+        assert.equal(active(), monster);
+        if (attack().sneakAttack?.status === 'PENDING') {
+          assert.notEqual(attack().sneakAttack.turnNumber, resolved.sneakAttack.turnNumber);
+          await checkPending(attack());
+          await share('MONSTER', monster, 'NONE');
+          await update();
+          await attacker.locator('#player-shared li').filter({hasText: monsterName}).waitFor({state: 'detached'});
+          await checkPending(attack());
+          const privateView = JSON.stringify((await readPlayer(attacker)).view);
+          assert.ok(!privateView.includes(monster) && !privateView.includes(monsterName));
+          const privateReceipt = await receiptFor(attacker, chosen.request, attackerWriter);
+          assert.deepEqual(privateReceipt.receipt.sneakAttackResult, {used: true, ...hitSummary(resolved)});
+          const declined = await clickPlayerCommand(attacker, decision(attacker, decisionLabels[1]), decisionLabels[1]);
+          await update();
+          const afterDecline = attack();
+          assert.equal(afterDecline.sneakAttack.status, 'DECLINED');
+          assert.deepEqual(afterDecline.sneakAttack.damageDice, []);
+          assert.deepEqual(declined.receipt.sneakAttackResult, {used: false, ...hitSummary(afterDecline)});
+          await attacker.locator('#player-receipt').filter({hasText: '已放弃偷袭'}).waitFor();
+          assert.ok(!(await attacker.locator('#player-receipt').textContent()).includes('伤害合计'));
+          assert.equal(hp(), hpBeforeOpportunity - afterDecline.damageAmount);
+          await finishMovement();
+          assert.equal(hp(), hpBeforeOpportunity - afterDecline.damageAmount);
+          break;
+        }
+        assert.equal(attack().hit, false);
+        await finishMovement();
+        await advanceTo(rogue);
+      }
+      assert.equal(attack().sneakAttack.status, 'DECLINED');
+      await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({result: 'PASSED', playerSessions: seats.length, reopenedPending: true,
+        deniedCrossSeat: true, idempotentReceipt: true, used, offTurnDeclinedAfterTargetRevocation: true}));
+      return;
+    }
     if (rogueFeatures) {
       const [rogue, novice] = fighters;
       const domain = () => state.campaign.domain;
@@ -378,16 +573,6 @@ async function main() {
         const button = attacker.locator('#player-actions button:enabled').filter({has: title});
         await button.waitFor();
         return clickPlayerCommand(attacker, button, label);
-      }
-      async function postPlayer(page, action, input, connectionId) {
-        const {session} = await readPlayer(page);
-        return page.evaluate(async ({action, input, connectionId, csrf}) => {
-          const response = await fetch('/api/player/' + action, {method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'X-Player-Connection': connectionId},
-            body: JSON.stringify(input)});
-          const result = await response.json();
-          return {status: response.status, code: result.code, receipt: result.receipt};
-        }, {action, input, connectionId, csrf: session.csrf});
       }
       const roleCard = attacker.locator('#player-cards .character-card').filter({
         has: attacker.getByRole('heading', {name: characters[0].name, exact: true})
@@ -404,12 +589,7 @@ async function main() {
       assert.deepEqual(history().cunningActions, []);
       assert.ok(!(await labels(observer)).some(label => label.startsWith('灵巧动作')));
       assert.ok(!(await labels(attacker)).some(label => label.startsWith('灵巧动作')));
-      const [takeover] = await Promise.all([
-        observer.waitForResponse(response => response.url() === playerOrigin + '/api/player/takeover'),
-        observer.locator('#player-takeover').click()
-      ]);
-      assert.equal(takeover.status(), 200);
-      const observerConnection = (await takeover.json()).connectionId;
+      const observerConnection = await takeControl(observer);
       await advanceTo(rogue);
       assert.deepEqual(history().cunningActions, cunningKinds);
       assert.ok((await labels(attacker)).includes('躲藏（动作）'));

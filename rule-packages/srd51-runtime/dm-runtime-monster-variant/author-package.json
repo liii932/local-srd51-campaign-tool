@@ -1,23 +1,23 @@
 {
   "author_schema_version": 2,
   "module_key": "dm_runtime_monster_variant",
-  "release_version": "7",
+  "release_version": "8",
   "package_display_name": "DM Hell Hound attack profile example",
   "role": "extension",
   "dependencies": [
     {
       "module_key": "srd51_magic",
-      "supported_versions": ["20"]
+      "supported_versions": ["21"]
     },
     {
       "module_key": "dm_runtime_house_rules",
-      "supported_versions": ["29"]
+      "supported_versions": ["31"]
     }
   ],
   "compatible_combinations": [
     {
-      "srd51_magic": "20",
-      "dm_runtime_house_rules": "29"
+      "srd51_magic": "21",
+      "dm_runtime_house_rules": "31"
     }
   ],
   "load_order_constraints": [],

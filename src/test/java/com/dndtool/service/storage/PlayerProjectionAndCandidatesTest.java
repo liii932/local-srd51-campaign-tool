@@ -92,6 +92,60 @@ class PlayerProjectionAndCandidatesTest {
         assertDoesNotThrow(() -> requireExecutionPermission(visible, fixture.player, passCurrentReaction(visible, fixture.second)));
     }
 
+    @Test void existingGrappleCanBeReleasedWithoutExposingAnotherMembersSneakAttack() throws Exception {
+        try (var game = new CampaignExtraAttackIntegrationTest.Fixture(temporary)) {
+            CampaignWolfBiteIntegrationTest.createWithDeliveredRules(game.service, "独立偷袭选择");
+            UUID grappler = game.character("抓者", "PC");
+            UUID rogue = CampaignRogueCombatIntegrationTest.rogue(game, "游荡者", "PC", "stealth", "acrobatics");
+            UUID target = game.character("目标", "NPC");
+            UUID grapplerMember = game.player(grappler);
+            UUID rogueMember = game.player(rogue, target);
+            UUID dagger = UUID.randomUUID();
+            game.equipment(dagger.toString(), rogue, "ITEM_ACQUIRED", new EquipmentInput(dagger,
+                    game.rule("equipment.item", "item.dagger"), "CARRIED", "取得匕首"));
+            game.equipment(UUID.randomUUID().toString(), rogue, "ITEM_EQUIPPED",
+                    new EquipmentInput(dagger, null, "MAIN_HAND", "就绪匕首"));
+            game.startBattle("城门", List.of(new Deployment(grappler, new Position(2, 2), 0),
+                    new Deployment(rogue, new Position(1, 1), 0), new Deployment(target, new Position(2, 1), 1)), 20, 13, 1);
+            game.combat(Command.action(Kind.BEGIN_ATTACK, grappler));
+            var sequence = game.actor(grappler).sequence();
+            game.combat(Command.melee(Kind.GRAPPLE, grappler, target, null, null,
+                    new MeleeInput(sequence.sequenceKey(), sequence.performed(), null, HandSlot.MAIN_HAND, null, null)));
+            var contest = game.battle().activeFlow();
+            game.combat(Command.melee(Kind.CHOOSE_MELEE_DEFENSE, target, null, contest.flowKey(), contest.leafFrameKey(),
+                    new MeleeInput(null, null, null, null, ContestSkill.ACROBATICS, null)), 19, 2);
+            game.combat(Command.action(Kind.END_TURN, grappler));
+            game.combat(Command.action(Kind.BEGIN_ATTACK, rogue));
+            game.combat(Command.attack(rogue, target, dagger), 19);
+
+            var atChoice = game.access();
+            var flow = game.battle().activeFlow();
+            assertEquals(Stage.SNEAK_ATTACK_CHOICE, flow.frames().getLast().stage());
+            var pending = PlayerCampaignProjection.project(atChoice, grapplerMember).getAsJsonObject("pending");
+            assertFalse(pending.get("active").getAsBoolean());
+            var release = PlayerCandidateFactory.candidates(atChoice, grapplerMember).getFirst();
+            assertEquals(List.of("释放主手抓住的目标"), PlayerCandidateFactory.candidates(atChoice, grapplerMember).stream()
+                    .map(PlayerCandidateFactory.Candidate::label).toList());
+            var releaseCommand = CampaignDomainCodec.fromJson(release.input().get("command"), Command.class);
+            assertEquals(Kind.RELEASE_GRAPPLE, releaseCommand.kind());
+            assertEquals(flow.leafFrameKey(), releaseCommand.leafKey());
+            game.submit(UUID.randomUUID().toString(), atChoice, release.input(), Actor.player(grapplerMember, grappler));
+            assertEquals(flow, game.battle().activeFlow());
+            var releaseReceipt = PlayerCampaignProjection.receipt(game.access(), grapplerMember, game.state().roots().getLast());
+            assertEquals("COMPLETED", releaseReceipt.get("outcome").getAsString());
+            assertFalse(releaseReceipt.has("sneakAttackResult"));
+
+            var refreshed = game.access();
+            var use = PlayerCandidateFactory.candidates(refreshed, rogueMember).getFirst();
+            assertEquals("使用偷袭", use.label());
+            long beforeHp = game.card(target).hitPoints();
+            game.dice.addAll(List.of(1, 1));
+            game.submit(UUID.randomUUID().toString(), refreshed, use.input(), Actor.player(rogueMember, rogue));
+            var receipt = PlayerCampaignProjection.receipt(game.access(), rogueMember, game.state().roots().getLast());
+            assertEquals(beforeHp - game.card(target).hitPoints(), receipt.getAsJsonObject("sneakAttackResult").get("damage").getAsLong());
+        }
+    }
+
     @Test void counterspellCandidateTargetsTheSharedCantripCasterAndRevocationRejectsDirectSubmission() {
         var snapshot = CampaignRuleFixtures.snapshot(UUID.randomUUID().toString(), "戏法反制");
         snapshot = apply(snapshot, "node-create", json("name", "营地"));

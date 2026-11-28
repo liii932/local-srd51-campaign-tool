@@ -358,6 +358,8 @@ Sneak Attack → Divine Smite → 完整伤害骰 → GWF → 骰后减项 → �
 <a id="hit-riders"></a>
 #### 命中附加伤害
 
+当前 SQLite 支持一至二级游荡者。已证明资格的攻击在原攻击帧进入 `SNEAK_ATTACK_CHOICE`，攻击者提交 `USE_SNEAK_ATTACK` 或 `DECLINE_SNEAK_ATTACK`。普通攻击、借机和预备攻击共享武器伤害结算。更高等级的骰阶与下表其他附加能力仍属目标设计。[当前可执行规则](../../rules/schema-2-rogue.md#命中后选择偷袭)
+
 | 附加 / 真实 owner | 固定资格与决定 | 成本及伤害 |
 |---|---|---|
 | Sneak Attack / 特性用量 | 最终命中 creature，武器确为 finesse 或 ranged。采用已掷攻击的净优势，或其无净劣势且空间证明目标 5 尺内有另一名未失能的目标敌人。读取准确 turn identity 和既有用量；选择 `ADD_SNEAK_ATTACK/DECLINE`。 | 接受 ADD 写入唯一 `(actor,feature,combat,turn)` 用量和附加骰规格 `ceil(rogueLevel/2)d6`，引用原武器主伤害分量类型；放弃不占用额度。反应发生在哪个 turn 就使用其额度，不按 round 或本人 turn 归并。 |

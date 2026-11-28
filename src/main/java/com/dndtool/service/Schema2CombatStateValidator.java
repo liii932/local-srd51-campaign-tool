@@ -94,6 +94,7 @@ final class Schema2CombatStateValidator {
                 for(ReadyRelease r:f.readyReleases())check(frames.containsKey(r.frameKey())&&frames.get(r.frameKey()).kind()==FrameKind.READY_RELEASE&&triggers.containsKey(r.triggerKey())&&r.completed()==(r.outcome()!=null)&&r.completed()==(frames.get(r.frameKey()).status()==FrameStatus.TERMINAL));
             }
             validateAttackSequences(b);
+            check(Schema2SneakAttackRules.validState(b));
             Schema2MeleeControlRules.validate(b);
             Schema2ObservationRules.validate(b);
             validateMonstersAndBatches(b,actors,allFrames,keys);
