@@ -104,7 +104,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 团队属性检定（[79](../references/srd-5.1/pages/page-079.md)） | DM 在焦点世界节点选择规则角色，共享属性或技能与 DC，按各人条件分别掷骰。标准包至少一半成功即全队成功，家规可覆盖该比例 | 一个根记录全部角色原骰对应关系、所需与实际成功人数及选中消息，完整文件恢复后可继续检定 | [团队检定](schema-2-character-foundations.md#团队属性检定)、[冻结字段](schema-2-foundation-authoring.md#团队成功比例) |
 | 对抗检定（[77](../references/srd-5.1/pages/page-077.md)） | DM 在焦点世界节点选择两名规则角色，双方各用适合其行动的属性或技能，比较总值。标准领先 1 分即胜，检定变体需领先 2 分，差距不足保持现状 | 根记录保存双方原骰、修正、总值和共同裁定。完整文件重开可回看并继续对抗。战斗对抗的目标、额度与状态见[近战控制](schema-2-melee-control.md) | [对抗检定](schema-2-character-foundations.md#对抗检定)、[字段](schema-2-foundation-authoring.md#对抗最小获胜分差) |
 | 共同工作（[79](../references/srd-5.1/pages/page-079.md)） | 原文；尚待接通 | 须核验协助者能否独立尝试、合作是否有效并将优势用于主检定 | [基础](#foundation) |
-| 被动检定、感知/隐藏关系（[78—79](../references/srd-5.1/pages/page-078.md)、[94](../references/srd-5.1/pages/page-094.md)） | 规则角色可对 DM 指定的 DC 执行[被动检定](schema-2-character-foundations.md#被动检定)。标准 10 + 适用修正，优势 +5、劣势 −5。基础分与幅度可由规则包覆盖；直接检定、分支后果和完整文件重开共用冻结规则 | 怪物被动察觉仍是元数据。自动隐蔽与发现、观察者和目标的感官与场景条件待接入 | [基础](#foundation)、[怪物](#monsters) |
+| 被动检定、感知/隐藏关系（[78—79](../references/srd-5.1/pages/page-078.md)、[94](../references/srd-5.1/pages/page-094.md)） | 规则角色可对 DM 指定的 DC 执行[被动检定](schema-2-character-foundations.md#被动检定)。标准 10 + 适用修正，优势 +5、劣势 −5。基础分与幅度可由规则包覆盖。战斗躲藏与开场受惊按各观察者的被动察觉结算，怪物使用冻结属性块 | 格位遮挡、已知位置和主动搜索已接入。特殊感官与声音传播仍待接入 | [基础](#foundation)、[躲藏与观察](schema-2-observation.md) |
 | 专精、半熟练、最低值、重掷/骰后替换（[12—14](../references/srd-5.1/pages/page-012.md)、[39—40](../references/srd-5.1/pages/page-039.md)） | 旧特性元数据；未接通 | 缺贡献去重/取整、原骰→重掷/替换关系、触发窗口、资源一次消费；Lucky/Reliable Talent/Indomitable 不因有 d20 工具而完成 | [成长](#growth)、[动作流](#combat) |
 | 奖励/惩罚骰、伤害骰与百分骰（[76](../references/srd-5.1/pages/page-076.md)、[96](../references/srd-5.1/pages/page-096.md)及具体条目） | 真实 Bless d4、健康声明 d4—d12、近战与短弓伤害及有限共享 d6；通用组合/百分骰机制未接入 | 已接分支局部闭环；缺每种规则批准的骰式、修正时点与独立审计，不能接受客户端任意骰式或结果 | [基础](#foundation)、[施法](#spells)、[怪物](#monsters) |
 | 灵感（[59—60](../references/srd-5.1/pages/page-059.md)） | 原文/旧元数据；未接入 | 缺授予/持有上限/转交、明确消耗时点与优势来源、并发和恢复；DM 优势布尔输入不是灵感资源 | [基础](#foundation)当前仅裁定检定情境 |
@@ -146,7 +146,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 
 | 机制族与原文 | 当前数据/执行 | 状态/恢复与具体缺口 | 依据 |
 |---|---|---|---|
-| 遭遇/先攻/同值/回合/轮次（[90—91](../references/srd-5.1/pages/page-090.md)） | 有限类型化；警觉的角色及有限怪物，服务器先攻、同值有限排列 | 局部闭环；缺突袭、完整遭遇 roster、阵营变化、非参战生物与 XP 工作流 | [战斗](#combat)、[怪物](#monsters) |
+| 遭遇/先攻/同值/回合/轮次（[90—91](../references/srd-5.1/pages/page-090.md)） | 支持警觉开场、共同或独立隐匿、逐人受惊和首个本人回合结束时恢复反应。同类怪物可共用先攻原骰，实例各有回合，同分按 DM 排列 | 完整遭遇名册、阵营变化、非参战生物与 XP 工作流待接入 | [遭遇开场](schema-2-combat.md#encounter-opening)、[怪物](#monsters) |
 | action/bonus action/reaction、回合重置（[90—91](../references/srd-5.1/pages/page-090.md)） | 规则角色与怪物共用普通动作、附赠动作、反应和移动预算。本人新回合刷新，其他人的余额保留。战士两击共付一次普通动作，回气另付一次附赠动作和一次特性使用次数 | 局部闭环。其余附赠动作来源、额外普通动作、其他额外攻击来源及每回合施法限制仍待接入 | [战斗](#combat)、[回气](schema-2-second-wind.md)、[施法](#spells) |
 | 普通武器 Attack、命中/暴击/伤害（[93—97](../references/srd-5.1/pages/page-093.md)） | 普通手持近战与双手短弓逐击结算；Attack 序列按冻结规则与真实授予为一次或两次；真实属性/熟练/AC、原骰及健康 | 局部闭环；缺非致命击倒、徒手/天然武器及其他属性/多个伤害分量/特性修正；每种新 profile 须完整来源 | [战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md) |
 | 远程/投掷/双持（[93—95](../references/srd-5.1/pages/page-093.md)） | 角色、骷髅与地精短弓支持射程、贴身劣势、双方视线、武器掩护、命中与护盾术。角色逐支扣箭 | 弹药回收、投掷以及双持附赠攻击待接入 | [短弓与远程攻击](schema-2-ranged-attacks.md) |

@@ -69,7 +69,12 @@ public final class Schema2CombatState {
             int abilityModifier, int skillBonus, boolean disadvantage, int total) { }
     public record ObservationContest(UUID counterpartId, int opposingScore, UUID previousHideOperationId, boolean hiddenAfter) { }
     public record ObservationCheck(UUID operationId, Kind kind, UUID actorId, Position position, RuleIdentity rule,
-            RuleIdentity skill, String monsterSkill, boolean nimbleEscape, ObservationRoll roll, List<ObservationContest> contests) {
+            RuleIdentity skill, String monsterSkill, boolean nimbleEscape, ObservationRoll roll, List<ObservationContest> contests,
+            UUID openingOperationId, UUID rollSource) {
+        public ObservationCheck(UUID operationId, Kind kind, UUID actorId, Position position, RuleIdentity rule,
+                RuleIdentity skill, String monsterSkill, boolean nimbleEscape, ObservationRoll roll, List<ObservationContest> contests) {
+            this(operationId, kind, actorId, position, rule, skill, monsterSkill, nimbleEscape, roll, contests, null, null);
+        }
         public ObservationCheck { contests = List.copyOf(contests); }
     }
     public record ObservationState(List<ObservationCellInput> cells, List<ObservationPair> pairs, List<ObservationCheck> checks) {
@@ -81,13 +86,53 @@ public final class Schema2CombatState {
             checks = List.copyOf(checks);
         }
     }
+    public record OpeningGroup(List<UUID> members) {
+        public OpeningGroup {
+            if (members == null || members.isEmpty() || members.size() > Schema2CombatRules.MAX_COMBATANTS)
+                throw invalid("S2_COMBAT_OPENING_GROUP");
+            members.forEach(Schema2CombatState::uuid);
+            members = List.copyOf(members);
+        }
+        public UUID rollSource() { return members.getFirst(); }
+    }
+    public record OpeningInput(List<OpeningGroup> stealthGroups, List<OpeningGroup> initiativeGroups) {
+        public OpeningInput {
+            stealthGroups = openingGroups(stealthGroups, 1);
+            initiativeGroups = openingGroups(initiativeGroups, 2);
+        }
+
+        private static List<OpeningGroup> openingGroups(List<OpeningGroup> groups, int minimumMembers) {
+            if (groups == null || groups.size() > Schema2CombatRules.MAX_COMBATANTS)
+                throw invalid("S2_COMBAT_OPENING_GROUP");
+            Set<UUID> seen = new HashSet<>();
+            for (OpeningGroup group : groups) {
+                if (group == null || group.members().size() < minimumMembers)
+                    throw invalid("S2_COMBAT_OPENING_GROUP");
+                for (UUID member : group.members())
+                    if (!seen.add(member) || seen.size() > Schema2CombatRules.MAX_COMBATANTS)
+                        throw invalid("S2_COMBAT_OPENING_GROUP");
+            }
+            return List.copyOf(groups);
+        }
+    }
     /** An exhaustive intent union; irrelevant fields are rejected by the pure preflight. */
     public record Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path,
             List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey,
             UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey,
             ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
             List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput,
-            MeleeInput meleeInput, DragInput dragInput, MonsterAttackInput monsterAttackInput, ObservationCellInput observationCell) {
+            MeleeInput meleeInput, DragInput dragInput, MonsterAttackInput monsterAttackInput, ObservationCellInput observationCell,
+            OpeningInput opening) {
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments,
+                List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput,
+                ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey,
+                com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
+                List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput,
+                MeleeInput meleeInput, DragInput dragInput, MonsterAttackInput monsterAttackInput, ObservationCellInput observationCell) {
+            this(kind, actorId, targetId, itemId, path, deployments, tieBreakOrder, flowKey, leafKey, windowKey, opportunityKey,
+                    castInput, readyInput, readyKey, zoneInput, zoneKey, healthInput, seconds, monsterDeployments, breathInput,
+                    monsterRestInput, meleeInput, dragInput, monsterAttackInput, observationCell, null);
+        }
         public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments,
                 List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput,
                 ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey,
@@ -133,6 +178,12 @@ public final class Schema2CombatState {
             if (kind==null || path==null || deployments==null || tieBreakOrder==null || path.size()>64 || deployments.size()>64 || tieBreakOrder.size()>64 || monsterDeployments==null || monsterDeployments.size()>64 || monsterDeployments.stream().anyMatch(Objects::isNull))
                 throw invalid("S2_COMBAT_COMMAND");
             path = List.copyOf(path); deployments = List.copyOf(deployments); tieBreakOrder = List.copyOf(tieBreakOrder); monsterDeployments=List.copyOf(monsterDeployments);
+            if (opening != null && opening.stealthGroups().isEmpty() && opening.initiativeGroups().isEmpty()) opening = null;
+        }
+        public Command withOpening(OpeningInput input) {
+            return new Command(kind, actorId, targetId, itemId, path, deployments, tieBreakOrder, flowKey, leafKey, windowKey,
+                    opportunityKey, castInput, readyInput, readyKey, zoneInput, zoneKey, healthInput, seconds, monsterDeployments,
+                    breathInput, monsterRestInput, meleeInput, dragInput, monsterAttackInput, observationCell, input);
         }
         public static Command monsterRest(Kind kind, UUID monster, UUID rest, MonsterRestKind restKind) {
             return new Command(kind,monster,null,null,List.of(),List.of(),List.of(),null,null,null,null,null,null,null,null,null,null,0,List.of(),null,new MonsterRestInput(rest,restKind));
@@ -288,7 +339,12 @@ public final class Schema2CombatState {
     public record SavingThrowAttempt(UUID frameKey, UUID subjectId, String kind, String abilityKey,
             int d20, int abilityModifier, int proficiencyBonus, UUID blessingEffectKey, Integer blessingD4,
             int difficultyClass, int total, boolean success) { }
-    public record Initiative(UUID characterId, int d20, int dexterityModifier, int total, int ordinal) { }
+    public record Initiative(UUID characterId, int d20, int dexterityModifier, int total, int ordinal,
+            boolean surprised, UUID rollSource) {
+        public Initiative(UUID characterId, int d20, int dexterityModifier, int total, int ordinal) {
+            this(characterId, d20, dexterityModifier, total, ordinal, false, characterId);
+        }
+    }
     public record AttackSequence(UUID sequenceKey, int limit, int performed, int forfeited, boolean closed) { }
     public record Combatant(UUID characterId, Position position, int side, int actionsRemaining,
             int bonusActionsRemaining, boolean reactionAvailable, int movementSpentHalfFeet, int movementBonus,
@@ -323,7 +379,11 @@ public final class Schema2CombatState {
         }
 
         Combatant spendReaction() {
-            return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining, false,
+            return withReactionAvailable(false);
+        }
+
+        Combatant withReactionAvailable(boolean available) {
+            return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining, available,
                     movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
         }
 
@@ -598,6 +658,10 @@ public final class Schema2CombatState {
         }
         public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses);monsters=List.copyOf(monsters);saveDamageBatches=List.copyOf(saveDamageBatches);monsterRests=List.copyOf(monsterRests); if (meleeControl == null || observation == null) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID"); }
         public UUID activeActor() { return initiative.isEmpty() ? null : initiative.get(activeOrdinal).characterId(); }
+        public boolean surprised(UUID actorId) {
+            return status == Status.ACTIVE && round == 1 && initiative.stream().anyMatch(value ->
+                    value.surprised() && value.ordinal() >= activeOrdinal && value.characterId().equals(actorId));
+        }
         public Flow activeFlow() { return flows.stream().filter(f -> f.status() == FlowStatus.ACTIVE).findFirst().orElse(null); }
     }
     public record Roll(String purpose, UUID subjectId, int sides, int value) { }

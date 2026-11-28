@@ -77,7 +77,7 @@ public final class Schema2CombatHistory {
                 require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
             }
             validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);validateMonsterAttackTransition(e);
-            validateRangedAttackTransition(e);validateObservationTransition(e);validateAttackObservationTransition(e);
+            validateRangedAttackTransition(e);validateOpeningTransition(e);validateObservationTransition(e);validateAttackObservationTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
             for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
             for(CombatFact f:e.resolution().facts())require(token(f.kind())&&(f.reason()==null||token(f.reason())));
@@ -181,6 +181,7 @@ public final class Schema2CombatHistory {
                 && (b.initiative().isEmpty() ? b.status()!=Status.ACTIVE && b.activeOrdinal()==0
                     : b.activeOrdinal()>=0 && b.activeOrdinal()<currentMembers.size() && b.initiative().size()==currentMembers.size()));
         Set<UUID> initiative=new HashSet<>();for(int i=0;i<b.initiative().size();i++) {Initiative n=b.initiative().get(i);require(initiative.add(n.characterId())&&currentMembers.contains(n.characterId())&&n.ordinal()==i&&n.d20()>=1&&n.d20()<=20&&n.dexterityModifier()>=-5&&n.dexterityModifier()<=10&&n.total()==n.d20()+n.dexterityModifier());}
+        require(Schema2CombatStateValidator.validOpeningState(b));
         for(Combatant c:b.combatants()) {require(c.position()!=null&&c.side()>=0&&c.side()<=15&&c.movementSpentHalfFeet()>=0&&c.movementBonus()>=0&&Schema2CombatStateValidator.validActionBudgets(c));if(c.sequence()!=null) {AttackSequence s=c.sequence();uuid(s.sequenceKey());require(s.limit()>=1&&s.limit()<=20&&s.performed()>=0&&s.forfeited()>=0&&s.performed()+s.forfeited()<=s.limit()&&s.closed()==(s.performed()+s.forfeited()==s.limit()));}}
         require(b.ongoingEffects().size()<=128);Set<UUID> effectKeys=new HashSet<>();
         for(OngoingEffect effect:b.ongoingEffects()) {
@@ -381,9 +382,161 @@ public final class Schema2CombatHistory {
         if (save.blessingD4() != null) expectedRolls.add(new Roll(purpose + "_BLESS_D4", target, 4, save.blessingD4()));
     }
 
+    private static void validateOpeningTransition(Event event) {
+        Command command = event.command();
+        Kind kind = command.kind();
+        Battle before = event.before(), after = event.after();
+        List<Roll> rolls = event.resolution().rolls();
+        if (!Schema2ObservationRules.openingHide(kind)) {
+            require(rolls.stream().noneMatch(roll -> openingStealthRoll(roll) || openingInitiativeRoll(roll)));
+            if (Schema2CombatRules.placementCommand(command)) require(after.initiative().isEmpty());
+            else if (before != null) validateTurnTransition(event);
+            return;
+        }
+        require(after.status() == Status.ACTIVE && after.round() == 1 && after.activeOrdinal() == 0
+                && (before == null || before.status() == Status.EXPLORATION)
+                && after.turnNumber() == (before == null ? 1 : before.turnNumber() + 1));
+        List<UUID> roster = after.combatants().stream().map(Combatant::characterId).toList();
+        List<UUID> ties = command.tieBreakOrder();
+        require(ties.size() == roster.size() && new HashSet<>(ties).containsAll(roster));
+        List<Initiative> expectedOrder = after.initiative().stream().sorted(
+                Comparator.comparingInt(Initiative::total).reversed().thenComparingInt(row -> ties.indexOf(row.characterId()))).toList();
+        require(expectedOrder.equals(after.initiative()));
+
+        OpeningInput opening = command.opening();
+        List<OpeningGroup> initiativeGroups = opening == null ? List.of() : opening.initiativeGroups();
+        List<OpeningGroup> stealthGroups = opening == null ? List.of() : opening.stealthGroups();
+        List<Roll> stealthRolls = rolls.stream().filter(Schema2CombatHistory::openingStealthRoll).toList();
+        List<Roll> initiativeRolls = rolls.stream().filter(Schema2CombatHistory::openingInitiativeRoll).toList();
+        int initiativeStart = stealthRolls.size();
+        require(rolls.subList(0, initiativeStart).equals(stealthRolls)
+                && rolls.subList(initiativeStart, initiativeStart + initiativeRolls.size()).equals(initiativeRolls));
+        validateInitiativeDraws(event, initiativeGroups, initiativeRolls);
+        validateOpeningStealth(event, stealthGroups, stealthRolls);
+    }
+
+    private static void validateTurnTransition(Event event) {
+        Battle before = event.before(), after = event.after();
+        require(before.initiative().equals(after.initiative()));
+        if (event.command().kind() == Kind.END_TURN) {
+            require(before.status() == Status.ACTIVE && after.status() == Status.ACTIVE
+                    && before.activeActor().equals(event.command().actorId()));
+            int next = (before.activeOrdinal() + 1) % before.initiative().size();
+            require(after.turnNumber() == before.turnNumber() + 1 && after.activeOrdinal() == next
+                    && after.round() == before.round() + (next == 0 ? 1 : 0));
+            UUID outgoing = before.activeActor();
+            if (before.surprised(outgoing))
+                require(!after.surprised(outgoing) && member(after, outgoing).reactionAvailable());
+        } else {
+            require(before.turnNumber() == after.turnNumber() && before.activeOrdinal() == after.activeOrdinal()
+                    && before.round() == after.round());
+        }
+        if (event.command().kind() == Kind.END_COMBAT) {
+            require(before.status() == Status.ACTIVE && after.status() == Status.EXPLORATION);
+            for (Combatant actor : after.combatants()) if (before.surprised(actor.characterId()))
+                require(actor.reactionAvailable());
+        }
+    }
+
+    private static boolean openingStealthRoll(Roll roll) {
+        return Schema2EncounterOpeningRules.STEALTH_ROLL.equals(roll.purpose())
+                || Schema2EncounterOpeningRules.STEALTH_SECOND_ROLL.equals(roll.purpose());
+    }
+
+    private static boolean openingInitiativeRoll(Roll roll) {
+        return "INITIATIVE".equals(roll.purpose()) || "INITIATIVE_SECOND".equals(roll.purpose());
+    }
+
+    private static void validateInitiativeDraws(Event event, List<OpeningGroup> groups, List<Roll> rolls) {
+        Command command = event.command();
+        List<UUID> drawOrder = new ArrayList<>();
+        if (command.kind() == Kind.START) {
+            for (Deployment deployment : command.deployments()) drawOrder.add(deployment.characterId());
+            for (MonsterDeployment deployment : command.monsterDeployments()) drawOrder.add(deployment.monsterId());
+        } else {
+            drawOrder.addAll(command.tieBreakOrder());
+        }
+
+        Map<UUID, UUID> sourceByActor = new HashMap<>();
+        for (OpeningGroup group : groups) for (UUID actor : group.members())
+            require(drawOrder.contains(actor) && sourceByActor.put(actor, group.rollSource()) == null);
+        Map<UUID, Integer> values = new HashMap<>();
+        Deque<Roll> draws = new ArrayDeque<>(rolls);
+        for (UUID actor : drawOrder) {
+            UUID source = sourceByActor.getOrDefault(actor, actor);
+            if (values.containsKey(source)) continue;
+            int value = openingDraw(draws, "INITIATIVE", source);
+            if (!sourceByActor.containsKey(actor) && draws.peekFirst() != null
+                    && "INITIATIVE_SECOND".equals(draws.peekFirst().purpose()))
+                value = Math.min(value, openingDraw(draws, "INITIATIVE_SECOND", actor));
+            values.put(source, value);
+        }
+        require(draws.isEmpty());
+        for (Initiative entry : event.after().initiative()) {
+            UUID source = sourceByActor.getOrDefault(entry.characterId(), entry.characterId());
+            require(source.equals(entry.rollSource()) && Objects.equals(values.get(source), entry.d20()));
+        }
+    }
+
+    private static int openingDraw(Deque<Roll> draws, String purpose, UUID source) {
+        Roll roll = draws.pollFirst();
+        require(roll != null && purpose.equals(roll.purpose()) && source.equals(roll.subjectId())
+                && roll.sides() == 20 && roll.value() >= 1 && roll.value() <= 20);
+        return roll.value();
+    }
+
+    private static void validateOpeningStealth(Event event, List<OpeningGroup> groups, List<Roll> rolls) {
+        Battle before = event.before(), after = event.after();
+        ObservationState prior = before == null ? ObservationState.EMPTY : before.observation();
+        Deque<Roll> draws = new ArrayDeque<>(rolls);
+        Deque<ObservationCheck> checks = new ArrayDeque<>(after.observation().checks());
+        for (ObservationCheck check : prior.checks()) require(check.equals(checks.pollFirst()));
+        List<ObservationCheck> newChecks = List.copyOf(checks);
+        Map<UUID, Integer> passiveScores = new HashMap<>();
+        Set<UUID> undetectedThreats = new HashSet<>(), detectedThreats = new HashSet<>(), hiders = new HashSet<>();
+        for (OpeningGroup group : groups) {
+            UUID source = group.rollSource();
+            int side = member(after, source).side();
+            int first = openingDraw(draws, Schema2EncounterOpeningRules.STEALTH_ROLL, source);
+            Integer second = draws.peekFirst() != null && Schema2EncounterOpeningRules.STEALTH_SECOND_ROLL.equals(draws.peekFirst().purpose())
+                    ? openingDraw(draws, Schema2EncounterOpeningRules.STEALTH_SECOND_ROLL, source) : null;
+            boolean hasDisadvantage = false;
+            for (UUID actor : group.members()) {
+                Combatant hider = member(after, actor);
+                ObservationCheck check = checks.pollFirst();
+                require(hiders.add(actor) && hider.side() == side && check != null
+                        && actor.equals(check.actorId()) && source.equals(check.rollSource())
+                        && event.operationId().equals(check.openingOperationId()) && check.kind() == event.command().kind()
+                        && Schema2ObservationRules.openingHideKey(event.operationId(), actor).equals(check.operationId())
+                        && hider.position().equals(check.position()) && check.roll() != null && check.roll().firstD20() == first);
+                if (check.roll().disadvantage()) {
+                    require(second != null && second.equals(check.roll().secondD20()));
+                    hasDisadvantage = true;
+                }
+                for (ObservationContest contest : check.contests()) {
+                    UUID observer = contest.counterpartId();
+                    Integer previousScore = passiveScores.putIfAbsent(observer, contest.opposingScore());
+                    UUID priorHide = before == null ? null : Schema2ObservationRules.priorHide(before, observer, actor);
+                    require(member(after, observer).side() != hider.side()
+                            && Objects.equals(priorHide, contest.previousHideOperationId())
+                            && (previousScore == null || previousScore == contest.opposingScore()));
+                    (contest.hiddenAfter() ? undetectedThreats : detectedThreats).add(observer);
+                }
+            }
+            require(hasDisadvantage == (second != null));
+        }
+        require(draws.isEmpty() && checks.isEmpty());
+        for (Initiative entry : after.initiative()) if (entry.surprised())
+            require(undetectedThreats.contains(entry.characterId()) && !detectedThreats.contains(entry.characterId()));
+        Battle baseline = Schema2ObservationRules.withObservation(after, prior);
+        require(Schema2ObservationRules.applyOpeningHides(baseline, before == null, newChecks)
+                .observation().equals(after.observation()));
+    }
+
     private static void validateObservationTransition(Event event) {
         Battle before = event.before(), after = event.after();
         Kind kind = event.command().kind();
+        if (Schema2ObservationRules.openingHide(kind)) return;
         ObservationState prior = before == null ? ObservationState.EMPTY : before.observation();
         ObservationState current = after.observation();
         if (kind == Kind.SET_OBSERVATION_CELL) {
@@ -625,6 +778,7 @@ public final class Schema2CombatHistory {
         if(b.status()==Status.ENDED)require(holders.isEmpty()&&b.activeFlow()==null&&b.ongoingEffects().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.shields().stream().allMatch(e->e.status()==EffectStatus.ENDED)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING)&&b.environmentZones().stream().allMatch(z->z.endedOperationId()!=null)&&b.suppressionCauses().stream().allMatch(c->c.releasedOperationId()!=null));
     }
     private static void validateCommand(Command c) {
+        require(c.opening() == null || Schema2ObservationRules.openingHide(c.kind()));
         if (c.kind() == Kind.SET_OBSERVATION_CELL) {
             require(c.observationCell() != null && Command.setObservationCell(c.observationCell()).equals(c)
                     && c.observationCell().position().x() >= 0 && c.observationCell().position().y() >= 0);
@@ -816,8 +970,16 @@ public final class Schema2CombatHistory {
         if (command.meleeInput() != null) count++;
         if (command.observationCell() != null) count++;
         if (command.dragInput() != null) count += 1L + command.dragInput().path().size();
+        if (command.opening() != null) {
+            count += 1L + openingGroupFactCount(command.opening().stealthGroups())
+                    + openingGroupFactCount(command.opening().initiativeGroups());
+        }
         if (event.before() != null) count += stateFactCount(event.before());
         return count + stateFactCount(event.after());
+    }
+
+    private static long openingGroupFactCount(List<OpeningGroup> groups) {
+        return groups.stream().mapToLong(group -> 1L + group.members().size()).sum();
     }
 
     private static long stateFactCount(Battle state) {

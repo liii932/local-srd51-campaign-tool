@@ -94,8 +94,21 @@ public record Schema2CombatRequest(UUID operationId, UUID combatId, UUID campaig
                 out.writeBoolean(observationCell.blocksSight());
                 text(out, observationCell.cover().name());
             }
+            OpeningInput opening = command.opening();
+            if (opening != null) {
+                text(out, "S2_COMBAT_ENCOUNTER_OPENING_V1");
+                groups(out, opening.stealthGroups());
+                groups(out, opening.initiativeGroups());
+            }
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException|NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+    }
+    private static void groups(DataOutputStream out, List<OpeningGroup> groups) throws IOException {
+        out.writeInt(groups.size());
+        for (OpeningGroup group : groups) {
+            out.writeInt(group.members().size());
+            for (UUID member : group.members()) id(out, member);
+        }
     }
     private static void cast(DataOutputStream out,CastInput cast)throws IOException {
         out.writeBoolean(cast!=null);if(cast==null)return;

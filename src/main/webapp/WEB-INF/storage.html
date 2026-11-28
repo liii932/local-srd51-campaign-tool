@@ -300,6 +300,12 @@
               <option value="END_CONCENTRATION">结束专注</option><option value="END_COMBAT">结束战斗，进入探索</option>
               <option value="EXPLORATION_MOVE">探索移动</option><option value="EXPLORATION_ADVANCE_TIME">探索推进时间</option><option value="REENTER_COMBAT">开始规则战斗</option>
             </select></label>
+            <details id="domain-opening" hidden>
+              <summary>设置开场隐匿、分组先攻与同分顺序</summary>
+              <p>默认全员警觉、各自掷先攻。若有伏击，选出生物进行隐匿。未察觉任何敌人的生物会受惊。共同隐匿的同阵营成员共用原骰，各自使用自己的加值。</p>
+              <p>同阵营的同类怪物可组成先攻组。先攻同分时，顺位较小的生物先行动。选择已有顺位会交换两者的顺位。</p>
+              <div id="domain-opening-roster"></div>
+            </details>
             <label>目标<select name="targetId" class="combat-actor-choice" data-optional required></select></label>
             <label>武器<select name="itemId" class="equipment-choice" data-optional></select></label>
             <label>空手<select name="hand" required><option value="">请选择</option><option value="MAIN_HAND">主手</option><option value="OFF_HAND">副手</option></select></label>

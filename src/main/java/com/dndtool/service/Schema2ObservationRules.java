@@ -27,8 +27,10 @@ public final class Schema2ObservationRules {
 
     private record PairKey(UUID observer, UUID subject) { }
     private record Ray(boolean blocked, Cover cover) { }
-    private record CheckBasis(RuleIdentity rule, RuleIdentity skill, String monsterSkill, PreparedRoll characterRoll,
-                              int abilityModifier, int skillBonus) { }
+    record CheckBasis(RuleIdentity rule, RuleIdentity skill, String monsterSkill, PreparedRoll characterRoll,
+                      int abilityModifier, int skillBonus) {
+        boolean secondDieRequired() { return characterRoll != null && characterRoll.secondDieRequired(); }
+    }
     record Plan(CheckBasis basis, RuleIdentity nimbleSource, List<ObservationContest> contests) { }
 
     @FunctionalInterface
@@ -84,6 +86,12 @@ public final class Schema2ObservationRules {
         return pairs;
     }
 
+    private static Map<UUID, ObservationCheck> checks(ObservationState state) {
+        Map<UUID, ObservationCheck> checks = new HashMap<>();
+        for (ObservationCheck check : state.checks()) checks.put(check.operationId(), check);
+        return checks;
+    }
+
     private static boolean hidingCell(List<ObservationCellInput> cells, Position position) {
         return cells.stream().anyMatch(cell -> cell.hideAllowed() && cell.position().equals(position));
     }
@@ -132,6 +140,7 @@ public final class Schema2ObservationRules {
         ObservationState state = next.observation();
         if (state.cells().isEmpty() && state.pairs().isEmpty()) return next;
         Map<PairKey, ObservationPair> retained = pairs(state);
+        Map<UUID, ObservationCheck> checks = checks(state);
         Map<UUID, Combatant> previousActors = new HashMap<>();
         if (previous != null) for (Combatant actor : previous.combatants()) previousActors.put(actor.characterId(), actor);
         Map<PairKey, ObservationPair> updated = new TreeMap<>(PAIR_ORDER);
@@ -142,7 +151,7 @@ public final class Schema2ObservationRules {
             ObservationPair old = retained.get(key);
             boolean clear = !ray(state.cells(), observer.position(), subject.position()).blocked();
             UUID hide = old != null && observer.side() != subject.side() ? old.hideOperationId() : null;
-            if (clear && (hide == null || !hidingCell(state.cells(), subject.position()))) continue;
+            if (clear && (hide == null || !retainHide(state, subject.position(), checks.get(hide)))) continue;
             Position last = null;
             if (old != null) last = old.lastKnownPosition();
             else if (previousActors.containsKey(observerId) && previousActors.containsKey(subjectId))
@@ -178,12 +187,64 @@ public final class Schema2ObservationRules {
 
     static boolean hiding(Kind kind) { return kind == Kind.HIDE || kind == Kind.NIMBLE_HIDE; }
 
+    static boolean openingHide(Kind kind) { return kind == Kind.START || kind == Kind.REENTER_COMBAT; }
+
+    static UUID openingHideKey(UUID operation, UUID actor) {
+        return Schema2CombatRules.key(operation, "opening-stealth-" + actor);
+    }
+
+    private static boolean hideCheck(Kind kind) { return hiding(kind) || openingHide(kind); }
+
+    private static boolean retainHide(ObservationState state, Position position, ObservationCheck check) {
+        return hidingCell(state.cells(), position) || check != null && openingHide(check.kind()) && position.equals(check.position());
+    }
+
+    static UUID priorHide(Battle battle, UUID observer, UUID subject) {
+        ObservationPair pair = pair(battle, observer, subject);
+        return pair == null ? null : pair.hideOperationId();
+    }
+
+    static Battle applyOpeningHides(Battle battle, boolean firstEncounter, List<ObservationCheck> openingChecks) {
+        if (openingChecks.isEmpty()) return battle;
+        var state = battle.observation();
+        var updated = pairs(state);
+        for (ObservationCheck check : openingChecks) for (ObservationContest contest : check.contests()) {
+            PairKey key = new PairKey(contest.counterpartId(), check.actorId());
+            Position lastKnown = firstEncounter ? null : knownPosition(battle, key.observer(), key.subject());
+            if (contest.hiddenAfter()) {
+                updated.put(key, new ObservationPair(key.observer(), key.subject(), lastKnown, check.operationId()));
+            } else if (contest.previousHideOperationId() != null) {
+                Combatant observer = member(battle, key.observer());
+                if (visible(battle, observer.position(), check.position())) updated.remove(key);
+                else updated.put(key, new ObservationPair(key.observer(), key.subject(), lastKnown, null));
+            }
+        }
+        List<ObservationCheck> checks = new ArrayList<>(state.checks());
+        checks.addAll(openingChecks);
+        return withObservation(battle, new ObservationState(state.cells(), List.copyOf(updated.values()), checks));
+    }
+
     static long factCount(ObservationState state) {
         return (long) state.cells().size() + state.pairs().size() + state.checks().size()
                 + state.checks().stream().mapToLong(check -> check.contests().size() + (check.roll() == null ? 0 : 1)).sum();
     }
 
     static long potentialGrowth(Battle before, Command command, int remainingPath) {
+        if (openingHide(command.kind()) && command.opening() != null) {
+            Map<UUID, Integer> sides = new HashMap<>();
+            if (before == null) {
+                for (Deployment actor : command.deployments()) sides.put(actor.characterId(), actor.side());
+                for (MonsterDeployment actor : command.monsterDeployments()) sides.put(actor.monsterId(), actor.side());
+            } else {
+                for (Combatant actor : before.combatants()) sides.put(actor.characterId(), actor.side());
+            }
+            long growth = 0;
+            for (OpeningGroup group : command.opening().stealthGroups()) for (UUID hider : group.members()) {
+                long opponents = sides.values().stream().filter(side -> !side.equals(sides.get(hider))).count();
+                growth += 2 + 2 * opponents;
+            }
+            return growth;
+        }
         if (before == null) return 0;
         var state = before.observation();
         if (command.kind() == Kind.SET_OBSERVATION_CELL)
@@ -212,8 +273,7 @@ public final class Schema2ObservationRules {
         boolean hide = hiding(kind);
         if (hide && !hideAvailable(battle, id)) throw invalid("S2_HIDE_UNAVAILABLE");
         CheckBasis basis = basis(roster, battle, id, hide ? STEALTH : PERCEPTION);
-        Map<UUID, ObservationCheck> checks = new HashMap<>();
-        for (ObservationCheck check : battle.observation().checks()) checks.put(check.operationId(), check);
+        Map<UUID, ObservationCheck> checks = checks(battle.observation());
         Map<PairKey, ObservationPair> prior = pairs(battle.observation());
         List<ObservationContest> contests = new ArrayList<>();
         for (Combatant other : battle.combatants().stream().sorted(Comparator.comparing(Combatant::characterId, UUID_ORDER)).toList()) {
@@ -228,9 +288,13 @@ public final class Schema2ObservationRules {
         return new Plan(basis, nimbleSource, List.copyOf(contests));
     }
 
-    private static int passivePerception(Map<UUID, Context> roster, Battle battle, UUID observer) {
+    static int passivePerception(Map<UUID, Context> roster, Battle battle, UUID observer) {
         if (!roster.containsKey(observer)) return Schema2MonsterRules.passivePerception(roster, battle, observer);
         return CHECKS.passiveScore(basis(roster, battle, observer, PERCEPTION).characterRoll());
+    }
+
+    static CheckBasis stealthBasis(Map<UUID, Context> roster, Battle battle, UUID hider) {
+        return basis(roster, battle, hider, STEALTH);
     }
 
     private static CheckBasis basis(Map<UUID, Context> roster, Battle battle, UUID id, String skill) {
@@ -295,10 +359,14 @@ public final class Schema2ObservationRules {
 
     private static ObservationRoll roll(CheckBasis basis, String purpose, UUID id, Draw draws) {
         int first = draws.d20(purpose, id);
+        Integer second = basis.secondDieRequired() ? draws.d20(purpose + "_SECOND", id) : null;
+        return roll(basis, first, second);
+    }
+
+    static ObservationRoll roll(CheckBasis basis, int first, Integer second) {
         if (basis.characterRoll() == null)
             return new ObservationRoll(first, null, first, basis.abilityModifier(), basis.skillBonus(), false,
                     first + basis.abilityModifier() + basis.skillBonus());
-        Integer second = basis.characterRoll().secondDieRequired() ? draws.d20(purpose + "_SECOND", id) : null;
         var result = CHECKS.resolveRoll(basis.characterRoll(), first, second);
         return new ObservationRoll(first, second, result.selectedD20(), result.abilityModifier(), result.proficiencyBonus(),
                 result.effectiveDisadvantage(), result.total());
@@ -334,8 +402,8 @@ public final class Schema2ObservationRules {
             if (pair.hideOperationId() == null) require(!clear);
             else {
                 var check = checks.get(pair.hideOperationId());
-                require(observer.side() != subject.side() && (!clear || hideAvailable(battle, key.subject()))
-                        && check != null && hiding(check.kind()) && check.actorId().equals(key.subject())
+                require(observer.side() != subject.side() && (!clear || retainHide(state, subject.position(), check))
+                        && check != null && hideCheck(check.kind()) && check.actorId().equals(key.subject())
                         && check.contests().stream().anyMatch(contest -> contest.counterpartId().equals(key.observer())
                             && check.roll().total() > contest.opposingScore()));
             }
@@ -352,15 +420,21 @@ public final class Schema2ObservationRules {
     private static void validateCheck(ObservationCheck check, Map<UUID, ObservationCheck> previous) {
         uuid(check.operationId());
         uuid(check.actorId());
-        require(checkAction(check.kind()) && check.position() != null && check.rule() != null
+        boolean opening = openingHide(check.kind());
+        require((checkAction(check.kind()) || opening) && check.position() != null && check.rule() != null
                 && check.contests().size() < Schema2CombatRules.MAX_COMBATANTS);
+        if (opening) {
+            uuid(check.openingOperationId());
+            uuid(check.rollSource());
+            require(check.operationId().equals(openingHideKey(check.openingOperationId(), check.actorId())));
+        } else require(check.openingOperationId() == null && check.rollSource() == null);
         boolean nimble = check.kind() == Kind.NIMBLE_HIDE || check.kind() == Kind.NIMBLE_DISENGAGE;
         require(check.nimbleEscape() == nimble && (!nimble || GOBLIN_MONSTER.equals(check.rule())));
         if (check.kind() == Kind.NIMBLE_DISENGAGE) {
             require(check.roll() == null && check.skill() == null && check.monsterSkill() == null && check.contests().isEmpty());
             return;
         }
-        boolean hide = hiding(check.kind());
+        boolean hide = hideCheck(check.kind());
         String skill = hide ? STEALTH : PERCEPTION;
         boolean monster = "adventure.monster".equals(check.rule().ruleType());
         ObservationRoll roll = check.roll();
@@ -380,13 +454,13 @@ public final class Schema2ObservationRules {
             if (prior != null || !hide) {
                 var old = previous.get(prior);
                 UUID hider = hide ? check.actorId() : opponent, observer = hide ? opponent : check.actorId();
-                require(old != null && hiding(old.kind()) && old.actorId().equals(hider)
+                require(old != null && hideCheck(old.kind()) && old.actorId().equals(hider)
                         && old.contests().stream().anyMatch(past -> past.counterpartId().equals(observer)
                             && old.roll().total() > past.opposingScore())
                         && (hide || contest.opposingScore() == old.roll().total()));
             }
             int margin = Integer.compare(roll.total(), contest.opposingScore());
-            require(contest.hiddenAfter() == (hide ? margin > 0 || margin == 0 && prior != null : margin <= 0));
+            require(contest.hiddenAfter() == (hide ? margin > 0 || !opening && margin == 0 && prior != null : margin <= 0));
             lastOpponent = opponent;
         }
     }
@@ -395,7 +469,7 @@ public final class Schema2ObservationRules {
         if (!valid) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
     }
 
-    private static Battle withObservation(Battle b, ObservationState observation) {
+    static Battle withObservation(Battle b, ObservationState observation) {
         return new Battle(b.combatId(), b.campaignId(), b.combatRule(), b.status(), b.round(), b.turnNumber(), b.activeOrdinal(),
                 b.version(), b.combatants(), b.initiative(), b.flows(), b.ongoingEffects(), b.readyPreparations(), b.triggerFacts(),
                 b.shields(), b.concentrationHolders(), b.environmentZones(), b.suppressionCauses(), b.monsters(),

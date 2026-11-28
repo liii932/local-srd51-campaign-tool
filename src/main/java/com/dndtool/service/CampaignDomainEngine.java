@@ -476,7 +476,8 @@ public final class CampaignDomainEngine {
             int suffix=prepared.requiredSuffixEvents(); boolean closing=command.kind()==Kind.CLOSE_SCENE;
             int closeEvents=closing?0:1; // explicit terminal scene close
             if (!closing && request.spaceOwned()) closeEvents++; // explicit departure before close
-            if(!closing && (before==null || before.status()==Schema2CombatState.Status.ACTIVE))closeEvents++;
+            if(!closing && command.kind()!=Kind.END_COMBAT && (before==null || before.status()==Schema2CombatState.Status.ACTIVE
+                    || command.kind()==Kind.REENTER_COMBAT))closeEvents++;
             if(!closing && before!=null) {
                 closeEvents+=(int)before.monsterRests().stream().filter(r->r.status()==MonsterRestStatus.ACTIVE).count();
                 closeEvents+=(int)before.concentrationHolders().stream().map(ConcentrationHolder::actorId).distinct().count();

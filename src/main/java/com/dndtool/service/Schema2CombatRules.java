@@ -38,14 +38,16 @@ public final class Schema2CombatRules {
         private final Battle before;
         private final Command command;
         private final Schema2MeleeControlRules.ContestPlan meleePlan;
+        private final Schema2EncounterOpeningRules.Plan openingPlan;
         private Prepared(UUID operationId, UUID combatId, UUID campaignId, Map<UUID,Context> roster, Battle before, Command command) {
-            this(operationId, combatId, campaignId, roster, before, command, null);
+            this(operationId, combatId, campaignId, roster, before, command, null, null);
         }
         private Prepared(UUID operationId, UUID combatId, UUID campaignId, Map<UUID,Context> roster, Battle before,
-                Command command, Schema2MeleeControlRules.ContestPlan meleePlan) {
+                Command command, Schema2MeleeControlRules.ContestPlan meleePlan, Schema2EncounterOpeningRules.Plan openingPlan) {
             this.operationId = operationId; this.combatId = combatId; this.campaignId = campaignId;
             this.roster = Map.copyOf(roster); this.before = before; this.command = command;
             this.meleePlan = meleePlan;
+            this.openingPlan = openingPlan;
         }
         public Battle before() { return before; }
         public Command command() { return command; }
@@ -236,10 +238,15 @@ public final class Schema2CombatRules {
         } else if (command.kind() != Kind.START) throw invalid("S2_COMBAT_NOT_FOUND");
         if (Schema2MeleeControlRules.handles(command.kind()))
             return new Prepared(operationId, combatId, campaignId, roster, before, command,
-                    melee.prepare(operationId, roster, before, command, knownPositions));
+                    melee.prepare(operationId, roster, before, command, knownPositions), null);
         Prepared prepared = new Prepared(operationId,combatId,campaignId,roster,before,command);
         // The minimum branch checks every deterministic dependency and permitted future boundary.
         preflightIntent(prepared, knownPositions);
+        if (Schema2ObservationRules.openingHide(command.kind())) {
+            Battle basis = before == null ? startingBattle(prepared) : before;
+            return new Prepared(operationId, combatId, campaignId, roster, before, command, null,
+                    Schema2EncounterOpeningRules.prepare(roster, basis, command, operationId));
+        }
         return prepared;
     }
 
@@ -299,6 +306,7 @@ public final class Schema2CombatRules {
             return;
         }
         if (command.observationCell() != null) throw invalid("S2_COMBAT_COMMAND");
+        if (command.opening() != null && !Schema2ObservationRules.openingHide(command.kind())) throw invalid("S2_COMBAT_COMMAND");
         for(UUID id:Arrays.asList(command.actorId(),command.targetId(),command.itemId(),command.flowKey(),command.leafKey(),command.windowKey(),command.opportunityKey(),command.readyKey(),command.zoneKey()))if(id!=null)uuid(id);
         MonsterAttackInput monsterAttack = command.monsterAttackInput();
         if (command.kind() == Kind.MONSTER_ATTACK) {
@@ -393,7 +401,7 @@ public final class Schema2CombatRules {
                 .findFirst().orElseThrow(() -> invalid("S2_COMBAT_AMMUNITION_UNAVAILABLE"));
     }
     public int speed(Map<UUID,Context> roster, Battle battle, UUID id) {
-        if (!Schema2MonsterRules.living(roster, battle, id) || Schema2MeleeControlRules.grappled(battle, id)) return 0;
+        if (battle.surprised(id) || !Schema2MonsterRules.living(roster, battle, id) || Schema2MeleeControlRules.grappled(battle, id)) return 0;
         Context character = roster.get(id);
         if (character != null) return speed(character);
         MonsterInstance monster = Schema2MonsterRules.instance(battle, id);
@@ -427,7 +435,7 @@ public final class Schema2CombatRules {
             if(!ids.equals(p.roster.keySet()))throw invalid("S2_COMBAT_DEPLOYMENT");
             for(MonsterDeployment deployment:command.monsterDeployments()) {
                 if(!ids.add(deployment.monsterId())||!positions.add(deployment.position()))throw invalid("S2_COMBAT_DEPLOYMENT");
-                sides.add(deployment.side());Schema2MonsterRules.initial(p.roster,deployment);
+                sides.add(deployment.side());
             }
             if(ids.size()<2||ids.size()>MAX_COMBATANTS||sides.size()<2||command.tieBreakOrder().size()!=ids.size()
                     ||!new HashSet<>(command.tieBreakOrder()).equals(ids))throw invalid("S2_COMBAT_DEPLOYMENT");
@@ -464,8 +472,11 @@ public final class Schema2CombatRules {
                 if (command.kind() == Kind.BEGIN_ATTACK && actor.sequence() != null && !actor.sequence().closed()) throw invalid("S2_COMBAT_SEQUENCE_ACTIVE");
                 if (command.kind() == Kind.BEGIN_ATTACK) attackAllowance(p.roster.get(actor.characterId()));
             }
-            case HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE ->
-                    Schema2ObservationRules.prepare(p.roster, p.before, actor, command.kind());
+            case HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE -> {
+                if (p.before.observation().checks().stream().anyMatch(check -> check.operationId().equals(p.operationId)))
+                    throw invalid("S2_COMBAT_OPERATION_CONFLICT");
+                Schema2ObservationRules.prepare(p.roster, p.before, actor, command.kind());
+            }
             case FORFEIT_ATTACKS -> { if (actor.sequence() == null || actor.sequence().closed()) throw invalid("S2_COMBAT_SEQUENCE_UNAVAILABLE"); }
             case SECOND_WIND -> {
                 Context context = p.roster.get(actor.characterId());
@@ -475,6 +486,7 @@ public final class Schema2CombatRules {
                 health.applyHealing(paid, 1 + paid.level());
             }
             case DROP_PRONE -> {
+                if (p.before.surprised(actor.characterId())) throw invalid("S2_COMBAT_ACTOR_SURPRISED");
                 if (!p.roster.containsKey(actor.characterId())) throw invalid("S2_MONSTER_ACTION_UNSUPPORTED");
                 if (actor.prone()) throw invalid("S2_COMBAT_ALREADY_PRONE");
             }
@@ -497,6 +509,42 @@ public final class Schema2CombatRules {
         return new Schema2CharacterRuntime.Command("DEATH_SAVE_RESOLVED",null,0,null,null,null,GrowthChoices.EMPTY,null,null,null,
                 new HealthInput(owners.getFirst().identity(),null,null,"Combat turn begins"));
     }
+
+    private static Battle startingBattle(Prepared p) {
+        List<Combatant> combatants = new ArrayList<>(p.command.deployments().stream()
+                .sorted(Comparator.comparing(Deployment::characterId, Schema2CombatHistory.UUID_ORDER))
+                .map(d -> placedActor(null, d.characterId(), d.position(), d.side(),
+                        p.roster.get(d.characterId()).character().hitPoints() == 0)).toList());
+        List<MonsterInstance> monsters = new ArrayList<>();
+        for (MonsterDeployment d : p.command.monsterDeployments().stream()
+                .sorted(Comparator.comparing(MonsterDeployment::monsterId, Schema2CombatHistory.UUID_ORDER)).toList()) {
+            combatants.add(placedActor(null, d.monsterId(), d.position(), d.side(), false));
+            monsters.add(Schema2MonsterRules.initial(p.roster, d));
+        }
+        return new Battle(p.combatId, p.campaignId, combatRule(p.roster.values().iterator().next().material()), Status.ACTIVE,
+                1, 1, 0, 0, combatants, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), monsters, List.of(), List.of());
+    }
+
+    private Battle openEncounter(Prepared p, Draws dice, List<HealthChange> changes, List<CombatFact> facts) {
+        boolean firstEncounter = p.command.kind() == Kind.START;
+        Battle basis = p.openingPlan.basis();
+        var opening = Schema2EncounterOpeningRules.resolve(p.openingPlan, p.operationId, p.command.kind(),
+                (purpose, id) -> dice.draw(purpose, id, 20));
+        if (!firstEncounter) basis = Schema2MonsterRestRules.interrupt(basis, p.operationId);
+        Set<UUID> surprised = new HashSet<>();
+        for (Initiative entry : opening.initiative()) if (entry.surprised()) surprised.add(entry.characterId());
+        var actors = basis.combatants().stream().map(actor -> actor.startTurn(false, actor.prone())
+                .withReactionAvailable(!surprised.contains(actor.characterId()))).toList();
+        Battle battle = new Battle(basis.combatId(), basis.campaignId(), basis.combatRule(), Status.ACTIVE, 1,
+                firstEncounter ? 1 : basis.turnNumber() + 1, 0, basis.version(), actors, opening.initiative(), basis.flows(),
+                basis.ongoingEffects(), basis.readyPreparations(), basis.triggerFacts(), basis.shields(), basis.concentrationHolders(),
+                basis.environmentZones(), basis.suppressionCauses(), basis.monsters(), basis.saveDamageBatches(), basis.monsterRests(),
+                basis.meleeControl(), basis.observation());
+        battle = Schema2ObservationRules.applyOpeningHides(battle, firstEncounter, opening.openingChecks());
+        return beginTurn(p, battle, dice, changes, facts);
+    }
+
     private Resolution execute(Prepared p, Draws dice) {
         if (p.command.kind() == Kind.SET_OBSERVATION_CELL) {
             Battle after = Schema2ObservationRules.setCell(p.before, p.command.observationCell());
@@ -539,41 +587,15 @@ public final class Schema2CombatRules {
         List<CombatFact> facts = new ArrayList<>(); List<HealthChange> changes = new ArrayList<>();
         Battle battle = p.before;
         if (p.command.kind() == Kind.START) {
-            List<Initiative> initiatives = new ArrayList<>();
-            for (Deployment deployment : p.command.deployments()) {
-                int dex = modifier(p.roster.get(deployment.characterId()).character(),"ability.dexterity");
-                int d20 = dice.draw("INITIATIVE",deployment.characterId(),20);
-                Context initiativeContext=p.roster.get(deployment.characterId());
-                if(equipment.derive(initiativeContext.material(),initiativeContext.character()).physicalCheckDisadvantage())
-                    d20=Math.min(d20,dice.draw("INITIATIVE_SECOND",deployment.characterId(),20));
-                initiatives.add(new Initiative(deployment.characterId(),d20,dex,d20 + dex,0));
-            }
-            List<MonsterInstance> monsters=new ArrayList<>();
-            for(MonsterDeployment deployment:p.command.monsterDeployments()) {
-                MonsterInstance m=Schema2MonsterRules.initial(p.roster,deployment);monsters.add(m);
-                int dex=Schema2MonsterRules.modifier(Schema2MonsterRules.definition(p.roster,m.monster()).statBlock(),"ability.dexterity"),d20=dice.draw("INITIATIVE",m.monsterId(),20);
-                initiatives.add(new Initiative(m.monsterId(),d20,dex,d20+dex,0));
-            }
-            monsters.sort(Comparator.comparing(MonsterInstance::monsterId,(a,b)->{int h=Long.compareUnsigned(a.getMostSignificantBits(),b.getMostSignificantBits());return h!=0?h:Long.compareUnsigned(a.getLeastSignificantBits(),b.getLeastSignificantBits());}));
-            initiatives.sort(Comparator.comparingInt(Initiative::total).reversed().thenComparingInt(i -> p.command.tieBreakOrder().indexOf(i.characterId())));
-            List<Initiative> ordered = new ArrayList<>();
-            for (int i=0;i<initiatives.size();i++) { var value = initiatives.get(i); ordered.add(new Initiative(value.characterId(),value.d20(),value.dexterityModifier(),value.total(),i)); }
-            List<Combatant> combatants = new ArrayList<>(p.command.deployments().stream()
-                    .sorted(Comparator.comparing(d -> d.characterId().toString()))
-                    .map(d -> placedActor(null, d.characterId(), d.position(), d.side(),
-                            p.roster.get(d.characterId()).character().hitPoints() == 0)).toList());
-            for (MonsterDeployment d : p.command.monsterDeployments().stream()
-                    .sorted(Comparator.comparing(MonsterDeployment::monsterId, Schema2CombatHistory.UUID_ORDER)).toList())
-                combatants.add(placedActor(null, d.monsterId(), d.position(), d.side(), false));
-            battle = new Battle(p.combatId,p.campaignId,combatRule(p.roster.values().iterator().next().material()),Status.ACTIVE,1,1,0,0,combatants,ordered,List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),List.of(),monsters,List.of(),List.of());
-            battle = Schema2ObservationRules.refresh(null, battle);
-            battle = beginTurn(p,battle,dice,changes,facts);
+            battle = openEncounter(p, dice, changes, facts);
             facts.add(new CombatFact("COMBAT_STARTED",battle.activeActor(),p.combatId,null));
         } else {
             Combatant actor = combatant(battle,p.command.actorId());
             switch (p.command.kind()) {
                 case END_TURN -> {
-                    battle = replaceActor(battle,actor.closeSequence());
+                    actor = actor.closeSequence();
+                    if (battle.surprised(actor.characterId())) actor = actor.withReactionAvailable(true);
+                    battle = replaceActor(battle, actor);
                     int next = (battle.activeOrdinal() + 1) % battle.initiative().size();
                     battle = copy(battle,battle.status(),battle.round() + (next == 0 ? 1 : 0),battle.turnNumber() + 1,next,battle.combatants(),battle.flows());
                     Prepared turnPrepared=p;
@@ -587,7 +609,10 @@ public final class Schema2CombatRules {
                 case END_COMBAT -> {
                     Map<UUID,Context> contexts=recordRoundTime(p,battle,changes,facts);
                     battle=reconcileEffects(new Prepared(p.operationId,p.combatId,p.campaignId,contexts,p.before,p.command),battle,changes,facts);
-                    battle=copy(battle,Status.EXPLORATION,battle.round(),battle.turnNumber(),battle.activeOrdinal(),battle.combatants().stream().map(Combatant::closeSequence).toList(),battle.flows());
+                    Battle ending = battle;
+                    var actors = ending.combatants().stream().map(member -> ending.surprised(member.characterId())
+                            ? member.closeSequence().withReactionAvailable(true) : member.closeSequence()).toList();
+                    battle=copy(battle,Status.EXPLORATION,battle.round(),battle.turnNumber(),battle.activeOrdinal(),actors,battle.flows());
                 }
                 case DASH, DISENGAGE, DODGE, BEGIN_ATTACK -> {
                     AttackSequence sequence = p.command.kind() == Kind.BEGIN_ATTACK
@@ -733,13 +758,7 @@ public final class Schema2CombatRules {
                 Frame frame=new Frame(owner,null,FrameKind.HEALTH,owner,Invocation.ROOT,FrameStatus.TERMINAL,Stage.HEALTH_RESOLVED,null,null);
                 b=appendFlow(b,new Flow(key(p.operationId,"scene-flow"),owner,null,FlowStatus.COMPLETED,List.of(frame),List.of(),List.of(),List.of(),List.of(),saves,List.of(),List.of()));
             }
-            case REENTER_COMBAT -> {
-                b=Schema2MonsterRestRules.interrupt(b,p.operationId);
-                List<Initiative> order=new ArrayList<>();for(UUID actor:c.tieBreakOrder()) {Context context=p.roster.get(actor);int modifier=context==null?Schema2MonsterRules.modifier(Schema2MonsterRules.definition(p.roster,Schema2MonsterRules.instance(b,actor).monster()).statBlock(),"ability.dexterity"):modifier(context.character(),"ability.dexterity"),roll=dice.draw("INITIATIVE",actor,20);if(context!=null&&equipment.derive(context.material(),context.character()).physicalCheckDisadvantage())roll=Math.min(roll,dice.draw("INITIATIVE_SECOND",actor,20));order.add(new Initiative(actor,roll,modifier,roll+modifier,0));}
-                order.sort(Comparator.comparingInt(Initiative::total).reversed().thenComparingInt(i->c.tieBreakOrder().indexOf(i.characterId())));List<Initiative> numbered=new ArrayList<>();for(int i=0;i<order.size();i++) {Initiative value=order.get(i);numbered.add(new Initiative(value.characterId(),value.d20(),value.dexterityModifier(),value.total(),i));}
-                var actors = b.combatants().stream().map(a -> a.startTurn(false, a.prone())).toList();
-                b=new Battle(b.combatId(),b.campaignId(),b.combatRule(),Status.ACTIVE,1,b.turnNumber()+1,0,b.version(),actors,numbered,b.flows(),b.ongoingEffects(),b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests(),b.meleeControl(),b.observation());b=beginTurn(p,b,dice,changes,facts);
-            }
+            case REENTER_COMBAT -> b = openEncounter(p, dice, changes, facts);
             case CLOSE_SCENE -> b=copy(b,Status.ENDED,b.round(),b.turnNumber(),b.activeOrdinal(),b.combatants(),b.flows());
             default -> throw invalid("S2_COMBAT_COMMAND");
         }
@@ -748,6 +767,7 @@ public final class Schema2CombatRules {
     }
 
     private Battle beginTurn(Prepared p, Battle battle, Draws dice, List<HealthChange> changes, List<CombatFact> facts) {
+        boolean surprised = battle.surprised(battle.activeActor());
         if(Schema2MonsterRules.isMonster(battle,battle.activeActor())) {
             var monster=Schema2MonsterRules.instance(battle,battle.activeActor());List<MonsterActionUse> uses=new ArrayList<>();
             for(var use:monster.actionUses()) {
@@ -757,7 +777,8 @@ public final class Schema2CombatRules {
             }
             battle=Schema2MonsterRules.replace(battle,new MonsterInstance(monster.monsterId(),monster.monster(),monster.hitPoints(),monster.dead(),uses));
             Combatant actor = combatant(battle, monster.monsterId());
-            return replaceActor(battle, actor.startTurn(!monster.dead(), actor.prone()));
+            return replaceActor(battle, actor.startTurn(!surprised && !monster.dead(), actor.prone())
+                    .withReactionAvailable(!surprised));
         }
         battle=Schema2CombatStateValidator.expireTurnFacts(battle,facts);
         Combatant actor = combatant(battle,battle.activeActor()); Context context = p.roster.get(actor.characterId()); State current = context.character();
@@ -778,8 +799,8 @@ public final class Schema2CombatRules {
             changes.add(new HealthChange(actor.characterId(),current,resolved.state(),turnKey,0,false,resolved.result(),true));
             current = resolved.state(); facts.add(new CombatFact("TURN_DEATH_SAVE_RESOLVED",actor.characterId(),turnKey,null));
         }
-        return replaceActor(battle, actor.startTurn(current.hitPoints() > 0 && !current.health().dead(),
-                actor.prone() || current.hitPoints() == 0));
+        return replaceActor(battle, actor.startTurn(!surprised && current.hitPoints() > 0 && !current.health().dead(),
+                actor.prone() || current.hitPoints() == 0).withReactionAvailable(!surprised));
     }
     private static Map<UUID,Context> afterRound(Map<UUID,Context> roster) {
         Map<UUID,Context> result=new HashMap<>();

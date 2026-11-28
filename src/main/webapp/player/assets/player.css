@@ -8,3 +8,4 @@
 .route-directions button:nth-child(5){grid-column:3}
 .route-controls{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
 .route-controls button{min-height:44px}
+.character-content .turn-surprise{margin:0 0 8px;padding:8px 10px;border-left:2px solid var(--gold);background:#332e22;color:#efdfb7}
