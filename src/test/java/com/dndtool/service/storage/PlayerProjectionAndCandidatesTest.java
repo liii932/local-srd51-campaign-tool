@@ -1,10 +1,11 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.service.CampaignDomainEngine;
 import com.dndtool.service.Schema2CharacterRuntime;
 import com.dndtool.service.Schema2CharacterRuntime.EquipmentInput;
 import com.dndtool.service.Schema2CharacterRuntime.GrowthChoices;
-
-import com.dndtool.service.Schema2CombatState;
+import com.dndtool.service.Schema2CombatHistory;
+import com.dndtool.service.Schema2PreparationIdentity;
 import com.google.gson.*;
 import java.nio.file.Path;
 import java.util.*;
@@ -19,6 +20,134 @@ class PlayerProjectionAndCandidatesTest {
     @TempDir Path temporary;
     private final PlayerCandidateFactory choices = new PlayerCandidateFactory();
     private final PlayerCampaignProjection projection = new PlayerCampaignProjection();
+
+    @Test void sharedSceneKeepsPositionsAndDirectTargetsRelativeToTheActingObserver() {
+        var fixture = new ObservationFixture();
+        var unshared = fixture.access(false, false, null);
+        assertDirectTargetForbidden(unshared, fixture.player, fixture.cast(fixture.first));
+        assertDirectTargetForbidden(unshared, fixture.player, fixture.grapple(fixture.first));
+
+        var clear = fixture.access(true, false, null);
+        var cast = fixture.cast(fixture.first);
+        var grapple = fixture.grapple(fixture.first);
+        assertDoesNotThrow(() -> requireExecutionPermission(clear, fixture.player, cast));
+        assertDoesNotThrow(() -> requireExecutionPermission(clear, fixture.player, grapple));
+
+        var obscured = fixture.access(true, true, null);
+        var view = sharedScene(obscured, fixture.player);
+        assertFalse(view.has("participants"));
+        var perspectives = view.getAsJsonArray("perspectives");
+        assertEquals(2, perspectives.size());
+        var first = named(perspectives, "observer", "第一观察者").getAsJsonArray("participants");
+        var second = named(perspectives, "observer", "第二观察者").getAsJsonArray("participants");
+        var remembered = named(first, "name", "目标");
+        assertEquals("3, 1", remembered.get("position").getAsString());
+        assertTrue(remembered.get("lastKnown").getAsBoolean());
+        var seen = named(second, "name", "目标");
+        assertEquals("4, 1", seen.get("position").getAsString());
+        assertFalse(seen.has("lastKnown"));
+        assertFalse(view.toString().contains("未纳入观察的放置"));
+        assertTrue(sharedScene(obscured, fixture.spectator).getAsJsonArray("participants").isEmpty());
+        assertTrue(choices.candidates(obscured, fixture.spectator).isEmpty());
+
+        assertDirectTargetForbidden(obscured, fixture.player, cast);
+        assertDirectTargetForbidden(obscured, fixture.player, grapple);
+        assertDoesNotThrow(() -> requireExecutionPermission(obscured, fixture.player, fixture.cast(fixture.second)));
+        assertDoesNotThrow(() -> requireExecutionPermission(obscured, fixture.player, fixture.grapple(fixture.second)));
+    }
+
+    @Test void lastKnownRowsDoNotRevealTheHiddenSubjectsInitiativeOrder() {
+        var fixture = new ObservationFixture();
+        var base = fixture.access(true, true, null);
+        var earlier = sharedScene(fixture.withTargetInitiative(base, 18), fixture.player).getAsJsonArray("perspectives");
+        var later = sharedScene(fixture.withTargetInitiative(base, 5), fixture.player).getAsJsonArray("perspectives");
+        var firstEarlier = named(earlier, "observer", "第一观察者").getAsJsonArray("participants");
+        var firstLater = named(later, "observer", "第一观察者").getAsJsonArray("participants");
+        assertTrue(named(firstEarlier, "name", "目标").get("lastKnown").getAsBoolean());
+        assertEquals(firstEarlier, firstLater);
+        var secondEarlier = named(earlier, "observer", "第二观察者").getAsJsonArray("participants");
+        var secondLater = named(later, "observer", "第二观察者").getAsJsonArray("participants");
+        assertEquals("目标", secondEarlier.get(0).getAsJsonObject().get("name").getAsString());
+        assertEquals("目标", secondLater.asList().getLast().getAsJsonObject().get("name").getAsString());
+    }
+
+    @Test void monsterPendingUsesTheCurrentDecisionMakersSightEvenWithAnotherOwnedObserver() {
+        var fixture = new ObservationFixture();
+        var blocked = fixture.access(true, true, fixture.first);
+        var pending = projection.project(blocked, fixture.player).getAsJsonObject("pending");
+        assertFalse(pending.get("active").getAsBoolean());
+        assertFalse(pending.get("own").getAsBoolean());
+        assertFalse(pending.toString().contains("移动怪物"));
+        assertTrue(choices.candidates(blocked, fixture.player).isEmpty());
+        assertDirectTargetForbidden(blocked, fixture.player, passCurrentReaction(blocked, fixture.first));
+        assertDirectTargetForbidden(blocked, fixture.player, passCurrentReaction(blocked, fixture.second));
+
+        var visible = fixture.access(true, true, fixture.second);
+        pending = projection.project(visible, fixture.player).getAsJsonObject("pending");
+        assertTrue(pending.get("active").getAsBoolean());
+        assertTrue(pending.get("own").getAsBoolean());
+        assertTrue(pending.get("description").getAsString().contains("移动怪物（5, 3）"));
+        assertDoesNotThrow(() -> requireExecutionPermission(visible, fixture.player, passCurrentReaction(visible, fixture.second)));
+    }
+
+    @Test void aSharedManualCardOutsideTheObservationRosterDoesNotChangeMovementCandidates() {
+        var snapshot = CampaignRuleFixtures.snapshot(UUID.randomUUID().toString(), "手工卡占位");
+        snapshot = apply(snapshot, "node-create", json("name", "营地"));
+        UUID world = subject(snapshot);
+        snapshot = apply(snapshot, "focus-set", CampaignSpaceFixtures.target(CampaignSpaceData.Ref.world(world)));
+        snapshot = apply(snapshot, "character-create", json("name", "移动的战士", "kind", "PC", "classKey", "fighter", "backgroundKey", "acolyte"));
+        UUID fighter = subject(snapshot);
+        snapshot = apply(snapshot, "character-create", json("name", "远处的守卫", "kind", "NPC", "classKey", "fighter", "backgroundKey", "acolyte"));
+        UUID guard = subject(snapshot);
+        snapshot = apply(snapshot, "manual-create", json("name", "已共享手工卡", "kind", "NPC", "template", "blank"));
+        UUID manual = subject(snapshot);
+        snapshot = apply(snapshot, "member-add", json("name", "移动玩家"));
+        UUID player = subject(snapshot);
+        snapshot = apply(snapshot, "control-set", json("characterId", fighter.toString(), "memberId", player.toString(), "controlVersion", "0"));
+        for (UUID actor : List.of(fighter, guard, manual))
+            snapshot = apply(snapshot, "position", json("characterId", actor.toString(), "nodeId", world.toString()));
+        snapshot = apply(snapshot, "scene-create", json("name", "局部场景", "nodeId", world.toString(),
+                "width", "10", "height", "10", "resolution", "RULES"));
+        UUID scene = subject(snapshot);
+        var enter = json("sceneId", scene.toString());
+        var placements = new JsonArray();
+        placements.add(json("id", fighter.toString(), "version", "0", "x", "2", "y", "2", "side", "0"));
+        placements.add(json("id", guard.toString(), "version", "0", "x", "8", "y", "8", "side", "1"));
+        placements.add(json("id", manual.toString(), "version", "0", "x", "3", "y", "2", "side", "1"));
+        enter.add("subjects", placements);
+        snapshot = apply(snapshot, "scene-enter", enter);
+        var battle = CampaignSpaceCommands.currentBattle(snapshot.domains()).current();
+        snapshot = apply(snapshot, "combat-command", combatInput(battle, Command.reenter(fighter, List.of(fighter, guard))));
+        snapshot = apply(snapshot, "share-set", shareInput(player, ShareKind.SCENE, scene));
+        snapshot = apply(snapshot, "share-set", shareInput(player, ShareKind.CHARACTER, manual));
+        battle = CampaignSpaceCommands.currentBattle(snapshot.domains()).current();
+        assertEquals(fighter, battle.activeActor());
+        assertTrue(battle.combatants().stream().noneMatch(c -> c.characterId().equals(manual)));
+
+        var eastOccupied = access(snapshot);
+        var eastOptions = movementOptions(eastOccupied, player);
+        var moveManual = json("characterId", manual.toString(), "version", "1", "minutes", "0", "adjudication", "手工卡绕过战士");
+        JsonArray path = new JsonArray();
+        path.add(json("x", "2", "y", "1"));
+        path.add(json("x", "1", "y", "2"));
+        moveManual.add("path", path);
+        snapshot = apply(snapshot, "space-move", moveManual);
+        var westOccupied = access(snapshot);
+        var westOptions = movementOptions(westOccupied, player);
+        var view = projection.project(eastOccupied, player);
+        assertTrue(view.getAsJsonObject("shared").getAsJsonArray("cards").toString().contains("已共享手工卡"));
+        assertEquals(view, projection.project(westOccupied, player));
+        assertEquals(eastOptions.keySet(), westOptions.keySet());
+        eastOptions.forEach((label, option) -> assertEquals(option.input().get("command"), westOptions.get(label).input().get("command")));
+        String east = "向东移动一格", west = "向西移动一格";
+        assertTrue(eastOptions.keySet().containsAll(List.of(east, west)));
+        assertEquals("SCENE_CELL_OCCUPIED", assertThrows(StorageException.class,
+                () -> submitMovement(eastOccupied, player, fighter, eastOptions.get(east))).code());
+        assertEquals("SCENE_CELL_OCCUPIED", assertThrows(StorageException.class,
+                () -> submitMovement(westOccupied, player, fighter, westOptions.get(west))).code());
+        var openEast = submitMovement(westOccupied, player, fighter, westOptions.get(east));
+        assertEquals(new Position(3, 2), CampaignSpaceCommands.position(openEast, fighter).grid());
+    }
 
     @Test void ownCardSharedAudienceAndRevocationNeverSerializeTheHostGraph() throws Exception {
         try (var service = create("projection")) {
@@ -221,6 +350,168 @@ class PlayerProjectionAndCandidatesTest {
     private static Schema2CharacterRuntime.History characterHistory(CampaignDomainData.State domain, UUID id) {
         return domain.characters().stream().filter(c -> c.id().equals(id)).findFirst().orElseThrow().history();
     }
+    private static CampaignData.Snapshot apply(CampaignData.Snapshot snapshot, String action, JsonObject input) {
+        var state = new CampaignDomainCommands().apply(snapshot, action, CampaignSpaceFixtures.focused(snapshot.domains(), input),
+                UUID.randomUUID(), "0".repeat(64), sides -> 10);
+        return new CampaignData.Snapshot(snapshot.campaignId(), snapshot.name(), state);
+    }
+    private static UUID subject(CampaignData.Snapshot snapshot) {
+        return snapshot.domains().roots().getLast().subjectId();
+    }
+    private static CampaignStorageService.AccessSnapshot access(CampaignData.Snapshot snapshot) {
+        return new CampaignStorageService.AccessSnapshot(snapshot, UUID.randomUUID().toString(), 0, snapshot.domains().roots().size(), new JsonObject());
+    }
+    private static JsonObject combatInput(Battle battle, Command command) {
+        var input = json("combatId", battle.combatId().toString(), "combatVersion", Long.toString(battle.version()));
+        input.add("command", CampaignDomainCodec.toJson(command));
+        return input;
+    }
+    private static Map<String, PlayerCandidateFactory.Candidate> movementOptions(CampaignStorageService.AccessSnapshot access, UUID player) {
+        var result = new TreeMap<String, PlayerCandidateFactory.Candidate>();
+        PlayerCandidateFactory.candidates(access, player).stream().filter(option -> option.label().endsWith("移动一格"))
+                .forEach(option -> result.put(option.label(), option));
+        return result;
+    }
+    private static CampaignDomainData.State submitMovement(CampaignStorageService.AccessSnapshot access, UUID player, UUID actor,
+            PlayerCandidateFactory.Candidate option) {
+        return new CampaignDomainCommands().apply(access.snapshot(), option.action(), option.input(), UUID.randomUUID(),
+                "0".repeat(64), sides -> fail("Movement occupancy must be resolved before dice"), Actor.player(player, actor));
+    }
+
+    private static JsonObject sharedScene(CampaignStorageService.AccessSnapshot access, UUID player) {
+        return PlayerCampaignProjection.project(access, player).getAsJsonObject("shared").getAsJsonArray("scenes").get(0).getAsJsonObject();
+    }
+    private static JsonObject named(JsonArray rows, String field, String value) {
+        return rows.asList().stream().map(JsonElement::getAsJsonObject).filter(row -> value.equals(row.get(field).getAsString()))
+                .findFirst().orElseThrow();
+    }
+    private static Command passCurrentReaction(CampaignStorageService.AccessSnapshot access, UUID actor) {
+        var flow = CampaignSpaceCommands.currentBattle(access.snapshot().domains()).current().activeFlow();
+        var window = flow.windows().getFirst();
+        return Command.reaction(Kind.PASS_REACTION, actor, null, flow.flowKey(), flow.leafFrameKey(), window.windowKey(),
+                window.opportunities().getFirst().opportunityKey());
+    }
+    private static void requireExecutionPermission(CampaignStorageService.AccessSnapshot access, UUID player, Command command) {
+        JsonObject input = new JsonObject();
+        input.add("command", CampaignDomainCodec.toJson(command));
+        CampaignParticipationCommands.requireExecutionPermission(access.snapshot().domains(), "combat-command", input,
+                Actor.player(player, command.actorId()));
+    }
+    private static void assertDirectTargetForbidden(CampaignStorageService.AccessSnapshot access, UUID player, Command command) {
+        var domain = access.snapshot().domains();
+        var battle = CampaignSpaceCommands.currentBattle(domain).current();
+        JsonObject input = json("combatId", battle.combatId().toString(), "combatVersion", Long.toString(battle.version()));
+        input.add("focus", CampaignSpaceCommands.focusPayload(domain));
+        input.add("command", CampaignDomainCodec.toJson(command));
+        assertEquals("PLAYER_COMMAND_FORBIDDEN", assertThrows(StorageException.class, () -> new CampaignDomainCommands()
+                .apply(access.snapshot(), "combat-command", input, UUID.randomUUID(), "0".repeat(64),
+                        sides -> fail("Unauthorized command must be rejected before draws"), Actor.player(player, command.actorId()))).code());
+    }
+
+    private static final class ObservationFixture {
+        final UUID campaign = UUID.randomUUID(), node = UUID.randomUUID(), scene = UUID.randomUUID();
+        final UUID player = UUID.randomUUID(), spectator = UUID.randomUUID();
+        final UUID first = UUID.randomUUID(), second = UUID.randomUUID(), target = UUID.randomUUID();
+        final UUID monster = UUID.randomUUID(), untracked = UUID.randomUUID();
+        final CampaignRuleContext rules = CampaignRuleFixtures.rules();
+        final CampaignDomainData.Material material = CampaignDomainData.Material.of(rules.projection());
+        final Schema2PreparationIdentity preparation = Schema2PreparationIdentity.random();
+        final CampaignSpaceData.Ref sceneRef = CampaignSpaceData.Ref.scene(scene);
+        final List<CampaignDomainData.Character> roster = List.of(person(first, "第一观察者", "PC"),
+                person(second, "第二观察者", "PC"), person(target, "目标", "NPC"), person(untracked, "未纳入观察的放置", "NPC"));
+
+        Command cast(UUID actor) {
+            return Command.cast(actor, new CastInput(rules.rule("character.spellcasting", "spellcasting.life_domain"),
+                    rules.rule("adventure.spell", "spell.cure_wounds"), List.of(target), null));
+        }
+        Command grapple(UUID actor) {
+            return Command.melee(Kind.GRAPPLE, actor, target, null, null,
+                    new MeleeInput(UUID.randomUUID(), 0, null, HandSlot.MAIN_HAND, null, null));
+        }
+        CampaignStorageService.AccessSnapshot access(boolean shareTarget, boolean obscure, UUID reactor) {
+            var monsterRule = rules.rule("adventure.monster", "monster.goblin");
+            var positions = List.of(placed(first, 2, 1, 0), placed(second, 4, 2, 0), placed(target, 4, 1, 1),
+                    placed(monster, 5, 3, 1), placed(untracked, 8, 8, 1));
+            var combatants = positions.stream().filter(position -> !position.characterId().equals(untracked))
+                    .map(p -> new Combatant(p.characterId(), p.grid(), p.side(), 1, 1, true, 0, 0, false, false, null, false)).toList();
+            var observation = obscure ? obscuredView() : ObservationState.EMPTY;
+            var battle = new Battle(scene, campaign, rules.rule("adventure.combat", "combat.standard"), Status.ACTIVE, 1, 1, 0,
+                    obscure ? 2 : 1, combatants, List.of(new Initiative(first, 19, 1, 20, 0)),
+                    reactor == null ? List.of() : List.of(monsterMovePending(reactor)), List.of(), List.of(), List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(new MonsterInstance(monster, monsterRule, 7, false, List.of())),
+                    List.of(), List.of(), MeleeControl.EMPTY, observation);
+            var shares = new ArrayList<>(List.of(share(ShareKind.SCENE, scene), share(ShareKind.MONSTER, monster),
+                    share(ShareKind.CHARACTER, untracked)));
+            if (shareTarget) shares.add(share(ShareKind.CHARACTER, target));
+            var participation = new State(List.of(new Member(player, "玩家", true, 1), new Member(spectator, "旁观成员", true, 1)),
+                    List.of(new Control(first, player, 1), new Control(second, player, 1)), shares, List.of());
+            var space = new CampaignSpaceData.State(new CampaignSpaceData.Focus(sceneRef, 1),
+                    List.of(new CampaignSpaceData.Scene(scene, "观察试验场", node, 10, 10, "RULES", "COMBAT", 1)),
+                    List.of(new CampaignSpaceData.Clock(sceneRef, 0, 0)),
+                    List.of(new CampaignSpaceData.Monster(monster, "移动怪物", monsterRule, 7, false, false, List.of(), 0)));
+            var domain = new CampaignDomainData.State(material, roster, List.of(new Schema2CombatHistory.History(battle, List.of(), List.of())),
+                    List.of(new CampaignDomainData.Node(node, "营地", List.of())), positions, List.of(), List.of(),
+                    CampaignManualData.State.empty(), participation, space);
+            return new CampaignStorageService.AccessSnapshot(new CampaignData.Snapshot(campaign.toString(), "观察", domain),
+                    UUID.randomUUID().toString(), 0, 0, new JsonObject());
+        }
+        CampaignStorageService.AccessSnapshot withTargetInitiative(CampaignStorageService.AccessSnapshot access, int targetRoll) {
+            var domain = access.snapshot().domains();
+            var history = domain.combats().getFirst();
+            var battle = history.current();
+            Map<UUID, Integer> rolls = Map.of(first, 20, second, 14, monster, 10, target, targetRoll);
+            var ordered = rolls.keySet().stream().sorted(Comparator.comparingInt(rolls::get).reversed()).toList();
+            var initiative = new ArrayList<Initiative>();
+            for (UUID actor : ordered) initiative.add(new Initiative(actor, rolls.get(actor), 0, rolls.get(actor), initiative.size()));
+            var changed = new Battle(battle.combatId(), battle.campaignId(), battle.combatRule(), battle.status(), battle.round(),
+                    battle.turnNumber(), battle.activeOrdinal(), battle.version(), battle.combatants(), initiative, battle.flows(),
+                    battle.ongoingEffects(), battle.readyPreparations(), battle.triggerFacts(), battle.shields(), battle.concentrationHolders(),
+                    battle.environmentZones(), battle.suppressionCauses(), battle.monsters(), battle.saveDamageBatches(), battle.monsterRests(),
+                    battle.meleeControl(), battle.observation());
+            var state = new CampaignDomainData.State(domain.material(), domain.characters(),
+                    List.of(new Schema2CombatHistory.History(changed, history.members(), history.events())), domain.nodes(), domain.positions(),
+                    domain.items(), domain.roots(), domain.manual(), domain.participation(), domain.space());
+            return new CampaignStorageService.AccessSnapshot(new CampaignData.Snapshot(access.snapshot().campaignId(),
+                    access.snapshot().name(), state), access.runId(), access.epoch(), access.revision(), access.localControl());
+        }
+        private ObservationState obscuredView() {
+            UUID hide = UUID.randomUUID();
+            var hiding = new Position(4, 1);
+            var stealth = rules.rule("character.proficiency", "proficiency.skill.stealth");
+            var attempt = new ObservationCheck(hide, Kind.HIDE, target, hiding, rules.checkRule(), stealth, null,
+                    false, new ObservationRoll(11, null, 11, 1, 0, false, 12),
+                    List.of(new ObservationContest(first, 11, null, true), new ObservationContest(second, 13, null, false)));
+            return new ObservationState(List.of(new ObservationCellInput(new Position(3, 2), false, true, Cover.NONE),
+                    new ObservationCellInput(hiding, true, false, Cover.NONE)),
+                    List.of(new ObservationPair(first, target, new Position(3, 1), hide),
+                            new ObservationPair(first, monster, new Position(4, 3), null)), List.of(attempt));
+        }
+        private CampaignDomainData.Character person(UUID id, String name, String kind) {
+            var plan = rules.initialPlan(campaign, id, preparation, "cleric", "acolyte");
+            var history = new CampaignDomainEngine().initial(rules.projection(), plan, UUID.randomUUID(),
+                    rules.initialAbilities("cleric"), rules.initialChoices("cleric"), UUID.randomUUID());
+            return new CampaignDomainData.Character(name, kind, true, plan, history);
+        }
+        private CampaignDomainData.Position placed(UUID id, int x, int y, int side) {
+            return new CampaignDomainData.Position(id, sceneRef, new Position(x, y), side, 1);
+        }
+        private static Share share(ShareKind kind, UUID subject) {
+            return new Share(UUID.randomUUID(), kind, subject, new Audience(AudienceKind.ALL, List.of()), true, 1);
+        }
+        private Flow monsterMovePending(UUID reactor) {
+            UUID root = UUID.randomUUID(), leaf = UUID.randomUUID(), window = UUID.randomUUID(), choice = UUID.randomUUID();
+            var trigger = new TriggerFact(UUID.randomUUID(), TriggerKind.MOVEMENT_LEAVE_REACH_BEFORE, root,
+                    monster, null, new Position(6, 3), 0);
+            var opportunity = new Opportunity(choice, reactor, 0, List.of(), OpportunityStatus.PENDING, leaf, null, null);
+            var movement = new Frame(root, null, FrameKind.MOVEMENT, root, Invocation.ROOT, FrameStatus.WAITING_WINDOW,
+                    Stage.MOVEMENT_LEAVE_REACH_BEFORE, null, null);
+            var selection = new Frame(leaf, root, FrameKind.REACTION_SELECTION, choice, Invocation.REACTION,
+                    FrameStatus.PENDING, Stage.MOVEMENT_LEAVE_REACH_BEFORE, window, choice);
+            return new Flow(UUID.randomUUID(), root, leaf, FlowStatus.ACTIVE, List.of(movement, selection),
+                    List.of(new Window(window, root, 0, 0, WindowStatus.OPEN, List.of(opportunity), trigger)), null, List.of());
+        }
+    }
+
     private static Map<String, Integer> cardSpeeds(CampaignStorageService service, UUID player) {
         var speeds = new HashMap<String, Integer>();
         for (var element : PlayerCampaignProjection.project(service.accessSnapshot(), player).getAsJsonArray("cards")) {
@@ -235,11 +526,14 @@ class PlayerProjectionAndCandidatesTest {
     private static UUID member(CampaignStorageService service,String name) { var v=command(service,"member-add",json("name",name)); return UUID.fromString(v.lastCommand().requestId()); }
     private static void assign(CampaignStorageService service,UUID pc,UUID member) { command(service,"control-set",json("characterId",pc.toString(),"memberId",member.toString(),"controlVersion","0")); }
     private static void share(CampaignStorageService service, UUID player, ShareKind kind, UUID subject) {
+        command(service, "share-set", shareInput(player, kind, subject));
+    }
+    private static JsonObject shareInput(UUID player, ShareKind kind, UUID subject) {
         JsonObject share = json("shareVersion", "0", "kind", kind.name(), "subjectId", subject.toString());
         share.add("shareId", JsonNull.INSTANCE);
         share.addProperty("active", true);
         share.add("audience", CampaignDomainCodec.toJson(new Audience(AudienceKind.SPECIFIC, List.of(player))));
-        command(service, "share-set", share);
+        return share;
     }
     private static Set<String> labels(CampaignStorageService service, UUID player) {
         Set<String> result = new HashSet<>();

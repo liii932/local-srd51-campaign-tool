@@ -7,6 +7,7 @@ import com.dndtool.service.Schema2CharacterEquipmentRules;
 import com.dndtool.service.Schema2CombatHistory;
 import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2CombatState;
+import com.dndtool.service.Schema2ObservationRules;
 import com.google.gson.*;
 import java.util.*;
 import static com.dndtool.service.storage.CampaignParticipationData.*;
@@ -36,10 +37,10 @@ public final class PlayerCampaignProjection {
             var ref = CampaignSpaceData.Ref.scene(local.id());
             var battle = state.combats().stream().map(h -> h.current()).filter(b -> b.combatId().equals(local.id())).findFirst().orElse(null);
             String mode = local.mode().equals("COMBAT") ? "战斗" : "探索";
-            scenes.add(spaceView(state, visible, visibleMonsters(state, member, local.id()), ref, local.name(), focus, battle, mode));
+            scenes.add(spaceView(state, own, visible, visibleMonsters(state, member, local.id()), ref, local.name(), focus, battle, mode));
         }
         for (var node : state.nodes()) if (scenes.size() < 16 && shared(state, member, ShareKind.SCENE, node.id()))
-            scenes.add(spaceView(state, visible, Set.of(), CampaignSpaceData.Ref.world(node.id()), node.name(), focus, null, "世界节点"));
+            scenes.add(spaceView(state, own, visible, Set.of(), CampaignSpaceData.Ref.world(node.id()), node.name(), focus, null, "世界节点"));
         List<String> allowedLogs = new ArrayList<>();
         UUID campaign = UUID.fromString(access.snapshot().campaignId());
         for (var root : state.roots()) {
@@ -54,34 +55,72 @@ public final class PlayerCampaignProjection {
         view.add("pending", pending(state, member, own));
         return view;
     }
-    private static JsonObject spaceView(CampaignDomainData.State state, Set<UUID> visible, Set<UUID> monsters,
+    private static JsonObject spaceView(CampaignDomainData.State state, Set<UUID> own, Set<UUID> visible, Set<UUID> monsters,
             CampaignSpaceData.Ref ref, String name, CampaignSpaceData.Ref focus, Schema2CombatState.Battle battle, String mode) {
         boolean focused = ref.equals(focus);
         JsonObject row = new JsonObject();
         row.addProperty("name", name);
         row.addProperty("description", mode + (focused ? " · 当前执行空间" : " · 后台冻结"));
         row.addProperty("focused", focused);
-        List<UUID> order = battle != null && battle.status() == Schema2CombatState.Status.ACTIVE
-                ? battle.initiative().stream().map(Schema2CombatState.Initiative::characterId).toList() : List.of();
-        UUID actor = order.isEmpty() ? null : battle.activeActor();
-        if (focused && actor != null)
-            row.addProperty("turnLabel", visible.contains(actor) || monsters.contains(actor)
-                    ? participantName(state, monsters, actor) + "的回合" : "等待其他行动者");
-        List<CampaignDomainData.Position> placements = state.positions().stream()
-                .filter(p -> ref.equals(p.space()) && (visible.contains(p.characterId()) || monsters.contains(p.characterId())))
-                .sorted(Comparator.comparingInt(p -> order.contains(p.characterId()) ? order.indexOf(p.characterId()) : order.size()))
-                .limit(64).toList();
-        JsonArray participants = new JsonArray();
-        for (var placement : placements) {
-            JsonObject person = new JsonObject();
-            person.addProperty("name", participantName(state, monsters, placement.characterId()));
-            var grid = placement.grid();
-            person.addProperty("position", grid == null ? name : grid.x() + ", " + grid.y());
-            person.addProperty("current", focused && placement.characterId().equals(actor));
-            participants.add(person);
+        var observers = battle == null ? List.<UUID>of() : battle.combatants().stream()
+                .map(Schema2CombatState.Combatant::characterId).filter(own::contains).toList();
+        if (observers.size() <= 1) {
+            addSceneParticipants(row, state, visible, monsters, ref, name, focused, battle, observers.isEmpty() ? null : observers.getFirst());
+        } else {
+            JsonArray perspectives = new JsonArray();
+            for (UUID observer : observers) {
+                JsonObject perspective = new JsonObject();
+                perspective.addProperty("observer", characterName(state, observer));
+                addSceneParticipants(perspective, state, visible, monsters, ref, name, focused, battle, observer);
+                perspectives.add(perspective);
+            }
+            row.add("perspectives", perspectives);
         }
-        row.add("participants", participants);
         return row;
+    }
+
+    private record SceneParticipant(UUID subject, Schema2CombatState.Position position, boolean lastKnown) { }
+
+    private static void addSceneParticipants(JsonObject row, CampaignDomainData.State state, Set<UUID> visible,
+            Set<UUID> monsters, CampaignSpaceData.Ref ref, String name, boolean focused, Schema2CombatState.Battle battle, UUID observer) {
+        Map<UUID, Integer> initiative = new HashMap<>();
+        if (battle != null && battle.status() == Schema2CombatState.Status.ACTIVE)
+            battle.initiative().forEach(turn -> initiative.put(turn.characterId(), turn.ordinal()));
+        UUID actor = initiative.isEmpty() ? null : battle.activeActor();
+        Set<UUID> combatants = battle == null ? Set.of() : battle.combatants().stream().map(Schema2CombatState.Combatant::characterId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (focused && actor != null)
+            row.addProperty("turnLabel", (visible.contains(actor) || monsters.contains(actor))
+                    && observer != null && Schema2ObservationRules.visible(battle, observer, actor)
+                    ? participantName(state, monsters, actor) + "的回合" : "等待其他行动者");
+        List<SceneParticipant> placements = new ArrayList<>();
+        for (var placement : state.positions()) {
+            UUID subject = placement.characterId();
+            if (!ref.equals(placement.space()) || (!visible.contains(subject) && !monsters.contains(subject))) continue;
+            var grid = placement.grid();
+            boolean lastKnown = false;
+            if (battle != null) {
+                if (observer == null || !combatants.contains(subject)) continue;
+                grid = Schema2ObservationRules.knownPosition(battle, observer, subject);
+                if (grid == null) continue;
+                lastKnown = !Schema2ObservationRules.visible(battle, observer, subject);
+            }
+            placements.add(new SceneParticipant(subject, grid, lastKnown));
+        }
+        var order = Comparator.comparing(SceneParticipant::lastKnown)
+                .thenComparingInt(p -> p.lastKnown() ? 0 : initiative.getOrDefault(p.subject(), Integer.MAX_VALUE))
+                .thenComparing(p -> p.subject().toString());
+        JsonArray participants = new JsonArray();
+        placements.stream().sorted(order).limit(64).forEach(placement -> {
+            JsonObject person = new JsonObject();
+            person.addProperty("name", participantName(state, monsters, placement.subject()));
+            var grid = placement.position();
+            if (placement.lastKnown()) person.addProperty("lastKnown", true);
+            person.addProperty("position", grid == null ? name : grid.x() + ", " + grid.y());
+            person.addProperty("current", focused && !placement.lastKnown() && placement.subject().equals(actor));
+            participants.add(person);
+        });
+        row.add("participants", participants);
     }
 
     public static JsonObject receipt(CampaignStorageService.AccessSnapshot access, UUID member, CampaignDomainData.Root root) {
@@ -230,17 +269,17 @@ public final class PlayerCampaignProjection {
             if (battle.status() == Schema2CombatState.Status.ENDED || flow == null || battle.combatants().stream().noneMatch(c -> own.contains(c.characterId()))) continue;
             var leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
             var window = flow.windows().stream().filter(w -> w.windowKey().equals(leaf.windowKey())).findFirst().orElse(null);
+            var opportunity = currentOpportunity(window, flow.leafFrameKey());
             UUID mover = CampaignParticipationCommands.opportunityMonster(battle, window);
-            if (mover != null && !visibleMonsters(state, member, battle.combatId()).contains(mover)) continue;
+            if (mover != null && !canViewMonsterOpportunity(state, member, battle, own, mover, opportunity)) continue;
             if (!CampaignSpaceData.Ref.scene(battle.combatId()).equals(focus)) { frozen = true; continue; }
             hasFlow = true;
             ownDefense |= battle.meleeControl().contests().stream().anyMatch(contest -> contest.outcome() == null
                     && contest.frameKey().equals(flow.rootFrameKey()) && own.contains(contest.targetId()));
-            if (window != null && window.status() == Schema2CombatState.WindowStatus.OPEN && window.opportunities().stream()
-                    .anyMatch(o -> o.status() == Schema2CombatState.OpportunityStatus.PENDING && Objects.equals(o.selectionFrameKey(), flow.leafFrameKey()) && own.contains(o.actorId()))) {
+            if (opportunity != null && own.contains(opportunity.actorId())) {
                 ownChoice = true;
                 if (mover != null) {
-                    var cell = CampaignSpaceCommands.position(state, mover).grid();
+                    var cell = Schema2ObservationRules.knownPosition(battle, opportunity.actorId(), mover);
                     opportunityTarget = monsterName(state, mover) + "（" + cell.x() + ", " + cell.y() + "）将离开你的触及范围。可以借机攻击或放弃。";
                 }
             }
@@ -252,4 +291,27 @@ public final class PlayerCampaignProjection {
         return result;
     }
     private static String actionLabel(String action) { return switch (action) { case "combat-command" -> "行动已记录"; case "character-command", "check-effects", "manual-check" -> "角色操作已记录"; default -> "状态已更新"; }; }
+
+    static boolean canViewOpportunity(CampaignDomainData.State state, UUID member, Schema2CombatState.Battle battle,
+            Set<UUID> observers, UUID mover) {
+        var flow = battle.activeFlow();
+        if (flow == null) return false;
+        var leaf = flow.frames().stream().filter(f -> f.frameKey().equals(flow.leafFrameKey())).findFirst().orElseThrow();
+        var window = flow.windows().stream().filter(w -> w.windowKey().equals(leaf.windowKey())).findFirst().orElse(null);
+        return mover.equals(CampaignParticipationCommands.opportunityMonster(battle, window))
+                && canViewMonsterOpportunity(state, member, battle, observers, mover, currentOpportunity(window, leaf.frameKey()));
+    }
+
+    private static Schema2CombatState.Opportunity currentOpportunity(Schema2CombatState.Window window, UUID leaf) {
+        if (window == null || window.status() != Schema2CombatState.WindowStatus.OPEN) return null;
+        return window.opportunities().stream().filter(option -> option.status() == Schema2CombatState.OpportunityStatus.PENDING
+                && Objects.equals(option.selectionFrameKey(), leaf)).findFirst().orElse(null);
+    }
+
+    private static boolean canViewMonsterOpportunity(CampaignDomainData.State state, UUID member,
+            Schema2CombatState.Battle battle, Set<UUID> observers, UUID mover, Schema2CombatState.Opportunity opportunity) {
+        return opportunity != null && observers.contains(opportunity.actorId())
+                && visibleMonsters(state, member, battle.combatId()).contains(mover)
+                && Schema2ObservationRules.visible(battle, opportunity.actorId(), mover);
+    }
 }

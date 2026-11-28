@@ -179,7 +179,7 @@ B 被反制，A 继续产生 Bless；三个真实声明各保留自身动作/反
 动作 owner 管反应，资源 owner 管位，施法 owner 管真实 cast 终态。高阶检定、额外贡献、
 复杂视线和长施法的分支不由这个自动成功轨迹证明。
 
-**程序。** 当前规定所有参战者彼此可见、无遮挡的网格内，有限法师/3 环位反制链已接入。
+**程序。** 当前五尺网格中的有限法师/3 环位反制链检查反应者与施法者之间的视线和距离。
 [场景前提](../../rules/schema-2-combat.md) · [资格实现](../../../src/main/java/com/dndtool/service/Schema2SpellRules.java)
 [SQLite 恢复用例](../../../src/test/java/com/dndtool/service/storage/CampaignDomainsCombatIntegrationTest.java)
 从正常学习和准备进入三人场景，用生产命令及完整文件核对该轨迹。重开保留已付法术位和原先攻，
@@ -451,7 +451,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 | G04.4 无动作释放及失效 | U→P | 当前等待期间释放只结束准确关系与手位。重复释放不多消条件；联动等待恢复后只停后缀，已走位置、原骰不倒改。[释放写门](action-continuation-protocol.md#grapple-attempt) | [V04](#v04)；准确活动关系及当前叶子的免费释放 |
 | G05.1 高阶、升环、非 INT | U→P | 3 环对真实 5 环 DC 15，Sorcerer CHA +3 与 d20=8 得 11；用 5 环位自动成功、零骰。原环级不允许客户端替换。[反制检定](action-continuation-protocol.md#counterspell-check) | [V05](#v05)；有限实际位，局部 INT 分支 |
 | G05.2 能力检定贡献 | U→P | 上例合法灵感 d6=4 后 15 成功，无默认 PB，Bless 不加；有真实 Cutting Words 时可在公布前消费其反应。恢复原 11 后只抽待选贡献骰。[反制向量](spellcasting-extension-contract.md#spell-vectors) | [V05](#v05)；无通用选择及贡献 |
-| G05.3 真实观察及清晰路径 | U→P | 60 尺、有视线和实际施法见证才进入候选；61 尺、实墙、无施法见证均不获此机会。错 cast 或旧见证请求零成本，已接受事实不因后移墙面重写。[见证](spellcasting-extension-contract.md#counterspell-witness)、[视线](spatial-and-area-contract.md#visibility) | [V05](#v05)；现行场景假定彼此可见 |
+| G05.3 真实观察及清晰路径 | U→P | 60 尺、有视线和实际施法见证才进入候选；61 尺、实墙、无施法见证均不获此机会。错 cast 或旧见证请求零成本，已接受事实不因后移墙面重写。[见证](spellcasting-extension-contract.md#counterspell-witness)、[视线](spatial-and-area-contract.md#visibility) | [V05](#v05)；现行五尺网格按观察者检查视线与遮挡 |
 | G05.4 长施法中断 | U→P | 第十个工作 action 已付、此前 54 秒时成功反制，保留十次 action 与 54 秒，末段信用、位、耗材和效果未发生。保存第十段窗口不重开 START；错 ordinal 拒绝。[工作边](spellcasting-extension-contract.md#long-work) | [V05](#v05)；无长施法 |
 | G06.1 球体、绕角及完整集合 | U→P | 区内可绕障碍的目标纳入，完整阻断或超 20 尺排除。150 尺内指向被遮挡点时，在首交面近侧按精确距离及坐标序确定合法格点；无点返回 `NO_LEGAL_NEAR_SIDE_ORIGIN`，付款和掷骰均未发生。漏掉最后一个 roster 成员同样拒绝。[近侧取样](spatial-and-area-contract.md#visibility)、[空间区域](spatial-and-area-contract.md#areas)、[快照](spellcasting-extension-contract.md#spell-target-snapshots) | [V06](#v06)；已有有限锥体 |
 | G06.2 对象点燃及只有对象 | U→P | 触达的裸可燃对象点燃一次；已燃、封闭壳体阻隔、穿戴/携带或被抗魔裁切无新点燃。只有对象也点燃，零伤害骰及 save；最后对象写失败使本阶段 HP、燃烧共同回滚。[点燃](multi-target-save-damage.md#fireball-damage) | [V06](#v06)；无点燃消费者 |

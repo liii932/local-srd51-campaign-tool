@@ -2,6 +2,7 @@ package com.dndtool.service.storage;
 
 import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2CombatState;
+import com.dndtool.service.Schema2ObservationRules;
 import com.google.gson.*;
 import java.util.*;
 import static com.dndtool.service.storage.CampaignParticipationData.*;
@@ -156,12 +157,29 @@ public final class CampaignParticipationCommands {
         if (!action.equals("combat-command") || current == null) throw playerPermissionDenied();
         var command = CampaignDomainCodec.fromJson(input.get("command"), Schema2CombatState.Command.class);
         var battle = current.current();
+        boolean sharedScene = state.participation().shared(actor.memberId(), ShareKind.SCENE, battle.combatId());
+        if (command.kind() == Schema2CombatState.Kind.SET_OBSERVATION_CELL
+                || (command.kind() == Schema2CombatState.Kind.HIDE || command.kind() == Schema2CombatState.Kind.SEARCH) && !sharedScene)
+            throw playerPermissionDenied();
+        switch (command.kind()) {
+            case CAST -> {
+                if (command.castInput() == null) throw playerPermissionDenied();
+                requireSeenCharacters(state, actor.memberId(), battle, character, command.castInput().targets());
+            }
+            case GRAPPLE, SHOVE_PRONE, SHOVE_PUSH -> {
+                if (command.targetId() == null) throw playerPermissionDenied();
+                requireSeenCharacters(state, actor.memberId(), battle, character, List.of(command.targetId()));
+            }
+            default -> { }
+        }
         if (command.kind() == Schema2CombatState.Kind.ATTACK) {
             boolean monster = battle.monsters().stream().anyMatch(m -> m.monsterId().equals(command.targetId()));
             Set<UUID> targets = monster ? visibleMonsters(state, actor.memberId(), battle.combatId())
                     : PlayerCampaignProjection.visible(state, actor.memberId());
-            if (!targets.contains(command.targetId())) throw playerPermissionDenied();
-            if (!state.participation().shared(actor.memberId(), ShareKind.SCENE, battle.combatId())) {
+            if (!targets.contains(command.targetId()) || Schema2ObservationRules.knownPosition(battle, character, command.targetId()) == null)
+                throw playerPermissionDenied();
+            if (!sharedScene) {
+                if (!Schema2ObservationRules.visible(battle, character, command.targetId())) throw playerPermissionDenied();
                 var source = state.characters().stream().filter(c -> character.equals(c.id())).findFirst().orElseThrow();
                 var context = new Schema2CombatRules.Context(state.material().restore().projection(), source.initial(), source.history().current());
                 if (new Schema2CombatRules().weapon(context, command.itemId()).ranged()) throw playerPermissionDenied();
@@ -170,7 +188,7 @@ public final class CampaignParticipationCommands {
         if (battle.activeFlow() != null) {
             var window = battle.activeFlow().windows().stream().filter(w -> w.windowKey().equals(command.windowKey())).findFirst().orElse(null);
             UUID mover = opportunityMonster(battle, window);
-            if (mover != null && !visibleMonsters(state, actor.memberId(), battle.combatId()).contains(mover))
+            if (mover != null && !PlayerCampaignProjection.canViewOpportunity(state, actor.memberId(), battle, Set.of(character), mover))
                 throw playerPermissionDenied();
             return; // Scene preflight checks the exact leaf, deciding actor and reaction option.
         }
@@ -185,11 +203,21 @@ public final class CampaignParticipationCommands {
         } else if (!Set.of(Schema2CombatState.Kind.END_TURN, Schema2CombatState.Kind.BEGIN_ATTACK,
                 Schema2CombatState.Kind.FORFEIT_ATTACKS, Schema2CombatState.Kind.ATTACK, Schema2CombatState.Kind.CAST,
                 Schema2CombatState.Kind.MOVE, Schema2CombatState.Kind.DASH, Schema2CombatState.Kind.DISENGAGE,
-                Schema2CombatState.Kind.DODGE, Schema2CombatState.Kind.DROP_PRONE, Schema2CombatState.Kind.STAND_UP,
+                Schema2CombatState.Kind.DODGE, Schema2CombatState.Kind.HIDE, Schema2CombatState.Kind.SEARCH,
+                Schema2CombatState.Kind.DROP_PRONE, Schema2CombatState.Kind.STAND_UP,
                 Schema2CombatState.Kind.GRAPPLE, Schema2CombatState.Kind.SHOVE_PRONE, Schema2CombatState.Kind.SHOVE_PUSH,
                 Schema2CombatState.Kind.ESCAPE_GRAPPLE, Schema2CombatState.Kind.RELEASE_GRAPPLE,
                 Schema2CombatState.Kind.SECOND_WIND, Schema2CombatState.Kind.END_CONCENTRATION).contains(command.kind()))
             throw playerPermissionDenied();
+    }
+    private static void requireSeenCharacters(CampaignDomainData.State state, UUID member,
+            Schema2CombatState.Battle battle, UUID observer, List<UUID> targets) {
+        if (targets.isEmpty()) return; // A directional spell declares no individual target.
+        var sharedCharacters = PlayerCampaignProjection.visible(state, member);
+        for (UUID target : targets) {
+            if (!sharedCharacters.contains(target) || !Schema2ObservationRules.visible(battle, observer, target))
+                throw playerPermissionDenied();
+        }
     }
     private static StorageException playerPermissionDenied() {
         return new StorageException("PLAYER_COMMAND_FORBIDDEN", "This action is outside the player's current execution permission");

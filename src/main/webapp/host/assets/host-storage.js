@@ -342,8 +342,7 @@
       const action = breath[Number(value)];
       return `${action.action.entryKey}${action.available ? ' · 可用' : ' · 已用'}`;
     });
-    options(form.elements.targetId, (battle?.combatants || []).map(actor => actor.characterId)
-      .filter(id => id !== monster?.monsterId), personName);
+    options(form.elements.targetId, weaponTargets(form.elements.combatId.value, monster?.monsterId), personName);
     const kind = form.elements.kind.value;
     const attack = kind === 'MONSTER_ATTACK', exhale = kind === 'MONSTER_BREATH';
     const fields = {attackAction: attack, targetId: attack, breathAction: exhale, direction: exhale, restKind: !attack && !exhale};
@@ -802,12 +801,41 @@
     const band = shot.distanceFeet > shot.normalRangeFeet ? '长射程' : '正常射程';
     return `${shot.distanceFeet} 尺（${band}）${shot.closeEnemy ? ' · 近身敌人造成劣势' : ''}`;
   }
+  const coverNames = {NONE: '无掩护', HALF: '半掩护（AC +2）', THREE_QUARTERS: '四分之三掩护（AC +5）', TOTAL: '全掩护'};
+  const observationActions = {HIDE: '躲藏', SEARCH: '搜索', NIMBLE_HIDE: '灵巧逃脱（躲藏）', NIMBLE_DISENGAGE: '灵巧逃脱（撤离）'};
+  function attackSight(attack) {
+    const details = [];
+    if (!attack.attackerSeesTarget) details.push('攻击者看不见目标');
+    if (!attack.targetSeesAttacker) details.push('目标看不见攻击者');
+    if (attack.targetCover !== 'NONE') details.push(coverNames[attack.targetCover]);
+    if (!attack.targetAtAimedPosition) details.push('瞄准格已空');
+    return details.length ? ' · ' + details.join(' · ') : '';
+  }
+  function observationResult(check) {
+    const prefix = personName(check.actorId) + ' · ' + observationActions[check.kind];
+    if (!check.roll) return prefix;
+    const dice = [check.roll.firstD20, check.roll.secondD20].filter(value => value != null).join(' / ');
+    const results = check.contests.map(contest => personName(contest.counterpartId) + ' ' + contest.opposingScore
+      + (contest.hiddenAfter ? '（仍未发现）' : '（已发现）'));
+    return [prefix, 'd20=' + dice + '，总值 ' + check.roll.total, ...results].join(' · ');
+  }
+  function renderObservation(box, battle) {
+    const {cells, pairs, checks} = battle.observation;
+    if (cells.length) table(box, ['标记格位', '允许躲藏', '遮挡视线', '掩护'], cells.map(cell => [
+      cell.position.x + ', ' + cell.position.y, cell.hideAllowed ? '是' : '否', cell.blocksSight ? '是' : '否', coverNames[cell.cover]
+    ]));
+    if (pairs.length) table(box, ['观察者', '当前不可见的生物', '最后已知格位'], pairs.map(pair => [
+      personName(pair.observerId), personName(pair.subjectId),
+      pair.lastKnownPosition ? pair.lastKnownPosition.x + ', ' + pair.lastKnownPosition.y : '未知'
+    ]));
+    if (checks.length) text(box, 'p', observationResult(checks.at(-1)), 'observation-result');
+  }
   function characterShotResult(attack) {
     const shot = attack.rangedAttack;
     const dice = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
     const outcome = attack.status !== 'RESOLVED' ? '等待反应结算' : !attack.hit ? '未命中'
       : `${attack.critical ? '重击' : '命中'} · 伤害 ${attack.damageAmount}`;
-    return `${personName(attack.actorId)} → ${personName(attack.targetId)} · 射击 · ${rangedDetails(shot)} · 已用 1 支箭 · d20=${dice}，选用 ${attack.selectedD20}，护甲等级 ${attack.finalArmorClass} · ${outcome}`;
+    return `${personName(attack.actorId)} → ${personName(attack.targetId)} · 射击 · ${rangedDetails(shot)} · 已用 1 支箭 · d20=${dice}，选用 ${attack.selectedD20}，护甲等级 ${attack.finalArmorClass} · ${outcome}${attackSight(attack)}`;
   }
   function monsterAttackResult(attack) {
     const evidence = attack.monsterAttack;
@@ -816,10 +844,10 @@
     const dice = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
     const roll = `d20=${dice}，选用 ${attack.selectedD20}，命中修正 ${evidence.hitBonus}，总值 ${attack.selectedD20 + evidence.hitBonus}，护甲等级 ${attack.finalArmorClass}`;
     const pack = evidence.packTacticsAllies.length ? ` · 集群战术（${evidence.packTacticsAllies.map(personName).join('、')}）` : '';
-    const title = `${actor} → ${target} · ${kind} · ${name} · ${roll}${pack}`;
+    const title = `${actor} → ${target} · ${kind} · ${name} · ${roll}${pack}${attackSight(attack)}`;
     if (attack.status !== 'RESOLVED') return `${title} · 等待结算`;
     if (!attack.hit) return `${title} · 未命中`;
-    const damageTypes = {PIERCING: '穿刺', FIRE: '火焰'};
+    const damageTypes = {PIERCING: '穿刺', SLASHING: '挥砍', FIRE: '火焰'};
     const damage = evidence.damageComponents.map(component =>
       `${damageTypes[component.damageType] || component.damageType} d${component.diceSides}=${component.dice.join(' / ')}，修正 ${component.modifier}，原值 ${component.rawDamage}，有效 ${component.effectiveDamage}`);
     const result = `${title} · ${attack.critical ? '重击' : '命中'} · ${damage.join(' · ')} · 有效伤害合计 ${attack.damageAmount}`;
@@ -829,6 +857,8 @@
     const before = event.before, after = event.resolution.after;
     const previous = before?.meleeControl, current = after.meleeControl;
     const details = [];
+    const check = after.observation.checks.find(record => record.operationId === event.operationId);
+    if (check) details.push(observationResult(check));
     for (const contest of current?.contests || []) {
       const prior = previous?.contests.find(entry => entry.contestKey === contest.contestKey);
       if (!prior || prior.outcome !== contest.outcome) details.push(meleeContestResult(contest));
@@ -944,7 +974,12 @@
       CHECK_RESOLVED: '掷骰检定', PASSIVE_CHECK_RESOLVED: '被动检定', HEALTH_EFFECT_RESOLVED: '健康效果', ITEM_ACQUIRED: '取得装备', ITEM_EQUIPPED: '装备物品',
       NOTE: '便笺', NODE_CREATED: '建立地点', NODE_LINKED: '连接地点', POSITION: '调整位置', ITEM: '物品记录', COMBAT: '战斗行动'})[kind] || kind;
   }
-  const battleFor = id => domain()?.combats?.find(history => history.current.combatId === id)?.current;
+  const battleHistory = id => domain()?.combats?.find(history => history.current.combatId === id);
+  const battleFor = id => battleHistory(id)?.current;
+  function weaponTargets(combatId, actorId) {
+    const history = battleHistory(combatId), battle = history?.current;
+    return battle?.initiative[battle.activeOrdinal]?.characterId === actorId ? history?.weaponTargets || [] : [];
+  }
   const meleeLabels = {GRAPPLE: '擒抱', SHOVE_PRONE: '推倒', SHOVE_PUSH: '推开 5 尺', ESCAPE_GRAPPLE: '挣脱擒抱'};
   const meleeSkills = {ATHLETICS: '力量（运动）', ACROBATICS: '敏捷（杂技）'};
   const grappleEndLabels = {RELEASED: '主动释放', ESCAPED: '挣脱', GRAPPLER_INCAPACITATED: '擒抱者失能',
@@ -957,7 +992,7 @@
     return {type: 'scene.Command', kind, actorId, targetId: null, itemId: null, path: [], deployments: [], tieBreakOrder: [],
       flowKey: null, leafKey: null, windowKey: null, opportunityKey: null, castInput: null, readyInput: null, readyKey: null,
       zoneInput: null, zoneKey: null, healthInput: null, seconds: '0', monsterDeployments: [], breathInput: null,
-      monsterRestInput: null, meleeInput: null, dragInput: null, monsterAttackInput: null};
+      monsterRestInput: null, meleeInput: null, dragInput: null, monsterAttackInput: null, observationCell: null};
   }
   function sendCombat(battle, command, expected = focusToken()) {
     if (!battle || battle.combatId !== focusedBattle()?.combatId || expected.generation !== focusToken().generation) {
@@ -1006,6 +1041,7 @@
           actor.sequence ? `已攻击 ${actor.sequence.performed}/${actor.sequence.limit} · 剩余 ${actor.sequence.limit - actor.sequence.performed - actor.sequence.forfeited}${actor.sequence.forfeited ? ` · 已放弃 ${actor.sequence.forfeited}` : ''}` : '未开始'];
       }));
       renderGrapples(box, battle, executing);
+      renderObservation(box, battle);
       for (const effect of battle.ongoingEffects || []) text(box, 'p', `效果：${ruleName(effect.spell || effect.rule)} · ${effect.status === 'ACTIVE' ? '生效' : '已结束'}`);
       for (const zone of battle.environmentZones || []) if (!zone.endedOperationId) text(box, 'p', `环境区域：${ruleName(zone.rule)} · 中心 ${zone.center.x}, ${zone.center.y}`);
       for (const monster of battle.monsters || []) text(box, 'p', `${ruleName(monster.monster)} · 生命值 ${monster.hitPoints}${monster.dead ? ' · 已死亡' : ''}`);
@@ -1127,9 +1163,12 @@
   }
   function refreshCombatForm() {
     const form = byId('domain-combat'), battle = battleFor(form.elements.combatId.value);
+    const monster = battle?.monsters.find(m => m.monsterId === form.elements.actorId.value);
+    const nimble = monster && ruleFromValue(ruleValue(monster.monster))?.nimbleEscape;
     const exploration = ['DROP_PRONE', 'STAND_UP', 'EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
     const actions = battle?.status === 'EXPLORATION' ? exploration : battle?.status === 'ACTIVE'
-      ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT') : [];
+      ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT'
+        && (!kind.startsWith('NIMBLE_') || nimble)) : [];
     options(form.elements.kind, actions, kind => combatActions.get(kind));
     form.elements.kind.disabled = actions.length === 0;
     const kind = form.elements.kind.value;
@@ -1142,6 +1181,8 @@
     const actor = battle?.combatants.find(actor => actor.characterId === form.elements.actorId.value);
     const replacement = replacementKinds.includes(kind), shove = kind === 'SHOVE_PUSH', drag = kind === 'DRAG_GRAPPLE';
     const escape = kind === 'ESCAPE_GRAPPLE', sequence = actor?.sequence;
+    options(form.elements.targetId, kind === 'ATTACK' ? weaponTargets(form.elements.combatId.value, actor?.characterId)
+      : battle?.combatants.map(actor => actor.characterId) || [], personName);
     const target = battle?.combatants.find(actor => actor.characterId === form.elements.targetId.value);
     const destination = shove ? shoveDestination(actor, target) : null;
     const grapples = liveGrapples(battle).filter(grapple => (drag ? grapple.grapplerId : grapple.targetId) === actor?.characterId);
@@ -1155,6 +1196,9 @@
       : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
       : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列。每次攻击可使用武器，或改为擒抱或推撞。'
       : kind === 'ATTACK' ? '选择目标和持用的武器。每击使用一次攻击额度，短弓须双手持用且每次射击消耗一支携带的箭。'
+      : kind === 'HIDE' || kind === 'NIMBLE_HIDE' ? '在允许躲藏的格位掷一次隐匿，分别与敌人的被动察觉比较。'
+      : kind === 'SEARCH' ? '花一次普通动作进行感知（察觉）检定，更新此行动者对隐藏敌人的观察。'
+      : kind === 'NIMBLE_DISENGAGE' ? '用一次附赠动作撤离，本回合移动可离开敌人的触及。'
       : replacement && (!sequence || sequence.closed) ? '请先开始攻击动作，再使用一次剩余攻击擒抱或推撞。'
       : replacement ? `本次替代第 ${sequence.performed + 1} 次攻击。目标须选择防御检定。${destination ? `推开目的格为 (${destination.x},${destination.y})。` : ''}`
       : escape ? (grapples.length ? '选择要挣脱的擒抱关系及检定。尝试会消耗一次动作。' : '该行动者当前未被擒抱。')
@@ -1965,6 +2009,26 @@
         kind: values.kind === 'COMPLETE_MONSTER_REST' ? rest?.kind || values.restKind : values.restKind};
     }
     sendCombat(battle, value);
+  });
+  const observationForm = byId('domain-observation-cell');
+  function readObservationCell() {
+    const fields = observationForm.elements, battle = battleFor(fields.combatId.value);
+    const cell = battle?.observation.cells.find(cell => cell.position.x === fields.x.valueAsNumber && cell.position.y === fields.y.valueAsNumber);
+    fields.hideAllowed.checked = Boolean(cell?.hideAllowed);
+    fields.blocksSight.checked = Boolean(cell?.blocksSight);
+    fields.cover.value = cell?.cover || 'NONE';
+  }
+  for (const field of ['x', 'y']) observationForm.elements[field].addEventListener('input', readObservationCell);
+  observationForm.elements.combatId.addEventListener('change', readObservationCell);
+  observationForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const fields = observationForm.elements, battle = battleFor(fields.combatId.value);
+    if (!battle) return;
+    const command = baseCombat('SET_OBSERVATION_CELL');
+    command.observationCell = {type: 'scene.ObservationCellInput',
+      position: {type: 'scene.Position', x: fields.x.value, y: fields.y.value},
+      hideAllowed: fields.hideAllowed.checked, blocksSight: fields.blocksSight.checked, cover: fields.cover.value};
+    sendCombat(battle, command);
   });
   byId('domain-environment').addEventListener('submit', event => {
     event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)), battle = battleFor(values.combatId);

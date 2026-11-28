@@ -48,6 +48,14 @@ class CampaignSpacesIntegrationTest {
             }
             UUID sceneA = scene(service, west, "西侧庭院", "RULES");
             enter(service, sceneA, a1, a2);
+            var beforeMark = service.accessSnapshot();
+            int beforeMarkDice = dice.get();
+            var outside = Command.setObservationCell(new ObservationCellInput(new Position(8, 7), true, false, Cover.HALF));
+            assertEquals("SCENE_GRID_BOUNDS", assertThrows(StorageException.class, () -> combat(service, sceneA, outside)).code());
+            assertEquals(beforeMark, service.accessSnapshot());
+            assertEquals(beforeMarkDice, dice.get());
+            var boundaryCell = new ObservationCellInput(new Position(7, 7), true, false, Cover.HALF);
+            combat(service, sceneA, Command.setObservationCell(boundaryCell));
             long placementVersion = CampaignSpaceCommands.position(state(service), a1).version();
             var direct = object("characterId", a1, "placementVersion", placementVersion, "x", 7, "y", 7);
             var ruleExploration = service.accessSnapshot();
@@ -102,6 +110,8 @@ class CampaignSpacesIntegrationTest {
             assertEquals(Ref.scene(sceneB), state(service).space().focus().space());
             assertEquals(frozenA, sceneHistory(service, sceneA));
             assertEquals(frozenB, sceneHistory(service, sceneB));
+            assertEquals(List.of(boundaryCell), sceneHistory(service, sceneA).current().observation().cells());
+            assertTrue(sceneHistory(service, sceneB).current().observation().cells().isEmpty());
 
             focus(service, Ref.scene(sceneA));
             Battle pending = sceneHistory(service, sceneA).current();

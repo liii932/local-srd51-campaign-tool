@@ -146,21 +146,21 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 
 | 机制族与原文 | 当前数据/执行 | 状态/恢复与具体缺口 | 依据 |
 |---|---|---|---|
-| 遭遇/先攻/同值/回合/轮次（[90—91](../references/srd-5.1/pages/page-090.md)） | 有限类型化；警觉可见角色及有限怪物，服务器先攻、同值有限排列 | 局部闭环；缺突袭、完整遭遇 roster、阵营变化、非参战生物与 XP 工作流 | [战斗](#combat)、[怪物](#monsters) |
+| 遭遇/先攻/同值/回合/轮次（[90—91](../references/srd-5.1/pages/page-090.md)） | 有限类型化；警觉的角色及有限怪物，服务器先攻、同值有限排列 | 局部闭环；缺突袭、完整遭遇 roster、阵营变化、非参战生物与 XP 工作流 | [战斗](#combat)、[怪物](#monsters) |
 | action/bonus action/reaction、回合重置（[90—91](../references/srd-5.1/pages/page-090.md)） | 规则角色与怪物共用普通动作、附赠动作、反应和移动预算。本人新回合刷新，其他人的余额保留。战士两击共付一次普通动作，回气另付一次附赠动作和一次特性使用次数 | 局部闭环。其余附赠动作来源、额外普通动作、其他额外攻击来源及每回合施法限制仍待接入 | [战斗](#combat)、[回气](schema-2-second-wind.md)、[施法](#spells) |
 | 普通武器 Attack、命中/暴击/伤害（[93—97](../references/srd-5.1/pages/page-093.md)） | 普通手持近战与双手短弓逐击结算；Attack 序列按冻结规则与真实授予为一次或两次；真实属性/熟练/AC、原骰及健康 | 局部闭环；缺非致命击倒、徒手/天然武器及其他属性/多个伤害分量/特性修正；每种新 profile 须完整来源 | [战斗](#combat)、[有限额外攻击合同](schema-2-extra-attack.md) |
-| 远程/投掷/双持（[93—95](../references/srd-5.1/pages/page-093.md)） | 短弓与骷髅远程动作支持正常和长射程、贴身劣势、命中与护盾术。角色逐支扣箭 | 遮挡、弹药回收、投掷以及双持附赠攻击待接入 | [短弓与远程攻击](schema-2-ranged-attacks.md) |
+| 远程/投掷/双持（[93—95](../references/srd-5.1/pages/page-093.md)） | 角色、骷髅与地精短弓支持射程、贴身劣势、双方视线、武器掩护、命中与护盾术。角色逐支扣箭 | 弹药回收、投掷以及双持附赠攻击待接入 | [短弓与远程攻击](schema-2-ranged-attacks.md) |
 | Extra Attack（[25](../references/srd-5.1/pages/page-025.md)） | 单职业战士 5–6 级本人 Attack 两击；两击间移动、反应、换目标和放弃；完整文件保留原骰与序列进度 | 机会攻击和当前 Ready 响应仍为单击；更高等级、其他职业及多职业合并未接入 | [有限额外攻击合同](schema-2-extra-attack.md)、[真实链路验证](../testing.md#extra-attack-verification) |
 | Second Wind（[24](../references/srd-5.1/pages/page-024.md)） | 单职业战士 1–6 级真实一级授予，本人回合可先攻击再用附赠动作回气。额度、原骰、次数和 HP 同根。标准短长休恢复次数 | SQLite 完整文件及 Host/本人玩家候选已接合。多职业及战斗外执行仍待接入 | [有限回气合同](schema-2-second-wind.md)、[真实链路验证](../testing.md#second-wind-verification) |
 | Improved Critical（[25](../references/srd-5.1/pages/page-025.md)） | 单职业勇士 3–6 级正常取得，普通近战与短弓、近战 OA/Ready 选中 19/20 重击，固定修正不加倍 | 反应暂停及原骰/授予/伤害随完整文件恢复；投掷、多职业和 Superior Critical 未接入 | [有限精通重击合同](schema-2-improved-critical.md)、[真实链路验证](../testing.md#improved-critical-verification) |
 | Dash/Disengage/Dodge（[93](../references/srd-5.1/pages/page-093.md)） | 已接 action 成本及速度/本回合 OA 免除/攻击和 DEX save 贡献 | 局部闭环；新增失能、不可见、速度为零或特殊动作来源须消费真实贡献 | [战斗](#combat)、[怪物](#monsters) |
 | Help（[93](../references/srd-5.1/pages/page-093.md)） | 未接入 | 缺援助对象/任务/五尺敌人资格、下一次适用检定或攻击的单次优势、本人下回合期限及消费事实 | [战斗](#combat)、[检定](#foundation)待接 |
-| Hide/Search（[93—94](../references/srd-5.1/pages/page-093.md)） | 未接入；普通技能检定不足 | 缺隐藏关系/可被感知资格、主动搜索目标与被动值、观察者专属结果、失去隐藏和攻击影响 | 空间/感知/检定 owner 须共同接合 |
+| Hide/Search（[93—94](../references/srd-5.1/pages/page-093.md)） | 允许躲藏的格位使用一次隐匿分别对抗各敌人的被动察觉，主动搜索对抗原隐匿总值 | 记录各观察者所知格位，逐格更新视线，攻击后暴露。更广的声音传播及特殊感官待接入 | [躲藏与观察](schema-2-observation.md) |
 | Ready（[93—94](../references/srd-5.1/pages/page-093.md)） | 有限 attack/move/spell 及封闭完成事实触发、reaction、持能量专注 | 局部闭环；不解释任意自然语言触发，不开放其他物体/能力响应；新触发须有真实 producer 与恢复闭包 | [施法](#spells)、[动作流](#combat) |
 | Use an Object、拾取/重新装备、临时行动（[91](../references/srd-5.1/pages/page-091.md)、[94](../references/srd-5.1/pages/page-094.md)） | 战斗掉地已保存；使用/拾取未接入 | 缺免费交互与 action 区分、目标距离/手位、物品使用成本/效果/归属和类型化临时行动结果 | [基础](#foundation)、[战斗](#combat) |
 | Grapple/Shove/escape（[95—96](../references/srd-5.1/pages/page-095.md)） | 本人 Attack 替代一击、目标选技能、冻结分差、关系、推开或倒地、挣脱和释放 | 限活动场景单格中型规则角色。拖带两端位置与抓者花费共同提交，等待选技能、余击和反应可保存重开 | [近战控制](schema-2-melee-control.md) |
-| 移动/OA/倒地姿态（[91—95](../references/srd-5.1/pages/page-091.md)） | 规则角色与怪物在本人战斗回合逐格步行、双倍成本爬行或精确半速起身。规则怪物使用冻结步速，可疾走或撤离。共享怪物离开触及前，持械玩家可借机攻击或放弃。保存及重开保留停点和已付成本 | 角色另支持主动卧倒、Ready 爬行及有限探索移动。怪物可在探索中起身。怪物主动卧倒或探索移动、穿越占格、挤压、地形、传送及其他强制移动仍待接入。敌对可反应怪物的攻击来源无法解释时拒绝相关移动 | [倒地合同](schema-2-prone.md)、[战斗](#combat)、[怪物](#monsters) |
-| 体型空间、触及、掩护/遮挡、区域（[92](../references/srd-5.1/pages/page-092.md)、[96](../references/srd-5.1/pages/page-096.md)、[102—103](../references/srd-5.1/pages/page-102.md)） | 单点格、正常可见、无遮挡；有限锥形和固定半径区域 | 局部目标证明；缺大体积/三维/障碍、半/四分之三/全掩护、所有区域形状与完整战外 roster；点格政策不代表通用 SRD 空间引擎 | [战斗](#combat)、[怪物](#monsters)、[施法](#spells) |
+| 移动/OA/倒地姿态（[91—95](../references/srd-5.1/pages/page-091.md)） | 规则角色与怪物在本人战斗回合逐格步行、双倍成本爬行或精确半速起身。规则怪物使用冻结步速，可疾走或撤离。共享怪物离开触及前，看得见它的持械玩家可借机攻击或放弃。保存及重开保留停点和已付成本 | 角色另支持主动卧倒、Ready 爬行及有限探索移动。怪物可在探索中起身。怪物主动卧倒或探索移动、穿越占格、挤压、地形、传送及其他强制移动仍待接入。敌对可反应怪物的攻击来源无法解释时拒绝相关移动 | [倒地合同](schema-2-prone.md)、[战斗](#combat)、[怪物](#monsters) |
+| 体型空间、触及、掩护/遮挡、区域（[92](../references/srd-5.1/pages/page-092.md)、[96](../references/srd-5.1/pages/page-096.md)、[102—103](../references/srd-5.1/pages/page-102.md)） | 单格生物、逐观察者视线与三个等级的武器攻击掩护。另有有限锥形和固定半径区域 | 武器攻击已接 AC 加值、全掩护目标门与同版恢复。区域传播、掩护对敏捷豁免的加值、大体积和三维仍待接入 | [战斗](#combat)、[怪物](#monsters)、[施法](#spells) |
 | 伤害类型、抗性/易伤/免疫、共享伤害（[96—97](../references/srd-5.1/pages/page-096.md)） | 有限吐息共享骰及准确怪物防御/适用 gate；PC 来源不通用 | 局部闭环；缺角色防御 producer、多分量及一般物理/魔法/攻击门限、伤害后反应如 Uncanny Dodge、Evasion/Legendary Resistance | [怪物](#monsters)；共享核不能授予所有伤害机制 |
 | 治疗/temp HP/零 HP/稳定/死亡/即死（[97—99](../references/srd-5.1/pages/page-097.md)） | 真实有限健康、回合死亡豁免、稳定期限、掉物/倒地；怪物有限零 HP 死亡政策 | 局部闭环；缺医疗动作稳定、非致命击倒、复活、最大 HP 变化和特性替代后果；治疗不自动起身/捡物 | [健康](#foundation)、[战斗](#combat)、[怪物](#monsters) |
 | 坐骑战斗、水下战斗（[99](../references/srd-5.1/pages/page-099.md)） | 未接入 | 缺骑乘/下马与独立或受控坐骑先攻/action/位置、跌落/OA、游泳速度与武器/火抗规则 | 未建对应战斗消费者 |
@@ -198,7 +198,7 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 | 准备/已知/法术书/领域授权（[100](../references/srd-5.1/pages/page-100.md)、[15—17](../references/srd-5.1/pages/page-015.md)、[52—54](../references/srd-5.1/pages/page-052.md)） | 一级 Life 始终准备两法术；单职业 Wizard 1—5 级真实学习/升级/准备与长休标记 | 局部闭环；缺其余职业/种族/专长/怪物/物品授权、戏法、全部始终准备例外、抄录与仪式名单 | [施法](#spells) |
 | 法术位/升环/多职业/Pact（[100—101](../references/srd-5.1/pages/page-100.md)、[57—58](../references/srd-5.1/pages/page-057.md)） | 有限一至三环资源、已接法术的固定允许位；真实成本一次消费 | 局部闭环；缺通用升环效果、四至九环、多职业合并/分来源已知、Pact 分池及转换/特殊恢复 | [施法](#spells)、[成长](#growth) |
 | 施法时间/组件/法器/材料（[101—102](../references/srd-5.1/pages/page-101.md)） | action、reaction 与 Ready；正常发声/空手、真实圣徽、护甲禁施法 | 局部闭环；缺 bonus action 限制、长时施法/中断、沉默/绑缚、组件袋/各法器、定价/消耗材料、免组件例外 | [施法](#spells) |
-| 目标/区域/可见与路径（[102—103](../references/srd-5.1/pages/page-102.md)） | 当前角色定向法术与正常可见点格；怪物锥形另有完整内部 roster | 缺全生物/物体/位置目标、敌友/类别/感官、全部形状/体积/掩护及更广场景 reader；怪物部署不自动授权其成为每种法术目标 | [施法](#spells)、[怪物](#monsters) |
+| 目标/区域/可见与路径（[102—103](../references/srd-5.1/pages/page-102.md)） | 现有定向法术检查施法者视线和距离；怪物锥形另有完整内部 roster | 缺全生物/物体/位置目标、敌友/类别/感官、全部形状/体积/掩护及更广场景 reader；怪物部署不自动授权其成为每种法术目标 | [施法](#spells)、[怪物](#monsters) |
 | Bless（[122](../references/srd-5.1/pages/page-122.md)） | 有限类型化、真实一级 Life 授权、有限目标选择、成本/专注/d4 贡献 | 局部闭环；新增 save/attack 消费者必须显式消费有效贡献；不证明所有职业/升环/目标范围已支持 | [施法](#spells) |
 | Cure Wounds（[132](../references/srd-5.1/pages/page-132.md)） | 有限类型化、一级 Life、触及/组件/slot/d8+WIS+生命门徒 | 局部闭环；缺其他授权/升环、怪物类型例外及其他治疗/复活效果；不能把普通环境治疗当作施法 | [施法](#spells)、[健康](#foundation) |
 | Shield / Counterspell（[179](../references/srd-5.1/pages/page-179.md)、[131](../references/srd-5.1/pages/page-131.md)） | Wizard 已准备来源、准确反应窗口、AC 重判/有限自动反制、嵌套与一次成本 | 局部闭环；Magic Missile producer、四环以上 counter ability check/升环、未知施法来源与其他反应尚缺 | [施法](#spells)、[动作流](#combat) |
@@ -217,14 +217,14 @@ schema 2 有真实通用容量/消费/标准休息消费者；没有证明该准
 
 | 机制族与原文 | 当前数据/执行 | 状态/恢复与具体缺口 | 依据 |
 |---|---|---|---|
-| 属性块/CR/XP/类型/感官/语言（[254—258](../references/srd-5.1/pages/page-254.md)、[261—357](../references/srd-5.1/pages/page-261.md)、[366—403](../references/srd-5.1/pages/page-366.md)） | 有限类型化 stat_block 协议、狼、地狱犬和木乃伊实例；不代表所有 SRD 属性块已收录 | 有限实例局部闭环；缺全目录逐项映射、更多体型/运动、感官/语言/telepathy 执行；显式 save bonus 不能再叠 PB/属性 | [怪物](#monsters) |
+| 属性块/CR/XP/类型/感官/语言（[254—258](../references/srd-5.1/pages/page-254.md)、[261—357](../references/srd-5.1/pages/page-261.md)、[366—403](../references/srd-5.1/pages/page-366.md)） | 有限类型化 stat_block 协议、狼、地狱犬、木乃伊、骷髅与地精实例；不代表所有 SRD 属性块已收录 | 有限实例局部闭环；缺全目录逐项映射、更多体型/运动、感官/语言/telepathy 执行；显式 save bonus 不能再叠 PB/属性 | [怪物](#monsters) |
 | 部署/位置/先攻/HP/死亡（[254—259](../references/srd-5.1/pages/page-254.md)） | SMALL/MEDIUM 点格、有限真实 roster、怪物回合和零 HP 死亡 | 局部闭环；缺大体型、纯怪物场景、完整战外生物 roster、击败/俘获/战利品与 XP 奖励 | [怪物](#monsters)、[战斗](#combat) |
-| 普通近战/远程、天然武器、Multiattack（[259](../references/srd-5.1/pages/page-259.md)） | [狼和地狱犬啮咬](schema-2-monster-attacks.md)按冻结加值、触及和分量执行普通或借机攻击。狼最终命中后再做力量豁免，失败倒地。骷髅使用短剑或正常/长射程短弓 | Multiattack、Rotting Fist 的附加效果与其他未分类攻击仍待接入 | [怪物](#monsters) |
+| 普通近战/远程、天然武器、Multiattack（[259](../references/srd-5.1/pages/page-259.md)） | [狼和地狱犬啮咬](schema-2-monster-attacks.md)按冻结加值、触及和分量执行普通或借机攻击。狼最终命中后再做力量豁免，失败倒地。骷髅使用短剑，地精使用弯刀，两者均可使用正常/长射程短弓 | Multiattack、Rotting Fist 的附加效果与其他未分类攻击仍待接入 | [怪物](#monsters) |
 | Wolf Bite 命中后豁免（[393](../references/srd-5.1/pages/page-393.md)） | 2d4+2 穿刺，生物做 DC 11 力量豁免，失败倒地。可冻结整项覆盖 DC。护盾术、昏迷、伤害免疫、倒地免疫和已经倒地均有各自结果 | 单目标、单次豁免、单格小型/中型怪物或规则角色。借机窗口、已付移动、原骰和姿态完整恢复 | [怪物攻击](schema-2-monster-attacks.md) |
 | Hell Hound Fire Breath / Recharge（[321—322](../references/srd-5.1/pages/page-321.md)） | 有限吐息动作，15 尺点锥、DEX12、共享 6d6、半伤、recharge5—6 | 完整目标证明/共享骰/分阶段健康与专注、真实回合 recharge 和怪物休息局部闭环；不泛化任意吐息或区域 | [怪物](#monsters) |
 | 其他 save 动作：凝视/恐惧/疾病毒素/死亡（[259](../references/srd-5.1/pages/page-259.md)及各属性块） | 元数据或原文；例如 Dreadful Glare/Rotting Fist 未执行 | 缺可见/距离/目标类型、豁免与重复、免疫期限、状态/最大 HP/疾病/诅咒及死亡后继，不能只登记 damage_profile | [怪物](#monsters)、条件/健康 owner 待接 |
 | 怪物防御/被动：抗性、易伤、免疫、条件免疫（[257](../references/srd-5.1/pages/page-257.md)） | Hell Hound FIRE 免疫/Mummy FIRE 易伤、NONMAGICAL_ATTACKS gate 真实消费；狼的命中后果读取目标怪物的倒地免疫 | 局部闭环；缺所有防御来源/适用属性/魔法武器判定、Legendary Resistance、Magic Resistance、Evasion/特殊减伤、其余条件免疫的真实消费者 | [怪物](#monsters) |
-| 感知、Pack Tactics 与其他 traits（[257—259](../references/srd-5.1/pages/page-257.md)及各属性块） | Pack Tactics 按目标五尺内未失能盟友给怪物攻击提供优势。攻击记录保留适用盟友。吐息使用豁免 | 感知、再生、回避、反伤和死亡爆发等被动仍缺执行机制。未知特性在根预检拒绝 | [怪物](#monsters) |
+| 感知、Pack Tactics 与其他 traits（[257—259](../references/srd-5.1/pages/page-257.md)及各属性块） | Pack Tactics 按目标五尺内未失能盟友给怪物攻击提供优势。攻击记录保留适用盟友。吐息使用豁免 | 地精的灵巧逃脱可付一次附赠动作躲藏或撤离，属性块提供隐匿与被动察觉。特殊感官、再生、回避、反伤和死亡爆发等仍待接入。未知特性在根预检拒绝 | [怪物](#monsters) |
 | Innate Spellcasting/Spellcasting/Psionics（[258—259](../references/srd-5.1/pages/page-258.md)） | 属性块说明不是施法授权 | 缺已知/每日次数/slot、能力/DC/组件例外、怪物动作经济、法术效果及跨场景恢复；PC Wizard profile 不能用于怪物 | [怪物](#monsters)、[施法](#spells) |
 | 附赠/反应、Parry/OA/反制等（[259](../references/srd-5.1/pages/page-259.md)及各属性块） | 有限近战动作可在敌人主动离开前使用一次怪物反应。候选、决定和伤害随完整文件保存 | 其他反应、Parry 和未知攻击的触及与后果仍待接入 | [怪物](#monsters)、[动作流](#combat) |
 | 使用次数/短长休/充能恢复（[259](../references/srd-5.1/pages/page-259.md)） | 吐息 turn-start recharge、显式怪物短/长休恢复局部 | 缺其他每日/次数/随机/受条件恢复、怪物治疗与生命骰、不同资源来源；怪物休息不授予 PC 休息收益 | [怪物](#monsters) |

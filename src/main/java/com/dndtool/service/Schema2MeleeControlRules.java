@@ -162,6 +162,9 @@ public final class Schema2MeleeControlRules {
         require(sequence != null && !sequence.closed(), "S2_COMBAT_SEQUENCE_UNAVAILABLE");
         require(sequence.sequenceKey().equals(input.sequenceKey()) && sequence.performed() == input.attackOrdinal(),
                 "ACTION_FLOW_TARGET_MISMATCH");
+        Position known = Schema2ObservationRules.knownPosition(battle, actor.characterId(), target.characterId());
+        require(target.position().equals(known)
+                && Schema2ObservationRules.cover(battle, actor.position(), known) != Cover.TOTAL, "S2_COMBAT_TARGET");
         require(actor.position().distanceFeet(target.position()) == REACH_FEET, "S2_COMBAT_OUT_OF_REACH");
         require(targetSize.ordinal() - actorSize.ordinal() <= 1, "S2_COMBAT_TARGET_SIZE");
         if (command.kind() == Kind.GRAPPLE) {
@@ -243,6 +246,7 @@ public final class Schema2MeleeControlRules {
             facts.add(new CombatFact("ATTACK_ORDINAL_SPENT", initiator.characterId(), contest.contestKey(), contest.kind().name()));
         }
         after = withContest(after, complete);
+        if (!escape) after = Schema2ObservationRules.revealAttack(after, initiator.characterId());
         facts.add(new CombatFact("MELEE_CONTEST_RESOLVED", initiator.characterId(), complete.contestKey(), outcome.name()));
         if (outcome != ContestOutcome.INITIATOR_WINS) return after;
 
@@ -256,7 +260,7 @@ public final class Schema2MeleeControlRules {
             }
             case SHOVE_PUSH -> {
                 facts.add(new CombatFact("SHOVED_FIVE_FEET", target.characterId(), contest.contestKey(), null));
-                yield replaceActor(after, at(target, contest.destination()));
+                yield Schema2ObservationRules.refresh(after, replaceActor(after, at(target, contest.destination())));
             }
             default -> throw invalid("S2_COMBAT_COMMAND");
         };
@@ -341,7 +345,7 @@ public final class Schema2MeleeControlRules {
         return new Battle(b.combatId(), b.campaignId(), b.combatRule(), b.status(), b.round(), b.turnNumber(),
                 b.activeOrdinal(), b.version(), b.combatants(), b.initiative(), b.flows(), b.ongoingEffects(),
                 b.readyPreparations(), b.triggerFacts(), b.shields(), b.concentrationHolders(), b.environmentZones(),
-                b.suppressionCauses(), b.monsters(), b.saveDamageBatches(), b.monsterRests(), control);
+                b.suppressionCauses(), b.monsters(), b.saveDamageBatches(), b.monsterRests(), control, b.observation());
     }
 
     static Battle reconcile(Battle battle, Map<UUID, Context> roster, List<HealthChange> changes,

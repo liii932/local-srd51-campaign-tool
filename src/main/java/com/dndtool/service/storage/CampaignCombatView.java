@@ -4,6 +4,8 @@ import com.dndtool.module.composition.ProductionSchema2Projection;
 import com.dndtool.service.Schema2CombatRules;
 import com.dndtool.service.Schema2CombatState.Battle;
 import com.dndtool.service.Schema2CombatState.Combatant;
+import com.dndtool.service.Schema2CombatState.Cover;
+import com.dndtool.service.Schema2ObservationRules;
 import com.google.gson.JsonObject;
 import java.util.*;
 
@@ -35,5 +37,19 @@ final class CampaignCombatView {
         budget.addProperty("reactionAvailable", actor.reactionAvailable());
         budget.addProperty("movementRemainingHalfFeet", actor.remainingMovementHalfFeet(speed));
         return budget;
+    }
+
+    static List<UUID> weaponTargets(Battle battle) {
+        UUID attackerId = battle.activeActor();
+        Combatant attacker = battle.combatants().stream().filter(actor -> actor.characterId().equals(attackerId))
+                .findFirst().orElseThrow();
+        List<UUID> targets = new ArrayList<>();
+        for (Combatant defender : battle.combatants()) {
+            if (defender.side() == attacker.side()) continue;
+            var aim = Schema2ObservationRules.knownPosition(battle, attackerId, defender.characterId());
+            if (aim != null && Schema2ObservationRules.cover(battle, attacker.position(), aim) != Cover.TOTAL)
+                targets.add(defender.characterId());
+        }
+        return List.copyOf(targets);
     }
 }

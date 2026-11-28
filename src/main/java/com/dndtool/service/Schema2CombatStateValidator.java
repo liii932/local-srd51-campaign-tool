@@ -85,6 +85,7 @@ final class Schema2CombatStateValidator {
             }
             validateAttackSequences(b);
             Schema2MeleeControlRules.validate(b);
+            Schema2ObservationRules.validate(b);
             validateMonstersAndBatches(b,actors,allFrames,keys);
             check(active<=1&&(b.status()!=Status.ENDED||active==0));
             for(TriggerFact t:triggers.values())check(allFrames.containsKey(t.sourceFrameKey()));
@@ -178,19 +179,19 @@ final class Schema2CombatStateValidator {
     static boolean validAttackSource(AttackAttempt attack) {
         var source = attack.monsterAttack();
         var ranged = attack.rangedAttack();
+        if (!validAttackObservation(attack) || !validD20Selection(attack)) return false;
         if (ranged != null && !validRangedAttack(attack, ranged)) return false;
-        if (source == null) return attack.itemId() != null && (ranged == null || validD20Selection(attack));
+        if (source == null) return attack.itemId() != null;
         if (attack.itemId() != null || attack.sequenceKey() != null || attack.attackOrdinal() != 0
                 || !attack.damageDice().isEmpty() || attack.abilityModifier() != 0 || attack.proficiencyBonus() != 0
                 || !Schema2CombatHistory.validAction(source.action()) || source.packTacticsAllies().size() > 63
                 || new HashSet<>(source.packTacticsAllies()).size() != source.packTacticsAllies().size()
                 || source.packTacticsAllies().contains(attack.actorId()) || source.packTacticsAllies().contains(attack.targetId())
                 || !source.packTacticsAllies().isEmpty() && !attack.advantage()) return false;
-        if (!validD20Selection(attack)) return false;
         int selected = attack.selectedD20();
         int total = selected + source.hitBonus() + (attack.blessingD4() == null ? 0 : attack.blessingD4());
-        if (attack.initialHit() != (selected == 20 || selected != 1 && total >= attack.armorClass())
-                || attack.hit() != (selected == 20 || selected != 1 && total >= attack.finalArmorClass())) return false;
+        if (attack.initialHit() != (attack.targetAtAimedPosition() && (selected == 20 || selected != 1 && total >= attack.armorClass()))
+                || attack.hit() != (attack.targetAtAimedPosition() && (selected == 20 || selected != 1 && total >= attack.finalArmorClass()))) return false;
         if (source.hitBonus() < MONSTER_ATTACK_MIN_BONUS || source.hitBonus() > MONSTER_ATTACK_MAX_BONUS
                 || (ranged == null ? !MONSTER_ATTACK_REACH_FEET.contains(source.reachFeet()) : source.reachFeet() != 0)) return false;
         boolean settled = attack.hit() && attack.status() == AttackStatus.RESOLVED;
@@ -220,6 +221,21 @@ final class Schema2CombatStateValidator {
         return damage == attack.damageAmount();
     }
 
+    private static boolean validAttackObservation(AttackAttempt attack) {
+        Cover cover = attack.targetCover();
+        if (cover == null || cover == Cover.TOTAL || attack.aimedPosition() == null
+                || !attack.attackerSeesTarget() && !attack.disadvantage()) return false;
+        if (attack.opportunityAttack() && !attack.attackerSeesTarget()) return false;
+        if (!attack.targetAtAimedPosition()) {
+            int aimArmorClass = Math.max(1, cover.armorClassBonus());
+            return !attack.attackerSeesTarget() && !attack.targetSeesAttacker() && !attack.advantage()
+                    && !attack.initialHit() && !attack.hit() && !attack.critical() && attack.status() == AttackStatus.RESOLVED
+                    && attack.armorClass() == aimArmorClass && attack.finalArmorClass() == aimArmorClass;
+        }
+        return (attack.targetSeesAttacker() || attack.advantage()) && attack.armorClass() > cover.armorClassBonus()
+                && attack.finalArmorClass() >= attack.armorClass();
+    }
+
     private static boolean validD20Selection(AttackAttempt attack) {
         if ((attack.secondD20() != null) != (attack.advantage() != attack.disadvantage())) return false;
         int selected = attack.firstD20();
@@ -229,7 +245,8 @@ final class Schema2CombatStateValidator {
     }
 
     private static boolean validRangedAttack(AttackAttempt attack, RangedAttackEvidence ranged) {
-        if (attack.opportunityAttack() || ranged.distanceFeet() <= 0 || ranged.distanceFeet() % 5 != 0
+        if (attack.opportunityAttack() || ranged.distanceFeet() < 0 || ranged.distanceFeet() == 0 && attack.targetAtAimedPosition()
+                || ranged.distanceFeet() % 5 != 0
                 || ranged.normalRangeFeet() < 5 || ranged.normalRangeFeet() % 5 != 0
                 || ranged.longRangeFeet() <= ranged.normalRangeFeet() || ranged.longRangeFeet() % 5 != 0
                 || ranged.longRangeFeet() > MAX_WEAPON_RANGE_FEET || ranged.distanceFeet() > ranged.longRangeFeet()

@@ -172,6 +172,175 @@ class Schema2RangedAttackRulesTest {
         }
     }
 
+    @Test void hiddenShooterIgnoresUnseeingDodgeAndAdjacentHostilityAndRevealsOnAMiss() {
+        var game = new Game("fighter");
+        game.armBow(true);
+        game.arrow(FIRST_ARROW);
+        game.add(game.nearby, "fighter");
+        Position firingCell = new Position(0, 0);
+        game.apply(Command.start(List.of(new Deployment(game.shooter, firingCell, 0),
+                new Deployment(game.target, new Position(3, 0), 1), new Deployment(game.nearby, new Position(0, 1), 1)),
+                List.of(game.shooter, game.target, game.nearby)), 20, 10, 2);
+        game.cell(firingCell, true, false, Cover.NONE);
+        game.apply(Command.action(Kind.HIDE, game.shooter), 20);
+        game.apply(Command.action(Kind.END_TURN, game.shooter));
+        game.apply(Command.action(Kind.DODGE, game.target));
+        game.apply(Command.action(Kind.END_TURN, game.target));
+        game.apply(Command.action(Kind.END_TURN, game.nearby));
+        assertFalse(Schema2ObservationRules.visible(game.battle, game.target, game.shooter));
+        assertFalse(Schema2ObservationRules.visible(game.battle, game.nearby, game.shooter));
+
+        game.begin();
+        game.apply(game.shoot(), 1, 2);
+        var attack = game.lastAttack();
+        assertTrue(attack.attackerSeesTarget());
+        assertFalse(attack.targetSeesAttacker());
+        assertTrue(attack.advantage());
+        assertFalse(attack.disadvantage());
+        assertFalse(attack.rangedAttack().closeEnemy());
+        assertFalse(attack.hit());
+        assertTrue(Schema2ObservationRules.visible(game.battle, game.target, game.shooter));
+        assertTrue(Schema2ObservationRules.visible(game.battle, game.nearby, game.shooter));
+    }
+
+    @Test void hiddenTargetsCanBeAttackedAtTheRememberedCellWithoutTrackingTheirMovement() {
+        for (boolean moved : List.of(false, true)) {
+            var game = new Game("fighter", "wizard");
+            game.prepareShield();
+            game.armBow(true);
+            game.arrow(FIRST_ARROW);
+            Position remembered = new Position(2, 0), next = new Position(3, 0);
+            game.start(remembered, false);
+            game.cell(remembered, true, false, Cover.NONE);
+            game.cell(next, true, false, Cover.NONE);
+            game.apply(Command.action(Kind.HIDE, game.target), 20);
+            if (moved) game.apply(Command.move(game.target, List.of(next)));
+            game.apply(Command.action(Kind.END_TURN, game.target));
+            assertEquals(remembered, Schema2ObservationRules.knownPosition(game.battle, game.shooter, game.target));
+
+            game.begin();
+            var shot = game.apply(game.shoot(), 20, 20);
+            var attack = game.lastAttack();
+            assertEquals(remembered, attack.aimedPosition());
+            assertEquals(10, attack.rangedAttack().distanceFeet());
+            assertEquals(!moved, attack.targetAtAimedPosition());
+            assertFalse(attack.attackerSeesTarget());
+            assertTrue(attack.disadvantage());
+            assertEquals(20, attack.selectedD20());
+            assertEquals(!moved, attack.initialHit());
+            assertEquals(!moved, attack.critical());
+            assertEquals(!moved, game.battle.activeFlow() != null);
+            assertFalse(game.carries(FIRST_ARROW));
+            assertTrue(shot.healthChanges().isEmpty());
+            assertFalse(Schema2ObservationRules.visible(game.battle, game.shooter, game.target));
+        }
+    }
+
+    @Test void aStaleAimInTheShootersCellStillCannotHitTheHiddenTarget() {
+        var game = new Game("fighter");
+        game.armBow(true);
+        game.arrow(FIRST_ARROW);
+        Position remembered = new Position(2, 0), next = new Position(3, 0);
+        game.start(remembered, false);
+        game.cell(remembered, true, false, Cover.NONE);
+        game.cell(next, true, false, Cover.NONE);
+        game.apply(Command.action(Kind.HIDE, game.target), 20);
+        game.apply(Command.move(game.target, List.of(next)));
+        game.apply(Command.action(Kind.END_TURN, game.target));
+        game.apply(Command.move(game.shooter, List.of(new Position(1, 0), remembered)));
+        game.begin();
+
+        var shot = game.apply(game.shoot(), 20, 20);
+        assertEquals(0, game.lastAttack().rangedAttack().distanceFeet());
+        assertFalse(game.lastAttack().initialHit());
+        assertFalse(game.lastAttack().hit());
+        assertTrue(shot.healthChanges().isEmpty());
+        assertFalse(game.carries(FIRST_ARROW));
+    }
+
+    @Test void coverChangesTheHitThresholdAndTheOriginalBonusStaysThroughShield() {
+        for (Cover cover : List.of(Cover.HALF, Cover.THREE_QUARTERS)) {
+            var game = new Game("wizard");
+            game.prepareShield();
+            game.armBow(true);
+            game.arrow(FIRST_ARROW);
+            Position defenseCell = new Position(4, 0);
+            game.start(defenseCell, true);
+            game.cell(defenseCell, false, false, cover);
+            int baseAc = game.equipment.derive(game.material, game.roster.get(game.target).character()).armorClass();
+            game.begin();
+            var launched = game.apply(game.shoot(), baseAc + cover.armorClassBonus() - 3);
+            var pending = game.lastAttack();
+            assertEquals(baseAc + cover.armorClassBonus(), pending.armorClass());
+            assertEquals(cover, pending.targetCover());
+            assertTrue(pending.initialHit());
+            assertEquals(1, launched.rolls().size());
+            game.apply(game.shield());
+            var finished = game.apply(game.continueAttack());
+            var resolved = game.lastAttack();
+            assertEquals(baseAc + cover.armorClassBonus() + 5, resolved.finalArmorClass());
+            assertEquals(cover, resolved.targetCover());
+            assertEquals(defenseCell, resolved.aimedPosition());
+            assertEquals(pending.selectedD20(), resolved.selectedD20());
+            assertFalse(resolved.hit());
+            assertTrue(finished.rolls().isEmpty());
+            assertTrue(finished.healthChanges().isEmpty());
+        }
+    }
+
+    @Test void totalCoverStopsDirectAttacksBeforeSpendingAnArrowOrAttackOrdinal() {
+        var game = new Game("fighter");
+        game.armBow(true);
+        game.arrow(FIRST_ARROW);
+        Position defenseCell = new Position(4, 0);
+        game.start(defenseCell, true);
+        game.cell(new Position(2, 0), false, false, Cover.TOTAL);
+        assertEquals(defenseCell, Schema2ObservationRules.knownPosition(game.battle, game.shooter, game.target));
+        game.begin();
+        game.reject(game.shoot(), "S2_COMBAT_TOTAL_COVER");
+        assertTrue(game.carries(FIRST_ARROW));
+        assertEquals(0, game.actor(game.shooter).sequence().performed());
+        assertTrue(game.battle.flows().isEmpty());
+    }
+
+    @Test void opportunityAttackUsesTheVisibleDepartureCellAndThenResumesTheSameMovement() {
+        for (boolean hiddenAtDeparture : List.of(false, true)) {
+            var game = new Game("fighter");
+            game.armDagger(game.target);
+            Position departure = new Position(2, 0), boundary = new Position(3, 0), finish = new Position(4, 0);
+            game.apply(Command.start(List.of(new Deployment(game.shooter, departure, 0),
+                    new Deployment(game.target, new Position(1, 0), 1)), List.of(game.shooter, game.target)), 20, 2);
+            game.cell(departure, true, false, Cover.HALF);
+            game.cell(boundary, true, true, Cover.NONE);
+            game.cell(finish, true, true, Cover.NONE);
+            if (hiddenAtDeparture) game.apply(Command.action(Kind.HIDE, game.shooter), 20);
+
+            game.apply(Command.move(game.shooter, List.of(boundary, finish)));
+            UUID movementKey = game.battle.flows().getLast().movements().getFirst().movementKey();
+            if (!hiddenAtDeparture) {
+                assertEquals(departure, game.actor(game.shooter).position());
+                var flow = game.battle.activeFlow();
+                var window = game.activeWindow();
+                var option = window.opportunities().getFirst();
+                assertEquals(game.target, option.actorId());
+                game.apply(Command.reaction(Kind.DECLARE_OPPORTUNITY_ATTACK, game.target, option.options().getFirst().itemId(),
+                        flow.flowKey(), flow.leafFrameKey(), window.windowKey(), option.opportunityKey()), 1);
+                assertEquals(Cover.HALF, game.lastAttack().targetCover());
+                assertEquals(departure, game.lastAttack().aimedPosition());
+                game.apply(game.continueFlow(game.shooter));
+            } else {
+                assertTrue(game.battle.flows().getLast().windows().isEmpty());
+                assertTrue(game.actor(game.target).reactionAvailable());
+            }
+            assertNull(game.battle.activeFlow());
+            assertEquals(finish, game.actor(game.shooter).position());
+            assertEquals(departure, Schema2ObservationRules.knownPosition(game.battle, game.target, game.shooter));
+            var movement = game.battle.flows().getLast().movements().getFirst();
+            assertEquals(movementKey, movement.movementKey());
+            assertEquals(2, movement.cursor());
+        }
+    }
+
     @Test void aReadiedMeleeAttackAfterShieldCanDropTheBowWithoutStoppingTheLaunchedShot() {
         var game = new Game("wizard");
         game.prepareShield();
@@ -330,6 +499,9 @@ class Schema2RangedAttackRulesTest {
             return new EntryIdentity(skeleton(), "actions", skeleton().moduleKey(), key);
         }
         void begin() { apply(Command.action(Kind.BEGIN_ATTACK, shooter)); }
+        void cell(Position position, boolean hideAllowed, boolean blocksSight, Cover cover) {
+            apply(Command.setObservationCell(new ObservationCellInput(position, hideAllowed, blocksSight, cover)));
+        }
         Command shoot() { return Command.attack(shooter, target, bow); }
         Command shield() {
             Flow flow = battle.activeFlow();

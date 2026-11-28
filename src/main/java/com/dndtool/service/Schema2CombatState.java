@@ -13,6 +13,7 @@ public final class Schema2CombatState {
     public enum Status { ACTIVE, EXPLORATION, ENDED }
     public enum Kind { START, OPEN_SCENE, SET_SCENE_ROSTER, MONSTER_BREATH, MONSTER_ATTACK, BEGIN_MONSTER_REST, COMPLETE_MONSTER_REST, END_TURN, DASH, DISENGAGE, DODGE, DROP_PRONE, STAND_UP, SECOND_WIND, BEGIN_ATTACK, ATTACK, FORFEIT_ATTACKS,
         GRAPPLE, SHOVE_PRONE, SHOVE_PUSH, CHOOSE_MELEE_DEFENSE, ESCAPE_GRAPPLE, RELEASE_GRAPPLE,
+        HIDE, SEARCH, NIMBLE_HIDE, NIMBLE_DISENGAGE, SET_OBSERVATION_CELL,
         MOVE, PASS_REACTION, DECLARE_OPPORTUNITY_ATTACK, DECLARE_SHIELD, DECLARE_COUNTERSPELL, RELEASE_READY,
         ADVANCE_WINDOW, CONTINUE_MOVEMENT, CONTINUE_FLOW, CAST, READY_ATTACK, READY_MOVE, READY_SPELL,
         CREATE_ENVIRONMENT_ZONE, END_ENVIRONMENT_ZONE, EXPLORATION_HEALTH, EXPLORATION_ADVANCE_TIME, EXPLORATION_MOVE, REENTER_COMBAT, CLOSE_SCENE, END_CONCENTRATION, END_COMBAT }
@@ -38,7 +39,7 @@ public final class Schema2CombatState {
     public enum ConcentrationKind { BLESS_EFFECT, READY_SPELL }
     public enum SuppressionReleaseReason { LEFT_ZONE, ZONE_ENDED, EFFECT_ENDED }
 
-    /** Coordinates are cells in a bounded, unobscured, level five-foot square grid. */
+    /** Coordinates are cells in a bounded, level five-foot square grid. */
     public record Position(int x, int y) {
         public Position { if (Math.abs((long)x) > 10000 || Math.abs((long)y) > 10000) throw invalid("S2_COMBAT_POSITION"); }
         public int distanceFeet(Position other) { return Math.max(Math.abs(x - other.x), Math.abs(y - other.y)) * 5; }
@@ -46,13 +47,57 @@ public final class Schema2CombatState {
     public record Deployment(UUID characterId, Position position, int side) {
         public Deployment { uuid(characterId); Objects.requireNonNull(position); if (side < 0 || side > 15) throw invalid("S2_COMBAT_SIDE"); }
     }
+    public enum Cover {
+        NONE(0), HALF(2), THREE_QUARTERS(5), TOTAL(0);
+
+        private final int armorClassBonus;
+
+        Cover(int armorClassBonus) { this.armorClassBonus = armorClassBonus; }
+
+        public int armorClassBonus() { return armorClassBonus; }
+    }
+    public record ObservationCellInput(Position position, boolean hideAllowed, boolean blocksSight, Cover cover) {
+        public ObservationCellInput {
+            if (position == null || cover == null) throw invalid("S2_OBSERVATION_CELL");
+        }
+
+        public boolean isDefault() { return !hideAllowed && !blocksSight && cover == Cover.NONE; }
+    }
+    /** A fully seen, unhidden subject has no retained pair. */
+    public record ObservationPair(UUID observerId, UUID subjectId, Position lastKnownPosition, UUID hideOperationId) { }
+    public record ObservationRoll(int firstD20, Integer secondD20, int selectedD20,
+            int abilityModifier, int skillBonus, boolean disadvantage, int total) { }
+    public record ObservationContest(UUID counterpartId, int opposingScore, UUID previousHideOperationId, boolean hiddenAfter) { }
+    public record ObservationCheck(UUID operationId, Kind kind, UUID actorId, Position position, RuleIdentity rule,
+            RuleIdentity skill, String monsterSkill, boolean nimbleEscape, ObservationRoll roll, List<ObservationContest> contests) {
+        public ObservationCheck { contests = List.copyOf(contests); }
+    }
+    public record ObservationState(List<ObservationCellInput> cells, List<ObservationPair> pairs, List<ObservationCheck> checks) {
+        public static final ObservationState EMPTY = new ObservationState(List.of(), List.of(), List.of());
+
+        public ObservationState {
+            cells = List.copyOf(cells);
+            pairs = List.copyOf(pairs);
+            checks = List.copyOf(checks);
+        }
+    }
     /** An exhaustive intent union; irrelevant fields are rejected by the pure preflight. */
     public record Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path,
             List<Deployment> deployments, List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey,
             UUID windowKey, UUID opportunityKey, CastInput castInput, ReadyInput readyInput, UUID readyKey,
             ZoneInput zoneInput, UUID zoneKey, com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
             List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput,
-            MeleeInput meleeInput, DragInput dragInput, MonsterAttackInput monsterAttackInput) {
+            MeleeInput meleeInput, DragInput dragInput, MonsterAttackInput monsterAttackInput, ObservationCellInput observationCell) {
+        public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments,
+                List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput,
+                ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey,
+                com.dndtool.service.Schema2CharacterRuntime.HealthInput healthInput, int seconds,
+                List<MonsterDeployment> monsterDeployments, BreathInput breathInput, MonsterRestInput monsterRestInput,
+                MeleeInput meleeInput, DragInput dragInput, MonsterAttackInput monsterAttackInput) {
+            this(kind,actorId,targetId,itemId,path,deployments,tieBreakOrder,flowKey,leafKey,windowKey,opportunityKey,castInput,
+                    readyInput,readyKey,zoneInput,zoneKey,healthInput,seconds,monsterDeployments,breathInput,monsterRestInput,
+                    meleeInput,dragInput,monsterAttackInput,null);
+        }
         public Command(Kind kind, UUID actorId, UUID targetId, UUID itemId, List<Position> path, List<Deployment> deployments,
                 List<UUID> tieBreakOrder, UUID flowKey, UUID leafKey, UUID windowKey, UUID opportunityKey, CastInput castInput,
                 ReadyInput readyInput, UUID readyKey, ZoneInput zoneInput, UUID zoneKey,
@@ -116,6 +161,10 @@ public final class Schema2CombatState {
             return new Command(kind,null,null,null,List.of(),deployments,List.of(),null,null,null,null,null,null,null,null,null,null,0,monsters,null);
         }
         public static Command action(Kind kind, UUID actor) { return new Command(kind,actor,null,null,List.of(),List.of(),List.of(),null,null,null,null); }
+        public static Command setObservationCell(ObservationCellInput input) {
+            return new Command(Kind.SET_OBSERVATION_CELL,null,null,null,List.of(),List.of(),List.of(),null,null,null,null,
+                    null,null,null,null,null,null,0,List.of(),null,null,null,null,null,input);
+        }
         public static Command attack(UUID actor, UUID target, UUID item) { return new Command(Kind.ATTACK,actor,target,item,List.of(),List.of(),List.of(),null,null,null,null); }
         public static Command monsterAttack(UUID actor, UUID target, EntryIdentity action) {
             return new Command(Kind.MONSTER_ATTACK,actor,target,null,List.of(),List.of(),List.of(),null,null,null,null,
@@ -268,6 +317,11 @@ public final class Schema2CombatState {
                     reactionAvailable, movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
         }
 
+        Combatant withDisengaged() {
+            return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining,
+                    reactionAvailable, movementSpentHalfFeet, movementBonus, true, dodging, sequence, prone);
+        }
+
         Combatant spendReaction() {
             return new Combatant(characterId, position, side, actionsRemaining, bonusActionsRemaining, false,
                     movementSpentHalfFeet, movementBonus, disengaged, dodging, sequence, prone);
@@ -388,40 +442,8 @@ public final class Schema2CombatState {
             int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
             boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
             UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
-            MonsterAttackEvidence monsterAttack, RangedAttackEvidence rangedAttack) {
-        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
-                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
-                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
-                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
-                UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
-                MonsterAttackEvidence monsterAttack) {
-            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,selectedD20,
-                    abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,damageAmount,
-                    blessingEffectKey,blessingD4,status,initialHit,finalArmorClass,monsterAttack,null);
-        }
-        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
-                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
-                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
-                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
-                UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass) {
-            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,selectedD20,
-                    abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,damageAmount,
-                    blessingEffectKey,blessingD4,status,initialHit,finalArmorClass,null);
-        }
-        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
-                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
-                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
-                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
-                UUID blessingEffectKey, Integer blessingD4) {
-            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,selectedD20,abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,damageAmount,blessingEffectKey,blessingD4,AttackStatus.RESOLVED,hit,armorClass);
-        }
-        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
-                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
-                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
-                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount) {
-            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,
-                    selectedD20,abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,damageAmount,null,null);
-        }
+            MonsterAttackEvidence monsterAttack, RangedAttackEvidence rangedAttack, boolean attackerSeesTarget,
+            boolean targetSeesAttacker, Cover targetCover, Position aimedPosition, boolean targetAtAimedPosition) {
         public AttackAttempt { damageDice = List.copyOf(damageDice); }
     }
     public record RangedAttackEvidence(int distanceFeet, int normalRangeFeet, int longRangeFeet, boolean closeEnemy,
@@ -542,7 +564,17 @@ public final class Schema2CombatState {
             List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields,
             List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones,
             List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches, List<MonsterRest> monsterRests,
-            MeleeControl meleeControl) {
+            MeleeControl meleeControl, ObservationState observation) {
+        public Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status, int round, long turnNumber,
+                int activeOrdinal, long version, List<Combatant> combatants, List<Initiative> initiative, List<Flow> flows,
+                List<OngoingEffect> ongoingEffects, List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts,
+                List<ShieldEffect> shields, List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones,
+                List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches,
+                List<MonsterRest> monsterRests, MeleeControl meleeControl) {
+            this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,
+                    ongoingEffects,readyPreparations,triggerFacts,shields,concentrationHolders,environmentZones,suppressionCauses,
+                    monsters,saveDamageBatches,monsterRests,meleeControl,ObservationState.EMPTY);
+        }
         public Battle(UUID combatId, UUID campaignId, RuleIdentity combatRule, Status status, int round, long turnNumber, int activeOrdinal, long version, List<Combatant> combatants, List<Initiative> initiative, List<Flow> flows, List<OngoingEffect> ongoingEffects, List<ReadyPreparation> readyPreparations, List<TriggerFact> triggerFacts, List<ShieldEffect> shields, List<ConcentrationHolder> concentrationHolders, List<EnvironmentZone> environmentZones, List<SuppressionCause> suppressionCauses, List<MonsterInstance> monsters, List<SaveDamageBatch> saveDamageBatches, List<MonsterRest> monsterRests) {
             this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,
                     ongoingEffects,readyPreparations,triggerFacts,shields,concentrationHolders,environmentZones,suppressionCauses,
@@ -564,7 +596,7 @@ public final class Schema2CombatState {
                 List<Initiative> initiative, List<Flow> flows) {
             this(combatId,campaignId,combatRule,status,round,turnNumber,activeOrdinal,version,combatants,initiative,flows,List.of());
         }
-        public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses);monsters=List.copyOf(monsters);saveDamageBatches=List.copyOf(saveDamageBatches);monsterRests=List.copyOf(monsterRests); if (meleeControl == null) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID"); }
+        public Battle { combatants = List.copyOf(combatants); initiative = List.copyOf(initiative); flows = List.copyOf(flows); ongoingEffects = List.copyOf(ongoingEffects); readyPreparations=List.copyOf(readyPreparations);triggerFacts=List.copyOf(triggerFacts);shields=List.copyOf(shields);concentrationHolders=List.copyOf(concentrationHolders);environmentZones=List.copyOf(environmentZones);suppressionCauses=List.copyOf(suppressionCauses);monsters=List.copyOf(monsters);saveDamageBatches=List.copyOf(saveDamageBatches);monsterRests=List.copyOf(monsterRests); if (meleeControl == null || observation == null) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID"); }
         public UUID activeActor() { return initiative.isEmpty() ? null : initiative.get(activeOrdinal).characterId(); }
         public Flow activeFlow() { return flows.stream().filter(f -> f.status() == FlowStatus.ACTIVE).findFirst().orElse(null); }
     }

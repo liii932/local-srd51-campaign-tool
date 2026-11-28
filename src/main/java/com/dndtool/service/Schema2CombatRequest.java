@@ -86,6 +86,14 @@ public record Schema2CombatRequest(UUID operationId, UUID combatId, UUID campaig
             MonsterAttackInput monsterAttack = command.monsterAttackInput();
             out.writeBoolean(monsterAttack != null);
             if (monsterAttack != null) entryIdentity(out, monsterAttack.action());
+            ObservationCellInput observationCell = command.observationCell();
+            if (observationCell != null) {
+                text(out, "S2_COMBAT_OBSERVATION_CELL_V1");
+                position(out, observationCell.position());
+                out.writeBoolean(observationCell.hideAllowed());
+                out.writeBoolean(observationCell.blocksSight());
+                text(out, observationCell.cover().name());
+            }
             out.flush(); return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes.toByteArray()));
         } catch (IOException|NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }

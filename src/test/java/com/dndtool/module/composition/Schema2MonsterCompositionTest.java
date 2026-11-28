@@ -1,13 +1,86 @@
 package com.dndtool.module.composition;
 
+import com.dndtool.service.storage.BundledCampaignRules;
 import com.google.gson.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class Schema2MonsterCompositionTest {
+    @Test void goblinStatBlockAndBothWeaponProfilesSurviveFrozenRestore() {
+        var material = BundledCampaignRules.projection();
+        var restored = ProductionSchema2Projection.restore(material.members(), material.projection().rules(),
+                material.projection().entries(), material.projection().chains());
+        var definition = restored.projection().rules().stream().filter(FinalMonster.class::isInstance)
+                .map(FinalMonster.class::cast).filter(row -> row.enabled() && row.identity().equals(GOBLIN_MONSTER))
+                .findFirst().orElseThrow().definition();
+        var block = definition.statBlock();
+        assertEquals(315, definition.sourcePage());
+        assertEquals(MonsterSize.SMALL, block.size());
+        assertEquals(MonsterCreatureType.HUMANOID, block.creatureType());
+        assertEquals(15, block.armorClass());
+        assertEquals(7, block.hitPoints());
+        assertEquals(30, block.walkSpeedFeet());
+        assertEquals(new MonsterAbilities(8, 14, 10, 10, 8, 8), block.abilities());
+        assertEquals(List.of(new MonsterSkillBonus("skill.stealth", 6)), block.skills());
+        assertEquals(9, block.passivePerception());
+        assertEquals(60, block.darkvisionFeet());
+        assertEquals(1, block.traits().size());
+        assertTrue(block.traits().getFirst().isNimbleEscape(GOBLIN_MONSTER));
+        var scimitar = new EntryIdentity(GOBLIN_MONSTER, "actions", GOBLIN_MONSTER.moduleKey(), "scimitar");
+        var shortbow = new EntryIdentity(GOBLIN_MONSTER, "actions", GOBLIN_MONSTER.moduleKey(), "shortbow");
+        var actions = new HashMap<EntryIdentity, MonsterAttackProfile>();
+        for (FinalEntry row : restored.projection().entries()) {
+            if (row.enabled() && row.entry() instanceof MonsterActionEntry action
+                    && action.identity().rule().equals(GOBLIN_MONSTER)) {
+                assertEquals(315, action.actionProfile().sourcePage());
+                actions.put(action.identity(), action.actionProfile().attackProfile());
+            }
+        }
+        assertEquals(Map.of(
+                scimitar, new MonsterAttackProfile(4, 5, List.of(new MonsterAttackDamage(DamageType.SLASHING, 1, 6, 2)), null),
+                shortbow, new MonsterAttackProfile(4, 0, 80, 320, List.of(new MonsterAttackDamage(DamageType.PIERCING, 1, 6, 2)), null)),
+                actions);
+        assertArrayEquals(material.finalRulesJson(), restored.finalRulesJson());
+    }
+
+    @Test void nimbleEscapeRequiresExactOwnerKeyAndTypedScopeAcrossComposition() {
+        for (Consumer<JsonArray> edit : List.<Consumer<JsonArray>>of(
+                rows -> goblinTraits(rows).get(0).getAsJsonObject().addProperty("key", "other_trait"),
+                rows -> goblinTraits(rows).get(0).getAsJsonObject().addProperty("scope", "PERCEPTION_HEARING_SMELL_ONLY"),
+                rows -> monsterTraits(rows, "monster.skeleton").add(goblinTraits(rows).get(0).deepCopy()))) {
+            assertEquals("S2_TYPE", assertThrows(Schema2Exception.class, () -> composeWithMonsterEdit(edit)).diagnostic().code());
+        }
+        var renamed = composeWithMonsterEdit(rows -> goblinTraits(rows).get(0).getAsJsonObject()
+                .addProperty("display_name", "Fuite agile"));
+        var definition = renamed.projection().rules().stream().filter(FinalMonster.class::isInstance)
+                .map(FinalMonster.class::cast).filter(row -> row.identity().equals(GOBLIN_MONSTER))
+                .findFirst().orElseThrow().definition();
+        assertTrue(definition.statBlock().traits().getFirst().isNimbleEscape(GOBLIN_MONSTER));
+    }
+
+    private static ProductionSchema2Projection composeWithMonsterEdit(Consumer<JsonArray> edit) {
+        var artifacts = BundledCampaignRules.artifacts(BundledCampaignRules.STANDARD);
+        var members = new ArrayList<>(artifacts.stream().map(ProductionRuleArtifact::originalMembers).toList());
+        int magic = 2;
+        members.set(magic, new TreeMap<>(members.get(magic)));
+        Schema2GrantFixtures.edit(members, magic, "rules.json", rows -> edit.accept(rows.getAsJsonArray()));
+        return ProductionSchema2Projection.compose(Schema2GrantFixtures.artifacts(members));
+    }
+
+    private static JsonArray goblinTraits(JsonArray rows) {
+        return monsterTraits(rows, GOBLIN_MONSTER.ruleKey());
+    }
+
+    private static JsonArray monsterTraits(JsonArray rows, String ruleKey) {
+        return rows.asList().stream().map(JsonElement::getAsJsonObject)
+                .filter(row -> ruleKey.equals(row.getAsJsonObject("identity").get("rule_key").getAsString()))
+                .findFirst().orElseThrow().getAsJsonObject("stat_block").getAsJsonArray("traits");
+    }
+
     @Test void originalStatBlocksDefensesRealActionIdentityAndWholeAtomProvenanceSurviveProductionRestore(){
         var p=Schema2MonsterFixtures.projection();var monsters=p.projection().rules().stream().filter(FinalMonster.class::isInstance).map(FinalMonster.class::cast).toList();assertEquals(3,monsters.size());
         var h=monsters.stream().filter(m->m.identity().equals(Schema2MonsterFixtures.HELL_HOUND)).findFirst().orElseThrow().definition();

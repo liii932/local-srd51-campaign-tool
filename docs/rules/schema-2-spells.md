@@ -37,6 +37,8 @@ Magic Missile 元数据不能触发该分支。Bless/Cure Wounds 等定向法术
 [Burning Hands](schema-2-spell-save-damage.md)仅在自己的完整区域合同内接纳已部署角色和怪物，
 [有限怪物吐息](schema-2-monster-breath.md)不自动开放其他向怪物施放的法术。
 
+指向其他角色的 Bless、Cure Wounds 与 Counterspell 需要施法者当前能看见目标，并满足各自距离。只知道最后格位时无法选中该角色。锥形伤害仍由其效果规则枚举范围内生物。[视线与掩护](schema-2-observation.md)
+
 完整规则、目标、组件、资源、乐观版本和强制继续容量先于 RNG 与写入验证。每次施法声明只支付一次，
 反制或被打断不退款。暂停窗口使用同一 frame graph：选择帧、反应子帧与父帧关系明确保存；CLOSED 窗口
 须显式继续才成为 CONSUMED，不以“最后一个窗口”猜测当前 owner。读取和恢复不会隐式 PASS。

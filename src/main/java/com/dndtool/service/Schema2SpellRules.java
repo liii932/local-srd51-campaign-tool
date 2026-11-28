@@ -124,10 +124,9 @@ public final class Schema2SpellRules {
         } else if (!free || input.materialItemId()!=null) throw invalid("S2_SPELL_COMPONENT");
         if (input.targets().isEmpty() || input.targets().size()>(bless?3:1) || new HashSet<>(input.targets()).size()!=input.targets().size())
             throw invalid("S2_SPELL_TARGET");
-        Combatant origin=member(battle,actor);
         for (UUID id:input.targets()) {
             Context destination=roster.get(id);
-            if (destination==null || origin.position().distanceFeet(member(battle,id).position())>(bless?30:5)) throw invalid("S2_SPELL_TARGET");
+            if (destination==null || !directTargetAvailable(battle,actor,id,bless?30:5)) throw invalid("S2_SPELL_TARGET");
             if (cure && destination.character().health().dead()) throw invalid("S2_HEALTH_DEAD");
             if (cure) {
                 Schema2FeatureSupport.requireSupportedFeatures(destination.material(),destination.character(),"S2_HEALTH_EFFECT_UNSUPPORTED");
@@ -171,10 +170,15 @@ public final class Schema2SpellRules {
             if(!input.targets().equals(List.of(actor)) || input.targetCastFrameKey()!=null)throw invalid("S2_SPELL_TARGET");
         } else {
             CastAttempt target=findCast(battle,input.targetCastFrameKey());
-            if(target==null || target.status()!=CastStatus.PENDING || target.actorId().equals(actor) || !input.targets().equals(List.of(target.actorId())) || member(battle,actor).position().distanceFeet(member(battle,target.actorId()).position())>60)throw invalid("S2_SPELL_TARGET");
+            if(target==null || target.status()!=CastStatus.PENDING || target.actorId().equals(actor) || !input.targets().equals(List.of(target.actorId())) || !directTargetAvailable(battle,actor,target.actorId(),60))throw invalid("S2_SPELL_TARGET");
         }
         if(caster.version()>=Schema2CharacterRuntime.MAX_EVENTS-1)throw invalid("ACTION_FLOW_RESERVATION_INSUFFICIENT");
         return new Prepared(input.castingRule(),resource,profile.abilityKey(),spells.getFirst().definition(),input,caster,0,false);
+    }
+
+    static boolean directTargetAvailable(Battle battle, UUID caster, UUID target, int rangeFeet) {
+        return Schema2ObservationRules.visible(battle,caster,target)
+                && member(battle,caster).position().distanceFeet(member(battle,target).position())<=rangeFeet;
     }
 
     private static boolean anyHandFree(Battle battle, State caster) {
@@ -237,10 +241,10 @@ public final class Schema2SpellRules {
             effects.add(e);
         }
         List<ReadyPreparation> ready=b.readyPreparations().stream().map(r->holder.kind()==ConcentrationKind.READY_SPELL && r.readyKey().equals(holder.sourceKey()) && Set.of(ReadyStatus.PREPARING,ReadyStatus.ARMED).contains(r.status())?new ReadyPreparation(r.readyKey(),r.actorId(),r.declaredTurnNumber(),r.expiresAtTurnNumber(),r.input(),ReadyStatus.LOST,r.heldCastFrameKey(),reason):r).toList();
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,ready,b.triggerFacts(),b.shields(),b.concentrationHolders().stream().filter(h->!h.actorId().equals(caster)).toList(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests(),b.meleeControl());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,ready,b.triggerFacts(),b.shields(),b.concentrationHolders().stream().filter(h->!h.actorId().equals(caster)).toList(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests(),b.meleeControl(),b.observation());
     }
     public static Battle withEffects(Battle b,List<OngoingEffect> effects) {
-        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests(),b.meleeControl());
+        return new Battle(b.combatId(),b.campaignId(),b.combatRule(),b.status(),b.round(),b.turnNumber(),b.activeOrdinal(),b.version(),b.combatants(),b.initiative(),b.flows(),effects,b.readyPreparations(),b.triggerFacts(),b.shields(),b.concentrationHolders(),b.environmentZones(),b.suppressionCauses(),b.monsters(),b.saveDamageBatches(),b.monsterRests(),b.meleeControl(),b.observation());
     }
     private static Combatant member(Battle b,UUID id) {return b.combatants().stream().filter(c -> c.characterId().equals(id)).findFirst().orElseThrow(() -> invalid("S2_SPELL_TARGET"));}
     private static IllegalArgumentException invalid(String code) {return new IllegalArgumentException(code);}

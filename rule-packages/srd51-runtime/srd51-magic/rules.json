@@ -765,5 +765,73 @@
       "experience_points": 50,
       "traits": []
     }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.monster",
+      "rule_key": "monster.goblin"
+    },
+    "display_name": "Goblin",
+    "description": "Small humanoid (goblinoid) with Scimitar, Shortbow and Nimble Escape.",
+    "source_page": 315,
+    "stat_block": {
+      "size": "SMALL",
+      "creature_type": "HUMANOID",
+      "alignment": "neutral evil",
+      "armor_class": 15,
+      "armor_description": "leather armor, shield",
+      "hit_points": 7,
+      "hit_dice_count": 2,
+      "hit_dice_sides": 6,
+      "hit_dice_modifier": 0,
+      "walk_speed_feet": 30,
+      "abilities": {
+        "strength": 8,
+        "dexterity": 14,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 8,
+        "charisma": 8
+      },
+      "saving_throws": [],
+      "skills": [
+        {
+          "skill_key": "skill.stealth",
+          "bonus": 6
+        }
+      ],
+      "damage_defenses": [],
+      "condition_immunities": [],
+      "darkvision_feet": 60,
+      "blindsight_feet": 0,
+      "tremorsense_feet": 0,
+      "truesight_feet": 0,
+      "passive_perception": 9,
+      "languages": [
+        {
+          "name": "Common",
+          "understands": true,
+          "speaks": true
+        },
+        {
+          "name": "Goblin",
+          "understands": true,
+          "speaks": true
+        }
+      ],
+      "challenge_numerator": 1,
+      "challenge_denominator": 4,
+      "experience_points": 50,
+      "traits": [
+        {
+          "key": "nimble_escape",
+          "scope": "NIMBLE_ESCAPE_BONUS_HIDE_DISENGAGE_V1",
+          "display_name": "Nimble Escape",
+          "description": "On its turn, the goblin can use a bonus action to Disengage or Hide."
+        }
+      ]
+    }
   }
 ]

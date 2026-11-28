@@ -88,7 +88,9 @@ DM-managed 自由卡与有限规则角色各自校验，不自动互相转换；
 
 DM 通过本机 loopback 操作。SQLite 的可选玩家原型使用独立 HTTPS 入口，支持邀请审批、
 PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操作收据查证。玩家可在共享场景中
-用近战武器或短弓攻击向本人揭示的规则怪物，看到命中、实际伤害和击倒结果。Host 接口与完整战役文件
+按本人角色的视角查看规则怪物的当前或最后已知格位，用近战武器或短弓攻击，并看到命中、实际伤害和击倒结果。DM 可布置掩护，地精可用附赠动作躲藏或撤离。[躲藏、观察与掩护](./docs/rules/schema-2-observation.md)
+
+Host 接口与完整战役文件
 仅对 DM 开放。监听需要显式配置，应用不会自行创建 Connector。
 使用范围见[运行合同](./docs/storage-vitality-loop.md)，边界见[安全说明](./docs/security.md)，
 隔离验证见[测试指南](./docs/testing.md#玩家参与原型验证)。真实局域网部署、证书信任和外部设备验收
@@ -144,13 +146,13 @@ PC 控制分配、明确共享、有限服务端候选动作、DM 裁定和操�
 ## 构建与测试
 
 从源码生成应用 WAR 可在仓库根目录运行 `mvn -DskipTests package`，产物为
-`target/dnd-tool-se-0.8.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
+`target/dnd-tool-se-0.9.0.war`。这条命令只打包。改动应用机制、API 或存储时，按变更选择
 JUnit 用例，例如启动逻辑用 `mvn '-Dtest=StorageApplicationListenerTest' test`。
 
 可运行规则模组用已有应用 WAR 运行作者场景。以下命令核对该 WAR 随附标准组合的巨剑攻击、伤害及目标剩余 HP。
 
 ```sh
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.8.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.9.0.war \
   --case weapon-damage rule-packages/srd51-runtime/scenarios/standard.json
 ```
 

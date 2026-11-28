@@ -711,6 +711,7 @@ public final class CampaignStorageService implements AutoCloseable {
                 for (var actor : battle.combatants())
                     budgets.add(actor.characterId().toString(), CampaignCombatView.turnBudget(roster, battle, actor));
                 view.add("turnBudgets", budgets);
+                view.add("weaponTargets", json.toJsonTree(CampaignCombatView.weaponTargets(battle)));
             }
             combats.add(view);
         }

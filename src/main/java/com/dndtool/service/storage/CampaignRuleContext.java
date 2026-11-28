@@ -182,7 +182,7 @@ public final class CampaignRuleContext {
                                boolean executable, String description, String abilityKey, String category,
                                Boolean allowAlternateSkillAbility,
                                RuleIdentity parentRace, boolean creationChoice, boolean spellbookChoice, boolean directResourceSpend,
-                               List<FieldOverride> overrides, List<MonsterAttackChoice> monsterAttacks) {
+                               List<FieldOverride> overrides, List<MonsterAttackChoice> monsterAttacks, boolean nimbleEscape) {
         public CatalogEntry {
             overrides = List.copyOf(overrides);
             monsterAttacks = List.copyOf(monsterAttacks);
@@ -253,7 +253,9 @@ public final class CampaignRuleContext {
                     definition instanceof CharacterSourceDefinition source ? source.parentRace() : null,
                     creationChoice, spellbookChoice, directResourceSpend,
                     overrides.getOrDefault(row.identity(), List.of()),
-                    executable ? monsterAttacks.getOrDefault(row.identity(), List.of()) : List.of()));
+                    executable ? monsterAttacks.getOrDefault(row.identity(), List.of()) : List.of(),
+                    executable && definition instanceof MonsterDefinition monster
+                            && monster.statBlock().traits().stream().anyMatch(trait -> trait.isNimbleEscape(row.identity()))));
         }
         return new Metadata("SRD 5.1 finite current-application rules", "FINITE_APPLICATION_SCHEMA_2",
                 interpretation(), binding, catalog, List.of(
@@ -265,7 +267,7 @@ public final class CampaignRuleContext {
                     "Unimplemented fighter features, Evocation Savant and Sculpt Spells remain catalog-only OPTION metadata and are not acquired; Grappler is blocked acquisition metadata.",
                     "Only Bless, Cure Wounds, Shield, Counterspell and Burning Hands have bounded casting consumers; other spells are metadata.",
                     "Multiclass growth acquisition does not authorize combined-caster slot semantics or unsupported multiclass casting.",
-                    "Wolf and Hell Hound bites, Hell Hound Fire Breath and the Skeleton's shortsword and shortbow use frozen monster actions.",
+                    "Wolf and Hell Hound bites, Hell Hound Fire Breath, Skeleton and Goblin weapons use frozen monster actions. A Goblin with Nimble Escape can hide or disengage as a bonus action.",
                     "The antimagic area and direct vital effects are explicit DM house rules."));
     }
 
