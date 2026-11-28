@@ -34,6 +34,12 @@ public final class Schema2CompositionKernel {
     public static final String HEAVY_ARMOR_MOVEMENT_ALGORITHM = "SRD_2014_HEAVY_ARMOR_MOVEMENT_V1";
     public static final String SUBRACE_HIT_POINTS_ALGORITHM = "SRD_2014_SUBRACE_HIT_POINTS_V1";
     public static final String STONECUNNING_ALGORITHM = "SRD_2014_DWARF_STONECUNNING_V1";
+    public static final String FIRE_BOLT_ALGORITHM = "SRD_2014_FIRE_BOLT_V1";
+    public static final String SACRED_FLAME_ALGORITHM = "SRD_2014_SACRED_FLAME_V1";
+    public static final String CLASS_CANTRIPS_TYPE = "character.class_cantrips";
+    private static final String CLASS_CANTRIPS_ALGORITHM = "SRD_2014_CLASS_CANTRIPS_V1";
+    private static final RuleIdentity WIZARD_CLASS = new RuleIdentity("srd51_characters", "character.class", "class.wizard");
+    private static final RuleIdentity CLERIC_CLASS = new RuleIdentity("srd51_characters", "character.class", "class.cleric");
     public static final int STONECUNNING_MIN_MULTIPLIER = 1, STONECUNNING_MAX_MULTIPLIER = 3;
     public static final RuleIdentity STONECUNNING_DWARF = new RuleIdentity("srd51_runtime", "character.race", "race.dwarf");
     public static final RuleIdentity STONECUNNING_HISTORY = new RuleIdentity("srd51_runtime", "character.proficiency",
@@ -59,7 +65,7 @@ public final class Schema2CompositionKernel {
     /** Same bounded categories as the existing tool proficiency partition. */
     public enum ToolCategory { ARTISAN, KIT, GAMING_SET, MUSICAL_INSTRUMENT, NAVIGATION, VEHICLE }
     public enum Field {
-        STAT_BLOCK("stat_block"), ACTION_PROFILE("action_profile"),
+        STAT_BLOCK("stat_block"), ACTION_PROFILE("action_profile"), CANTRIP_PROFILE("cantrip_profile"),
         DISPLAY_NAME("display_name"), DESCRIPTION("description"), CATEGORY("category"),
         SOURCE_PAGE("source_page"), MINIMUM_ENABLED_MEMBERS("minimum_enabled_members"),
         AUTHOR_NOTE("author_note"), LANGUAGE("language"), TOOL("tool"),
@@ -114,7 +120,7 @@ public final class Schema2CompositionKernel {
     public record RuleIdentity(String moduleKey, String ruleType, String ruleKey) implements Identity { }
     public record EntryIdentity(RuleIdentity rule, String collectionKey, String moduleKey,
                                 String entryKey) implements Identity { }
-    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, ArmorMovementDefinition, SubraceHitPointsDefinition, StonecunningDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, EnvironmentDefinition, MonsterDefinition {
+    public sealed interface Definition permits LanguageDefinition, LanguageSetDefinition, ToolDefinition, ToolSetDefinition, CharacterSourceDefinition, ClassProgressionDefinition, ResourceDefinition, SubclassDefinition, FeatureDefinition, FeatDefinition, ProficiencyDefinition, ProficiencySetDefinition, RestDefinition, CheckDefinition, ItemDefinition, HealthDefinition, VitalEffectDefinition, CombatDefinition, WeaponAttackDefinition, MovementDefinition, ArmorMovementDefinition, SubraceHitPointsDefinition, StonecunningDefinition, SpellDefinition, SpellcastingDefinition, WizardSpellcastingDefinition, ClassCantripsDefinition, EnvironmentDefinition, MonsterDefinition {
         RuleIdentity identity();
         String displayName();
         String authorNote();
@@ -207,7 +213,20 @@ public final class Schema2CompositionKernel {
             RuleIdentity owner, RuleIdentity skill, int proficiencyMultiplier,
             String algorithm, String authorNote) implements Definition { }
     public record SpellDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
-            String algorithm, String authorNote) implements Definition { }
+            String algorithm, CantripProfile cantripProfile, String authorNote) implements Definition { }
+    public record CantripProfile(int rangeFeet, int damageDiceSides, DamageType damageType,
+            int scalingLevel, boolean ignoresSaveCover) {
+        public int diceCount(int totalLevel) { return totalLevel >= scalingLevel ? 2 : 1; }
+    }
+    /** Class cantrip selection is independent of leveled resources, learning and preparation. */
+    public record ClassCantripsDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
+            RuleIdentity ownerClass, String abilityKey, String algorithm, String authorNote) implements Definition {
+        public int knownCount(int classLevel) {
+            if (classLevel == 1) return 3;
+            if (ownerClass.equals(WIZARD_CLASS) && classLevel >= 2 && classLevel <= 5) return classLevel >= 4 ? 4 : 3;
+            return 0;
+        }
+    }
     public record SpellcastingDefinition(RuleIdentity identity, String displayName, String description, int sourcePage,
             RuleIdentity ownerClass, RuleIdentity requiredSubclass, RuleIdentity requiredFeature, RuleIdentity slotResource,
             RuleIdentity bless, RuleIdentity cureWounds, RuleIdentity materialItem, String abilityKey,
@@ -311,7 +330,7 @@ public final class Schema2CompositionKernel {
     public sealed interface GrantSpec permits FixedGrant, ChoiceGrant { GrantCategory category(); }
     public record FixedGrant(GrantCategory category, RuleIdentity target) implements GrantSpec { }
     public record ChoiceGrant(GrantCategory category, RuleIdentity candidates, int count) implements GrantSpec { }
-    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry, ClassLevelEntry, ProficiencyMemberEntry, GrowthProficiencyGrantEntry, SpellbookEntry, MonsterActionEntry {
+    public sealed interface Entry permits LanguageEntry, ToolEntry, ProficiencyGrantEntry, ClassLevelEntry, ProficiencyMemberEntry, GrowthProficiencyGrantEntry, SpellbookEntry, CantripEntry, MonsterActionEntry {
         EntryIdentity identity();
         String authorNote();
         RuleIdentity target();
@@ -337,13 +356,17 @@ public final class Schema2CompositionKernel {
     public record SpellbookEntry(EntryIdentity identity, RuleIdentity spell, String authorNote) implements Entry {
         @Override public RuleIdentity target() { return spell; }
     }
+    public record CantripEntry(EntryIdentity identity, RuleIdentity spell, String authorNote) implements Entry {
+        @Override public RuleIdentity target() { return spell; }
+    }
     public record MonsterActionEntry(EntryIdentity identity, MonsterActionProfile actionProfile, String authorNote) implements Entry {
         @Override public RuleIdentity target() { return identity.rule(); }
     }
-    public sealed interface FieldValue permits TextValue, IntegerValue, IdentityValue, BooleanValue, GrantValue, PrerequisiteValue, GrowthGrantValue, MonsterStatBlockValue, MonsterActionProfileValue, GroupSuccessThreshold { }
+    public sealed interface FieldValue permits TextValue, IntegerValue, IdentityValue, BooleanValue, GrantValue, PrerequisiteValue, GrowthGrantValue, MonsterStatBlockValue, MonsterActionProfileValue, CantripProfileValue, GroupSuccessThreshold { }
     public record GroupSuccessThreshold(int numerator, int denominator) implements FieldValue { }
     public record MonsterStatBlockValue(MonsterStatBlock value) implements FieldValue { }
     public record MonsterActionProfileValue(MonsterActionProfile value) implements FieldValue { }
+    public record CantripProfileValue(CantripProfile value) implements FieldValue { }
     public record TextValue(String value) implements FieldValue { }
     public record IntegerValue(int value) implements FieldValue { }
     public record IdentityValue(RuleIdentity value) implements FieldValue { }
@@ -372,7 +395,7 @@ public final class Schema2CompositionKernel {
     public record FieldChain(Identity target, Field field, List<ChainStep> steps) {
         public FieldChain { steps = List.copyOf(steps); }
     }
-    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalArmorMovement, FinalSubraceHitPoints, FinalStonecunning, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalEnvironment, FinalMonster {
+    public sealed interface FinalRule permits FinalLanguage, FinalLanguageSet, FinalTool, FinalToolSet, FinalCharacterSource, FinalClassProgression, FinalResource, FinalSubclass, FinalFeature, FinalFeat, FinalProficiency, FinalProficiencySet, FinalRest, FinalCheck, FinalItem, FinalHealth, FinalVitalEffect, FinalCombat, FinalWeaponAttack, FinalMovement, FinalArmorMovement, FinalSubraceHitPoints, FinalStonecunning, FinalSpell, FinalSpellcasting, FinalWizardSpellcasting, FinalClassCantrips, FinalEnvironment, FinalMonster {
         Definition definition();
         RuleIdentity identity();
         boolean enabled();
@@ -454,6 +477,9 @@ public final class Schema2CompositionKernel {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalWizardSpellcasting(WizardSpellcastingDefinition definition, boolean enabled) implements FinalRule {
+        @Override public RuleIdentity identity() { return definition.identity(); }
+    }
+    public record FinalClassCantrips(ClassCantripsDefinition definition, boolean enabled) implements FinalRule {
         @Override public RuleIdentity identity() { return definition.identity(); }
     }
     public record FinalEnvironment(EnvironmentDefinition definition, boolean enabled) implements FinalRule {
@@ -767,6 +793,10 @@ public final class Schema2CompositionKernel {
                         }
                         validateWizardReferences(new FinalWizardSpellcasting(casting,true),originalReferences,source);
                     }
+                    if (original instanceof ClassCantripsDefinition casting) {
+                        var owner = originalObjectAt(casting.ownerClass(), chains, declarations.get(declaration.getKey()), source);
+                        validateClassCantripsOwner(owner, true, source);
+                    }
                     if(original instanceof FeatureDefinition feature) {
                         Set<Identity> targets=new HashSet<>();targets.add(feature.owner());
                         if (FIGHTER_SECOND_WIND_ALGORITHM.equals(feature.executionAlgorithm()))
@@ -809,6 +839,11 @@ public final class Schema2CompositionKernel {
                             for(ChainStep step:chain.steps())if(step.loadIndex()<declarationIndex || step.loadIndex()==declarationIndex&&step.op().equals("initial"))algorithm=step.after();
                         if(algorithm==null || !(algorithm.value() instanceof TextValue value) || !wizardSpell(value.value()))
                             throw fail("S2_TYPE",Stage.FINAL,"Original Wizard learning member is not a Wizard spell",source);
+                    }
+                    if (original instanceof CantripEntry member) {
+                        int declarationIndex = declarations.get(declaration.getKey());
+                        validateCantripMember(originalObjectAt(member.identity().rule(), chains, declarationIndex, source),
+                                originalObjectAt(member.spell(), chains, declarationIndex, source), Stage.FINAL, source);
                     }
                 }
             } catch (Schema2Exception malformed) {
@@ -940,6 +975,11 @@ public final class Schema2CompositionKernel {
                         checkReference(pack,reference.getValue(),referenceType(reference.getKey()),objects,row.location.child(reference.getKey().key()));
                     validateWizardReferences(new FinalWizardSpellcasting(casting,true),objects,row.location);
                 }
+                if (row.value instanceof ClassCantripsDefinition casting) {
+                    var ownerLocation = row.location.child("owner_class");
+                    checkReference(pack, casting.ownerClass(), "character.class", objects, ownerLocation);
+                    validateClassCantripsOwner(objects.get(casting.ownerClass()), true, ownerLocation);
+                }
                 if (row.value instanceof ItemDefinition item) {
                     if (item.proficiency() != null) checkReference(pack, item.proficiency(), referenceType(Field.PROFICIENCY), objects, row.location.child("proficiency"));
                     if (item.stealthSkill() != null) checkReference(pack, item.stealthSkill(), referenceType(Field.STEALTH_SKILL), objects, row.location.child("stealth_skill"));
@@ -965,6 +1005,8 @@ public final class Schema2CompositionKernel {
                 else checkReference(pack, value.target(), referenceType(reference), objects, row.location.child(reference.key()));
                 if(value instanceof SpellbookEntry member && !wizardSpell(textField(objects.get(member.spell()).fields,Field.ALGORITHM)))
                     throw fail("S2_TYPE",Stage.AUTHOR,"Original Wizard learning member must be a Wizard spell",row.location);
+                if (value instanceof CantripEntry member)
+                    validateCantripMember(objects.get(member.identity().rule()), objects.get(member.spell()), Stage.AUTHOR, row.location);
             }
             for (Located<Change> row : pack.changes) {
                 Change change = row.value;
@@ -1382,7 +1424,7 @@ public final class Schema2CompositionKernel {
     }
 
     private static boolean executionType(String type) {
-        return Set.of("equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment").contains(type);
+        return Set.of("equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", CLASS_CANTRIPS_TYPE, "adventure.environment").contains(type);
     }
     private static Definition executionDefinition(Object input, RuleIdentity identity, Location source) {
         Set<String> required = new HashSet<>(Set.of("identity", "display_name", "description", "source_page", "algorithm"));
@@ -1405,6 +1447,12 @@ public final class Schema2CompositionKernel {
             required.addAll(Set.of("owner", "first_level_bonus", "per_additional_level_bonus"));
         } else if (identity.ruleType().equals(STONECUNNING_TYPE)) {
             required.addAll(Set.of("owner", "skill", "proficiency_multiplier"));
+        } else if (identity.ruleType().equals("adventure.spell")) {
+            String algorithm = mechanismAlgorithm(identity.ruleType(),
+                    required(object(input, source), "algorithm", source), source.child("algorithm"));
+            if (combatCantrip(algorithm) != null) required.add("cantrip_profile");
+        } else if (identity.ruleType().equals(CLASS_CANTRIPS_TYPE)) {
+            required.addAll(Set.of("owner_class", "ability_key"));
         } else if (identity.ruleType().equals("character.spellcasting")) {
             required.addAll(Set.of("owner_class", "required_subclass", "required_feature", "slot_resource", "bless", "cure_wounds", "material_item", "ability_key"));
         } else if (identity.ruleType().equals("character.wizard_spellcasting")) {
@@ -1420,7 +1468,24 @@ public final class Schema2CompositionKernel {
         String note = row.containsKey("author_note") ? text(row.get("author_note"), 1000, source.child("author_note")) : null;
         if (identity.ruleType().equals("adventure.spell")) {
             if (page != spellSourcePage(algorithm)) throw fail("S2_TYPE",Stage.AUTHOR,"Spell source page differs from its algorithm",source);
-            return new SpellDefinition(identity,name,description,page,algorithm,note);
+            CantripProfile expected = combatCantrip(algorithm);
+            CantripProfile profile = expected == null ? null : cantripProfile(row.get("cantrip_profile"), source.child("cantrip_profile"));
+            if (spellLevel(algorithm) == 0 && !identity.equals(cantripIdentity(algorithm)))
+                throw fail("S2_TYPE", Stage.AUTHOR, "Cantrip identity differs from its SRD spell algorithm", source);
+            if (!Objects.equals(combatCantrip(identity), profile))
+                throw fail("S2_TYPE", Stage.AUTHOR, "Cantrip combat parameters differ from the supported SRD spell", source);
+            return new SpellDefinition(identity, name, description, page, algorithm, profile, note);
+        }
+        if (identity.ruleType().equals(CLASS_CANTRIPS_TYPE)) {
+            RuleIdentity owner = typedReference(row.get("owner_class"), "character.class", source.child("owner_class"));
+            String ability = abilityKey(row.get("ability_key"), source.child("ability_key"));
+            boolean wizard = owner.equals(WIZARD_CLASS);
+            if ((!wizard && !owner.equals(CLERIC_CLASS))
+                    || !identity.equals(new RuleIdentity("srd51_magic", CLASS_CANTRIPS_TYPE, wizard ? "cantrips.wizard" : "cantrips.cleric"))
+                    || page != (wizard ? 52 : 15)
+                    || !ability.equals(wizard ? "ability.intelligence" : "ability.wisdom"))
+                throw fail("S2_TYPE", Stage.AUTHOR, "Cantrip source does not match the supported class table", source);
+            return new ClassCantripsDefinition(identity, name, description, page, owner, ability, algorithm, note);
         }
         if (identity.ruleType().equals("character.spellcasting")) {
             String ability=abilityKey(row.get("ability_key"),source.child("ability_key"));
@@ -1773,7 +1838,8 @@ public final class Schema2CompositionKernel {
         if (reference == Field.GROWTH_GRANT) return new GrowthProficiencyGrantEntry(entry, growthGrant(row.get("growth_grant"), source.child("growth_grant")), note);
         RuleIdentity target = typedReference(row.get(reference.key()), referenceType(reference), source.child(reference.key()));
         if (reference == Field.PROFICIENCY) return new ProficiencyMemberEntry(entry, target, note);
-        if (reference == Field.SPELL) return new SpellbookEntry(entry, target, note);
+        if (reference == Field.SPELL) return entry.rule().ruleType().equals(CLASS_CANTRIPS_TYPE)
+                ? new CantripEntry(entry, target, note) : new SpellbookEntry(entry, target, note);
         return reference == Field.LANGUAGE ? new LanguageEntry(entry, target, note) : new ToolEntry(entry, target, note);
     }
 
@@ -1804,6 +1870,12 @@ public final class Schema2CompositionKernel {
         FieldValue typed = switch (field) {
             case STAT_BLOCK -> new MonsterStatBlockValue(Schema2MonsterCodec.statBlock(value,source.child("value")));
             case ACTION_PROFILE -> new MonsterActionProfileValue(Schema2MonsterCodec.actionProfile(value,source.child("value")));
+            case CANTRIP_PROFILE -> {
+                CantripProfile profile = cantripProfile(value, source.child("value"));
+                if (!profile.equals(combatCantrip((RuleIdentity) target)))
+                    throw fail("S2_TYPE", Stage.AUTHOR, "Cantrip combat parameters differ from the supported SRD spell", source.child("value"));
+                yield new CantripProfileValue(profile);
+            }
             case DISPLAY_NAME -> new TextValue(text(value, 120, source.child("value")));
             case DESCRIPTION, AUTHOR_NOTE -> new TextValue(text(value, 1000, source.child("value")));
             case CATEGORY -> new TextValue(((RuleIdentity) target).ruleType().equals("character.tool")
@@ -1885,12 +1957,13 @@ public final class Schema2CompositionKernel {
         boolean catalog = Set.of("catalog.language_set", "catalog.tool_set", "catalog.proficiency_set").contains(rule.ruleType());
         boolean progression = rule.ruleType().equals("character.class_progression");
         boolean spellbook = rule.ruleType().equals("character.wizard_spellcasting");
+        boolean cantrips = rule.ruleType().equals(CLASS_CANTRIPS_TYPE);
         boolean monster=rule.ruleType().equals("adventure.monster");
-        if (!catalog && !sourceType(rule.ruleType()) && !progression && !spellbook && !monster)
+        if (!catalog && !sourceType(rule.ruleType()) && !progression && !spellbook && !cantrips && !monster)
             throw fail("S2_TYPE", Stage.AUTHOR, "Entry owner requires a catalog set or character source", source.child("rule").child("rule_type"));
         String collection = string(row.get("collection_key"), source.child("collection_key"));
         if (!(progression ? Set.of("levels", "starting_proficiencies", "multiclass_proficiencies").contains(collection)
-                : collection.equals(monster ? "actions" : spellbook ? "spells" : catalog ? "members" : "proficiency_grants")))
+                : collection.equals(monster ? "actions" : spellbook ? "spells" : cantrips ? "cantrips" : catalog ? "members" : "proficiency_grants")))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unknown collection key for this owner type", source.child("collection_key"));
         String owner = moduleKey(row.get("module_key"), source.child("module_key"));
         String key = identifier(row.get("entry_key"), "[a-z][a-z0-9_]{0,63}", source.child("entry_key"));
@@ -1904,7 +1977,7 @@ public final class Schema2CompositionKernel {
         String type = string(row.get("rule_type"), source.child("rule_type"));
         if (!Set.of("character.language", "catalog.language_set", "character.tool", "catalog.tool_set",
                 "character.class_progression", "character.resource", "character.subclass", "character.feature",
-                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
+                "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", CLASS_CANTRIPS_TYPE, "adventure.environment", "adventure.monster").contains(type) && !sourceType(type))
             throw fail("S2_TYPE", Stage.AUTHOR, "Unsupported finite rule type", source.child("rule_type"));
         String key = identifier(row.get("rule_key"), "[a-z][a-z0-9_.]{0,127}", source.child("rule_key"));
         String prefix = switch (type) {
@@ -1924,6 +1997,7 @@ public final class Schema2CompositionKernel {
             case "character.subrace_hit_points" -> "subrace_hit_points";
             case STONECUNNING_TYPE -> "stonecunning";
             case "character.spellcasting", "character.wizard_spellcasting" -> "spellcasting";
+            case CLASS_CANTRIPS_TYPE -> "cantrips";
             case "adventure.environment" -> "environment";
             case "adventure.monster" -> "monster";
             case "adventure.spell" -> "spell";
@@ -1949,6 +2023,7 @@ public final class Schema2CompositionKernel {
             case "adventure.combat" -> integer(input, 90, 95, source);
             case "adventure.spell" -> integer(input, 114, 187, source);
             case "character.wizard_spellcasting" -> integer(input, 52, 53, source);
+            case CLASS_CANTRIPS_TYPE -> integer(input, 15, 52, source);
             case "adventure.environment" -> integer(input, 0, 0, source);
             case "adventure.monster" -> integer(input, 258, 403, source);
             case "character.spellcasting" -> integer(input, 16, 17, source);
@@ -1981,6 +2056,7 @@ public final class Schema2CompositionKernel {
             case STONECUNNING_TYPE -> STONECUNNING_ALGORITHM;
             case "character.spellcasting" -> "LIFE_DOMAIN_LEVEL1_V1";
             case "character.wizard_spellcasting" -> "SRD_2014_WIZARD_PREPARED_V1";
+            case CLASS_CANTRIPS_TYPE -> CLASS_CANTRIPS_ALGORITHM;
             case "adventure.environment" -> "DM_ANTIMAGIC_ZONE_V1";
             case "adventure.health" -> "SRD_2014_HEALTH_V1";
             case "adventure.vital_effect" -> "DIRECT_VITAL_EFFECT_V1";
@@ -2002,7 +2078,7 @@ public final class Schema2CompositionKernel {
             case "catalog.language_set" -> Field.LANGUAGE;
             case "catalog.tool_set" -> Field.TOOL;
             case "catalog.proficiency_set" -> Field.PROFICIENCY;
-            case "character.wizard_spellcasting" -> Field.SPELL;
+            case "character.wizard_spellcasting", CLASS_CANTRIPS_TYPE -> Field.SPELL;
             case "adventure.monster" -> Field.ACTION_PROFILE;
             case "character.class_progression" -> identity.collectionKey().equals("levels") ? Field.LEVEL : Field.GROWTH_GRANT;
             default -> {
@@ -2035,7 +2111,7 @@ public final class Schema2CompositionKernel {
 
     private static boolean tracedCharacterType(String type) {
         return sourceType(type) || Set.of("character.class_progression", "character.resource", "character.subclass",
-                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+                "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", CLASS_CANTRIPS_TYPE, "adventure.environment", "adventure.monster").contains(type);
     }
 
     private static void originalOwner(String module, Identity identity, Location source) {
@@ -2328,8 +2404,17 @@ public final class Schema2CompositionKernel {
             throw fail("S2_TYPE", Stage.FINAL, "Stonecunning requires an Intelligence (History) skill", source);
     }
 
-    private record SpellMetadata(int level,int page,boolean wizard) { }
+    private record SpellMetadata(int level, int page, boolean wizard, String cantripKey) {
+        SpellMetadata(int level, int page, boolean wizard) { this(level, page, wizard, null); }
+    }
     private static final Map<String,SpellMetadata> SPELL_METADATA=Map.ofEntries(
+            Map.entry(FIRE_BOLT_ALGORITHM, new SpellMetadata(0, 144, false, "spell.fire_bolt")),
+            Map.entry(SACRED_FLAME_ALGORITHM, new SpellMetadata(0, 176, false, "spell.sacred_flame")),
+            Map.entry("SRD_2014_GUIDANCE_METADATA_V1", new SpellMetadata(0, 151, false, "spell.guidance")),
+            Map.entry("SRD_2014_LIGHT_METADATA_V1", new SpellMetadata(0, 159, false, "spell.light")),
+            Map.entry("SRD_2014_MAGE_HAND_METADATA_V1", new SpellMetadata(0, 160, false, "spell.mage_hand")),
+            Map.entry("SRD_2014_PRESTIDIGITATION_METADATA_V1", new SpellMetadata(0, 170, false, "spell.prestidigitation")),
+            Map.entry("SRD_2014_THAUMATURGY_METADATA_V1", new SpellMetadata(0, 187, false, "spell.thaumaturgy")),
             Map.entry("SRD_2014_BLESS_V1",new SpellMetadata(1,122,false)),
             Map.entry("SRD_2014_CURE_WOUNDS_V1",new SpellMetadata(1,132,false)),
             Map.entry("SRD_2014_SHIELD_V1",new SpellMetadata(1,179,true)),
@@ -2359,6 +2444,50 @@ public final class Schema2CompositionKernel {
         SpellMetadata result=SPELL_METADATA.get(algorithm);
         if(result==null)throw new IllegalArgumentException("S2_SPELL_UNAVAILABLE");
         return result;
+    }
+    private static RuleIdentity cantripIdentity(String algorithm) {
+        return new RuleIdentity("srd51_magic", "adventure.spell", spellMetadata(algorithm).cantripKey());
+    }
+    private static CantripProfile combatCantrip(String algorithm) {
+        return switch (algorithm) {
+            case FIRE_BOLT_ALGORITHM -> new CantripProfile(120, 10, DamageType.FIRE, 5, false);
+            case SACRED_FLAME_ALGORITHM -> new CantripProfile(60, 8, DamageType.RADIANT, 5, true);
+            default -> null;
+        };
+    }
+    private static CantripProfile combatCantrip(RuleIdentity identity) {
+        if (identity.equals(cantripIdentity(FIRE_BOLT_ALGORITHM))) return combatCantrip(FIRE_BOLT_ALGORITHM);
+        if (identity.equals(cantripIdentity(SACRED_FLAME_ALGORITHM))) return combatCantrip(SACRED_FLAME_ALGORITHM);
+        return null;
+    }
+    private static CantripProfile cantripProfile(Object input, Location source) {
+        var row = shape(input, Set.of("range_feet", "damage_dice_sides", "damage_type", "scaling_level", "ignores_save_cover"), Set.of(), source);
+        return new CantripProfile(integer(row.get("range_feet"), 5, 120, source.child("range_feet")),
+                integer(row.get("damage_dice_sides"), 4, 12, source.child("damage_dice_sides")),
+                enumValue(DamageType.class, row.get("damage_type"), source.child("damage_type")),
+                integer(row.get("scaling_level"), 1, 5, source.child("scaling_level")),
+                booleanAtom(row.get("ignores_save_cover"), source.child("ignores_save_cover")));
+    }
+    private static Map<String, Object> cantripProfileJson(CantripProfile profile) {
+        return json("range_feet", profile.rangeFeet(), "damage_dice_sides", profile.damageDiceSides(),
+                "damage_type", profile.damageType().name(), "scaling_level", profile.scalingLevel(),
+                "ignores_save_cover", profile.ignoresSaveCover());
+    }
+    private static void validateCantripMember(MutableObject owner, MutableObject spell, Stage stage, Location source) {
+        if (owner == null || spell == null)
+            throw fail("S2_REFERENCE_MISSING", stage, "Cantrip selection requires its exact class source and spell", source);
+        RuleIdentity ownerClass = ((IdentityValue) owner.fields.get(Field.OWNER_CLASS).value()).value();
+        String algorithm = textField(spell.fields, Field.ALGORITHM);
+        Set<String> legalKeys = ownerClass.equals(WIZARD_CLASS)
+                ? Set.of("spell.fire_bolt", "spell.light", "spell.mage_hand", "spell.prestidigitation")
+                : Set.of("spell.sacred_flame", "spell.guidance", "spell.light", "spell.thaumaturgy");
+        if (spellLevel(algorithm) != 0 || !cantripIdentity(algorithm).equals(spell.identity)
+                || !legalKeys.contains(((RuleIdentity) spell.identity).ruleKey()))
+            throw fail("S2_TYPE", stage, "Cantrip choice must be on the supported list for its class", source);
+    }
+    private static void validateClassCantripsOwner(MutableObject owner, boolean profileEnabled, Location source) {
+        if (owner == null || profileEnabled && !enabled(owner))
+            throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Cantrip selection requires an available class", source);
     }
     private static Map<Field,RuleIdentity> spellcastingReferences(SpellcastingDefinition d) {
         return Map.of(Field.OWNER_CLASS,d.ownerClass(),Field.REQUIRED_SUBCLASS,d.requiredSubclass(),Field.REQUIRED_FEATURE,d.requiredFeature(),
@@ -2507,6 +2636,8 @@ public final class Schema2CompositionKernel {
                     if(wizard.enabled() && !wizardOwners.add(wizard.definition().ownerClass()))
                         throw fail("S2_SPELLCASTING_AMBIGUOUS",Stage.FINAL,"Wizard owner has multiple enabled profiles",object.source);
                 }
+                if (checked instanceof FinalClassCantrips cantrips)
+                    validateClassCantripsOwner(objects.get(cantrips.definition().ownerClass()), cantrips.enabled(), object.source);
                 if(checked instanceof FinalCombat && checked.enabled() && ++enabledCombat>1)
                     throw fail("S2_COMBAT_AMBIGUOUS",Stage.FINAL,"At most one combat algorithm may be enabled",object.source);
                 if(checked instanceof FinalWeaponAttack weapon && checked.enabled() && !weaponItems.add(weapon.definition().item()))
@@ -2627,18 +2758,24 @@ public final class Schema2CompositionKernel {
             }
             RuleIdentity candidate = ((IdentityValue) object.fields.get(reference).value()).value();
             MutableObject target = objects.get(candidate);
-            if (owner == null || !identity.collectionKey().equals(reference == Field.SPELL ? "spells" : "members") || target == null
+            boolean cantrips = identity.rule().ruleType().equals(CLASS_CANTRIPS_TYPE);
+            if (owner == null || !identity.collectionKey().equals(cantrips ? "cantrips" : reference == Field.SPELL ? "spells" : "members") || target == null
                     || !Arrays.asList(referenceType(reference).split("[|]")).contains(candidate.ruleType())) {
                 throw fail("S2_REFERENCE_MISSING", Stage.FINAL, "Final entry ownership and typed catalog references must remain valid", object.source);
             }
-            if (reference == Field.SPELL && !wizardSpell(textField(target.fields,Field.ALGORITHM)))
+            if (cantrips) validateCantripMember(owner, target, Stage.FINAL, object.source);
+            if (reference == Field.SPELL && !cantrips && !wizardSpell(textField(target.fields,Field.ALGORITHM)))
                 throw fail("S2_TYPE",Stage.FINAL,"Wizard learning member must be on the closed Wizard spell list",object.source);
             if (reference == Field.PROFICIENCY) {
                 String expectedCategory = textField(owner.fields, Field.CATEGORY);
                 String actualCategory = candidate.ruleType().equals("character.tool") ? "TOOL" : textField(target.fields, Field.CATEGORY);
                 if (!expectedCategory.equals(actualCategory)) throw fail("S2_TYPE", Stage.FINAL, "Proficiency set member category differs", object.source);
             }
-            if (enabled(object) && enabled(target)) candidates.computeIfAbsent(identity.rule(), ignored -> new HashSet<>()).add(candidate);
+            if (enabled(object) && enabled(target)) {
+                boolean added = candidates.computeIfAbsent(identity.rule(), ignored -> new HashSet<>()).add(candidate);
+                if (!added && cantrips)
+                    throw fail("S2_DUPLICATE_IDENTITY", Stage.FINAL, "Cantrip source has duplicate enabled spell choices", object.source);
+            }
         }
         for (MutableObject object : objects.values()) {
             if (object.identity instanceof RuleIdentity identity
@@ -2653,6 +2790,9 @@ public final class Schema2CompositionKernel {
                         .filter(spell -> spellLevel(textField(objects.get(spell).fields,Field.ALGORITHM))==1).count();
                 if(firstLevel<6) throw fail("S2_CANDIDATES_INSUFFICIENT",Stage.FINAL,"Wizard learning catalog requires six distinct first-level choices",object.source);
             }
+            if (object.identity instanceof RuleIdentity identity && identity.ruleType().equals(CLASS_CANTRIPS_TYPE)
+                    && enabled(object) && candidates.getOrDefault(identity, Set.of()).size() < 4)
+                throw fail("S2_CANDIDATES_INSUFFICIENT", Stage.FINAL, "Cantrip source requires four distinct enabled choices", object.source);
             if (object.identity instanceof RuleIdentity identity && identity.ruleType().equals("character.class_progression")
                     && textField(object.fields, Field.ADVANCEMENT_SCOPE).equals(ProgressionScope.CHARACTER_ADVANCEMENT.name())) {
                 int maximum = ((IntegerValue) object.fields.get(Field.SUPPORTED_MAXIMUM_LEVEL).value()).value();
@@ -2703,8 +2843,12 @@ public final class Schema2CompositionKernel {
         if (type.equals("catalog.proficiency_set")) return List.of(Field.DISPLAY_NAME, Field.CATEGORY, Field.MINIMUM_ENABLED_MEMBERS, Field.AUTHOR_NOTE);
         if (type.equals("character.spellcasting")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.OWNER_CLASS,Field.REQUIRED_SUBCLASS,Field.REQUIRED_FEATURE,Field.SLOT_RESOURCE,Field.BLESS,Field.CURE_WOUNDS,Field.MATERIAL_ITEM,Field.ABILITY_KEY,Field.ALGORITHM,Field.AUTHOR_NOTE);
         if (type.equals("character.wizard_spellcasting")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.OWNER_CLASS,Field.REQUIRED_FEATURE,Field.SLOT_RESOURCE,Field.RANK2_SLOT_RESOURCE,Field.RANK3_SLOT_RESOURCE,Field.ABILITY_KEY,Field.ALGORITHM,Field.AUTHOR_NOTE);
+        if (type.equals(CLASS_CANTRIPS_TYPE)) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
+                Field.OWNER_CLASS, Field.ABILITY_KEY, Field.ALGORITHM, Field.AUTHOR_NOTE);
         if (type.equals("adventure.environment")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ALGORITHM,Field.AUTHOR_NOTE);
-        if (type.equals("adventure.spell")) return List.of(Field.DISPLAY_NAME,Field.DESCRIPTION,Field.SOURCE_PAGE,Field.ALGORITHM,Field.AUTHOR_NOTE);
+        if (type.equals("adventure.spell")) return combatCantrip((RuleIdentity) identity) == null
+                ? List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.AUTHOR_NOTE)
+                : List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE, Field.ALGORITHM, Field.CANTRIP_PROFILE, Field.AUTHOR_NOTE);
         if (type.equals("equipment.weapon_attack")) return List.of(Field.DISPLAY_NAME, Field.DESCRIPTION, Field.SOURCE_PAGE,
                 Field.ITEM, Field.ABILITY_POLICY, Field.DICE_COUNT, Field.DICE_SIDES, Field.DAMAGE_TYPE, Field.REACH_FEET,
                 Field.NORMAL_RANGE_FEET, Field.LONG_RANGE_FEET, Field.AMMUNITION, Field.ALGORITHM, Field.AUTHOR_NOTE);
@@ -2821,6 +2965,7 @@ public final class Schema2CompositionKernel {
             if (definition instanceof SpellDefinition value) return new FinalSpell(value, enabled);
             if (definition instanceof SpellcastingDefinition value) return new FinalSpellcasting(value, enabled);
             if (definition instanceof WizardSpellcastingDefinition value) return new FinalWizardSpellcasting(value, enabled);
+            if (definition instanceof ClassCantripsDefinition value) return new FinalClassCantrips(value, enabled);
             if (definition instanceof EnvironmentDefinition value) return new FinalEnvironment(value, enabled);
             if (definition instanceof MonsterDefinition value) return new FinalMonster(value, enabled);
             if (definition instanceof HealthDefinition value) return new FinalHealth(value, enabled);
@@ -2872,7 +3017,8 @@ public final class Schema2CompositionKernel {
         if (reference == Field.GRANT) return new ProficiencyGrantEntry(identity, ((GrantValue) fields.get(Field.GRANT).value()).value(), noteField(fields));
         RuleIdentity target = ((IdentityValue) fields.get(reference).value()).value();
         if (reference == Field.PROFICIENCY) return new ProficiencyMemberEntry(identity, target, noteField(fields));
-        if (reference == Field.SPELL) return new SpellbookEntry(identity, target, noteField(fields));
+        if (reference == Field.SPELL) return identity.rule().ruleType().equals(CLASS_CANTRIPS_TYPE)
+                ? new CantripEntry(identity, target, noteField(fields)) : new SpellbookEntry(identity, target, noteField(fields));
         return reference == Field.LANGUAGE ? new LanguageEntry(identity, target, noteField(fields)) : new ToolEntry(identity, target, noteField(fields));
     }
 
@@ -2960,6 +3106,13 @@ public final class Schema2CompositionKernel {
             result.put("description",monster.description());result.put("source_page",monster.sourcePage());result.put("stat_block",Schema2MonsterCodec.statBlockJson(monster.statBlock()));
         } else if (value instanceof SpellDefinition spell) {
             result.put("description",spell.description()); result.put("source_page",spell.sourcePage()); result.put("algorithm",spell.algorithm());
+            if (spell.cantripProfile() != null) result.put("cantrip_profile", cantripProfileJson(spell.cantripProfile()));
+        } else if (value instanceof ClassCantripsDefinition casting) {
+            result.put("description", casting.description());
+            result.put("source_page", casting.sourcePage());
+            result.put("owner_class", identityJson(casting.ownerClass()));
+            result.put("ability_key", casting.abilityKey());
+            result.put("algorithm", casting.algorithm());
         } else if (value instanceof SpellcastingDefinition casting) {
             result.put("description",casting.description()); result.put("source_page",casting.sourcePage()); result.put("algorithm",casting.algorithm());
             result.put("owner_class",identityJson(casting.ownerClass())); result.put("required_subclass",identityJson(casting.requiredSubclass()));
@@ -3034,6 +3187,7 @@ public final class Schema2CompositionKernel {
         else if (value instanceof ProficiencyMemberEntry member) result.put("proficiency", identityJson(member.proficiency()));
         else if (value instanceof GrowthProficiencyGrantEntry grant) result.put("growth_grant", growthGrantJson(grant.grant()));
         else if (value instanceof SpellbookEntry member) result.put("spell",identityJson(member.spell()));
+        else if (value instanceof CantripEntry member) result.put("spell", identityJson(member.spell()));
         else if(value instanceof MonsterActionEntry action) result.put("action_profile",Schema2MonsterCodec.actionProfileJson(action.actionProfile()));
         else result.put(value instanceof LanguageEntry ? "language" : "tool", identityJson(value.target()));
         if (value.authorNote() != null) result.put("author_note", value.authorNote());
@@ -3054,7 +3208,7 @@ public final class Schema2CompositionKernel {
         return json("kind", "CHOICE", "candidates", identityJson(choice.candidates()), "count", choice.count());
     }
     private static boolean newAdvancementType(String type) {
-        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", "adventure.environment", "adventure.monster").contains(type);
+        return Set.of("character.subclass", "character.feature", "character.feat", "character.proficiency", "catalog.proficiency_set", "adventure.rest", "adventure.check", "equipment.item", "equipment.armor_movement", "adventure.health", "adventure.vital_effect", "adventure.combat", "equipment.weapon_attack", "character.movement", "character.subrace_hit_points", STONECUNNING_TYPE, "adventure.spell", "character.spellcasting", "character.wizard_spellcasting", CLASS_CANTRIPS_TYPE, "adventure.environment", "adventure.monster").contains(type);
     }
     private static Map<String, Object> changeJson(Change value) {
         if (value instanceof SetField set) return json("op", "set_field", "target", identityJson(set.target()),
@@ -3076,6 +3230,7 @@ public final class Schema2CompositionKernel {
     private static Object valueJson(FieldValue value) {
         if(value instanceof MonsterStatBlockValue monster) return Schema2MonsterCodec.statBlockJson(monster.value());
         if(value instanceof MonsterActionProfileValue action) return Schema2MonsterCodec.actionProfileJson(action.value());
+        if (value instanceof CantripProfileValue cantrip) return cantripProfileJson(cantrip.value());
         if (value instanceof TextValue text) return text.value();
         if (value instanceof IntegerValue integer) return integer.value();
         if (value instanceof IdentityValue identity) return identityJson(identity.value());

@@ -1,5 +1,6 @@
 package com.dndtool.service;
 
+import com.dndtool.module.composition.Schema2CompositionKernel.DamageType;
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackDamage;
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterAttackProfile;
 import com.dndtool.module.composition.Schema2CompositionKernel.MonsterOnHitSave;
@@ -75,11 +76,12 @@ final class Schema2CombatStateValidator {
                 for (Frame frame:f.frames()) if (frame.kind()==FrameKind.MOVEMENT) check(movementKeys.contains(frame.ownerKey()));
                 for(AttackAttempt a:f.attacks()) {
                     check(a.sequenceKey()==null ? a.attackOrdinal()==0 : !a.opportunityAttack()&&a.attackOrdinal()>=0&&a.attackOrdinal()<2);
-                    check(frames.containsKey(a.frameKey())&&frames.get(a.frameKey()).kind()==FrameKind.ATTACK&&reference(actors,a.actorId(),live)&&reference(actors,a.targetId(),live)&&!a.actorId().equals(a.targetId())&&validAttackSource(a)&&a.firstD20()>=1&&a.firstD20()<=20&&a.selectedD20()>=1&&a.selectedD20()<=20&&(a.secondD20()==null||a.secondD20()>=1&&a.secondD20()<=20)&&a.status()!=null&&a.armorClass()>0&&a.finalArmorClass()>0&&a.damageAmount()>=0&&a.damageDice().size()<=40&&a.damageDice().stream().allMatch(d->d>=1&&d<=12)&&validBless(a.blessingEffectKey(),a.blessingD4()));
+                    check(frames.containsKey(a.frameKey())&&frames.get(a.frameKey()).kind()==FrameKind.ATTACK&&reference(actors,a.actorId(),live)&&reference(actors,a.targetId(),live)&&(a.spellAttack()!=null||!a.actorId().equals(a.targetId()))&&validAttackSource(a)&&a.firstD20()>=1&&a.firstD20()<=20&&a.selectedD20()>=1&&a.selectedD20()<=20&&(a.secondD20()==null||a.secondD20()>=1&&a.secondD20()<=20)&&a.status()!=null&&a.armorClass()>0&&a.finalArmorClass()>0&&a.damageAmount()>=0&&a.damageDice().size()<=40&&a.damageDice().stream().allMatch(d->d>=1&&d<=12)&&validBless(a.blessingEffectKey(),a.blessingD4()));
                     if(a.status()==AttackStatus.HIT_PENDING_DAMAGE)check(a.initialHit()&&a.hit()&&a.damageDice().isEmpty()&&a.damageAmount()==0&&frames.get(a.frameKey()).status()!=FrameStatus.TERMINAL);
                     if(!a.hit())check(a.damageDice().isEmpty()&&a.damageAmount()==0);
+                    if (a.spellAttack()!=null) check(validSpellAttackLink(f,frames.get(a.frameKey()),a));
                 }
-                for(CastAttempt c:f.casts()) {check(frames.containsKey(c.frameKey())&&frames.get(c.frameKey()).kind()==FrameKind.CAST&&allCasts.put(c.frameKey(),c)==null&&reference(actors,c.actorId(),live)&&c.castingRule()!=null&&Set.of("character.spellcasting","character.wizard_spellcasting").contains(c.castingRule().ruleType())&&c.spell()!=null&&c.spell().ruleType().equals("adventure.spell")&&c.slotResource()!=null&&c.slotResource().ruleType().equals("character.resource")&&c.slotLevel()>=1&&c.slotLevel()<=9&&(c.coneDirection()==null?!c.targets().isEmpty():c.targets().isEmpty()&&c.coneDirection()>=0&&c.coneDirection()<8&&c.readyKey()==null)&&c.targets().size()<=3&&c.targets().stream().allMatch(target->reference(actors,target,live))&&new HashSet<>(c.targets()).size()==c.targets().size()&&c.status()!=null&&c.healingDice().size()<=1&&c.healingDice().stream().allMatch(d->d>=1&&d<=8)&&c.appliedHealing()>=0&&c.requestedHealing()>=c.appliedHealing());if(c.status()==CastStatus.PENDING||c.status()==CastStatus.COUNTERED||c.status()==CastStatus.HELD||c.status()==CastStatus.INTERRUPTED)check(c.healingDice().isEmpty()&&c.requestedHealing()==0&&c.appliedHealing()==0&&c.effectKey()==null);}
+                for(CastAttempt c:f.casts()) {check(frames.containsKey(c.frameKey())&&frames.get(c.frameKey()).kind()==FrameKind.CAST&&allCasts.put(c.frameKey(),c)==null&&reference(actors,c.actorId(),live)&&validCastSource(c,frames.get(c.frameKey()))&&c.spell()!=null&&c.spell().ruleType().equals("adventure.spell")&&(c.coneDirection()==null?!c.targets().isEmpty():c.targets().isEmpty()&&c.coneDirection()>=0&&c.coneDirection()<8&&c.readyKey()==null)&&c.targets().size()<=3&&c.targets().stream().allMatch(target->reference(actors,target,live))&&new HashSet<>(c.targets()).size()==c.targets().size()&&c.status()!=null&&c.healingDice().size()<=1&&c.healingDice().stream().allMatch(d->d>=1&&d<=8)&&c.appliedHealing()>=0&&c.requestedHealing()>=c.appliedHealing());if(c.status()==CastStatus.PENDING||c.status()==CastStatus.COUNTERED||c.status()==CastStatus.HELD||c.status()==CastStatus.INTERRUPTED)check(c.healingDice().isEmpty()&&c.requestedHealing()==0&&c.appliedHealing()==0&&c.effectKey()==null);}
                 for(SavingThrowAttempt s:f.savingThrows())check(frames.containsKey(s.frameKey())&&reference(actors,s.subjectId(),live)&&s.d20()>=1&&s.d20()<=20&&s.proficiencyBonus()>=0&&s.proficiencyBonus()<=6&&validBless(s.blessingEffectKey(),s.blessingD4())&&s.total()==s.d20()+s.abilityModifier()+s.proficiencyBonus()+(s.blessingD4()==null?0:s.blessingD4())&&s.success()==(s.total()>=s.difficultyClass()));
                 for(AbilityCheckAttempt c:f.abilityChecks())check(frames.containsKey(c.frameKey())&&reference(actors,c.subjectId(),live)&&c.kind().equals("COUNTERSPELL")&&c.abilityKey().equals("ability.intelligence")&&c.d20()>=1&&c.d20()<=20&&c.proficiencyBonus()==0&&c.total()==c.d20()+c.abilityModifier()&&c.success()==(c.total()>=c.difficultyClass()));
                 for(ReadyRelease r:f.readyReleases())check(frames.containsKey(r.frameKey())&&frames.get(r.frameKey()).kind()==FrameKind.READY_RELEASE&&triggers.containsKey(r.triggerKey())&&r.completed()==(r.outcome()!=null)&&r.completed()==(frames.get(r.frameKey()).status()==FrameStatus.TERMINAL));
@@ -209,6 +211,7 @@ final class Schema2CombatStateValidator {
         var ranged = attack.rangedAttack();
         if (!validAttackObservation(attack) || !validD20Selection(attack)) return false;
         if (ranged != null && !validRangedAttack(attack, ranged)) return false;
+        if (attack.spellAttack() != null) return validSpellAttack(attack);
         if (source == null) return attack.itemId() != null;
         if (attack.itemId() != null || attack.sequenceKey() != null || attack.attackOrdinal() != 0
                 || !attack.damageDice().isEmpty() || attack.abilityModifier() != 0 || attack.proficiencyBonus() != 0
@@ -249,6 +252,70 @@ final class Schema2CombatStateValidator {
         return damage == attack.damageAmount();
     }
 
+    static boolean validCastSource(CastAttempt cast, Frame frame) {
+        if (cast.castingRule() == null) return false;
+        if (cast.slotLevel() != 0) return Set.of("character.spellcasting","character.wizard_spellcasting").contains(cast.castingRule().ruleType())
+                && cast.slotResource()!=null && "character.resource".equals(cast.slotResource().ruleType())
+                && cast.slotLevel()>=1 && cast.slotLevel()<=9 && cast.sacredFlame()==null;
+        if (!Schema2SpellRules.CLASS_CANTRIPS.equals(cast.castingRule().ruleType()) || frame.invocation()!=Invocation.ROOT
+                || cast.targets().size()!=1 || cast.slotResource()!=null || cast.materialItemId()!=null
+                || cast.targetCastFrameKey()!=null || cast.readyKey()!=null || cast.coneDirection()!=null
+                || cast.status()==CastStatus.HELD || cast.healingModifier()!=0 || !cast.healingDice().isEmpty()
+                || cast.requestedHealing()!=0 || cast.appliedHealing()!=0 || cast.effectKey()!=null) return false;
+        var sacred = cast.sacredFlame();
+        if (sacred==null) return true;
+        var save = sacred.savingThrow();
+        return cast.status()==CastStatus.RESOLVED && save!=null && save.targetOrdinal()==0
+                && Schema2ActionFlowRules.SACRED_FLAME_DEX.equals(save.purpose()) && "ability.dexterity".equals(save.abilityKey())
+                && Schema2SavingThrowRules.validResult(save)
+                && (save.success() ? sacred.damage()==null : validCantripDamage(sacred.damage(),DamageType.RADIANT,8,false));
+    }
+
+    static boolean validSpellAttackLink(Flow flow, Frame frame, AttackAttempt attack) {
+        UUID castKey = attack.spellAttack().castFrameKey();
+        return castKey!=null && castKey.equals(frame.parentFrameKey()) && frame.kind()==FrameKind.ATTACK
+                && frame.invocation()==Invocation.CONTINUATION
+                && flow.casts().stream().anyMatch(cast -> cast.frameKey().equals(castKey) && cast.slotLevel()==0
+                    && cast.sacredFlame()==null && cast.actorId().equals(attack.actorId())
+                    && cast.targets().equals(List.of(attack.targetId()))
+                    && (frame.status()==FrameStatus.TERMINAL
+                        ? cast.status()==CastStatus.RESOLVED : cast.status()==CastStatus.PENDING));
+    }
+
+    private static boolean validSpellAttack(AttackAttempt attack) {
+        if (attack.monsterAttack()!=null || attack.itemId()!=null || attack.rangedAttack()==null
+                || attack.sequenceKey()!=null || attack.attackOrdinal()!=0 || attack.opportunityAttack()
+                || !attack.damageDice().isEmpty()) return false;
+        int selected = attack.selectedD20();
+        int total = selected + attack.abilityModifier() + attack.proficiencyBonus()
+                + (attack.blessingD4()==null ? 0 : attack.blessingD4());
+        boolean couldHit = attack.targetAtAimedPosition() && selected!=1;
+        boolean initial = couldHit && (selected==20 || total>=attack.armorClass());
+        boolean hit = couldHit && (selected==20 || total>=attack.finalArmorClass());
+        if (initial!=attack.initialHit() || hit!=attack.hit() || selected==20 && hit && !attack.critical()
+                || !hit && attack.critical()) return false;
+        var damage = attack.spellAttack().damage();
+        if (attack.spellAttack().unseenDeadAtAim())
+            return !attack.spellAttack().targetDeadBeforeDamage() && !attack.targetAtAimedPosition()
+                    && attack.status()==AttackStatus.RESOLVED && !hit && damage==null && attack.damageAmount()==0;
+        if (attack.spellAttack().targetDeadBeforeDamage())
+            return attack.status()==AttackStatus.RESOLVED && hit && damage==null && attack.damageAmount()==0;
+        return attack.status()==AttackStatus.RESOLVED && hit
+                ? validCantripDamage(damage,DamageType.FIRE,10,attack.critical()) && attack.damageAmount()==damage.effectiveDamage()
+                : damage==null && attack.damageAmount()==0;
+    }
+
+    private static boolean validCantripDamage(AttackDamageComponent damage, DamageType type, int sides, boolean critical) {
+        return damage!=null && damage.damageType()==type && damage.diceSides()==sides && damage.modifier()==0
+                && damage.diceCount()>=1 && damage.diceCount()<=2
+                && damage.dice().size()==damage.diceCount()*(critical?2:1)
+                && damage.dice().stream().allMatch(die -> die>=1 && die<=sides)
+                && damage.rawDamage()==damage.dice().stream().mapToInt(Integer::intValue).sum()
+                && damage.defenses().stream().allMatch(defense -> defense.source()!=null && Set.of("IMMUNITY","RESISTANCE","VULNERABILITY").contains(defense.kind()))
+                && new HashSet<>(damage.defenses()).size()==damage.defenses().size()
+                && damage.effectiveDamage()==Schema2SaveDamageRules.damage(damage.rawDamage(),false,damage.defenses());
+    }
+
     private static boolean validAttackObservation(AttackAttempt attack) {
         Cover cover = attack.targetCover();
         if (cover == null || cover == Cover.TOTAL || attack.aimedPosition() == null
@@ -273,15 +340,17 @@ final class Schema2CombatStateValidator {
     }
 
     private static boolean validRangedAttack(AttackAttempt attack, RangedAttackEvidence ranged) {
-        if (attack.opportunityAttack() || ranged.distanceFeet() < 0 || ranged.distanceFeet() == 0 && attack.targetAtAimedPosition()
+        boolean spell = attack.spellAttack()!=null;
+        if (attack.opportunityAttack() || ranged.distanceFeet() < 0 || !spell && ranged.distanceFeet() == 0 && attack.targetAtAimedPosition()
                 || ranged.distanceFeet() % 5 != 0
                 || ranged.normalRangeFeet() < 5 || ranged.normalRangeFeet() % 5 != 0
-                || ranged.longRangeFeet() <= ranged.normalRangeFeet() || ranged.longRangeFeet() % 5 != 0
+                || (spell ? ranged.longRangeFeet()!=ranged.normalRangeFeet() : ranged.longRangeFeet()<=ranged.normalRangeFeet())
+                || ranged.longRangeFeet() % 5 != 0
                 || ranged.longRangeFeet() > MAX_WEAPON_RANGE_FEET || ranged.distanceFeet() > ranged.longRangeFeet()
                 || (ranged.closeEnemy() || ranged.distanceFeet() > ranged.normalRangeFeet()) && !attack.disadvantage())
             return false;
         UUID ammunition = ranged.ammunitionItemId();
-        return attack.monsterAttack() != null ? ammunition == null : attack.sequenceKey() != null
+        return spell || attack.monsterAttack() != null ? ammunition == null : attack.sequenceKey() != null
                 && ammunition != null && ammunition.version() == 4 && ammunition.variant() == 2
                 && !ammunition.equals(attack.itemId());
     }

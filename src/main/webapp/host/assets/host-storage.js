@@ -246,6 +246,7 @@
         if (!rule.enabled || !types.includes(rule.type)) return false;
         if (select.form.id === 'domain-create') return rule.creationChoice;
         if (select.form.id === 'domain-spellbook' && select.name !== 'castingRule') return rule.spellbookChoice;
+        if (select.name === 'spell' && rule.cantripClasses?.length) return false;
         if (select.form.id === 'domain-resource') return rule.directResourceSpend;
         return rule.executable;
       });
@@ -262,6 +263,7 @@
     }
     for (const select of document.querySelectorAll('.node-choice')) options(select, (domain().nodes || []).map(node => node.id), id => domain().nodes.find(node => node.id === id).name);
     refreshCreationSubraces();
+    refreshCreationCantrips();
     refreshCharacterChoices();
     refreshCheckAbility();
     refreshCheckAbility(byId('domain-group-check'));
@@ -274,6 +276,45 @@
     options(subraceKey, choices.map(ruleValue), value => ruleFromValue(value).name);
     subraceKey.disabled = choices.length === 0;
     subraceKey.parentElement.hidden = subraceKey.disabled;
+  }
+  function refreshCreationCantrips() {
+    const fields = byId('domain-create').elements;
+    const owner = ruleFromValue(fields.classKey.value);
+    chooseCantrips(fields.cantripKeys, owner, owner?.cantripCounts?.[0] || 0, [], '已知戏法', 'create');
+  }
+  function refreshGrowthCantrips() {
+    const form = byId('domain-growth'), character = selectedCharacter(form);
+    const owner = ruleFromValue(form.elements.class.value);
+    const level = character?.state.classes.find(entry => ruleValue(entry.characterClass) === form.elements.class.value)?.level || 0;
+    const known = (character?.state.knownCantrips || []).filter(entry => ruleValue(entry.characterClass) === form.elements.class.value)
+      .map(entry => ruleValue(entry.spell));
+    const count = character ? Math.max(0, (owner?.cantripCounts?.[level] || 0) - known.length) : 0;
+    chooseCantrips(form.elements.newCantrips, owner, count, known, '新学戏法', character?.id);
+  }
+  function chooseCantrips(select, owner, count, known, label, subject) {
+    select.disabled = count === 0;
+    select.parentElement.hidden = select.disabled;
+    const scope = JSON.stringify([workspaceScope, subject, owner?.key, count, known]);
+    if (select.dataset.scope === scope) return;
+    select.dataset.scope = scope;
+    select.dataset.count = String(count);
+    select.replaceChildren();
+    select.setCustomValidity('');
+    if (!count) return;
+    select.parentElement.querySelector('span').textContent = `${label}（选 ${count} 项）`;
+    const pool = catalog().filter(rule => rule.enabled && rule.cantripClasses?.includes(owner.key) && !known.includes(ruleValue(rule)));
+    const defaults = pool.filter(rule => rule.defaultCantripClasses.includes(owner.key));
+    const chosen = new Set([...defaults, ...pool.filter(rule => !defaults.includes(rule))].slice(0, count).map(ruleValue));
+    for (const rule of pool) {
+      const option = new Option(rule.name + (rule.executable ? '（可施放）' : '（仅记录）'), ruleValue(rule));
+      option.selected = chosen.has(option.value);
+      select.add(option);
+    }
+    validateCantripCount(select);
+  }
+  function validateCantripCount(select) {
+    const count = Number(select.dataset.count);
+    select.setCustomValidity(!select.disabled && select.selectedOptions.length !== count ? `请选择 ${count} 项戏法。` : '');
   }
   function refreshCheckAbility(form = byId('domain-check'), fields = form.elements) {
     const individual = form.id === 'domain-check';
@@ -328,6 +369,7 @@
     }
     refreshCheckBranches();
     refreshArcaneRecovery();
+    refreshGrowthCantrips();
   }
   function refreshMonsterForm(form) {
     const battle = battleFor(form.elements.combatId.value);
@@ -739,6 +781,11 @@
     text(card, 'p', `特性：${(current.features || []).map(feature => ruleName(feature.feature)).join('；') || '无'}`);
     text(card, 'p', `熟练：${(current.proficiencies || []).map(proficiency => ruleName(proficiency.target)).join('；') || '无'}`);
     if (current.rest?.active) text(card, 'p', `休息中：${current.rest.active.kind || current.rest.active.restKind} · ${current.rest.active.phase}`);
+    if (current.knownCantrips.length) {
+      const known = current.knownCantrips.map(entry => ruleName(entry.spell) + '（' + ruleName(entry.characterClass)
+        + ' · ' + (ruleFromValue(ruleValue(entry.spell)).executable ? '可施放' : '仅记录') + '）');
+      text(card, 'p', '已知戏法：' + known.join('、'));
+    }
     if (current.spellbook) {
       text(card, 'p', `已准备法术：${current.spellbook.prepared.map(ruleName).join('、') || '无'}`);
       const day = current.spellbook.lastArcaneRecoveryDay;
@@ -841,6 +888,19 @@
       : `${attack.critical ? '重击' : '命中'} · 伤害 ${attack.damageAmount}`;
     return `${personName(attack.actorId)} → ${personName(attack.targetId)} · 射击 · ${rangedDetails(shot)} · 已用 1 支箭 · d20=${dice}，选用 ${attack.selectedD20}，护甲等级 ${attack.finalArmorClass} · ${outcome}${attackSight(attack)}`;
   }
+  function cantripAttackResult(attack, cast) {
+    const d20 = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
+    const damage = attack.spellAttack.damage;
+    const outcome = attack.status !== 'RESOLVED' ? '等待反应' : !attack.hit ? '未命中'
+      : `${attack.critical ? '重击' : '命中'}，伤害骰 ${damage.dice.join(' + ')}，实际伤害 ${damage.effectiveDamage}`;
+    return `${personName(attack.actorId)} → ${personName(attack.targetId)} · ${ruleName(cast.spell)} · d20=${d20}，选用 ${attack.selectedD20}，护甲等级 ${attack.finalArmorClass} · ${outcome}`;
+  }
+  function cantripSaveResult(cast) {
+    const {savingThrow: save, damage} = cast.sacredFlame;
+    const d20 = [save.firstD20, save.secondD20].filter(die => die != null).join(' / ') || '自动失败';
+    return `${personName(cast.actorId)} → ${personName(cast.targets[0])} · ${ruleName(cast.spell)} · 敏捷豁免 ${d20}，总值 ${save.total} 对 DC ${save.difficultyClass} · ${save.success ? '豁免成功' : '豁免失败'}`
+      + (damage ? `，伤害骰 ${damage.dice.join(' + ')}，实际伤害 ${damage.effectiveDamage}` : '，实际伤害 0');
+  }
   function monsterAttackResult(attack) {
     const evidence = attack.monsterAttack;
     const name = monsterAttackName(evidence.action), actor = personName(attack.actorId), target = personName(attack.targetId);
@@ -882,9 +942,15 @@
     }
     for (const flow of after.flows) {
       const earlier = before?.flows.find(old => old.flowKey === flow.flowKey);
-      for (const attack of flow.attacks.filter(attack => attack.monsterAttack || attack.rangedAttack)) {
+      for (const attack of flow.attacks.filter(attack => attack.monsterAttack || attack.rangedAttack || attack.spellAttack)) {
         const prior = earlier?.attacks.find(previous => previous.frameKey === attack.frameKey);
-        if (!prior || prior.status !== attack.status) details.push(attack.monsterAttack ? monsterAttackResult(attack) : characterShotResult(attack));
+        if (prior?.status === attack.status) continue;
+        if (attack.spellAttack) details.push(cantripAttackResult(attack, flow.casts.find(c => c.frameKey === attack.spellAttack.castFrameKey)));
+        else details.push(attack.monsterAttack ? monsterAttackResult(attack) : characterShotResult(attack));
+      }
+      for (const cast of flow.casts) {
+        const prior = earlier?.casts.find(c => c.frameKey === cast.frameKey);
+        if (cast.sacredFlame && !prior?.sacredFlame) details.push(cantripSaveResult(cast));
       }
       for (const movement of flow.movements.filter(move => move.drag)) {
         const prior = earlier?.movements.find(move => move.movementKey === movement.movementKey);
@@ -1181,6 +1247,18 @@
       });
     }
     refreshCombatForm();
+    refreshCantripCast();
+  }
+  function refreshCantripCast() {
+    const battle = focusedBattle(), form = byId('domain-cantrip');
+    const choices = battleHistory(battle?.combatId)?.cantripChoices || [];
+    form.hidden = choices.length === 0;
+    if (form.hidden) return;
+    byId('cantrip-caster').textContent = personName(battle.initiative[battle.activeOrdinal].characterId) + ' · 普通动作';
+    const spells = [...new Set(choices.map(choice => ruleValue(choice.spell)))];
+    options(form.elements.spell, spells, value => ruleFromValue(value).name);
+    const targets = choices.filter(choice => ruleValue(choice.spell) === form.elements.spell.value);
+    options(form.elements.targetId, targets.map(choice => choice.target), personName);
   }
   const combatActions = new Map(Array.from(byId('domain-combat').elements.kind.options, option => [option.value, option.textContent]));
   function shoveDestination(actor, target) {
@@ -1904,7 +1982,7 @@
   }
   function baseCharacter(kind) {
     return {type: 'character.Command', kind, resource: null, amount: '0', recoveryTrigger: null, hpChoice: null, targetClass: null,
-      growthChoices: {type: 'character.GrowthChoices', subclass: null, abilityIncreases: [], feat: null, proficiencyChoices: []},
+      growthChoices: {type: 'character.GrowthChoices', subclass: null, abilityIncreases: [], feat: null, proficiencyChoices: [], cantrips: []},
       restInput: null, checkInput: null, equipmentInput: null, healthInput: null, combatInput: null, spellbookInput: null};
   }
   function domainForm(id, action, build) {
@@ -1926,14 +2004,19 @@
   }
   const multipleRules = select => Array.from(select.selectedOptions, option => typedRule(option.value));
   byId('domain-create').elements.raceKey.addEventListener('change', refreshCreationSubraces);
-  domainForm('domain-create', 'character-create', (_, values) => ({name: values.name, kind: values.kind,
+  byId('domain-create').elements.classKey.addEventListener('change', refreshCreationCantrips);
+  byId('domain-growth').elements.class.addEventListener('change', refreshGrowthCantrips);
+  for (const field of [byId('domain-create').elements.cantripKeys, byId('domain-growth').elements.newCantrips])
+    field.addEventListener('change', () => validateCantripCount(field));
+  domainForm('domain-create', 'character-create', (form, values) => ({name: values.name, kind: values.kind,
     raceKey: ruleFromValue(values.raceKey).key, classKey: ruleFromValue(values.classKey).key,
     backgroundKey: ruleFromValue(values.backgroundKey).key,
+    cantripKeys: Array.from(form.elements.cantripKeys.selectedOptions, option => ruleFromValue(option.value).key),
     ...(values.subraceKey ? {subraceKey: ruleFromValue(values.subraceKey).key} : {})}));
   domainForm('domain-profile', 'character-profile', (_, values) => ({characterId: values.characterId, name: values.name, kind: values.kind, active: values.active === 'on'}));
-  characterForm('domain-growth', (_, values) => ({...baseCharacter('CHARACTER_ADVANCED'), hpChoice: values.hpChoice, targetClass: typedRule(values.class),
+  characterForm('domain-growth', (form, values) => ({...baseCharacter('CHARACTER_ADVANCED'), hpChoice: values.hpChoice, targetClass: typedRule(values.class),
     growthChoices: {type: 'character.GrowthChoices', subclass: typedRule(values.subclass), feat: typedRule(values.feat),
-      abilityIncreases: values.ability ? [[values.ability, '2']] : [], proficiencyChoices: []}}));
+      abilityIncreases: values.ability ? [[values.ability, '2']] : [], proficiencyChoices: [], cantrips: multipleRules(form.elements.newCantrips)}}));
   characterForm('domain-resource', (_, values) => ({...baseCharacter(values.kind),
     resource: values.kind === 'RESOURCE_SPENT' ? typedRule(values.resource) : null,
     amount: values.kind === 'RESOURCE_SPENT' ? values.amount : '0', recoveryTrigger: values.kind === 'RESOURCES_RECOVERED' ? values.recoveryTrigger : null}));
@@ -2100,6 +2183,17 @@
       }
     }
     sendCombat(battle, value);
+  });
+  byId('domain-cantrip').elements.spell.addEventListener('change', refreshCantripCast);
+  byId('domain-cantrip').addEventListener('submit', event => {
+    event.preventDefault();
+    const form = event.currentTarget, battle = focusedBattle();
+    const choice = battleHistory(battle?.combatId)?.cantripChoices?.find(option =>
+      ruleValue(option.spell) === form.elements.spell.value && option.target === form.elements.targetId.value);
+    if (!choice) { message('请重新选择当前可用的戏法和目标。'); return; }
+    const castInput = {type: 'scene.CastInput', castingRule: typedRule(choice.castingRule), spell: typedRule(choice.spell),
+      targets: [choice.target], materialItemId: null, slotLevel: '0', targetCastFrameKey: null, coneDirection: null};
+    sendCombat(battle, {...baseCombat('CAST', battle.initiative[battle.activeOrdinal].characterId), castInput});
   });
   byId('domain-cast').addEventListener('submit', event => {
     event.preventDefault(); const form = event.currentTarget, values = Object.fromEntries(new FormData(form)), battle = battleFor(values.combatId);

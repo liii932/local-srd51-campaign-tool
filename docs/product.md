@@ -59,8 +59,10 @@ Wizard Spellcasting、Arcane Recovery 与一级 Life profile 则由真实消费�
 机会攻击和反应/继续保存实际骰点及完整状态。规则角色可在本人战斗回合
 [主动卧倒、双倍成本爬行和半速起身](rules/schema-2-prone.md)，Ready 移动使用自己的反应移动上限；
 探索中也可主动卧倒、双倍成本爬行和起身：卧倒不耗时，移动与起身各推进六秒，保留旧战斗预算；
-姿态、路径前缀、已付成本和反应窗口随完整文件恢复。生命领域支持 Bless/Cure Wounds；单职业 Wizard
-支持 Shield/Counterspell/Burning Hands、真实法术书、学习/准备和短休奥术回想。其余目录法术
+姿态、路径前缀、已付成本和反应窗口随完整文件恢复。一级法师和牧师建卡时各选三个职业戏法。在已学会的前提下，法术位耗尽仍可分别施放火焰箭和圣火术。[职业戏法](rules/schema-2-cantrips.md)
+
+生命领域支持 Bless/Cure Wounds；单职业 Wizard
+支持 Shield/Counterspell/Burning Hands、真实法术书、学习/准备和短休奥术回想。其余有环目录法术
 只提供学习/准备元数据，不能施放。多施法职业的共享位数不在现有 casting 消费者支持范围。
 地狱犬支持吐息、充能，以及[普通啮咬与借机攻击](rules/schema-2-monster-attacks.md)。狼也能普通或借机啮咬，命中后依实际力量豁免裁定倒地。两种生物的 Pack Tactics 均可改变攻击选骰。骷髅可用短剑近战或在本人回合使用短弓。装备短弓的角色逐击扣除实有箭支。双方按各自冻结的射程和相同的近身条件结算。[远程武器](rules/schema-2-ranged-attacks.md)
 

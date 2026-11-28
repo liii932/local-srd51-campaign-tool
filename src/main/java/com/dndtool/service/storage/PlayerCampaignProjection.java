@@ -22,7 +22,7 @@ public final class PlayerCampaignProjection {
         view.addProperty("campaignName", "冒险房间");
         view.addProperty("playerName", state.participation().member(member).name());
         JsonArray cards = new JsonArray();
-        for (var c : state.characters()) if (own.contains(c.id())) cards.add(ruleCard(state, c));
+        for (var c : state.characters()) if (own.contains(c.id())) cards.add(ruleCard(state, c, member));
         for (var c : state.manual().characters()) if (own.contains(c.id())) cards.add(manualCard(state, c.current()));
         view.add("cards", cards);
         JsonObject shared = new JsonObject(); JsonArray summaries = new JsonArray(), scenes = new JsonArray(), logs = new JsonArray();
@@ -137,7 +137,82 @@ public final class PlayerCampaignProjection {
         if (event != null && Objects.equals(event.command().actorId(), root.actor().characterId())
                 && (event.command().kind() == Schema2CombatState.Kind.ATTACK
                     || event.command().kind() == Schema2CombatState.Kind.DECLARE_OPPORTUNITY_ATTACK)) addMonsterAttackResult(result, event);
+        if (event != null && isCantrip(event)) {
+            var flow = event.after().flows().getLast();
+            JsonObject outcome = cantripOutcome(access.snapshot().domains(), event, flow);
+            if (outcome != null) result.add("cantripResult", outcome);
+        }
         return result;
+    }
+
+    private static boolean isCantrip(Schema2CombatHistory.Event event) {
+        return event.command().kind() == Schema2CombatState.Kind.CAST && event.command().castInput().slotLevel() == 0;
+    }
+
+    private static JsonObject cantripOutcome(CampaignDomainData.State domain, Schema2CombatHistory.Event event,
+            Schema2CombatState.Flow flow) {
+        var cast = flow.casts().stream().filter(c -> c.frameKey().equals(flow.rootFrameKey())).findFirst().orElseThrow();
+        JsonObject result = new JsonObject();
+        result.addProperty("spell", ruleName(domain, cast.spell()));
+        if (cast.status() == Schema2CombatState.CastStatus.COUNTERED || cast.status() == Schema2CombatState.CastStatus.INTERRUPTED) {
+            result.addProperty("outcome", cast.status().name());
+            return result;
+        }
+        UUID target = cast.targets().getFirst();
+        UUID damageFrame = cast.frameKey();
+        int damage;
+        if (cast.sacredFlame() != null) {
+            var save = cast.sacredFlame();
+            result.addProperty("outcome", save.savingThrow().success() ? "SAVED" : "FAILED_SAVE");
+            damage = save.damage() == null ? 0 : save.damage().effectiveDamage();
+        } else {
+            var attack = flow.attacks().stream().filter(a -> a.spellAttack() != null
+                    && a.spellAttack().castFrameKey().equals(cast.frameKey())).findFirst().orElse(null);
+            if (attack == null || attack.status() != Schema2CombatState.AttackStatus.RESOLVED) return null;
+            result.addProperty("outcome", attack.hit() ? "HIT" : "MISS");
+            damageFrame = attack.frameKey();
+            damage = attack.damageAmount();
+        }
+        result.addProperty("damage", damage);
+        boolean dropped = false;
+        if (damage > 0) {
+            var monster = event.before().monsters().stream().filter(m -> m.monsterId().equals(target)).findFirst();
+            if (monster.isPresent()) {
+                int hp = monster.get().hitPoints();
+                dropped = hp > 0 && hp <= damage;
+            } else {
+                for (var change : event.resolution().healthChanges()) {
+                    if (damageFrame.equals(change.frameKey()) && change.characterId().equals(target)
+                            && change.before().hitPoints() > 0 && change.after().hitPoints() == 0) dropped = true;
+                }
+            }
+        }
+        result.addProperty("dropped", dropped);
+        return result;
+    }
+
+    private static void addLatestCantrip(JsonObject card, CampaignDomainData.State domain, UUID member, UUID caster) {
+        var history = CampaignSpaceCommands.currentBattle(domain);
+        if (history == null || !shared(domain, member, ShareKind.SCENE, history.current().combatId())) return;
+        for (var entry : history.events().reversed()) {
+            if (!isCantrip(entry) || !caster.equals(entry.command().actorId())) continue;
+            boolean submitted = domain.roots().stream().anyMatch(root -> root.operationId().equals(entry.operationId())
+                    && root.actor().kind() == ActorKind.PLAYER && member.equals(root.actor().memberId()));
+            if (!submitted) continue;
+            UUID target = entry.command().castInput().targets().getFirst();
+            if (!visible(domain, member).contains(target) && !visibleMonsters(domain, member, history.current().combatId()).contains(target)) return;
+            var rootFlow = entry.after().flows().getLast();
+            for (var step : history.events()) {
+                if (step.after().version() < entry.after().version()) continue;
+                var flow = step.after().flows().stream().filter(f -> f.flowKey().equals(rootFlow.flowKey())).findFirst().orElseThrow();
+                var outcome = cantripOutcome(domain, step, flow);
+                if (outcome != null) {
+                    card.add("lastCantrip", outcome);
+                    return;
+                }
+            }
+            return;
+        }
     }
 
     private static void addMonsterAttackResult(JsonObject receipt, Schema2CombatHistory.Event event) {
@@ -204,7 +279,7 @@ public final class PlayerCampaignProjection {
             JsonObject row = new JsonObject(); row.addProperty("label", names.get(i)); row.addProperty("value", value); row.addProperty("modifier", Math.floorDiv(value - 10, 2)); a.add(row);
         } return a;
     }
-    private static JsonObject ruleCard(CampaignDomainData.State domain, CampaignDomainData.Character c) {
+    private static JsonObject ruleCard(CampaignDomainData.State domain, CampaignDomainData.Character c, UUID member) {
         var state = c.history().current(); JsonObject card = base(c.id(), c.name(), c.kind(), state.hitPoints(), state.maximumHitPoints(), state.level());
         card.addProperty("className", ruleName(domain, state.characterClass())); card.addProperty("proficiencyBonus", state.proficiencyBonus());
         var material = domain.material().restore().projection();
@@ -224,6 +299,20 @@ public final class PlayerCampaignProjection {
         card.add("equipment", equipment);
         JsonArray proficiencies = new JsonArray(); state.proficiencies().forEach(p -> proficiencies.add(ruleName(domain, p.target()))); card.add("proficiencies", proficiencies);
         JsonArray features = new JsonArray(); state.features().forEach(f -> features.add(ruleName(domain, f.feature()))); state.feats().forEach(f -> features.add(ruleName(domain, f.feat()))); card.add("features", features);
+        if (!state.knownCantrips().isEmpty()) {
+            JsonArray known = new JsonArray();
+            for (var acquisition : state.knownCantrips()) {
+                var spell = material.classCantrips(acquisition.characterClass()).orElseThrow().options().stream()
+                        .filter(s -> s.identity().equals(acquisition.spell())).findFirst().orElseThrow();
+                JsonObject row = new JsonObject();
+                row.addProperty("name", spell.displayName());
+                row.addProperty("source", ruleName(domain, acquisition.characterClass()));
+                row.addProperty("executable", spell.cantripProfile() != null);
+                known.add(row);
+            }
+            card.add("knownCantrips", known);
+            addLatestCantrip(card, domain, member, c.id());
+        }
         if (state.spellbook() != null) {
             JsonObject book = new JsonObject(); JsonArray learned = new JsonArray(), prepared = new JsonArray();
             state.spellbook().learned().forEach(s -> learned.add(ruleName(domain, s.spell()))); state.spellbook().prepared().forEach(s -> prepared.add(ruleName(domain, s)));

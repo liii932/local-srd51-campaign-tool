@@ -225,7 +225,7 @@ public final class Schema2CharacterHealthRules {
     private static State copy(State before, long hp, HealthState health, RestState clock, long version) {
         return new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(), before.characterClass(),
                 before.abilities(), before.level(), before.proficiencyBonus(), hp, before.maximumHitPoints(), before.classes(), before.hitDicePools(),
-                before.subclasses(), before.features(), before.feats(), before.proficiencies(), version, before.resources(), clock, before.equipment(), health, before.spellbook());
+                before.subclasses(), before.features(), before.feats(), before.proficiencies(), version, before.resources(), clock, before.equipment(), health, before.spellbook(), before.knownCantrips());
     }
     private static IllegalArgumentException invalid(String code) { return new IllegalArgumentException(code); }
 }

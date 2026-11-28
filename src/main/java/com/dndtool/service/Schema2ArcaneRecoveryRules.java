@@ -53,7 +53,7 @@ public final class Schema2ArcaneRecoveryRules {
         return new State(rested.identity(), rested.campaignId(), rested.characterId(), rested.preparationOperationId(), rested.characterClass(),
                 rested.abilities(), rested.level(), rested.proficiencyBonus(), rested.hitPoints(), rested.maximumHitPoints(), rested.classes(),
                 rested.hitDicePools(), rested.subclasses(), rested.features(), rested.feats(), rested.proficiencies(), rested.version(), resources,
-                rested.rest(), rested.equipment(), rested.health(), book);
+                rested.rest(), rested.equipment(), rested.health(), book, rested.knownCantrips());
     }
 
     public void validateState(ProductionSchema2Projection material, State state) {

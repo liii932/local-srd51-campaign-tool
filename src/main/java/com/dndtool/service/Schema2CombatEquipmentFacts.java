@@ -24,6 +24,6 @@ public final class Schema2CombatEquipmentFacts {
         return withEquipment(state, items, state.version());
     }
     private static State withEquipment(State state, List<EquipmentItem> items, long version) {
-        return new State(state.identity(),state.campaignId(),state.characterId(),state.preparationOperationId(),state.characterClass(),state.abilities(),state.level(),state.proficiencyBonus(),state.hitPoints(),state.maximumHitPoints(),state.classes(),state.hitDicePools(),state.subclasses(),state.features(),state.feats(),state.proficiencies(),version,state.resources(),state.rest(),items,state.health(),state.spellbook());
+        return new State(state.identity(),state.campaignId(),state.characterId(),state.preparationOperationId(),state.characterClass(),state.abilities(),state.level(),state.proficiencyBonus(),state.hitPoints(),state.maximumHitPoints(),state.classes(),state.hitDicePools(),state.subclasses(),state.features(),state.feats(),state.proficiencies(),version,state.resources(),state.rest(),items,state.health(),state.spellbook(),state.knownCantrips());
     }
 }

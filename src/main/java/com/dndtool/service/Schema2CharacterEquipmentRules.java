@@ -63,7 +63,7 @@ public final class Schema2CharacterEquipmentRules {
         State after = new State(before.identity(), before.campaignId(), before.characterId(), before.preparationOperationId(), before.characterClass(),
                 before.abilities(), before.level(), before.proficiencyBonus(), before.hitPoints(), before.maximumHitPoints(), before.classes(),
                 before.hitDicePools(), before.subclasses(), before.features(), before.feats(), before.proficiencies(), before.version() + 1,
-                before.resources(), clock, next, before.health(), before.spellbook());
+                before.resources(), clock, next, before.health(), before.spellbook(), before.knownCantrips());
         validateState(material, after); return after;
     }
 

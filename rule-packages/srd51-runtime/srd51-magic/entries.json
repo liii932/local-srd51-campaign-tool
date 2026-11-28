@@ -716,5 +716,165 @@
         ]
       }
     }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.cleric"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "guidance"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.guidance"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.cleric"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "light"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.light"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.cleric"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "sacred_flame"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.sacred_flame"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.cleric"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "thaumaturgy"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.thaumaturgy"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.wizard"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "fire_bolt"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.fire_bolt"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.wizard"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "light"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.light"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.wizard"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "mage_hand"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.mage_hand"
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_magic",
+        "rule_type": "character.class_cantrips",
+        "rule_key": "cantrips.wizard"
+      },
+      "collection_key": "cantrips",
+      "module_key": "srd51_magic",
+      "entry_key": "prestidigitation"
+    },
+    "spell": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.prestidigitation"
+    }
   }
 ]

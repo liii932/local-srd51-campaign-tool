@@ -76,7 +76,9 @@ public final class PlayerCandidateFactory {
                         case READY_RELEASE -> factory.add(Command.releaseReady(actor, option.readyKey(), flow.flowKey(), leaf.frameKey(), window.windowKey(), opportunity.opportunityKey()), "释放准备动作");
                         case SHIELD, COUNTERSPELL -> {
                             boolean counter = option.kind() == ReactionKind.COUNTERSPELL;
-                            var cast = new CastInput(option.castingRule(), option.spell(), List.of(actor), null, option.slotLevel(), counter ? window.trigger().sourceFrameKey() : null);
+                            UUID target = counter ? window.trigger().subjectId() : actor;
+                            if (counter && !visible.contains(target)) continue;
+                            var cast = new CastInput(option.castingRule(), option.spell(), List.of(target), null, option.slotLevel(), counter ? window.trigger().sourceFrameKey() : null);
                             factory.add(Command.reactionSpell(counter ? Kind.DECLARE_COUNTERSPELL : Kind.DECLARE_SHIELD, actor, cast, flow.flowKey(), leaf.frameKey(), window.windowKey(), opportunity.opportunityKey()),
                                     PlayerCampaignProjection.ruleName(domain, option.spell()) + "（" + option.slotLevel() + "环）");
                         }
@@ -96,6 +98,7 @@ public final class PlayerCandidateFactory {
                 if (sharedScene) {
                     factory.add(Command.action(Kind.HIDE, actor), "躲藏（动作）");
                     factory.add(Command.action(Kind.SEARCH, actor), "搜索（动作）");
+                    factory.cantrips(actor, visibleMonsters);
                 }
                 factory.attacks(actor, visible, visibleMonsters);
                 factory.attackReplacements(actor, visible);
@@ -185,6 +188,10 @@ public final class PlayerCandidateFactory {
                 rules.preflightCandidate(UUID.randomUUID(), roster, battle, command, knownPositions);
             }
             catch (StorageException | IllegalArgumentException unavailable) { return; }
+            addPrepared(command, label);
+        }
+        private void addPrepared(Command command, String label) {
+            if (result.size() >= MAX_CHOICES) return;
             JsonObject input = combatInput();
             input.add("command", CampaignDomainCodec.toJson(command)); PlayerCandidateFactory.add(result, label, command.actorId(), "combat-command", input);
         }
@@ -296,6 +303,17 @@ public final class PlayerCandidateFactory {
                         add(Command.move(actor, path, drag), "向" + DIRECTIONS[i] + "拖带" + locationLabel(held.hand().name()) + "目标一格");
                     }
                 }
+            }
+        }
+        void cantrips(UUID actor, Set<UUID> visibleMonsters) {
+            for (var choice : CampaignCombatView.cantripChoices(roster, battle, sharedPositions)) {
+                UUID id = choice.target();
+                String name = visibleMonsters.contains(id) ? PlayerCampaignProjection.monsterName(domain, id)
+                        : PlayerCampaignProjection.characterName(domain, id);
+                var aim = Schema2ObservationRules.knownPosition(battle, actor, id);
+                if (!Schema2ObservationRules.visible(battle, actor, id))
+                    name += "（最后已知 " + aim.x() + ", " + aim.y() + "）";
+                addPrepared(choice.command(actor), PlayerCampaignProjection.ruleName(domain, choice.spell()) + " · " + name);
             }
         }
         void spells(UUID actor, Set<UUID> visible) {

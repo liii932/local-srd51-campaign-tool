@@ -115,7 +115,7 @@ public final class Schema2CharacterProgressionRules {
         return validateState(material, new State(capacity.identity(), capacity.campaignId(), capacity.characterId(), capacity.preparationOperationId(),
                 capacity.characterClass(), capacity.abilities(), capacity.level(), capacity.proficiencyBonus(),
                 capacity.hitPoints() + difference, capacity.maximumHitPoints() + difference, capacity.classes(), capacity.hitDicePools(),
-                capacity.subclasses(), capacity.features(), capacity.feats(), capacity.proficiencies(), capacity.version(), capacity.resources(), capacity.rest(), capacity.equipment(), capacity.health(), capacity.spellbook()));
+                capacity.subclasses(), capacity.features(), capacity.feats(), capacity.proficiencies(), capacity.version(), capacity.resources(), capacity.rest(), capacity.equipment(), capacity.health(), capacity.spellbook(), capacity.knownCantrips()));
     }
 
     static void verifyInitialPlan(ProductionSchema2Projection material, InitialPlan plan) {
@@ -202,6 +202,7 @@ public final class Schema2CharacterProgressionRules {
         if (progression.advancementScope() == ProgressionScope.CHARACTER_ADVANCEMENT) return growth.validate(material, state);
         if (!state.classes().equals(List.of(new ClassLevel(state.characterClass(), state.level())))
                 || !state.subclasses().isEmpty() || !state.features().isEmpty() || !state.feats().isEmpty() || !state.proficiencies().isEmpty()
+                || !state.knownCantrips().isEmpty() || material.classCantrips(state.characterClass()).isPresent()
                 || state.proficiencyBonus() != 2 + (state.level() - 1) / 4
                 || state.hitDicePools().size() != 1 || state.hitDicePools().getFirst().sides() != progression.hitDieSides())
             throw invalid("S2_GROWTH_STATE");
@@ -285,13 +286,13 @@ public final class Schema2CharacterProgressionRules {
             int maximumHitDice, List<ResourceState> resources) {
         if (state.classes().size() != 1) return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(),
                 state.characterClass(), state.abilities(), level, state.proficiencyBonus(), hp, maximumHp, state.classes(), state.hitDicePools(),
-                state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version() + 1, resources, state.rest(), state.equipment(), state.health(), state.spellbook());
+                state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version() + 1, resources, state.rest(), state.equipment(), state.health(), state.spellbook(), state.knownCantrips());
         List<HitDicePool> pools = level == state.level() ? state.hitDicePools()
                 : List.of(new HitDicePool(state.hitDicePools().getFirst().sides(), hitDice, maximumHitDice));
         return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(),
                 state.characterClass(), state.abilities(), level, 2 + (level - 1) / 4, hp, maximumHp,
                 List.of(new ClassLevel(state.characterClass(), level)), pools, state.subclasses(), state.features(), state.feats(), state.proficiencies(),
-                state.version() + 1, resources, state.rest(), state.equipment(), state.health(), state.spellbook());
+                state.version() + 1, resources, state.rest(), state.equipment(), state.health(), state.spellbook(), state.knownCantrips());
     }
 
     private static void abilities(Map<String, Integer> values) {

@@ -108,7 +108,8 @@ public final class BundledSrd51Scenarios {
                 scenario("surprise-initiative", BundledSrd51Scenarios::verifySurpriseInitiative),
                 scenario("rule-origins", BundledSrd51Scenarios::verifyRuleOrigins),
                 scenario("wizard-evocation", BundledSrd51Scenarios::verifyWizardEvocation),
-                scenario("burning-hands", BundledSrd51Scenarios::verifyBurningHands)));
+                scenario("burning-hands", BundledSrd51Scenarios::verifyBurningHands),
+                scenario("known-combat-cantrips", BundledSrd51Scenarios::verifyKnownCombatCantrips)));
     }
 
     private static Map.Entry<String, Consumer<CampaignRuleContext>> scenario(String id, Consumer<BundledSrd51Scenarios> check) {
@@ -1385,6 +1386,87 @@ public final class BundledSrd51Scenarios {
         assertEquals(Schema2SpellRules.BURNING_HANDS, spell.spell().algorithm());
         Objects.requireNonNull(combat.preflight(UUID.randomUUID(), combatId, campaign, roster, battle,
                 Schema2CombatState.Command.cast(wizardId, burning)));
+    }
+
+    private void verifyKnownCombatCantrips() {
+        UUID campaign = UUID.randomUUID(), wizard = UUID.randomUUID(), cleric = UUID.randomUUID();
+        var wizardContext = cantripCharacter(campaign, wizard, "wizard", List.of("spell.fire_bolt", "spell.light", "spell.mage_hand"));
+        var clericContext = cantripCharacter(campaign, cleric, "cleric", List.of("spell.sacred_flame", "spell.guidance", "spell.thaumaturgy"));
+        var roster = Map.of(wizard, wizardContext, cleric, clericContext);
+        assertEquals(null, wizardContext.character().spellbook());
+
+        var combat = new Schema2CombatRules();
+        UUID fireScene = UUID.randomUUID();
+        var fireBattle = startBattle(combat, fireScene, campaign, roster, wizard, cleric, new Position(24, 0), List.of(18, 9));
+        var fireBolt = knownCantrip("wizard", "spell.fire_bolt", cleric);
+        var bolt = resolveKnownCantrip(combat, fireScene, campaign, roster, fireBattle, wizard, fireBolt, List.of(20, 2, 3));
+        assertEquals(List.of(new Schema2CombatState.Roll("ATTACK_D20", wizard, 20, 20),
+                new Schema2CombatState.Roll("FIRE_BOLT_DAMAGE", wizard, 10, 2),
+                new Schema2CombatState.Roll("FIRE_BOLT_DAMAGE", wizard, 10, 3)), bolt.rolls());
+        var attack = bolt.after().flows().getLast().attacks().getFirst();
+        assertTrue(attack.hit() && attack.critical());
+        expectNumber(120, attack.rangedAttack().distanceFeet());
+        expectNumber(2, attack.abilityModifier());
+        expectNumber(2, attack.proficiencyBonus());
+        assertEquals(DamageType.FIRE, attack.spellAttack().damage().damageType());
+        assertEquals(List.of(2, 3), attack.spellAttack().damage().dice());
+        expectNumber(5, bolt.healthChanges().getFirst().damageAmount());
+        assertTrue(bolt.ammunitionUses().isEmpty());
+
+        UUID flameScene = UUID.randomUUID();
+        var flameBattle = startBattle(combat, flameScene, campaign, roster, cleric, wizard, new Position(12, 0), List.of(18, 9));
+        var cover = Schema2CombatState.Command.setObservationCell(new ObservationCellInput(new Position(3, 0),
+                false, false, Cover.THREE_QUARTERS));
+        flameBattle = combat.resolve(combat.preflight(UUID.randomUUID(), flameScene, campaign, roster, flameBattle, cover),
+                sides -> { throw new AssertionError("Changing cover drew a die"); }).after();
+        assertEquals(Cover.THREE_QUARTERS, Schema2ObservationRules.cover(flameBattle, cleric, wizard));
+        assertTrue(Schema2ObservationRules.visible(flameBattle, cleric, wizard));
+        var sacredFlame = knownCantrip("cleric", "spell.sacred_flame", wizard);
+        var flame = resolveKnownCantrip(combat, flameScene, campaign, roster, flameBattle, cleric, sacredFlame, List.of(9, 4));
+        assertEquals(List.of(new Schema2CombatState.Roll("SACRED_FLAME_DEX_D20", wizard, 20, 9),
+                new Schema2CombatState.Roll("SACRED_FLAME_DAMAGE", cleric, 8, 4)), flame.rolls());
+        var outcome = flame.after().flows().getLast().casts().getFirst().sacredFlame();
+        assertEquals("ability.dexterity", outcome.savingThrow().abilityKey());
+        expectNumber(12, outcome.savingThrow().difficultyClass());
+        expectNumber(11, outcome.savingThrow().total());
+        assertEquals(false, outcome.savingThrow().success());
+        assertEquals(DamageType.RADIANT, outcome.damage().damageType());
+        assertEquals(List.of(4), outcome.damage().dice());
+        expectNumber(4, flame.healthChanges().getFirst().damageAmount());
+    }
+
+    private Schema2CombatRules.Context cantripCharacter(UUID campaign, UUID actor, String characterClass, List<String> spells) {
+        var plan = rules.initialPlan(campaign, actor, Schema2PreparationIdentity.random(), characterClass, "custom_artisan");
+        var state = new Schema2CharacterProgressionRules().initial(rules.projection(), plan, UUID.randomUUID(),
+                rules.initialAbilities(characterClass), rules.initialChoices(characterClass, spells));
+        assertEquals(spells.stream().sorted().toList(),
+                state.knownCantrips().stream().map(known -> known.spell().ruleKey()).toList());
+        return new Schema2CombatRules.Context(rules.projection(), plan, state);
+    }
+
+    private Schema2CombatState.CastInput knownCantrip(String characterClass, String spell, UUID target) {
+        return new Schema2CombatState.CastInput(rules.rule("character.class_cantrips", "cantrips." + characterClass),
+                rules.rule("adventure.spell", spell), List.of(target), null, 0, null);
+    }
+
+    private static Schema2CombatState.Resolution resolveKnownCantrip(Schema2CombatRules combat, UUID combatId, UUID campaign,
+            Map<UUID, Schema2CombatRules.Context> roster, Battle before, UUID caster, Schema2CombatState.CastInput input,
+            List<Integer> scriptedRolls) {
+        expectNumber(1, activeCombatant(before).actionsRemaining());
+        var dice = new ArrayDeque<>(scriptedRolls);
+        var result = combat.resolve(combat.preflight(UUID.randomUUID(), combatId, campaign, roster, before,
+                Schema2CombatState.Command.cast(caster, input)), sides -> dice.removeFirst());
+        assertTrue(dice.isEmpty());
+        expectNumber(0, activeCombatant(result.after()).actionsRemaining());
+        var cast = result.after().flows().getLast().casts().getFirst();
+        assertEquals(Schema2CombatState.CastStatus.RESOLVED, cast.status());
+        assertEquals(input.spell(), cast.spell());
+        expectNumber(0, cast.slotLevel());
+        assertEquals(null, cast.slotResource());
+        expectNumber(1, result.healthChanges().size());
+        assertEquals(input.targets().getFirst(), result.healthChanges().getFirst().characterId());
+        assertEquals(null, result.healthChanges().getFirst().resource());
+        return result;
     }
 
     private State initializeSpellbook(Schema2WizardSpellbookRules books, State wizard) {

@@ -267,7 +267,7 @@ class Schema2GrowthRulesTest {
         return new State(state.identity(), state.campaignId(), state.characterId(), state.preparationOperationId(),
                 state.characterClass(), state.abilities(), state.level(), state.proficiencyBonus(), current, maximum, state.classes(),
                 state.hitDicePools(), state.subclasses(), state.features(), state.feats(), state.proficiencies(), state.version(),
-                state.resources(), state.rest(), state.equipment(), health, state.spellbook());
+                state.resources(), state.rest(), state.equipment(), health, state.spellbook(), state.knownCantrips());
     }
     private State initial(Map<String, Integer> abilities) {
         return rules.initial(material, retainedPlan, UUID.randomUUID(), abilities, fullInitialChoices());

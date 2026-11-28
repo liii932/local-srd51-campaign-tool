@@ -44,7 +44,7 @@ public final class Schema2WizardSpellbookRules {
         State after=Schema2CharacterRuntime.withSpellbook(before,before.version()+1,book);
         if(preparationMinutes>0) {
             RestState r=after.rest(); if(r.minute()>Schema2CharacterRestRules.MAX_MINUTE-preparationMinutes)throw invalid("S2_CHARACTER_TIME");
-            after=new State(after.identity(),after.campaignId(),after.characterId(),after.preparationOperationId(),after.characterClass(),after.abilities(),after.level(),after.proficiencyBonus(),after.hitPoints(),after.maximumHitPoints(),after.classes(),after.hitDicePools(),after.subclasses(),after.features(),after.feats(),after.proficiencies(),after.version(),after.resources(),new RestState(r.minute()+preparationMinutes,r.second(),r.lastLongRestEndMinute(),r.lastLongRestEndSecond(),null),after.equipment(),after.health(),book);
+            after=new State(after.identity(),after.campaignId(),after.characterId(),after.preparationOperationId(),after.characterClass(),after.abilities(),after.level(),after.proficiencyBonus(),after.hitPoints(),after.maximumHitPoints(),after.classes(),after.hitDicePools(),after.subclasses(),after.features(),after.feats(),after.proficiencies(),after.version(),after.resources(),new RestState(r.minute()+preparationMinutes,r.second(),r.lastLongRestEndMinute(),r.lastLongRestEndSecond(),null),after.equipment(),after.health(),book,after.knownCantrips());
         }
         validateState(material,after);return after;
     }

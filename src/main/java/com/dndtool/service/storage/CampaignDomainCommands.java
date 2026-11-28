@@ -54,9 +54,11 @@ public final class CampaignDomainCommands {
                 subject=result.subjectId();newText=CampaignDomainCodec.text(result.audit());
             }
             case "character-create" -> {
-                if (input.has("subraceKey")) CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey", "raceKey", "subraceKey");
-                else if (input.has("raceKey")) CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey", "raceKey");
-                else CampaignJson.fields(input, "name", "kind", "classKey", "backgroundKey");
+                List<String> fields = new ArrayList<>(List.of("name", "kind", "classKey", "backgroundKey"));
+                if (input.has("raceKey") || input.has("subraceKey")) fields.add("raceKey");
+                if (input.has("subraceKey")) fields.add("subraceKey");
+                if (input.has("cantripKeys")) fields.add("cantripKeys");
+                CampaignJson.fields(input, fields.toArray(String[]::new));
                 if (characters.size() >= 16) throw new StorageException("CAPACITY", "Campaign roster is full");
                 String name = CampaignJson.name(s(input, "name")), kind = s(input, "kind"), classKey = s(input, "classKey");
                 if (!Set.of("PC", "NPC").contains(kind)) throw CampaignJson.bad("Unsupported character kind");
@@ -66,7 +68,9 @@ public final class CampaignDomainCommands {
                         s(input, "backgroundKey"), input.has("raceKey") ? s(input, "raceKey") : "human",
                         input.has("subraceKey") ? s(input, "subraceKey") : null);
                 Map<String, Integer> abilities = context.initialAbilities(classKey);
-                var history = engine.initial(material, initial, child(operationId, "preparation"), abilities, context.initialChoices(classKey), operationId);
+                var choices = input.has("cantripKeys") ? context.initialChoices(classKey, cantripKeys(input))
+                        : context.initialChoices(classKey);
+                var history = engine.initial(material, initial, child(operationId, "preparation"), abilities, choices, operationId);
                 var character = new Character(name, kind, true, initial, history); characters.add(character);
                 oldText = "null"; newText = CampaignDomainCodec.text(new Profile(subject, name, kind, true));
             }
@@ -185,6 +189,18 @@ public final class CampaignDomainCommands {
         var after = new State(before.material(), characters, combats, nodes, positions, items, roots,manual,participation,space);
         CampaignParticipationCommands.validateCurrent(after);
         return after;
+    }
+
+    private static List<String> cantripKeys(JsonObject input) {
+        JsonArray values = CampaignJson.array(input, "cantripKeys");
+        if (values.size() > 3) throw new IllegalArgumentException("S2_KNOWN_CANTRIP_CHOICES");
+        List<String> spells = new ArrayList<>();
+        for (JsonElement value : values) {
+            if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString())
+                throw new IllegalArgumentException("S2_KNOWN_CANTRIP_CHOICES");
+            spells.add(value.getAsString());
+        }
+        return List.copyOf(spells);
     }
 
     private static List<UUID> characterOperations(List<Character> before, List<Character> after, Set<UUID> retainedOperations) {

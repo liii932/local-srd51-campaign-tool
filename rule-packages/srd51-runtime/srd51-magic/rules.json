@@ -833,5 +833,141 @@
         }
       ]
     }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.fire_bolt"
+    },
+    "display_name": "Fire Bolt",
+    "description": "A ranged spell attack against one creature deals fire damage on a hit.",
+    "source_page": 144,
+    "algorithm": "SRD_2014_FIRE_BOLT_V1",
+    "cantrip_profile": {
+      "range_feet": 120,
+      "damage_dice_sides": 10,
+      "damage_type": "FIRE",
+      "scaling_level": 5,
+      "ignores_save_cover": false
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.sacred_flame"
+    },
+    "display_name": "Sacred Flame",
+    "description": "One visible creature takes radiant damage on a failed Dexterity save and receives no cover bonus to the save.",
+    "source_page": 176,
+    "algorithm": "SRD_2014_SACRED_FLAME_V1",
+    "cantrip_profile": {
+      "range_feet": 60,
+      "damage_dice_sides": 8,
+      "damage_type": "RADIANT",
+      "scaling_level": 5,
+      "ignores_save_cover": true
+    }
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.guidance"
+    },
+    "display_name": "Guidance",
+    "description": "Class cantrip choice metadata only. This application does not execute this cantrip.",
+    "source_page": 151,
+    "algorithm": "SRD_2014_GUIDANCE_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.light"
+    },
+    "display_name": "Light",
+    "description": "Class cantrip choice metadata only. This application does not execute this cantrip.",
+    "source_page": 159,
+    "algorithm": "SRD_2014_LIGHT_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.mage_hand"
+    },
+    "display_name": "Mage Hand",
+    "description": "Class cantrip choice metadata only. This application does not execute this cantrip.",
+    "source_page": 160,
+    "algorithm": "SRD_2014_MAGE_HAND_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.prestidigitation"
+    },
+    "display_name": "Prestidigitation",
+    "description": "Class cantrip choice metadata only. This application does not execute this cantrip.",
+    "source_page": 170,
+    "algorithm": "SRD_2014_PRESTIDIGITATION_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "adventure.spell",
+      "rule_key": "spell.thaumaturgy"
+    },
+    "display_name": "Thaumaturgy",
+    "description": "Class cantrip choice metadata only. This application does not execute this cantrip.",
+    "source_page": 187,
+    "algorithm": "SRD_2014_THAUMATURGY_METADATA_V1"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "character.class_cantrips",
+      "rule_key": "cantrips.cleric"
+    },
+    "display_name": "Cleric cantrips",
+    "description": "Choose three Cleric cantrips at class level one.",
+    "source_page": 15,
+    "algorithm": "SRD_2014_CLASS_CANTRIPS_V1",
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.cleric"
+    },
+    "ability_key": "ability.wisdom"
+  },
+  {
+    "identity": {
+      "kind": "rule",
+      "module_key": "srd51_magic",
+      "rule_type": "character.class_cantrips",
+      "rule_key": "cantrips.wizard"
+    },
+    "display_name": "Wizard cantrips",
+    "description": "Choose three Wizard cantrips at class level one and another at class level four.",
+    "source_page": 52,
+    "algorithm": "SRD_2014_CLASS_CANTRIPS_V1",
+    "owner_class": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "character.class",
+      "rule_key": "class.wizard"
+    },
+    "ability_key": "ability.intelligence"
   }
 ]

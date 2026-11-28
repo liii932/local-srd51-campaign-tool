@@ -162,6 +162,12 @@
     if (focused?.disabled) (directionButtons.find(button => !button.disabled) || $('player-route-submit')).focus();
   }
   function stat(value, label) { const node = element('div', 'stat'); node.append(element('strong', '', value ?? '—'), element('span', '', label)); return node; }
+  function cantripResult(result) {
+    const outcome = {HIT: '命中', MISS: '未命中', SAVED: '目标豁免成功', FAILED_SAVE: '目标豁免失败',
+      COUNTERED: '被反制', INTERRUPTED: '被打断'}[result.outcome];
+    return result.spell + ' · ' + outcome + (result.damage == null ? '' : ` · 实际伤害 ${result.damage}`)
+      + (result.dropped ? ' · 击倒目标' : '');
+  }
   function listSection(parent, title, values, format) {
     if (!Array.isArray(values) || !values.length) return;
     const details = element('details'), summary = element('summary', '', title), list = element('ul', 'mini-list');
@@ -197,6 +203,9 @@
       listSection(content, '熟练', card.proficiencies, item => typeof item === 'string' ? item : item.label || item.name || '熟练');
       listSection(content, '特性与专长', card.features, item => String(item));
       listSection(content, '已准备法术', card.spellbook?.prepared, item => String(item));
+      listSection(content, '已知戏法', card.knownCantrips, item =>
+        `${item.name}（${item.source} · ${item.executable ? '可施放' : '仅记录'}）`);
+      if (card.lastCantrip) content.append(element('p', 'cantrip-result', cantripResult(card.lastCantrip)));
       listSection(content, '法术书', card.spellbook?.learned, item => String(item));
       article.append(top, stats, content); container.append(article);
     }
@@ -263,6 +272,7 @@
     if (lastReceipt) {
       let note = '上次收据：行动已完成。';
       if (lastReceipt.state === 'NOT_EXECUTED') note = '上次收据：确认未执行，旧请求已作废。';
+      else if (lastReceipt.cantripResult) note = cantripResult(lastReceipt.cantripResult);
       else if (lastReceipt.attackResult) {
         const {hit, damage, dropped} = lastReceipt.attackResult;
         note = `上次攻击${hit ? '命中' : '未命中'}，造成 ${damage} 点伤害，${dropped ? '击倒了目标' : '未击倒目标'}。`;
