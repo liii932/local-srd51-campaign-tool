@@ -13,11 +13,17 @@ import java.util.function.IntUnaryOperator;
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
 import static com.dndtool.service.Schema2CombatState.*;
 
-/** Closed ordinary-melee combat consumer. All preflight is pure and precedes the first die. */
+/** Ordinary combat consumer. All preflight is pure and precedes the first die. */
 public final class Schema2CombatRules {
     static final String SECOND_WIND_ROLL = "SECOND_WIND_HEALING";
     public static final int MAX_COMBATANTS = 64, MAX_FLOWS = 128, MAX_PATH = 64, MAX_FACTS = 4096;
     public static final int START_TIME_HEADROOM_MINUTES = (Schema2CombatHistory.MAX_EVENTS * 6 + 59) / 60 + 240;
+    public enum RangedDistance { NORMAL, LONG, OUT_OF_RANGE }
+
+    public static RangedDistance rangedDistance(int distanceFeet, int normalRangeFeet, int longRangeFeet) {
+        if (distanceFeet <= normalRangeFeet) return RangedDistance.NORMAL;
+        return distanceFeet <= longRangeFeet ? RangedDistance.LONG : RangedDistance.OUT_OF_RANGE;
+    }
     public record Context(ProductionSchema2Projection material, InitialPlan initial, State character, long sceneSecond) {
         public Context(ProductionSchema2Projection material, InitialPlan initial, State character) {
             this(material, initial, character, Schema2SpellRules.second(character));
@@ -278,8 +284,8 @@ public final class Schema2CombatRules {
             Schema2CharacterEquipmentRules.requireNoUnownedEffects(context.material(),character);
             if (character.rest().active() != null) throw invalid("S2_COMBAT_REST_ACTIVE");
             combatRule(context.material()); speed(context);
-            // Every held weapon is a possible OA source; a missing reader cannot be silently omitted.
-            for (EquipmentItem item : character.equipment()) if (preparedItem(item) && itemDefinition(context,item).kind() == EquipmentKind.WEAPON) weapon(context,item.itemId());
+            for (EquipmentItem item : character.equipment())
+                if (preparedItem(item) && weaponKind(itemDefinition(context, item).kind())) weapon(context, item.itemId());
         }
     }
 
@@ -312,8 +318,8 @@ public final class Schema2CombatRules {
     public static void validateFrozenSupport(ProductionSchema2Projection material) {
         combatRule(material);
         for (FinalRule row : material.projection().rules())
-            if (row instanceof FinalItem item && item.enabled() && item.definition().kind() == EquipmentKind.WEAPON)
-                weaponProfile(material, item.identity());
+            if (row instanceof FinalItem item && item.enabled() && weaponKind(item.definition().kind()))
+                weaponProfile(material, item.definition());
         Schema2MonsterRules.validateFrozenSupport(material);
     }
 
@@ -325,23 +331,57 @@ public final class Schema2CombatRules {
     int speed(Context context) {
         return equipment.walkingSpeed(context.material(), context.initial(), context.character());
     }
-    private ItemDefinition itemDefinition(Context context, EquipmentItem instance) {
-        var rows = context.material().projection().rules().stream().filter(FinalItem.class::isInstance).map(FinalItem.class::cast)
-                .filter(row -> row.enabled() && row.identity().equals(instance.item())).toList();
+    private static ItemDefinition itemDefinition(Context context, EquipmentItem instance) {
+        return itemDefinition(context.material(), instance.item());
+    }
+    private static ItemDefinition itemDefinition(ProductionSchema2Projection material, RuleIdentity identity) {
+        var rows = material.projection().rules().stream().filter(FinalItem.class::isInstance).map(FinalItem.class::cast)
+                .filter(row -> row.enabled() && row.identity().equals(identity)).toList();
         if (rows.size() != 1) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
         return rows.getFirst().definition();
     }
-    WeaponAttackDefinition weapon(Context context, UUID itemId) {
+    public WeaponAttackDefinition weapon(Context context, UUID itemId) {
         EquipmentItem instance = context.character().equipment().stream().filter(item -> item.itemId().equals(itemId) && preparedItem(item))
                 .findFirst().orElseThrow(() -> invalid("S2_COMBAT_WEAPON_NOT_PREPARED"));
-        if (itemDefinition(context,instance).kind() != EquipmentKind.WEAPON) throw invalid("S2_COMBAT_WEAPON_NOT_PREPARED");
-        return weaponProfile(context.material(), instance.item());
+        ItemDefinition item = itemDefinition(context, instance);
+        if (!weaponKind(item.kind()) || item.kind() == EquipmentKind.RANGED_WEAPON && !instance.location().equals("BOTH_HANDS"))
+            throw invalid("S2_COMBAT_WEAPON_NOT_PREPARED");
+        return weaponProfile(context.material(), item);
     }
-    private static WeaponAttackDefinition weaponProfile(ProductionSchema2Projection material, RuleIdentity item) {
+    private static boolean weaponKind(EquipmentKind kind) {
+        return kind == EquipmentKind.WEAPON || kind == EquipmentKind.RANGED_WEAPON;
+    }
+    private static WeaponAttackDefinition weaponProfile(ProductionSchema2Projection material, ItemDefinition item) {
         var rows = material.projection().rules().stream().filter(FinalWeaponAttack.class::isInstance).map(FinalWeaponAttack.class::cast)
-                .filter(row -> row.enabled() && row.definition().item().equals(item)).toList();
-        if (rows.size() != 1 || !rows.getFirst().definition().algorithm().equals("SRD_2014_MELEE_WEAPON_ATTACK_V1")) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
-        return rows.getFirst().definition();
+                .filter(row -> row.enabled() && row.definition().item().equals(item.identity())).toList();
+        if (rows.size() != 1) throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
+        WeaponAttackDefinition profile = rows.getFirst().definition();
+        if (item.kind() == EquipmentKind.RANGED_WEAPON) {
+            if (!RANGED_WEAPON_ATTACK_ALGORITHM.equals(profile.algorithm()) || !profile.ranged()
+                    || item.hands() != 2 || profile.abilityPolicy() != WeaponAbilityPolicy.DEXTERITY
+                    || itemDefinition(material, profile.ammunition()).kind() != EquipmentKind.AMMUNITION)
+                throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
+        } else if (profile.ranged() || !MELEE_WEAPON_ATTACK_ALGORITHM.equals(profile.algorithm())) {
+            throw invalid("ACTION_FLOW_RULE_UNSUPPORTED");
+        }
+        return profile;
+    }
+    WeaponAttackDefinition meleeWeapon(Context context, UUID itemId) {
+        var profile = weapon(context, itemId);
+        if (profile.ranged()) throw invalid("S2_COMBAT_MELEE_WEAPON_REQUIRED");
+        return profile;
+    }
+    WeaponAttackDefinition launchedRangedWeapon(Context context, UUID itemId) {
+        EquipmentItem instance = context.character().equipment().stream().filter(item -> item.itemId().equals(itemId))
+                .findFirst().orElseThrow(() -> invalid("ACTION_FLOW_FROZEN_DATA_INVALID"));
+        var profile = weaponProfile(context.material(), itemDefinition(context, instance));
+        if (!profile.ranged()) throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");
+        return profile;
+    }
+    static EquipmentItem ammunition(Context context, WeaponAttackDefinition weapon) {
+        return context.character().equipment().stream()
+                .filter(item -> item.location().equals("CARRIED") && item.item().equals(weapon.ammunition()))
+                .findFirst().orElseThrow(() -> invalid("S2_COMBAT_AMMUNITION_UNAVAILABLE"));
     }
     public int speed(Map<UUID,Context> roster, Battle battle, UUID id) {
         if (!Schema2MonsterRules.living(roster, battle, id) || Schema2MeleeControlRules.grappled(battle, id)) return 0;
@@ -471,7 +511,7 @@ public final class Schema2CombatRules {
             Battle after=Schema2OngoingEffectRules.withCauses(result.after(),reconciliation.causes());
             after = Schema2MeleeControlRules.reconcile(after, p.roster, result.healthChanges(), p.operationId, facts);
             validateState(after);
-            return new Resolution(after,result.healthChanges(),dice.actual,facts);
+            return new Resolution(after,result.healthChanges(),dice.actual,facts,result.ammunitionUses());
         }
         List<CombatFact> facts = new ArrayList<>(); List<HealthChange> changes = new ArrayList<>();
         Battle battle = p.before;

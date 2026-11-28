@@ -334,7 +334,10 @@
     const monster = battle?.monsters.find(monster => monster.monsterId === form.elements.actorId.value);
     const attacks = monsterAttacks(monster?.monster);
     const breath = monster?.actionUses || [];
-    options(form.elements.attackAction, attacks.map((_, index) => String(index)), value => attacks[Number(value)].name);
+    options(form.elements.attackAction, attacks.map((_, index) => String(index)), value => {
+      const choice = attacks[Number(value)];
+      return choice.normalRangeFeet ? `${choice.name} · 射程 ${choice.normalRangeFeet}/${choice.longRangeFeet} 尺` : choice.name;
+    });
     options(form.elements.breathAction, breath.map((_, index) => String(index)), value => {
       const action = breath[Number(value)];
       return `${action.action.entryKey}${action.available ? ' · 可用' : ' · 已用'}`;
@@ -795,10 +798,21 @@
       CONDITION_IMMUNE: `免疫倒地（${ruleName(effect.immunitySource)}）`}[effect.outcome];
     return [label, roll, result, posture].filter(Boolean).join(' · ');
   }
+  function rangedDetails(shot) {
+    const band = shot.distanceFeet > shot.normalRangeFeet ? '长射程' : '正常射程';
+    return `${shot.distanceFeet} 尺（${band}）${shot.closeEnemy ? ' · 近身敌人造成劣势' : ''}`;
+  }
+  function characterShotResult(attack) {
+    const shot = attack.rangedAttack;
+    const dice = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
+    const outcome = attack.status !== 'RESOLVED' ? '等待反应结算' : !attack.hit ? '未命中'
+      : `${attack.critical ? '重击' : '命中'} · 伤害 ${attack.damageAmount}`;
+    return `${personName(attack.actorId)} → ${personName(attack.targetId)} · 射击 · ${rangedDetails(shot)} · 已用 1 支箭 · d20=${dice}，选用 ${attack.selectedD20}，护甲等级 ${attack.finalArmorClass} · ${outcome}`;
+  }
   function monsterAttackResult(attack) {
     const evidence = attack.monsterAttack;
     const name = monsterAttackName(evidence.action), actor = personName(attack.actorId), target = personName(attack.targetId);
-    const kind = attack.opportunityAttack ? '借机攻击' : '近战攻击';
+    const kind = attack.rangedAttack ? `远程攻击 · ${rangedDetails(attack.rangedAttack)}` : attack.opportunityAttack ? '借机攻击' : '近战攻击';
     const dice = [attack.firstD20, attack.secondD20].filter(die => die != null).join(' / ');
     const roll = `d20=${dice}，选用 ${attack.selectedD20}，命中修正 ${evidence.hitBonus}，总值 ${attack.selectedD20 + evidence.hitBonus}，护甲等级 ${attack.finalArmorClass}`;
     const pack = evidence.packTacticsAllies.length ? ` · 集群战术（${evidence.packTacticsAllies.map(personName).join('、')}）` : '';
@@ -829,9 +843,9 @@
     }
     for (const flow of after.flows) {
       const earlier = before?.flows.find(old => old.flowKey === flow.flowKey);
-      for (const attack of flow.attacks.filter(attack => attack.monsterAttack)) {
+      for (const attack of flow.attacks.filter(attack => attack.monsterAttack || attack.rangedAttack)) {
         const prior = earlier?.attacks.find(previous => previous.frameKey === attack.frameKey);
-        if (!prior || prior.status !== attack.status) details.push(monsterAttackResult(attack));
+        if (!prior || prior.status !== attack.status) details.push(attack.monsterAttack ? monsterAttackResult(attack) : characterShotResult(attack));
       }
       for (const movement of flow.movements.filter(move => move.drag)) {
         const prior = earlier?.movements.find(move => move.movementKey === movement.movementKey);
@@ -997,6 +1011,8 @@
       for (const monster of battle.monsters || []) text(box, 'p', `${ruleName(monster.monster)} · 生命值 ${monster.hitPoints}${monster.dead ? ' · 已死亡' : ''}`);
       const monsterAttack = battle.flows.flatMap(flow => flow.attacks).findLast(attack => attack.monsterAttack);
       if (monsterAttack) text(box, 'p', monsterAttackResult(monsterAttack), 'monster-attack-result');
+      const shot = battle.flows.flatMap(flow => flow.attacks).findLast(attack => attack.rangedAttack && !attack.monsterAttack);
+      if (shot) text(box, 'p', characterShotResult(shot), 'character-shot-result');
       const recentCast = battle.flows.flatMap(flow => flow.casts).findLast(cast => cast.status === 'RESOLVED');
       if (recentCast) {
         const caster = roster().find(character => character.id === recentCast.actorId);
@@ -1138,7 +1154,7 @@
     byId('domain-combat-note').textContent = pending ? '请先在上方处理反应或继续结算，再进行下一次行动。'
       : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
       : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列。每次攻击可使用武器，或改为擒抱或推撞。'
-      : kind === 'ATTACK' ? '每次消耗当前序列的一次攻击；两击之间可合法移动或更换目标，也可放弃剩余攻击。'
+      : kind === 'ATTACK' ? '选择目标和持用的武器。每击使用一次攻击额度，短弓须双手持用且每次射击消耗一支携带的箭。'
       : replacement && (!sequence || sequence.closed) ? '请先开始攻击动作，再使用一次剩余攻击擒抱或推撞。'
       : replacement ? `本次替代第 ${sequence.performed + 1} 次攻击。目标须选择防御检定。${destination ? `推开目的格为 (${destination.x},${destination.y})。` : ''}`
       : escape ? (grapples.length ? '选择要挣脱的擒抱关系及检定。尝试会消耗一次动作。' : '该行动者当前未被擒抱。')

@@ -1,0 +1,13 @@
+[
+  {
+    "op": "set_field",
+    "target": {
+      "kind": "rule",
+      "module_key": "srd51_characters",
+      "rule_type": "equipment.weapon_attack",
+      "rule_key": "weapon_attack.shortbow"
+    },
+    "field": "normal_range_feet",
+    "value": 100
+  }
+]

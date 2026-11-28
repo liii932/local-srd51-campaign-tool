@@ -543,7 +543,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 [精通重击语义](../../semantics/srd-5.1/classes-fighter-monk.md#srd51-class-fighter-improved-critical)，
 具体声明、解释和采用范围见[有限机制合同](../../rules/schema-2-improved-critical.md)。
 
-当前消费者从单职业战士 3–6 级的正常勇士授予派生武器重击资格；普通近战、OA 与 Ready
+当前消费者从单职业战士 3–6 级的正常勇士授予派生武器重击资格；普通近战、[短弓](../../rules/schema-2-ranged-attacks.md)及近战 OA、Ready
 沿同一攻击路径使用最终选中 d20。19/20 重击，固定修正不加倍；19 的自动命中是明确的
 项目解释，反应后也适用。它不改变 Attack 额度或普通检定、豁免、法术的规则。
 此前特性仅为 OPTION 目录，不能凭既有声明或“P”取得执行资格；现由严格声明、组合、
@@ -552,7 +552,7 @@ DM 只选择已预检的有限后果，健康 owner 应用治疗，资源 owner 
 `CampaignImprovedCriticalIntegrationTest` 和 `browser-improved-critical.cjs` 从真实原包、
 准确接受与有序选择开始，定位正常取得、执行、反应继续和完整文件链证据。
 定向运行方法及内部集成/浏览器/部署的区别见
-[测试指南](../../testing.md#improved-critical-verification)。远程、投掷、法术攻击、
+[测试指南](../../testing.md#improved-critical-verification)。投掷、法术攻击、
 多职业和 Superior Critical 仍不在应用支持范围内；本节不改判原 V02/V03/V04 或整类攻击机制。
 
 ## 独立有限切片：倒地姿态生命周期

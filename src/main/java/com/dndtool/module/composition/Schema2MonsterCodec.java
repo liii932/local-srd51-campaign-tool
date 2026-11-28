@@ -36,15 +36,16 @@ final class Schema2MonsterCodec {
     }
     static MonsterActionProfile actionProfile(Object input,Location s) {
         var initial=object(input,s);var mode=enumValue(MonsterActionMode.class,required(initial,"mode",s),s.child("mode"));
+        String attackMechanism = attackMechanism(mode);
         Set<String> required=new HashSet<>(Set.of("display_name","description","source_page","mode"));
         if(mode==MonsterActionMode.SAVE_DAMAGE_BATCH_V1)required.addAll(Set.of("mechanism","save_policy","damage_profile","area","recharge"));
-        if(mode==MonsterActionMode.MELEE_ATTACK_V1)required.addAll(Set.of("mechanism","attack_profile"));
+        if (attackMechanism != null) required.addAll(Set.of("mechanism", "attack_profile"));
         var r=shape(input,required,Set.of(),s);String name=text(r.get("display_name"),120,s),description=text(r.get("description"),1000,s);int page=n(r,"source_page",258,403,s);
         if(mode==MonsterActionMode.BLOCKED_METADATA)return new MonsterActionProfile(name,description,page,mode,null,null,null,null,null,null);
-        if(mode==MonsterActionMode.MELEE_ATTACK_V1) {
-            exact(r.get("mechanism"),MONSTER_MELEE_ATTACK_MECHANISM,s.child("mechanism"));
-            return new MonsterActionProfile(name,description,page,mode,MONSTER_MELEE_ATTACK_MECHANISM,null,null,null,null,
-                    attackProfile(r.get("attack_profile"),s.child("attack_profile")));
+        if (attackMechanism != null) {
+            exact(r.get("mechanism"), attackMechanism, s.child("mechanism"));
+            return new MonsterActionProfile(name, description, page, mode, attackMechanism, null, null, null, null,
+                    attackProfile(r.get("attack_profile"), mode == MonsterActionMode.RANGED_ATTACK_V1, s.child("attack_profile")));
         }
         exact(r.get("mechanism"),"HELL_HOUND_FIRE_BREATH_V1",s);
         var save=shape(r.get("save_policy"),Set.of("ability_key","dc_mode","dc","fail_outcome","success_outcome"),Set.of(),s.child("save_policy"));
@@ -56,11 +57,23 @@ final class Schema2MonsterCodec {
         for(String k:List.of("turn_start","short_rest","long_rest"))if(!booleanAtom(recharge.get(k),s))throw bad(s);
         return new MonsterActionProfile(name,description,page,mode,"HELL_HOUND_FIRE_BREATH_V1",new MonsterSavePolicy("ability.dexterity","FIXED_DC",dc,"FULL","HALF"),new MonsterDamageProfile(6,6,DamageType.FIRE,"OTHER_DELIVERY","NO_ABILITY_MODIFIER"),new MonsterArea("CONE",15,"EXCLUDE_ORIGIN"),new MonsterRecharge(6,5,true,true,true),null);
     }
-    private static MonsterAttackProfile attackProfile(Object input,Location s) {
-        var profile=shape(input,Set.of("hit_bonus","reach_feet","damage"),Set.of("on_hit"),s);
+    private static String attackMechanism(MonsterActionMode mode) {
+        return switch (mode) {
+            case MELEE_ATTACK_V1 -> MONSTER_MELEE_ATTACK_MECHANISM;
+            case RANGED_ATTACK_V1 -> MONSTER_RANGED_ATTACK_MECHANISM;
+            case BLOCKED_METADATA, SAVE_DAMAGE_BATCH_V1 -> null;
+        };
+    }
+    private static MonsterAttackProfile attackProfile(Object input, boolean ranged, Location s) {
+        var profile = ranged
+                ? shape(input, Set.of("hit_bonus", "normal_range_feet", "long_range_feet", "damage"), Set.of(), s)
+                : shape(input, Set.of("hit_bonus", "reach_feet", "damage"), Set.of("on_hit"), s);
         int hitBonus=n(profile,"hit_bonus",MONSTER_ATTACK_MIN_BONUS,MONSTER_ATTACK_MAX_BONUS,s);
-        int reach=n(profile,"reach_feet",5,10,s);
-        if(!MONSTER_ATTACK_REACH_FEET.contains(reach))throw bad(s.child("reach_feet"));
+        int reach = ranged ? 0 : n(profile, "reach_feet", 5, 10, s);
+        if (!ranged && !MONSTER_ATTACK_REACH_FEET.contains(reach)) throw bad(s.child("reach_feet"));
+        int normal = ranged ? attackRangeFeet(profile.get("normal_range_feet"), s.child("normal_range_feet")) : 0;
+        int longRange = ranged ? attackRangeFeet(profile.get("long_range_feet"), s.child("long_range_feet")) : 0;
+        if (ranged && longRange <= normal) throw bad(s.child("long_range_feet"));
         List<?> rows=bounded(profile,"damage",2,s);
         if(rows.isEmpty())throw bad(s.child("damage"));
         List<MonsterAttackDamage> damage=new ArrayList<>();
@@ -78,7 +91,7 @@ final class Schema2MonsterCodec {
         }
         MonsterOnHitSave onHit = profile.containsKey("on_hit")
                 ? onHitSave(profile.get("on_hit"), s.child("on_hit")) : null;
-        return new MonsterAttackProfile(hitBonus, reach, damage, onHit);
+        return new MonsterAttackProfile(hitBonus, reach, normal, longRange, damage, onHit);
     }
     private static MonsterOnHitSave onHitSave(Object input, Location source) {
         var row = shape(input, Set.of("ability_key", "dc", "fail_outcome"), Set.of(), source);
@@ -98,13 +111,20 @@ final class Schema2MonsterCodec {
             if(d.mechanism()!=null||hasSaveFields||d.attackProfile()!=null)throw new IllegalArgumentException("Blocked monster metadata has executable fields");
             return r;
         }
-        if(d.mode()==MonsterActionMode.MELEE_ATTACK_V1) {
-            if(hasSaveFields||d.attackProfile()==null)throw new IllegalArgumentException("Invalid monster melee action fields");
-            MonsterAttackProfile attack=d.attackProfile();
+        String attackMechanism = attackMechanism(d.mode());
+        if (attackMechanism != null) {
+            MonsterAttackProfile attack = d.attackProfile();
+            if (hasSaveFields || attack == null || !attackMechanism.equals(d.mechanism())
+                    || attack.ranged() != (d.mode() == MonsterActionMode.RANGED_ATTACK_V1))
+                throw new IllegalArgumentException("Invalid monster weapon action fields");
             r.put("mechanism",d.mechanism());
-            var profile = json("hit_bonus",attack.hitBonus(),"reach_feet",attack.reachFeet(),"damage",
+            var profile = json("hit_bonus",attack.hitBonus(),"damage",
                     attack.damage().stream().map(row->json("damage_type",row.damageType().name(),
                             "dice_count",row.diceCount(),"dice_sides",row.diceSides(),"modifier",row.modifier())).toList());
+            if (attack.ranged()) {
+                profile.put("normal_range_feet", attack.normalRangeFeet());
+                profile.put("long_range_feet", attack.longRangeFeet());
+            } else profile.put("reach_feet", attack.reachFeet());
             if (attack.onHit() != null) {
                 var save = attack.onHit();
                 profile.put("on_hit", json("ability_key", save.abilityKey(), "dc", save.dc(), "fail_outcome", save.failOutcome()));
@@ -112,7 +132,7 @@ final class Schema2MonsterCodec {
             r.put("attack_profile", profile);
             return r;
         }
-        if(d.attackProfile()!=null)throw new IllegalArgumentException("Save-damage action has a melee attack profile");
+        if(d.attackProfile()!=null)throw new IllegalArgumentException("Save-damage action has a weapon attack profile");
         var save=d.savePolicy();var damage=d.damageProfile();var area=d.area();var recharge=d.recharge();
         r.put("mechanism",d.mechanism());r.put("save_policy",json("ability_key",save.abilityKey(),"dc_mode",save.dcMode(),"dc",save.dc(),"fail_outcome",save.failOutcome(),"success_outcome",save.successOutcome()));r.put("damage_profile",json("dice_count",damage.diceCount(),"dice_sides",damage.diceSides(),"damage_type",damage.damageType().name(),"delivery",damage.delivery(),"ability_modifier",damage.abilityModifier()));r.put("area",json("shape",area.shape(),"length_feet",area.lengthFeet(),"origin_policy",area.originPolicy()));r.put("recharge",json("dice_sides",recharge.diceSides(),"minimum_roll",recharge.minimumRoll(),"turn_start",recharge.turnStart(),"short_rest",recharge.shortRest(),"long_rest",recharge.longRest()));return r;
     }

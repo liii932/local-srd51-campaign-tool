@@ -1,8 +1,8 @@
 # Finite DM check variant
 
-The `dm_runtime_house_rules` version `26` extension is the fourth member of
+The `dm_runtime_house_rules` version `27` extension is the fourth member of
 the bundled check variant. The first three members are
-`srd51_runtime=13`, `srd51_characters=13` and `srd51_magic=13`, in that order.
+`srd51_runtime=13`, `srd51_characters=14` and `srd51_magic=16`, in that order.
 
 This variant enables `allow_alternate_skill_ability` on the check definition.
 Athletics defaults to Wisdom. The DM can choose a different ability for one

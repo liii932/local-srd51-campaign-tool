@@ -388,7 +388,17 @@ public final class Schema2CombatState {
             int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
             boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
             UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
-            MonsterAttackEvidence monsterAttack) {
+            MonsterAttackEvidence monsterAttack, RangedAttackEvidence rangedAttack) {
+        public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
+                UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
+                int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
+                boolean disadvantage, boolean critical, boolean hit, List<Integer> damageDice, int damageAmount,
+                UUID blessingEffectKey, Integer blessingD4, AttackStatus status, boolean initialHit, int finalArmorClass,
+                MonsterAttackEvidence monsterAttack) {
+            this(frameKey,actorId,targetId,itemId,sequenceKey,attackOrdinal,opportunityAttack,firstD20,secondD20,selectedD20,
+                    abilityModifier,proficiencyBonus,armorClass,advantage,disadvantage,critical,hit,damageDice,damageAmount,
+                    blessingEffectKey,blessingD4,status,initialHit,finalArmorClass,monsterAttack,null);
+        }
         public AttackAttempt(UUID frameKey, UUID actorId, UUID targetId, UUID itemId,
                 UUID sequenceKey, int attackOrdinal, boolean opportunityAttack, int firstD20, Integer secondD20,
                 int selectedD20, int abilityModifier, int proficiencyBonus, int armorClass, boolean advantage,
@@ -414,6 +424,8 @@ public final class Schema2CombatState {
         }
         public AttackAttempt { damageDice = List.copyOf(damageDice); }
     }
+    public record RangedAttackEvidence(int distanceFeet, int normalRangeFeet, int longRangeFeet, boolean closeEnemy,
+            UUID ammunitionItemId) { }
     public record MonsterAttackEvidence(EntryIdentity action, int hitBonus, int reachFeet, List<UUID> packTacticsAllies,
             List<AttackDamageComponent> damageComponents, MonsterAttackOnHitEvidence onHit) {
         public MonsterAttackEvidence {
@@ -575,9 +587,19 @@ public final class Schema2CombatState {
             this(characterId,before,after,frameKey,damageAmount,critical,healthResult,deathSave,false,0);
         }
     }
+    public record AmmunitionUse(UUID characterId, State before, State after, UUID frameKey, UUID itemId) { }
     public record CombatFact(String kind, UUID subjectId, UUID referenceKey, String reason) { }
-    public record Resolution(Battle after, List<HealthChange> healthChanges, List<Roll> rolls, List<CombatFact> facts) {
-        public Resolution { healthChanges = List.copyOf(healthChanges); rolls = List.copyOf(rolls); facts = List.copyOf(facts); }
+    public record Resolution(Battle after, List<HealthChange> healthChanges, List<Roll> rolls, List<CombatFact> facts,
+            List<AmmunitionUse> ammunitionUses) {
+        public Resolution(Battle after, List<HealthChange> healthChanges, List<Roll> rolls, List<CombatFact> facts) {
+            this(after, healthChanges, rolls, facts, List.of());
+        }
+        public Resolution {
+            healthChanges = List.copyOf(healthChanges);
+            rolls = List.copyOf(rolls);
+            facts = List.copyOf(facts);
+            ammunitionUses = List.copyOf(ammunitionUses);
+        }
     }
     private static boolean validMonsterIdentity(RuleIdentity rule) {
         return rule!=null&&"adventure.monster".equals(rule.ruleType())&&rule.moduleKey()!=null&&rule.moduleKey().matches("[a-z][a-z0-9_]{0,63}")

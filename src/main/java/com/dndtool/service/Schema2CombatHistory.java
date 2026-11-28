@@ -63,7 +63,8 @@ public final class Schema2CombatHistory {
             validateState(e.after(),currentMembers,knownCharacters,knownMonsters);
             if(e.command().castInput()!=null)require(dependencies.containsAll(e.command().castInput().targets()));
             for(Dependency d:e.dependencies())require(d.version()>=0&&d.version()<Schema2CharacterRuntime.MAX_EVENTS);
-            require(e.characterOperations().size()==e.resolution().healthChanges().size()&&e.characterOperations().size()<=MAX_COMBATANTS * 2);
+            require(e.characterOperations().size()==e.resolution().healthChanges().size()+e.resolution().ammunitionUses().size()
+                    && e.characterOperations().size()<=MAX_COMBATANTS * 2);
             for(UUID child:e.characterOperations()) {uuid(child);require(children.add(child)&&!operations.contains(child));}
             for(HealthChange change:e.resolution().healthChanges()) {
                 uuid(change.frameKey()); require(dependencies.contains(change.characterId()) && change.before()!=null && change.after()!=null
@@ -76,6 +77,7 @@ public final class Schema2CombatHistory {
                 require(!change.timeAdvance()||change.seconds()<=60||e.command().kind()==Kind.COMPLETE_MONSTER_REST);
             }
             validateCastResults(e);validateExtendedTransition(e);validateMeleeTransition(e);validateMonsterAttackTransition(e);
+            validateRangedAttackTransition(e);
             require(e.resolution().rolls().size()<=512&&e.resolution().facts().size()<=512&&e.command().path().size()<=64&&e.command().deployments().size()<=MAX_COMBATANTS&&e.command().tieBreakOrder().size()<=MAX_COMBATANTS);
             for(Roll r:e.resolution().rolls()) {uuid(r.subjectId());require(token(r.purpose())&&r.sides()>=2&&r.sides()<=20&&r.value()>=1&&r.value()<=r.sides());}
             for(CombatFact f:e.resolution().facts())require(token(f.kind())&&(f.reason()==null||token(f.reason())));
@@ -233,6 +235,56 @@ public final class Schema2CombatHistory {
         for (MeleeContest contest : b.meleeControl().contests())
             require(knownCharacters.contains(contest.actorId()) && knownCharacters.contains(contest.targetId()));
     }
+    private static void validateRangedAttackTransition(Event event) {
+        Map<UUID, AttackAttempt> retained = new HashMap<>();
+        if (event.before() != null) for (Flow flow : event.before().flows()) for (AttackAttempt attack : flow.attacks())
+            if (attack.rangedAttack() != null) require(retained.put(attack.frameKey(), attack) == null);
+        List<AmmunitionUse> uses = event.resolution().ammunitionUses();
+        require(uses.size() <= 1);
+        int spent = 0;
+        for (Flow flow : event.after().flows()) for (AttackAttempt attack : flow.attacks()) {
+            var ranged = attack.rangedAttack();
+            if (ranged == null) continue;
+            var old = retained.remove(attack.frameKey());
+            if (old != null) {
+                require(old.status() == AttackStatus.RESOLVED ? old.equals(attack)
+                        : old.rangedAttack().equals(ranged) && old.actorId().equals(attack.actorId())
+                            && old.targetId().equals(attack.targetId()) && Objects.equals(old.itemId(), attack.itemId())
+                            && Objects.equals(old.sequenceKey(), attack.sequenceKey()) && old.attackOrdinal() == attack.attackOrdinal()
+                            && old.firstD20() == attack.firstD20() && Objects.equals(old.secondD20(), attack.secondD20())
+                            && old.selectedD20() == attack.selectedD20() && old.advantage() == attack.advantage()
+                            && old.disadvantage() == attack.disadvantage() && old.abilityModifier() == attack.abilityModifier()
+                            && old.proficiencyBonus() == attack.proficiencyBonus() && old.armorClass() == attack.armorClass()
+                            && Objects.equals(old.blessingD4(), attack.blessingD4())
+                            && Objects.equals(old.blessingEffectKey(), attack.blessingEffectKey()) && old.initialHit() == attack.initialHit());
+                continue;
+            }
+            require(event.before() != null && attack.frameKey().equals(flow.rootFrameKey()));
+            Combatant source = member(event.before(), attack.actorId());
+            Combatant target = member(event.before(), attack.targetId());
+            require(source.position().distanceFeet(target.position()) == ranged.distanceFeet());
+            if (attack.monsterAttack() != null) continue;
+            require(++spent == 1 && uses.size() == 1 && event.command().kind() == Kind.ATTACK
+                    && attack.actorId().equals(event.command().actorId()) && attack.targetId().equals(event.command().targetId())
+                    && attack.itemId().equals(event.command().itemId()) && attack.actorId().equals(event.before().activeActor()));
+            var sequence = source.sequence();
+            var next = member(event.after(), attack.actorId()).sequence();
+            require(sequence != null && !sequence.closed() && next != null && sequence.sequenceKey().equals(attack.sequenceKey())
+                    && attack.attackOrdinal() == sequence.performed() && next.sequenceKey().equals(sequence.sequenceKey())
+                    && next.limit() == sequence.limit() && next.forfeited() == sequence.forfeited()
+                    && next.performed() == sequence.performed() + 1);
+            AmmunitionUse use = uses.getFirst();
+            require(attack.actorId().equals(use.characterId()) && attack.frameKey().equals(use.frameKey())
+                    && ranged.ammunitionItemId().equals(use.itemId()) && use.before() != null && use.after() != null
+                    && use.characterId().equals(use.before().characterId())
+                    && event.dependencies().contains(new Dependency(use.characterId(), use.before().version()))
+                    && use.before().equipment().stream()
+                        .anyMatch(item -> item.itemId().equals(use.itemId()) && "CARRIED".equals(item.location()))
+                    && Schema2CombatEquipmentFacts.spendAmmunition(use.before(), use.itemId()).equals(use.after()));
+        }
+        require(retained.isEmpty() && spent == uses.size());
+    }
+
     private static void validateMonsterAttackTransition(Event event) {
         Map<UUID, AttackAttempt> prior = new HashMap<>();
         if (event.before() != null) for (Flow flow : event.before().flows())
@@ -708,6 +760,7 @@ public final class Schema2CombatHistory {
             }
             for (AttackAttempt attack : flow.attacks()) {
                 count += 1L + attack.damageDice().size();
+                if (attack.rangedAttack() != null) count++;
                 var monster = attack.monsterAttack();
                 if (monster != null) {
                     count += 1L + monster.packTacticsAllies().size();

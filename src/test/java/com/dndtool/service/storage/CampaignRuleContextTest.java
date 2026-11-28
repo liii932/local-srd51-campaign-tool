@@ -18,6 +18,8 @@ import static com.dndtool.service.storage.CampaignDomainData.Material;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CampaignRuleContextTest {
+    private static final String CHECK_VARIANT_RELEASE = "11";
+
     @Test void restoredContextsSupplyTheirOwnInitialGrantsAndCatalogSources() {
         var standard = material(BundledCampaignRules.STANDARD).restore();
         var savedVariant = material(BundledCampaignRules.CHECK_VARIANT);
@@ -28,7 +30,7 @@ class CampaignRuleContextTest {
 
         assertNotEquals(standard.binding(), variant.binding());
         assertEquals("9", standard.binding().members().getLast().releaseVersion());
-        assertEquals("10", variant.binding().members().getLast().releaseVersion());
+        assertEquals(CHECK_VARIANT_RELEASE, variant.binding().members().getLast().releaseVersion());
         assertEquals("language.dwarvish", artisanLanguage(standard));
         assertEquals("language.gnomish", artisanLanguage(variant));
 
@@ -40,7 +42,7 @@ class CampaignRuleContextTest {
         var variantCheck = catalogRule(variantCatalog, "check.srd2014");
         assertEquals(Boolean.TRUE, variantCheck.allowAlternateSkillAbility());
         assertTrue(variantCheck.overrides().contains(new CampaignRuleContext.FieldOverride("allow_alternate_skill_ability",
-                BundledCampaignRules.HOUSE_RULE_MODULE, "10", null, null)));
+                BundledCampaignRules.HOUSE_RULE_MODULE, CHECK_VARIANT_RELEASE, null, null)));
         var standardAthletics = catalogRule(standardCatalog, "proficiency.skill.athletics");
         var variantAthletics = catalogRule(variantCatalog, "proficiency.skill.athletics");
         assertEquals("ability.strength", standardAthletics.abilityKey());
@@ -48,9 +50,9 @@ class CampaignRuleContextTest {
         assertEquals(standardAthletics.moduleKey(), variantAthletics.moduleKey());
         assertTrue(standardAthletics.overrides().isEmpty());
         assertTrue(variantAthletics.overrides().contains(new CampaignRuleContext.FieldOverride("ability_key",
-                BundledCampaignRules.HOUSE_RULE_MODULE, "10", null, null)));
+                BundledCampaignRules.HOUSE_RULE_MODULE, CHECK_VARIANT_RELEASE, null, null)));
         assertTrue(catalogRule(variantCatalog, "background.custom_artisan").overrides().contains(
-                new CampaignRuleContext.FieldOverride("grant", BundledCampaignRules.HOUSE_RULE_MODULE, "10",
+                new CampaignRuleContext.FieldOverride("grant", BundledCampaignRules.HOUSE_RULE_MODULE, CHECK_VARIANT_RELEASE,
                         "proficiency_grants", "trade_language")));
     }
 

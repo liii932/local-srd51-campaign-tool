@@ -1045,5 +1045,74 @@
       }
     },
     "author_note": "Only Life Domain is supported: its level-one bonus proficiency grants heavy armor even when cleric is acquired through multiclassing."
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_shortbow"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.shortbow"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.fighter"
+      },
+      "collection_key": "multiclass_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_shortbow"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.shortbow"
+      }
+    }
+  },
+  {
+    "identity": {
+      "kind": "entry",
+      "rule": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.class_progression",
+        "rule_key": "progression.cleric"
+      },
+      "collection_key": "starting_proficiencies",
+      "module_key": "srd51_characters",
+      "entry_key": "weapon_shortbow"
+    },
+    "growth_grant": {
+      "kind": "FIXED",
+      "target": {
+        "kind": "rule",
+        "module_key": "srd51_characters",
+        "rule_type": "character.proficiency",
+        "rule_key": "proficiency.weapon.shortbow"
+      }
+    }
   }
 ]

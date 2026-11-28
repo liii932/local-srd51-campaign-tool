@@ -13,8 +13,8 @@
 目标和武器资格仍先验证；自然 1 仍未命中，优势或劣势中未被选中的 19 无效。
 
 **应用支持：** 单职业战士 3–6 级，正常选择 Champion 并实际获得本特性，
-在已支持的手持近战武器普通攻击、借机攻击和 Ready 单击中使用。
-本切片不开放远程、投掷、徒手、天然武器、法术攻击、多职业或 Superior Critical。
+在手持近战武器的普通攻击、借机攻击、Ready 单击，以及[短弓射击](schema-2-ranged-attacks.md)中使用。
+投掷、徒手、天然武器、法术攻击、多职业及 Superior Critical 仍待接入。
 这些限制是当前消费者范围，不是 SRD 对精通重击的限制。
 
 ## 声明、组合与取得
@@ -31,7 +31,7 @@
 子职业必须启用，选择等级为 3，真实所有者是启用的 `class.fighter`。
 严格读取与最终组合都校验约束；修改字段不能绕过校验。组合至多启用一个此能力，
 未知算法、错误模式、等级、来源、所有者或重复声明拒绝。能力不绑定特定包名。
-内置 `srd51_characters@13` 使用稳定键 `feature.champion_improved_critical`，
+内置 `srd51_characters@14` 使用稳定键 `feature.champion_improved_critical`，
 外部包仍须遵守准确依赖、完整身份和同一支持合同。
 
 `Schema2GrowthRules` 在正常 `CHARACTER_ADVANCED` 选择子职业后派生授予，

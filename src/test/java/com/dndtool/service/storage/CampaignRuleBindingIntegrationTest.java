@@ -39,7 +39,7 @@ class CampaignRuleBindingIntegrationTest {
     private static final String BASE_RELEASE = "5";
     private static final String HOUSE = "dm_runtime_house_rules";
     private static final String HOUSE_RELEASE = "9";
-    private static final String VARIANT_RELEASE = "10";
+    private static final String VARIANT_RELEASE = "11";
     private static final String STR = "ability.strength";
     private static final String WIS = "ability.wisdom";
     private static final RuleIdentity ATHLETICS = new RuleIdentity(BASE, "character.proficiency", "proficiency.skill.athletics");
@@ -307,7 +307,7 @@ class CampaignRuleBindingIntegrationTest {
         var snapshot = service.accessSnapshot().snapshot();
         var state = snapshot.domains();
         var binding = state.material().binding();
-        assertEquals(List.of(BASE + "@" + BASE_RELEASE, "srd51_characters@5", "srd51_magic@5", HOUSE + "@" + release),
+        assertEquals(List.of(BASE + "@" + BASE_RELEASE, "srd51_characters@6", "srd51_magic@6", HOUSE + "@" + release),
                 binding.members().stream().map(member -> member.moduleKey() + "@" + member.releaseVersion()).toList());
         assertEquals(binding, character(state, scenario.actor()).initial().character().binding());
         var trade = character(state, scenario.actor()).initial().character().grants().stream()

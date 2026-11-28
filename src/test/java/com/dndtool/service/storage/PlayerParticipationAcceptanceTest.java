@@ -1,5 +1,6 @@
 package com.dndtool.service.storage;
 
+import com.dndtool.module.composition.Schema2CompositionKernel.EntryIdentity;
 import com.dndtool.service.Schema2CharacterRuntime;
 
 import com.dndtool.service.Schema2CombatState;
@@ -360,6 +361,213 @@ class PlayerParticipationAcceptanceTest {
             assertAbsent(restoredView, wolf, hidden, HIDDEN_WOLF, namesake, observer, "哨兵", "monster.wolf");
             assertAbsent(otherRestoredView, wolf, REVEALED_WOLF, hidden, HIDDEN_WOLF, namesake, fighter, FIGHTER);
             assertReceipt("UNVERIFIED", f.post(firstRestored, "receipt", receiptIdentity(drop.command())));
+        }
+    }
+
+    @Test void approvedArcherPaysBeforeShieldAndReceivesOnlyPublicMonsterOutcomes() throws Exception {
+        var dice = new ScriptedDice();
+        var failAfterUpdate = new AtomicBoolean();
+        try (Fixture f = new Fixture("ranged-weapon", dice, boundary -> {
+            if (boundary == CampaignStorageService.Boundary.AFTER_CHARACTER_UPDATE && failAfterUpdate.getAndSet(false))
+                throw new IllegalStateException("ranged transaction failure");
+        })) {
+            UUID archer = f.character("弓手", "PC");
+            UUID wizard = f.character("护盾法师", "PC", "wizard");
+            UUID bow = f.acquire(archer, "item.shortbow");
+            UUID firstArrow = f.acquire(archer, "item.arrow");
+            UUID secondArrow = f.acquire(archer, "item.arrow");
+            UUID thirdArrow = f.acquire(archer, "item.arrow");
+            UUID otherOwnerArrow = f.acquire(wizard, "item.arrow");
+            var unequipped = f.storage.accessSnapshot();
+            var wrongHand = assertThrows(StorageException.class, () -> f.equip(archer, bow, "MAIN_HAND"));
+            assertEquals("DOMAIN_REJECTED", wrongHand.code());
+            assertEquals("S2_EQUIPMENT_HANDS", wrongHand.getMessage());
+            assertEquals(unequipped, f.storage.accessSnapshot());
+            f.equip(archer, bow, "BOTH_HANDS");
+            var casting = f.rules.rule("character.wizard_spellcasting", "spellcasting.wizard");
+            f.characterCommand(wizard, Schema2CharacterRuntime.Command.spellbook("SPELLBOOK_INITIALIZED",
+                    new Schema2CharacterRuntime.SpellbookInput(casting, f.rules.initialWizardBook(), f.rules.initialWizardPrepared())));
+
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, archer, wizard);
+            UUID skeleton = f.monster("可见骷髅", "monster.skeleton");
+            UUID distant = f.monster("越界骷髅", "monster.skeleton");
+            UUID hidden = f.monster("未揭示骷髅", "monster.skeleton");
+            UUID scene = f.createScene(world, "70", "10");
+            dice.add(20, 12, 10, 5, 1);
+            f.enterBattle(scene, List.of(new Deployment(archer, new Position(2, 2), 0),
+                    new Deployment(wizard, new Position(18, 2), 1), new Deployment(skeleton, new Position(19, 2), 1),
+                    new Deployment(distant, new Position(67, 2), 1),
+                    new Deployment(hidden, new Position(19, 3), 1)));
+            assertTrue(dice.isEmpty());
+
+            Seat shooter = f.approve("弓手玩家"), defender = f.approve("法师玩家");
+            f.assign(archer, shooter.member);
+            f.assign(wizard, defender.member);
+            f.share(ShareKind.CHARACTER, wizard, true, shooter.member);
+            f.takeover(shooter);
+            f.takeover(defender);
+            assertReceipt("ACCEPTED", f.post(shooter, "command", f.command(shooter, f.option(shooter, "开始攻击动作"))));
+            assertTrue(shotLabels(f.view(shooter)).isEmpty());
+            rejectCombat(f, Command.attack(archer, wizard, bow), Actor.player(shooter.member, archer),
+                    "PLAYER_COMMAND_FORBIDDEN", null);
+            f.share(ShareKind.SCENE, scene, true, shooter.member, defender.member);
+            f.share(ShareKind.MONSTER, skeleton, true, shooter.member);
+            f.share(ShareKind.MONSTER, distant, true, shooter.member);
+            var view = f.view(shooter);
+            assertEquals(2, shotLabels(view).size());
+            assertTrue(shotLabels(view).stream().anyMatch(label -> label.contains("80 尺（正常射程）")));
+            assertTrue(shotLabels(view).stream().anyMatch(label -> label.contains("85 尺（长射程）")));
+            assertAbsent(view, "未揭示骷髅", skeleton, hidden, "monster.skeleton", "finalArmorClass");
+            var sharedCards = view.getAsJsonObject("shared").getAsJsonArray("cards");
+            assertEquals(1, sharedCards.size());
+            assertEquals("护盾法师", sharedCards.get(0).getAsJsonObject().get("name").getAsString());
+            rejectCombat(f, Command.attack(archer, distant, bow), null, "DOMAIN_REJECTED", "S2_COMBAT_OUT_OF_RANGE");
+            rejectCombat(f, Command.attack(archer, hidden, bow), Actor.player(shooter.member, archer),
+                    "PLAYER_COMMAND_FORBIDDEN", null);
+
+            var before = f.storage.accessSnapshot();
+            var request = f.command(shooter, f.option(shooter, "射击 护盾法师"));
+            var damageBefore = f.card(wizard).hitPoints();
+            var slotsBefore = f.wizardSlots(wizard);
+            var hostStrike = combatInput(before, Command.attack(archer, wizard, bow));
+            String faultRequest = uuid();
+            failAfterUpdate.set(true);
+            dice.add(10);
+            assertEquals("ranged transaction failure", assertThrows(IllegalStateException.class, () -> f.storage.domainCommand(
+                    faultRequest, before.epoch(), before.revision(), "combat-command", hostStrike)).getMessage());
+            assertTrue(dice.isEmpty());
+            assertEquals(before, f.storage.accessSnapshot());
+            assertTrue(f.storage.exactDomainReceipt(faultRequest, before.runId(), before.revision(), "combat-command", hostStrike,
+                    Actor.dm(archer, shooter.member), access -> {}).isEmpty());
+            assertEquals(0, f.actor(archer).sequence().performed());
+
+            dice.add(10);
+            var declared = f.post(shooter, "command", request);
+            var receipt = declared.body().getAsJsonObject("receipt");
+            assertEquals("WAITING", receipt.get("outcome").getAsString());
+            assertFalse(receipt.has("attackResult"));
+            var pending = f.latestAttack();
+            assertEquals(AttackStatus.HIT_PENDING_DAMAGE, pending.status());
+            assertTrue(pending.initialHit());
+            assertFalse(pending.disadvantage());
+            assertEquals(10, pending.firstD20());
+            assertNull(pending.secondD20());
+            assertEquals(1, pending.abilityModifier());
+            assertEquals(2, pending.proficiencyBonus());
+            assertEquals(1, f.actor(archer).sequence().performed());
+            assertArrowPayment(f, pending, Set.of(firstArrow, secondArrow, thirdArrow));
+            var root = f.state().roots().getLast();
+            assertEquals(Actor.player(shooter.member, archer), root.actor());
+            assertEquals(request.get("requestId").getAsString(), root.operationId().toString());
+            assertEquals(List.of(new CampaignSpaceData.Die(20, 10)), root.rolls());
+            assertEquals(damageBefore, f.card(wizard).hitPoints());
+            assertEquals(slotsBefore, f.wizardSlots(wizard));
+            var waiting = f.storage.accessSnapshot();
+            assertEquals(receipt, f.post(shooter, "receipt", receiptIdentity(request)).body().get("receipt"));
+            assertStale(f, shooter, request);
+            assertEquals(waiting, f.storage.accessSnapshot());
+            assertForgedArrowsRejected(f);
+
+            UUID shooterMember = shooter.member;
+            UUID defenderMember = defender.member;
+            finishAndOpen(f);
+            assertEquals(pending, f.latestAttack());
+            assertEquals(2, f.arrowIds(archer).size());
+            f.invitation = f.host("invite", object()).get("invitation").getAsString();
+            shooter = f.approve("重新核对弓手", shooterMember);
+            defender = f.approve("重新核对法师", defenderMember);
+            f.takeover(shooter);
+            f.takeover(defender);
+            assertReceipt("ACCEPTED", f.post(defender, "command", f.command(defender, f.option(defender, "Shield"))));
+            assertEquals(slotsBefore - 1, f.wizardSlots(wizard));
+            assertEquals(pending, f.latestAttack());
+            assertReceipt("ACCEPTED", f.post(shooter, "command", f.command(shooter, f.option(shooter, "继续结算当前行动"))));
+            var shielded = f.latestAttack();
+            assertEquals(AttackStatus.RESOLVED, shielded.status());
+            assertEquals(pending.frameKey(), shielded.frameKey());
+            assertEquals(pending.firstD20(), shielded.firstD20());
+            assertEquals(pending.rangedAttack(), shielded.rangedAttack());
+            assertEquals(pending.armorClass() + 5, shielded.finalArmorClass());
+            assertFalse(shielded.hit());
+            assertEquals(damageBefore, f.card(wizard).hitPoints());
+            assertTrue(f.state().roots().getLast().rolls().isEmpty());
+            assertEquals(2, f.arrowIds(archer).size());
+            assertEquals(1, f.actor(archer).sequence().performed());
+
+            f.endTurn();
+            f.advanceTo(archer);
+            assertPlayerShot(f, shooter, archer, skeleton, dice, 6, 7, false, 6);
+            f.endTurn();
+            f.advanceTo(archer);
+            assertPlayerShot(f, shooter, archer, skeleton, dice, 5, 6, true, 0);
+            assertTrue(f.arrowIds(archer).isEmpty());
+            f.endTurn();
+            f.advanceTo(archer);
+            f.combat(f.battle(), Command.action(Kind.BEGIN_ATTACK, archer));
+            rejectCombat(f, Command.attack(archer, wizard, bow), null, "DOMAIN_REJECTED", "S2_COMBAT_AMMUNITION_UNAVAILABLE");
+            assertTrue(shotLabels(f.view(shooter)).isEmpty());
+            assertTrue(dice.isEmpty());
+            finishAndOpen(f);
+            assertTrue(f.arrowIds(archer).isEmpty());
+            assertEquals(Set.of(otherOwnerArrow), f.arrowIds(wizard));
+            assertTrue(f.monster(skeleton).dead());
+        }
+    }
+
+    @Test void monsterShortbowUsesCloseEnemyDisadvantageAndNeitherBowProvidesOpportunityAttacks() throws Exception {
+        var dice = new ScriptedDice();
+        try (Fixture f = new Fixture("ranged-monster", dice)) {
+            UUID guard = f.character("守卫", "PC"), archer = f.character("近身弓手", "PC");
+            UUID bow = f.acquire(archer, "item.shortbow");
+            f.acquire(archer, "item.arrow");
+            f.equip(archer, bow, "BOTH_HANDS");
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, guard, archer);
+            UUID skeleton = f.monster("骷髅弓手", "monster.skeleton");
+            var rule = f.rules.rule("adventure.monster", "monster.skeleton");
+            var shortbow = new EntryIdentity(rule, "actions", rule.moduleKey(), "shortbow");
+            var shortsword = new EntryIdentity(rule, "actions", rule.moduleKey(), "shortsword");
+            UUID scene = f.createScene(world, "20", "10");
+            var origin = new Position(2, 2);
+            var adjacent = new Position(3, 2);
+            dice.add(20, 12, 5);
+            f.enterBattle(scene, archer, List.of(new Deployment(skeleton, origin, 0),
+                    new Deployment(archer, adjacent, 1), new Deployment(guard, new Position(18, 2), 1)));
+            assertTrue(dice.isEmpty());
+
+            long hitPoints = f.card(guard).hitPoints();
+            dice.add(20, 10, 6);
+            f.combat(f.battle(), Command.monsterAttack(skeleton, guard, shortbow));
+            var attack = f.latestAttack();
+            assertEquals(AttackStatus.RESOLVED, attack.status());
+            assertEquals(new RangedAttackEvidence(80, 80, 320, true, null), attack.rangedAttack());
+            assertEquals(shortbow, attack.monsterAttack().action());
+            assertEquals(4, attack.monsterAttack().hitBonus());
+            assertEquals(10, attack.selectedD20());
+            assertTrue(attack.disadvantage());
+            assertFalse(attack.critical());
+            assertTrue(attack.hit());
+            assertEquals(8, attack.damageAmount());
+            assertEquals(hitPoints - 8, f.card(guard).hitPoints());
+            assertFalse(f.actor(skeleton).actionAvailable());
+            assertTrue(f.state().combats().getFirst().events().getLast().resolution().ammunitionUses().isEmpty());
+
+            f.combat(f.battle(), Command.move(skeleton, List.of(new Position(1, 2))));
+            assertNull(f.battle().activeFlow());
+            assertTrue(f.actor(archer).reactionAvailable());
+            f.endTurn();
+            assertEquals(archer, f.battle().activeActor());
+            f.combat(f.battle(), Command.move(archer, List.of(origin, adjacent)));
+            var flow = f.battle().activeFlow();
+            var window = flow.windows().getLast();
+            var opportunity = window.opportunities().stream().filter(o -> o.status() == OpportunityStatus.PENDING)
+                    .findFirst().orElseThrow();
+            assertEquals(skeleton, opportunity.actorId());
+            assertEquals(List.of(shortsword), opportunity.options().stream().map(ReactionOption::monsterAttack).toList());
+            rejectCombat(f, Command.monsterOpportunityAttack(skeleton, shortbow, flow.flowKey(), flow.leafFrameKey(),
+                    window.windowKey(), opportunity.opportunityKey()), null, "DOMAIN_REJECTED", null);
+            assertTrue(dice.isEmpty());
+            finishAndOpen(f);
+            assertEquals(flow, f.battle().activeFlow());
         }
     }
 
@@ -790,6 +998,81 @@ class PlayerParticipationAcceptanceTest {
                 submitted, access -> {}).isEmpty());
     }
 
+    private static void assertArrowPayment(Fixture f, AttackAttempt attack, Set<UUID> previousArrows) {
+        UUID archer = attack.actorId();
+        UUID arrow = attack.rangedAttack().ammunitionItemId();
+        assertTrue(previousArrows.contains(arrow));
+        var remaining = new HashSet<>(previousArrows);
+        remaining.remove(arrow);
+        assertEquals(remaining, f.arrowIds(archer));
+        var child = f.history(archer).events().getLast();
+        var root = f.state().roots().getLast();
+        var event = f.state().combats().getFirst().events().getLast();
+        assertEquals(List.of(new AmmunitionUse(archer, child.before(), child.after(), attack.frameKey(), arrow)),
+                event.resolution().ammunitionUses());
+        assertEquals(List.of(child.operationId()), root.characterOperations());
+        assertEquals(root.characterOperations(), event.characterOperations());
+        assertEquals("COMBAT_AMMUNITION_SPENT", child.kind());
+        assertEquals(arrow, child.command().equipmentInput().itemId());
+        assertEquals(root.operationId(), child.command().combatInput().combatOperationId());
+        assertEquals(child.before().version() + 1, child.after().version());
+        assertNull(child.healthResult());
+        assertEquals(child.before().health(), child.after().health());
+    }
+
+    private static void assertPlayerShot(Fixture f, Seat shooter, UUID archer, UUID skeleton, ScriptedDice dice,
+            int damageDie, int damage, boolean dropped, int remaining) {
+        assertReceipt("ACCEPTED", f.post(shooter, "command", f.command(shooter, f.option(shooter, "开始攻击动作"))));
+        var previousArrows = f.arrowIds(archer);
+        var request = f.command(shooter, f.option(shooter, "射击 可见骷髅"));
+        dice.add(19, 13, damageDie);
+        var body = f.post(shooter, "command", request).body();
+        assertTrue(dice.isEmpty());
+        var receipt = body.getAsJsonObject("receipt");
+        assertEquals(Set.of("state", "outcome", "requestId", "label", "attackResult"), receipt.keySet());
+        assertEquals("COMPLETED", receipt.get("outcome").getAsString());
+        var result = receipt.getAsJsonObject("attackResult");
+        assertEquals(Set.of("hit", "damage", "dropped"), result.keySet());
+        assertTrue(result.get("hit").getAsBoolean());
+        assertEquals(damage, result.get("damage").getAsInt());
+        assertEquals(dropped, result.get("dropped").getAsBoolean());
+        assertAbsent(receipt, skeleton, "可见骷髅", "armorClass", "hitPoints", "remaining");
+        var monster = participants(body.getAsJsonObject("view")).asList().stream().map(JsonElement::getAsJsonObject)
+                .filter(row -> row.get("name").getAsString().equals("可见骷髅")).findFirst().orElseThrow();
+        assertEquals(Set.of("name", "position", "current"), monster.keySet());
+        var attack = f.latestAttack();
+        assertEquals(skeleton, attack.targetId());
+        assertEquals(13, attack.armorClass());
+        assertTrue(attack.disadvantage());
+        assertEquals(13, attack.selectedD20());
+        assertEquals(new RangedAttackEvidence(85, 80, 320, false, attack.rangedAttack().ammunitionItemId()), attack.rangedAttack());
+        assertEquals(List.of(new CampaignSpaceData.Die(20, 19), new CampaignSpaceData.Die(20, 13),
+                new CampaignSpaceData.Die(6, damageDie)), f.state().roots().getLast().rolls());
+        assertArrowPayment(f, attack, previousArrows);
+        assertEquals(remaining, f.monster(skeleton).hitPoints());
+        assertEquals(dropped, f.monster(skeleton).dead());
+        var committed = f.storage.accessSnapshot();
+        assertEquals(receipt, f.post(shooter, "receipt", receiptIdentity(request)).body().get("receipt"));
+        assertStale(f, shooter, request);
+        assertEquals(committed, f.storage.accessSnapshot());
+    }
+
+    private static void assertForgedArrowsRejected(Fixture f) {
+        var before = f.storage.accessSnapshot();
+        var codec = new CampaignCodec();
+        byte[] original = codec.encode(new CampaignData.Document(uuid(), before.snapshot()));
+        var forged = CampaignJson.read(original);
+        var history = forged.getAsJsonObject("domains").getAsJsonArray("combats").get(0).getAsJsonObject();
+        var resolution = history.getAsJsonArray("events").asList().getLast().getAsJsonObject().getAsJsonObject("resolution");
+        var use = resolution.getAsJsonArray("ammunitionUses").get(0).getAsJsonObject();
+        use.addProperty("itemId", uuid());
+        var integrity = forged.remove("integrity").getAsJsonObject();
+        integrity.addProperty("digest", CampaignJson.digest(CampaignCodec.FILE_DIGEST_DOMAIN, CampaignJson.canonical(forged)));
+        forged.add("integrity", integrity);
+        assertEquals("INVALID_FILE", assertThrows(StorageException.class,
+                () -> codec.decode(CampaignJson.canonical(forged))).code());
+    }
+
     private static JsonObject combatInput(CampaignStorageService.AccessSnapshot access, Command command) {
         var state = access.snapshot().domains();
         var current = CampaignSpaceCommands.currentBattle(state).current();
@@ -923,6 +1206,10 @@ class PlayerParticipationAcceptanceTest {
         return labels(view).stream().filter(label -> label.startsWith("攻击 ")).toList();
     }
 
+    private static List<String> shotLabels(JsonObject view) {
+        return labels(view).stream().filter(label -> label.startsWith("射击 ")).toList();
+    }
+
     private static JsonObject wolfOption(JsonObject view, String position) {
         var matches = attackLabels(view).stream()
                 .filter(label -> label.startsWith("攻击 " + REVEALED_WOLF) && label.contains(position)).toList();
@@ -965,7 +1252,10 @@ class PlayerParticipationAcceptanceTest {
             this(new CampaignStorageService(PlayerParticipationAcceptanceTest.this.temporary.resolve(name), faults), false);
         }
         Fixture(String name, ScriptedDice dice) throws Exception {
-            this(new CampaignStorageService(PlayerParticipationAcceptanceTest.this.temporary.resolve(name), ignored -> { }, dice), true);
+            this(name, dice, ignored -> { });
+        }
+        Fixture(String name, ScriptedDice dice, CampaignStorageService.FaultInjector faults) throws Exception {
+            this(new CampaignStorageService(PlayerParticipationAcceptanceTest.this.temporary.resolve(name), faults, dice), true);
         }
         private Fixture(CampaignStorageService storage, boolean deliveredRules) throws Exception {
             this.storage = storage;
@@ -993,22 +1283,31 @@ class PlayerParticipationAcceptanceTest {
         void takeover(Seat seat) { seat.connection = post(seat, "takeover", object()).body().get("connectionId").getAsString(); }
         JsonObject option(Seat seat, String label) { return PlayerParticipationAcceptanceTest.option(view(seat), label); }
         JsonObject command(Seat seat, JsonObject option) { return object("connectionId", seat.connection, "candidateId", option.get("id").getAsString(), "precondition", option.get("precondition").getAsString(), "requestId", uuid()); }
-        UUID character(String name, String kind) { send("character-create", object("name", name, "kind", kind, "classKey", "fighter", "backgroundKey", "acolyte")); return storage.accessSnapshot().snapshot().domains().characters().stream().filter(character -> character.name().equals(name)).findFirst().orElseThrow().id(); }
+        UUID character(String name, String kind) { return character(name, kind, "fighter"); }
+        UUID character(String name, String kind, String classKey) {
+            return UUID.fromString(send("character-create", object("name", name, "kind", kind, "classKey", classKey,
+                    "backgroundKey", "acolyte")).lastCommand().subjectId());
+        }
         UUID manual(String name, String kind) { send("manual-create", object("name", name, "kind", kind, "template", "blank")); return storage.accessSnapshot().snapshot().domains().manual().characters().stream().filter(character -> character.current().name().equals(name)).findFirst().orElseThrow().id(); }
-        UUID wolf(String name) {
+        UUID wolf(String name) { return monster(name, "monster.wolf"); }
+        UUID monster(String name, String ruleKey) {
             var input = object("name", name);
-            input.add("monster", CampaignDomainCodec.toJson(rules.rule("adventure.monster", "monster.wolf")));
+            input.add("monster", CampaignDomainCodec.toJson(rules.rule("adventure.monster", ruleKey)));
             return UUID.fromString(send("monster-create", input).lastCommand().subjectId());
         }
         CampaignSpaceData.Monster monster(UUID id) {
             return storage.accessSnapshot().snapshot().domains().space().monsters().stream()
                     .filter(monster -> monster.id().equals(id)).findFirst().orElseThrow();
         }
-        UUID createScene(UUID world) {
-            return UUID.fromString(send("scene-create", object("name", SCENE, "nodeId", world.toString(), "width", "10",
-                    "height", "10", "resolution", "RULES")).lastCommand().subjectId());
+        UUID createScene(UUID world) { return createScene(world, "10", "10"); }
+        UUID createScene(UUID world, String width, String height) {
+            return UUID.fromString(send("scene-create", object("name", SCENE, "nodeId", world.toString(), "width", width,
+                    "height", height, "resolution", "RULES")).lastCommand().subjectId());
         }
         void enterBattle(UUID scene, List<Deployment> placements) {
+            enterBattle(scene, placements.getFirst().characterId(), placements);
+        }
+        void enterBattle(UUID scene, UUID initiator, List<Deployment> placements) {
             var state = storage.accessSnapshot().snapshot().domains();
             var subjects = new JsonArray();
             for (var placement : placements) {
@@ -1021,7 +1320,7 @@ class PlayerParticipationAcceptanceTest {
             input.add("subjects", subjects);
             send("scene-enter", input);
             var roster = placements.stream().map(Deployment::characterId).toList();
-            combat(battle(), Command.reenter(roster.getFirst(), roster));
+            combat(battle(), Command.reenter(initiator, roster));
             assertEquals(roster.getFirst(), battle().activeActor());
         }
         void leaveBattle(UUID world, UUID... actors) {
@@ -1064,23 +1363,56 @@ class PlayerParticipationAcceptanceTest {
             host("share", object("payload", input.toString()));
         }
         void acquire(UUID pc, boolean equip) {
-            var command = new Schema2CharacterRuntime.Command("ITEM_ACQUIRED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
-                    new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), rules.rule("equipment.item", "item.longsword"), "CARRIED", "主持准备"), null);
-            characterCommand(pc, command);
-            if (equip) {
-                UUID item = storage.accessSnapshot().snapshot().domains().characters().stream().filter(character -> character.id().equals(pc)).findFirst().orElseThrow().history().current().equipment().getFirst().itemId();
-                characterCommand(pc, new Schema2CharacterRuntime.Command("ITEM_EQUIPPED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null,
-                        new Schema2CharacterRuntime.EquipmentInput(item, null, "MAIN_HAND", "主持准备"), null));
-            }
+            UUID item = acquire(pc, "item.longsword");
+            if (equip) equip(pc, item, "MAIN_HAND");
         }
-        void characterCommand(UUID pc, Schema2CharacterRuntime.Command command) { JsonObject input = characterInput(pc); input.add("command", CampaignDomainCodec.toJson(command)); send("character-command", input); }
-        JsonObject characterInput(UUID pc) { var state = storage.accessSnapshot().snapshot().domains().characters().stream().filter(character -> character.id().equals(pc)).findFirst().orElseThrow().history().current(); return object("characterId", pc.toString(), "characterVersion", Long.toString(state.version())); }
+        UUID acquire(UUID pc, String ruleKey) {
+            var input = new Schema2CharacterRuntime.EquipmentInput(UUID.randomUUID(), rules.rule("equipment.item", ruleKey), "CARRIED", "主持准备");
+            return UUID.fromString(equipment(pc, "ITEM_ACQUIRED", input).lastCommand().requestId());
+        }
+        void equip(UUID pc, UUID item, String location) {
+            equipment(pc, "ITEM_EQUIPPED", new Schema2CharacterRuntime.EquipmentInput(item, null, location, "主持准备"));
+        }
+        CampaignStorageService.CampaignView equipment(UUID pc, String kind, Schema2CharacterRuntime.EquipmentInput input) {
+            return characterCommand(pc, new Schema2CharacterRuntime.Command(kind, null, 0, null, null, null,
+                    Schema2CharacterRuntime.GrowthChoices.EMPTY, null, null, input, null));
+        }
+        CampaignStorageService.CampaignView characterCommand(UUID pc, Schema2CharacterRuntime.Command command) {
+            JsonObject input = characterInput(pc);
+            input.add("command", CampaignDomainCodec.toJson(command));
+            return send("character-command", input);
+        }
+        JsonObject characterInput(UUID pc) { return object("characterId", pc.toString(), "characterVersion", Long.toString(card(pc).version())); }
+        CampaignDomainData.State state() { return storage.accessSnapshot().snapshot().domains(); }
+        Schema2CharacterRuntime.History history(UUID id) {
+            return state().characters().stream().filter(character -> character.id().equals(id)).findFirst().orElseThrow().history();
+        }
+        Schema2CharacterRuntime.State card(UUID id) { return history(id).current(); }
+        long wizardSlots(UUID wizard) {
+            return card(wizard).resources().stream().filter(resource -> resource.identity().ruleKey().equals("resource.wizard.slot1"))
+                    .findFirst().orElseThrow().current();
+        }
+        Set<UUID> arrowIds(UUID archer) {
+            Set<UUID> result = new HashSet<>();
+            for (var item : card(archer).equipment()) {
+                if (!item.item().ruleKey().equals("item.arrow")) continue;
+                assertEquals("CARRIED", item.location());
+                result.add(item.itemId());
+            }
+            return result;
+        }
         JsonObject check(UUID pc) {
             JsonObject input = characterInput(pc); input.add("command", CampaignDomainCodec.toJson(new Schema2CharacterRuntime.Command("CHECK_RESOLVED", null, 0, null, null, null, Schema2CharacterRuntime.GrowthChoices.EMPTY, null,
                     new Schema2CharacterRuntime.CheckInput(rules.rule("adventure.check", "check.srd2014"), "ABILITY", "ability.strength", null, 10, false, false, "固定验收检定")))); return input;
         }
         void combat(Battle previous, Command command) { PlayerSpaceFixture.combat(storage, previous, command); }
-        Battle battle() { return storage.accessSnapshot().snapshot().domains().combats().getFirst().current(); }
+        Battle battle() { return state().combats().getFirst().current(); }
+        Combatant actor(UUID id) {
+            return battle().combatants().stream().filter(actor -> actor.characterId().equals(id)).findFirst().orElseThrow();
+        }
+        AttackAttempt latestAttack() {
+            return battle().flows().reversed().stream().flatMap(flow -> flow.attacks().reversed().stream()).findFirst().orElseThrow();
+        }
         @Override public void close() throws Exception { storage.close(); }
     }
     private static final class Seat {

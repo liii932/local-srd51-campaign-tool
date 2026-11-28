@@ -114,7 +114,7 @@ class CampaignRuleBundleIsolationTest {
             assertUnavailable(() -> BundledCampaignRules.projection(CHECK_VARIANT));
             var standard = BundledCampaignRules.projection().members();
             var variant = new ArrayList<>(standard.subList(0, 3));
-            variant.add(assertUnavailableCandidate(BundledCampaignRules.HOUSE_RULE_MODULE, "10"));
+            variant.add(assertUnavailableCandidate(BundledCampaignRules.HOUSE_RULE_MODULE, "11"));
             try (var service = new CampaignStorageService(root)) {
                 assertRejectedWithoutRun(root, service, LocalRuleLibraryException.class, "RULE_PACKAGE_MISSING",
                         () -> service.create("Unaccepted variant", variant));

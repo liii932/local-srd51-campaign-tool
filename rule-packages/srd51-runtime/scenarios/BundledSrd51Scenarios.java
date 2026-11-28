@@ -24,9 +24,12 @@ import com.dndtool.service.storage.CampaignDomainData;
 import com.dndtool.service.storage.CampaignGroupCheck;
 import com.dndtool.service.storage.CampaignContestCheck;
 import com.dndtool.service.storage.CampaignJson;
+import com.dndtool.service.storage.CampaignParticipationData;
 import com.dndtool.service.storage.CampaignRuleContext;
 import com.dndtool.service.storage.CampaignSpaceCommands;
 import com.dndtool.service.storage.CampaignSpaceData;
+import com.dndtool.service.storage.CampaignStorageService;
+import com.dndtool.service.storage.PlayerCandidateFactory;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -37,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.IntStream;
 
 import static com.dndtool.module.composition.Schema2CompositionKernel.*;
@@ -84,6 +88,8 @@ public final class BundledSrd51Scenarios {
                 scenario("dwarf-speed-author-edit", BundledSrd51Scenarios::verifyDwarfSpeedAuthorEdit),
                 scenario("heavy-armor-policy-author-edit", BundledSrd51Scenarios::verifyHeavyArmorPolicyAuthorEdit),
                 scenario("weapon-damage", BundledSrd51Scenarios::verifyWeaponDamage),
+                scenario("ranged-weapons", suite -> suite.verifyRangedWeapons(false)),
+                scenario("ranged-weapons-variant", suite -> suite.verifyRangedWeapons(true)),
                 scenario("monster-melee", suite -> suite.verifyMonsterMelee(false)),
                 scenario("monster-melee-variant", suite -> suite.verifyMonsterMelee(true)),
                 scenario("wolf-bite", suite -> suite.verifyWolfBite(11, Schema2CombatState.OnHitOutcome.SAVE_SUCCEEDED)),
@@ -387,15 +393,55 @@ public final class BundledSrd51Scenarios {
         }
 
         CampaignDomainData.Root apply(String action, JsonObject input) {
+            return apply(action, input, sides -> {
+                expectNumber(20, sides);
+                return dice.removeFirst();
+            });
+        }
+
+        CampaignDomainData.Root apply(String action, JsonObject input, IntUnaryOperator rolls) {
             input.add("focus", CampaignSpaceCommands.focusPayload(state));
             var snapshot = new CampaignData.Snapshot(campaignId, "Crossing", state);
             state = commands.apply(snapshot, action, input, UUID.randomUUID(),
-                    CampaignJson.digest("AUTHOR-SCENARIO", CampaignJson.canonical(input)), sides -> {
-                        expectNumber(20, sides);
-                        return dice.removeFirst();
-                    });
+                    CampaignJson.digest("AUTHOR-SCENARIO", CampaignJson.canonical(input)), rolls);
             return state.roots().getLast();
         }
+
+        UUID equipment(UUID actor, Command command) {
+            var character = state.characters().stream().filter(c -> actor.equals(c.id())).findFirst().orElseThrow();
+            var input = fields("characterId", actor.toString(), "characterVersion", Long.toString(character.history().current().version()));
+            input.add("command", CampaignDomainCodec.toJson(command));
+            return apply("character-command", input).operationId();
+        }
+
+        void share(String kind, UUID subject) {
+            var input = fields("shareVersion", "0", "kind", kind, "subjectId", subject.toString());
+            input.add("shareId", com.google.gson.JsonNull.INSTANCE);
+            input.addProperty("active", true);
+            input.add("audience", CampaignDomainCodec.toJson(new CampaignParticipationData.Audience(
+                    CampaignParticipationData.AudienceKind.ALL, List.of())));
+            apply("share-set", input);
+        }
+
+        void combat(Schema2CombatState.Command command, CampaignSpaceData.Die... expected) {
+            var battle = CampaignSpaceCommands.currentBattle(state).current();
+            var input = fields("combatId", battle.combatId().toString(), "combatVersion", Long.toString(battle.version()));
+            input.add("command", CampaignDomainCodec.toJson(command));
+            var rolls = new ArrayDeque<>(List.of(expected));
+            var root = apply("combat-command", input, sides -> {
+                var die = rolls.removeFirst();
+                expectNumber(die.sides(), sides);
+                return die.value();
+            });
+            assertTrue(rolls.isEmpty());
+            assertEquals(List.of(expected), root.rolls());
+        }
+    }
+
+    private static JsonObject fields(String... pairs) {
+        var result = new JsonObject();
+        for (int i = 0; i < pairs.length; i += 2) result.addProperty(pairs[i], pairs[i + 1]);
+        return result;
     }
 
     private void verifyPassiveChecks(int baseScore, int modeAdjustment) {
@@ -999,6 +1045,72 @@ public final class BundledSrd51Scenarios {
         var command = Schema2CombatState.Command.action(kind, actor);
         return combat.resolve(combat.preflight(UUID.randomUUID(), combatId, campaign, roster, battle, command),
                 sides -> { throw new AssertionError(kind + " drew a die"); }).after();
+    }
+
+    private void verifyRangedWeapons(boolean extendedRange) {
+        var campaign = checkParty("Archery field", List.of("Archer"));
+        UUID world = campaign.state.nodes().getFirst().id(), archer = campaign.state.characters().getFirst().id();
+        UUID bow = campaign.equipment(archer, equipmentCommand("ITEM_ACQUIRED", UUID.randomUUID(),
+                rules.rule("equipment.item", "item.shortbow"), "CARRIED"));
+        UUID arrow = campaign.equipment(archer, equipmentCommand("ITEM_ACQUIRED", UUID.randomUUID(),
+                rules.rule("equipment.item", "item.arrow"), "CARRIED"));
+        campaign.equipment(archer, equipmentCommand("ITEM_EQUIPPED", bow, null, "BOTH_HANDS"));
+        RuleIdentity skeleton = rules.rule("adventure.monster", "monster.skeleton");
+        var create = fields("name", "Skeleton");
+        create.add("monster", CampaignDomainCodec.toJson(skeleton));
+        UUID target = campaign.apply("monster-create", create).subjectId();
+        UUID scene = campaign.apply("scene-create", fields("name", "Range", "nodeId", world.toString(),
+                "width", "24", "height", "4", "resolution", "RULES")).subjectId();
+        var enter = fields("sceneId", scene.toString());
+        var placements = new JsonArray();
+        for (UUID id : List.of(archer, target)) {
+            long version = CampaignSpaceCommands.position(campaign.state, id).version();
+            placements.add(fields("id", id.toString(), "version", Long.toString(version), "x", id.equals(archer) ? "0" : "17",
+                    "y", "0", "side", id.equals(archer) ? "0" : "1"));
+        }
+        enter.add("subjects", placements);
+        campaign.apply("scene-enter", enter);
+        UUID member = campaign.apply("member-add", fields("name", "Archer's player")).subjectId();
+        campaign.apply("control-set", fields("characterId", archer.toString(), "memberId", member.toString(), "controlVersion", "0"));
+        campaign.share("SCENE", scene);
+        campaign.share("MONSTER", target);
+        campaign.combat(Schema2CombatState.Command.reenter(archer, List.of(archer, target)),
+                new CampaignSpaceData.Die(20, 18), new CampaignSpaceData.Die(20, 3));
+        campaign.combat(Schema2CombatState.Command.action(Kind.BEGIN_ATTACK, archer));
+
+        var access = new CampaignStorageService.AccessSnapshot(new CampaignData.Snapshot(campaign.campaignId, "Range", campaign.state),
+                campaign.campaignId, 1, campaign.state.roots().size(), new JsonObject());
+        var shot = Schema2CombatState.Command.attack(archer, target, bow);
+        var offered = PlayerCandidateFactory.candidates(access, member).stream()
+                .filter(option -> CampaignDomainCodec.toJson(shot).equals(option.input().get("command"))).toList();
+        expectNumber(1, offered.size());
+        assertTrue(offered.getFirst().label().endsWith(extendedRange ? "85 尺（正常射程）" : "85 尺（长射程）"));
+        var first = new CampaignSpaceData.Die(20, 15);
+        var second = extendedRange ? new CampaignSpaceData.Die(6, 4) : new CampaignSpaceData.Die(20, 6);
+        campaign.combat(shot, first, second);
+        var battle = CampaignSpaceCommands.currentBattle(campaign.state).current();
+        var attack = battle.flows().getLast().attacks().getFirst();
+        expectNumber(extendedRange ? 100 : 80, attack.rangedAttack().normalRangeFeet());
+        expectNumber(320, attack.rangedAttack().longRangeFeet());
+        expectNumber(85, attack.rangedAttack().distanceFeet());
+        assertEquals(arrow, attack.rangedAttack().ammunitionItemId());
+        assertTrue(campaign.state.characters().getFirst().history().current().equipment().stream().noneMatch(item -> arrow.equals(item.itemId())));
+        assertEquals(!extendedRange, attack.disadvantage());
+        expectNumber(extendedRange ? 15 : 6, attack.selectedD20());
+        assertEquals(extendedRange, attack.hit());
+        expectNumber(extendedRange ? 5 : 0, attack.damageAmount());
+        expectNumber(extendedRange ? 8 : 13, battle.monsters().getFirst().hitPoints());
+
+        campaign.combat(Schema2CombatState.Command.action(Kind.END_TURN, archer));
+        var monsterBow = new EntryIdentity(skeleton, "actions", skeleton.moduleKey(), "shortbow");
+        campaign.combat(Schema2CombatState.Command.monsterAttack(target, archer, monsterBow),
+                new CampaignSpaceData.Die(20, 18), new CampaignSpaceData.Die(20, 12), new CampaignSpaceData.Die(6, 3));
+        var response = CampaignSpaceCommands.currentBattle(campaign.state).current().flows().getLast().attacks().getFirst();
+        assertEquals(monsterBow, response.monsterAttack().action());
+        expectNumber(80, response.rangedAttack().normalRangeFeet());
+        assertTrue(response.disadvantage() && response.hit());
+        expectNumber(12, response.selectedD20());
+        expectNumber(5, response.damageAmount());
     }
 
     private void verifyWeaponDamage() {
