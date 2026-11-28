@@ -87,7 +87,7 @@ python3 rule-packages/srd51-runtime/build-bundles.py --check
 ```bash
 candidates="$(mktemp -d)"
 python3 rule-packages/srd51-runtime/build-bundles.py --output-dir "$candidates" dm-runtime-check-variant
-python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.9.0.war \
+python3 -B tools/rule-packages/verify-module-scenario.py --war target/dnd-tool-se-0.10.0.war \
   --module @srd51-runtime --module @srd51-characters --module @srd51-magic \
   --module "$candidates/dm-runtime-check-variant.zip" --case fixed-damage --case skill-check \
   rule-packages/srd51-runtime/scenarios/check-variant.json
@@ -250,7 +250,7 @@ Python、Node.js、Playwright/Chromium 等工具版本。固定干净的 Maven �
    源的一致性及 DRAFT 作者向量。以下为 Bash 示例，Windows 使用对应候选路径及本机 Python。
 
    ```bash
-   war=target/dnd-tool-se-0.9.0.war
+   war=target/dnd-tool-se-0.10.0.war
    scenarios=rule-packages/srd51-runtime/scenarios
    python3 rule-packages/srd51-runtime/build-bundles.py --check
    python3 -B tools/rule-packages/verify-module-scenario.py --war "$war" "$scenarios/standard.json"
@@ -411,7 +411,7 @@ ZIP 原始身份和 SQLite 冻结投影。纯规则、应用消费者和独立�
 生产代码或打包资源变化后，从候选对应源码的根目录运行。使用 Python 3.11+ 和环境中的 JDK 21+（`java`、`javac`、`jdeps`）。
 
 ```bash
-python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.9.0.war
+python3 -B tools/storage/audit-war.py target/dnd-tool-se-0.10.0.war
 ```
 
 保存命令、退出码及 JSON 输出，记录字节数、SHA-256、全部 ZIP 条目数、应用类和嵌套 JAR 数。
@@ -786,6 +786,25 @@ node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable
 ```bash
 mvn '-Dtest=Schema2ObservationRulesTest,Schema2RangedAttackRulesTest,Schema2GoblinRulesTest,PlayerProjectionAndCandidatesTest' test
 mvn '-Dtest=PlayerParticipationAcceptanceTest#goblinHideAndSearchKeepIndependentPlayerViewsThroughReopenAndRollback+sharedClericTargetMustBeSeenAndAnUnseenMoverDoesNotOpenAnOpportunity' test
+```
+
+<a id="surprise-initiative-verification"></a>
+
+#### 遭遇开场、逐人受惊与分组先攻
+
+标准包作者场景 `surprise-initiative` 使用地精隐匿总值 14 对照两名角色的被动察觉 13 和 14，并让两组同类怪物分别掷出同分先攻。核对逐人观察、骰源、同分顺序和每个实例的预算。[作者场景与命令](../rule-packages/srd51-runtime/scenarios/README.md#surprise-initiative)
+
+应用规则用例覆盖独立与共同隐匿、默认警觉、开场预检和首回合边界。SQLite 用例在本人回合结束前后分别保存、结束并重开，核对重试、回滚、实际玩家的同轮借机反应和重新开战。
+
+```bash
+mvn '-Dtest=Schema2EncounterOpeningTest,Schema2SpellSaveDamageRequestDigestTest' test
+mvn '-Dtest=PlayerParticipationAcceptanceTest#openingSurpriseSurvivesReopenAndAllowsSameRoundPlayerReactionAfterOwnTurn' test
+```
+
+按上述玩家测试容器流程在全新隔离根运行浏览器用例。DM 在实际开场表单选择隐匿组与先攻组、调整同分顺序，两名玩家从各自页面核对本人的状态、回合和反应资格。
+
+```bash
+node tools/storage/browser-player-monsters.cjs --fresh-root /absolute/disposable/surprise-store --surprise
 ```
 
 WAR 须额外包含玩家与主持参与界面、局部 QR 编码器、玩家边界/会话/投影/候选类、

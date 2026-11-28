@@ -31,6 +31,7 @@ final class Schema2CombatStateValidator {
                 }
             }
             Set<UUID> ordered=new HashSet<>();for(int i=0;i<b.initiative().size();i++) {Initiative v=b.initiative().get(i);check(actors.contains(v.characterId())&&ordered.add(v.characterId())&&v.ordinal()==i&&v.d20()>=1&&v.d20()<=20&&v.dexterityModifier()>=-5&&v.dexterityModifier()<=10&&v.total()==v.d20()+v.dexterityModifier()&&(i==0||b.initiative().get(i-1).total()>=v.total()));}
+            check(validOpeningState(b));
             Map<UUID,Frame> allFrames=new HashMap<>();Map<UUID,CastAttempt> allCasts=new HashMap<>();Map<UUID,TriggerFact> triggers=new HashMap<>();int active=0;
             Map<UUID,List<TriggerFact>> movementTriggers=new HashMap<>();
             for(TriggerFact t:b.triggerFacts()) {
@@ -114,6 +115,33 @@ final class Schema2CombatStateValidator {
             for(ShieldEffect e:b.shields()) {id(e.effectKey());CastAttempt c=allCasts.get(e.castFrameKey());check(keys.add(e.effectKey())&&reference(actors,e.actorId(),e.status()==EffectStatus.ACTIVE)&&e.startedTurnNumber()>0&&e.expiresAtTurnNumber()>e.startedTurnNumber()&&(e.status()!=EffectStatus.ACTIVE||e.expiresAtTurnNumber()<=e.startedTurnNumber()+actors.size())&&c!=null&&Objects.equals(c.effectKey(),e.effectKey())&&c.actorId().equals(e.actorId())&&e.status()!=null&&((e.status()==EffectStatus.ACTIVE)==(e.endReason()==null)));}
             if(b.status()==Status.ENDED)check(b.concentrationHolders().isEmpty()&&b.shields().stream().noneMatch(e->e.status()==EffectStatus.ACTIVE)&&b.readyPreparations().stream().noneMatch(r->r.status()==ReadyStatus.ARMED||r.status()==ReadyStatus.PREPARING));
         } catch(NullPointerException|NoSuchElementException malformed) {throw invalid("ACTION_FLOW_FROZEN_DATA_INVALID");}
+    }
+
+    static boolean validOpeningState(Battle battle) {
+        if (battle.initiative().isEmpty()) return true;
+        Map<UUID, Initiative> initiative = new HashMap<>();
+        Map<UUID, Combatant> actors = new HashMap<>();
+        Map<UUID, MonsterInstance> monsters = new HashMap<>();
+        for (Initiative entry : battle.initiative()) initiative.put(entry.characterId(), entry);
+        for (Combatant actor : battle.combatants()) actors.put(actor.characterId(), actor);
+        for (MonsterInstance monster : battle.monsters()) monsters.put(monster.monsterId(), monster);
+        for (Initiative entry : battle.initiative()) {
+            UUID id = entry.characterId();
+            Combatant actor = actors.get(id);
+            Initiative source = initiative.get(entry.rollSource());
+            if (actor == null || source == null || !source.characterId().equals(source.rollSource()) || source.d20() != entry.d20())
+                return false;
+            if (!id.equals(source.characterId())) {
+                MonsterInstance member = monsters.get(id), leader = monsters.get(source.characterId());
+                if (member == null || leader == null || !member.monster().equals(leader.monster())
+                        || entry.dexterityModifier() != source.dexterityModifier()
+                        || actor.side() != actors.get(source.characterId()).side()) return false;
+            }
+            if (battle.surprised(id) && (actor.actionsRemaining() != 0 || actor.bonusActionsRemaining() != 0
+                    || actor.reactionAvailable() || actor.movementSpentHalfFeet() != 0 || actor.movementBonus() != 0))
+                return false;
+        }
+        return true;
     }
 
     static boolean validActionBudgets(Combatant actor) {

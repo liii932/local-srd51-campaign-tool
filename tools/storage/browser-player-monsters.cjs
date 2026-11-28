@@ -14,10 +14,11 @@ const wolfName = '林地灰狼';
 async function main() {
   const [flag, storageRoot, scenario] = process.argv.slice(2);
   assert.ok(flag === '--fresh-root' && path.isAbsolute(storageRoot), 'Expected --fresh-root /absolute/disposable/player-store');
-  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation'].includes(scenario),
-    'Expected --movement, --ranged, or --observation');
+  assert.ok(scenario === undefined || ['--movement', '--ranged', '--observation', '--surprise'].includes(scenario),
+    'Expected --movement, --ranged, --observation, or --surprise');
   const ranged = scenario === '--ranged';
   const observation = scenario === '--observation';
+  const surprise = scenario === '--surprise';
   const monsterName = observation ? '林间哥布林' : ranged ? '林间骷髅' : wolfName;
   const root = await fs.realpath(storageRoot);
   const repo = await fs.realpath(path.join(__dirname, '../..'));
@@ -69,10 +70,10 @@ async function main() {
       if (memberId) await host.locator('#host-player-share-members input[value="' + memberId + '"]').check();
       await governance('share', () => submit(form));
     }
-    async function playerCommand(label) {
+    async function playerCommand(label, page = attacker) {
       const [response] = await Promise.all([
-        attacker.waitForResponse(r => r.url() === playerOrigin + '/api/player/command'),
-        attacker.getByRole('button', {name: label}).click()
+        page.waitForResponse(r => r.url() === playerOrigin + '/api/player/command'),
+        page.getByRole('button', {name: label}).click()
       ]);
       assert.equal(response.status(), 200);
       return (await response.json()).receipt;
@@ -81,7 +82,7 @@ async function main() {
     await host.goto(hostOrigin + '/host/storage');
     await waitForStorageReady(host);
     assert.equal((await readHost()).storage.state, 'IDLE');
-    await field('storage-create', 'name').fill(observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收');
+    await field('storage-create', 'name').fill(surprise ? '受惊与分组先攻验收' : observation ? '玩家观测与掩护验收' : ranged ? '玩家远程验收' : '玩家近战验收');
     await hostAction('create', () => host.locator('#storage-create button[type="submit"]').click());
     const fighters = [];
     for (const name of ['巡林战士', '营地战士']) {
@@ -121,12 +122,19 @@ async function main() {
         : [[fighters[0], 1, 1, 0], [monster, 2, 1, 1], [fighters[1], 3, 3, 0]];
     const secondWolfName = '营地灰狼';
     let secondWolf;
-    if (scenario === '--movement') {
-      await field('domain-monster-create', 'name').fill(secondWolfName);
-      await selectRule('domain-monster-create', 'monster', 'monster.wolf');
-      const result = await domainAction('domain-monster-create');
-      secondWolf = result.campaign.domain.space.monsters.find(m => m.name === secondWolfName).id;
-      placements.push([secondWolf, 1, 2, 1]);
+    const wolfNames = [wolfName], wolves = [monster];
+    if (scenario === '--movement' || surprise) {
+      const additional = surprise ? [secondWolfName, '溪边灰狼', '岩地灰狼'] : [secondWolfName];
+      for (const [index, name] of additional.entries()) {
+        await field('domain-monster-create', 'name').fill(name);
+        await selectRule('domain-monster-create', 'monster', 'monster.wolf');
+        const result = await domainAction('domain-monster-create');
+        const id = result.campaign.domain.space.monsters.find(m => m.name === name).id;
+        wolfNames.push(name);
+        wolves.push(id);
+        placements.push([id, 1 + index, 2, 1]);
+      }
+      secondWolf = wolves[1];
     }
     if (ranged) await field('domain-scene-create', 'width').fill('20');
     const scene = await createScene(host, hostAction, '林间空地', 'RULES');
@@ -156,6 +164,7 @@ async function main() {
     }
     assert.notEqual(members[0], members[1]);
     await attacker.locator('#player-takeover').click();
+    if (surprise) await observer.locator('#player-takeover').click();
     await host.getByText('共享给谁看', {exact: true}).click();
     await share('SCENE', scene, 'ALL');
     await share('MONSTER', monster, 'SELECTED', members[0]);
@@ -184,6 +193,132 @@ async function main() {
       for (let i = 0; i < battle().initiative.length && active() !== id; i++) await endTurn();
       assert.equal(active(), id);
     };
+    if (surprise) {
+      const combat = 'domain-combat', kind = field(combat, 'kind');
+      const openingOptions = host.locator('#domain-opening');
+      const row = name => openingOptions.locator('.opening-participant').filter({has: host.getByText(name, {exact: true})});
+      const history = () => state.campaign.domain.combats.find(c => c.current.combatId === scene);
+      const openingEvent = () => history().events.findLast(event => event.command.kind === 'REENTER_COMBAT');
+      const summary = host.locator('#domain-combat-summary');
+      const ownCard = page => page.locator('#player-cards .character-card');
+      const openingBudget = async page => (await readPlayer(page)).view.cards[0].turnBudget;
+      assert.equal(openingEvent().command.opening, null);
+      assert.ok(battle().initiative.every(entry => !entry.surprised && entry.rollSource === entry.characterId));
+      assert.equal(openingEvent().resolution.rolls.filter(roll => roll.purpose === 'INITIATIVE').length, 6);
+
+      let victim;
+      let attempts = 0;
+      // Use real dice. Retry a full setup if this contest leaves both players alert or only the last entrant surprised.
+      while (!victim && attempts++ < 16) {
+        await kind.selectOption('END_COMBAT');
+        state = await domainAction(combat);
+        await kind.selectOption('REENTER_COMBAT');
+        await openingOptions.locator('summary').click();
+        assert.deepEqual(errors, []);
+        assert.deepEqual((await openingOptions.locator('.opening-participant > strong').allTextContents()).sort(),
+          [...wolfNames, '巡林战士', '营地战士'].sort());
+        const pick = (name, label, option) => row(name).getByLabel(label, {exact: true}).selectOption({label: option});
+        await pick(wolfNames[0], '开场隐匿', '共同隐匿 · 组 1');
+        if (attempts === 1) {
+          await submit(combat);
+          await host.locator('#storage-message').filter({hasText: '共同隐匿至少需要两名同组成员'}).waitFor();
+          const untouched = (await readHost()).campaign.domain.combats.find(c => c.current.combatId === scene);
+          assert.equal(untouched.current.status, 'EXPLORATION');
+          assert.equal(untouched.events.length, history().events.length);
+        }
+        for (const name of wolfNames.slice(1)) await pick(name, '开场隐匿', '共同隐匿 · 组 1');
+        await pick('营地战士', '开场隐匿', '独立隐匿');
+        for (const [index, name] of wolfNames.entries())
+          await pick(name, '先攻掷骰', `共同先攻 · 组 ${index < 2 ? 1 : 2}`);
+        await pick(wolfNames[1], '同分顺位', '1');
+        const original = await row(wolfNames[0]).getByLabel('同分顺位', {exact: true}).inputValue();
+        assert.ok(Number(original) > 1);
+
+        const [request, started] = await Promise.all([
+          host.waitForRequest(r => r.url() === hostOrigin + '/api/host/storage/domain' && r.method() === 'POST'),
+          domainAction(combat)
+        ]);
+        state = started;
+        const sent = JSON.parse(new URLSearchParams(request.postData()).get('payload')).command.opening;
+        assert.deepEqual(Object.keys(sent).sort(), ['initiativeGroups', 'stealthGroups', 'type']);
+        for (const group of [...sent.stealthGroups, ...sent.initiativeGroups])
+          assert.deepEqual(Object.keys(group).sort(), ['members', 'type']);
+        const event = openingEvent(), {command, resolution} = event;
+        const groupMembers = groups => groups.map(group => group.members.slice().sort()).sort();
+        assert.deepEqual(groupMembers(command.opening.stealthGroups), [[...wolves].sort(), [fighters[1]]].sort());
+        assert.deepEqual(groupMembers(command.opening.initiativeGroups), [wolves.slice(0, 2).sort(), wolves.slice(2).sort()].sort());
+        assert.equal(command.tieBreakOrder[0], secondWolf);
+        const initiative = id => battle().initiative.find(entry => entry.characterId === id);
+        assert.equal(initiative(wolves[0]).rollSource, initiative(wolves[1]).rollSource);
+        assert.equal(initiative(wolves[2]).rollSource, initiative(wolves[3]).rollSource);
+        assert.notEqual(initiative(wolves[0]).rollSource, initiative(wolves[2]).rollSource);
+        assert.equal(initiative(wolves[0]).d20, initiative(wolves[1]).d20);
+        assert.ok(initiative(secondWolf).ordinal < initiative(monster).ordinal);
+        assert.equal(resolution.rolls.filter(roll => roll.purpose === 'INITIATIVE').length, 4);
+        assert.equal(resolution.rolls.filter(roll => roll.purpose === 'OPENING_STEALTH').length, 2);
+        const checks = resolution.after.observation.checks.filter(check => check.openingOperationId === event.operationId);
+        const wolfChecks = checks.filter(check => wolves.includes(check.actorId));
+        assert.equal(wolfChecks.length, 4);
+        assert.equal(new Set(wolfChecks.map(check => check.rollSource)).size, 1);
+        assert.equal(new Set(wolfChecks.map(check => check.roll.firstD20)).size, 1);
+        for (const [id, x, y] of placements) assert.deepEqual(actor(id).position, {x, y});
+        victim = battle().initiative.find(entry => entry.surprised && fighters.includes(entry.characterId)
+          && entry.ordinal < battle().initiative.length - 1);
+      }
+      assert.ok(victim, 'Expected a surprised PC to receive a first turn before the round ends');
+      const victimPage = seats[fighters.indexOf(victim.characterId)];
+      await summary.getByText('先攻顺序与开场状态', {exact: true}).click();
+      assert.equal(await summary.locator('.opening-initiative tbody tr').filter({hasText: '共用'}).count(), 4);
+      await summary.locator('.opening-initiative tbody tr').filter({hasText: '开场受惊'}).first().waitFor();
+      await host.locator('#campaign-log-toggle').click();
+      await host.locator('#storage-history > li').last().filter({hasText: '开场隐匿'}).filter({hasText: '共用'}).waitFor();
+      await host.locator('#campaign-log-close').click();
+      await ownCard(victimPage).locator('.turn-surprise').filter({hasText: '结束该回合后即可反应'}).waitFor();
+      await advanceTo(victim.characterId);
+      await victimPage.locator('#player-actions button:enabled').filter({hasText: '结束我的回合'}).waitFor();
+      const playerBefore = await readPlayer(victimPage);
+      assert.deepEqual(playerBefore.view.candidates.map(candidate => candidate.label), ['结束我的回合']);
+      assert.deepEqual(await openingBudget(victimPage), {actionsRemaining: 0, bonusActionsRemaining: 0,
+        reactionAvailable: false, movementRemainingHalfFeet: 0, surprised: true});
+      const privateView = JSON.stringify((await readPlayer(victimPage)).view);
+      assert.ok(!/openingOperationId|initiativeGroups|stealthGroups|rollSource|OPENING_STEALTH|opposingScore/.test(privateView));
+      await playerCommand(/^结束我的回合/, victimPage);
+      state = await readHost();
+      await waitForHistoryCount(host, state.campaign.domain.roots.length);
+      assert.equal(battle().round, 1);
+      assert.equal(state.campaign.domain.roots.at(-1).actor.memberId, members[seats.indexOf(victimPage)]);
+      assert.equal(history().turnBudgets[victim.characterId].reactionAvailable, true);
+      await ownCard(victimPage).locator('.turn-surprise').waitFor({state: 'detached'});
+      await ownCard(victimPage).locator('.turn-budget').filter({hasText: '反应可用'}).waitFor();
+      assert.equal((await openingBudget(victimPage)).surprised, false);
+      const firstGroupActors = battle().initiative.filter(entry => wolves.slice(0, 2).includes(entry.characterId));
+      await advanceTo(firstGroupActors[0].characterId);
+      const other = firstGroupActors[1].characterId;
+      if (history().turnBudgets[active()].surprised) {
+        await endTurn();
+        await advanceTo(firstGroupActors[0].characterId);
+      }
+      const otherBefore = actor(other);
+      await kind.selectOption('DASH');
+      state = await domainAction(combat);
+      assert.equal(actor(active()).actionsRemaining, 0);
+      assert.deepEqual(actor(other), otherBefore);
+      await endTurn();
+      await advanceTo(other);
+      if (history().turnBudgets[other].surprised) {
+        await endTurn();
+        await advanceTo(other);
+      }
+      assert.equal(actor(other).actionsRemaining, 1);
+      assert.equal(openingEvent().resolution.after.monsters.length, wolves.length);
+      await assertMonsterHiddenFromObserver();
+      await hostAction('end', () => host.locator('#storage-end').click());
+      assert.equal((await readHost()).storage.state, 'IDLE');
+      assert.deepEqual(errors, []);
+      console.log(JSON.stringify({result: 'PASSED', playerSessions: seats.length, independentInitiative: true,
+        initiativeGroups: 2, surpriseAttempts: attempts, firstTurnPassed: true, reactionRecoveredInRound: 1}));
+      return;
+    }
     if (observation) {
       const combatForm = 'domain-combat';
       const terrainForm = 'domain-observation-cell';
@@ -386,7 +521,7 @@ async function main() {
       await playerCommand(new RegExp('攻击 ' + secondWolfName));
       assert.equal((await playerBudget()).bonusActionsRemaining, 1);
       await playerCommand(/回气（附赠动作）/);
-      assert.deepEqual(await playerBudget(), {actionsRemaining: 0, bonusActionsRemaining: 0, reactionAvailable: true, movementRemainingHalfFeet: 60});
+      assert.deepEqual(await playerBudget(), {actionsRemaining: 0, bonusActionsRemaining: 0, reactionAvailable: true, movementRemainingHalfFeet: 60, surprised: false});
       await attacker.locator('#player-cards .turn-budget').filter({hasText: '普通动作 0 · 附赠动作 0'}).waitFor();
       state = await readHost();
       while (active() !== wolf) await endTurn();

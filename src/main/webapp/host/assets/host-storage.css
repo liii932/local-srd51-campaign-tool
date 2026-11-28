@@ -124,6 +124,14 @@ th { color: var(--accent); white-space: normal; }
 .deployment label { min-width: 0; }
 .deployment label:first-child { overflow-wrap: anywhere; }
 #domain-combat-summary, #domain-pending { display: grid; gap: 16px; margin: 16px 0; }
+#domain-opening { margin: 14px 0; padding: 9px 12px; border: 2px solid var(--border); border-radius: 3px; background: var(--paper); }
+#domain-opening p { font-size: .86rem; }
+.opening-participant { padding-block: 8px; border-top: 1px solid var(--border); }
+.opening-participant > strong { overflow-wrap: anywhere; }
+.opening-participant > small { display: block; color: var(--muted); }
+.opening-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 105px), 1fr)); gap: 8px; }
+.opening-choices label { margin: 4px 0; }
+.opening-choices select { padding: 5px; }
 #domain-pending-section { scroll-margin-top: 90px; }
 #domain-pending .card { border-color: var(--accent); background: var(--paper); }
 #domain-pending .actions { margin: 12px 0; }

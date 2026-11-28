@@ -36,6 +36,7 @@ final class CampaignCombatView {
         budget.addProperty("bonusActionsRemaining", actor.bonusActionsRemaining());
         budget.addProperty("reactionAvailable", actor.reactionAvailable());
         budget.addProperty("movementRemainingHalfFeet", actor.remainingMovementHalfFeet(speed));
+        budget.addProperty("surprised", battle.surprised(actor.characterId()));
         return budget;
     }
 

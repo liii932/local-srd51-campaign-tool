@@ -54,6 +54,8 @@ import com.dndtool.service.Schema2CombatState.Kind;
 import com.dndtool.service.Schema2CombatState.MeleeInput;
 import com.dndtool.service.Schema2CombatState.MonsterDeployment;
 import com.dndtool.service.Schema2CombatState.ObservationCellInput;
+import com.dndtool.service.Schema2CombatState.OpeningGroup;
+import com.dndtool.service.Schema2CombatState.OpeningInput;
 import com.dndtool.service.Schema2CombatState.Position;
 
 /** Authored expectations for the SRD 5.1 runtime combinations. */
@@ -103,6 +105,7 @@ public final class BundledSrd51Scenarios {
                 scenario("monster-turn-movement", BundledSrd51Scenarios::verifyMonsterTurnMovement),
                 scenario("monster-breath-profile", BundledSrd51Scenarios::verifyMonsterBreathProfile),
                 scenario("observer-hiding", BundledSrd51Scenarios::verifyObserverHiding),
+                scenario("surprise-initiative", BundledSrd51Scenarios::verifySurpriseInitiative),
                 scenario("rule-origins", BundledSrd51Scenarios::verifyRuleOrigins),
                 scenario("wizard-evocation", BundledSrd51Scenarios::verifyWizardEvocation),
                 scenario("burning-hands", BundledSrd51Scenarios::verifyBurningHands)));
@@ -973,6 +976,85 @@ public final class BundledSrd51Scenarios {
         assertTrue(Schema2ObservationRules.visible(searched, wizard, goblin));
         expectNumber(0, activeCombatant(searched).actionsRemaining());
         expectNumber(1, activeCombatant(searched).bonusActionsRemaining());
+    }
+
+    private void verifySurpriseInitiative() {
+        UUID campaign = UUID.randomUUID(), lookout = UUID.randomUUID(), scout = UUID.randomUUID();
+        UUID goblin = UUID.randomUUID(), partner = UUID.randomUUID();
+        UUID skeleton = UUID.randomUUID(), secondSkeleton = UUID.randomUUID();
+        var identity = Schema2PreparationIdentity.random();
+        var roster = Map.of(lookout, openingFighter(campaign, lookout, identity, "ability.intelligence"),
+                scout, openingFighter(campaign, scout, identity, "ability.dexterity"));
+        var characters = List.of(new Deployment(lookout, new Position(0, 0), 0), new Deployment(scout, new Position(0, 1), 0));
+        var goblinRule = rules.rule("adventure.monster", "monster.goblin");
+        var skeletonRule = rules.rule("adventure.monster", "monster.skeleton");
+        var firstGoblin = new MonsterDeployment(goblin, goblinRule, new Position(3, 0), 1);
+        var combat = new Schema2CombatRules();
+        var single = Schema2CombatState.Command.start(characters, List.of(firstGoblin), List.of(lookout, scout, goblin))
+                .withOpening(new OpeningInput(List.of(new OpeningGroup(List.of(goblin))), List.of()));
+        var first = resolveOpening(combat, campaign, roster, single, List.of(8, 19, 12, 1)).after();
+        var check = first.observation().checks().getFirst();
+        expectNumber(14, check.roll().total());
+        var passive = new HashMap<UUID, Integer>();
+        check.contests().forEach(contest -> passive.put(contest.counterpartId(), contest.opposingScore()));
+        assertEquals(Map.of(lookout, 13, scout, 14), passive);
+        assertEquals(lookout, first.activeActor());
+        assertTrue(first.surprised(lookout) && !first.surprised(scout));
+        assertTrue(!Schema2ObservationRules.visible(first, lookout, goblin) && Schema2ObservationRules.visible(first, scout, goblin));
+        var afterTurn = meleeStep(combat, roster, first, Schema2CombatState.Command.action(Kind.END_TURN, lookout), List.of());
+        expectNumber(1, afterTurn.round());
+        assertTrue(!afterTurn.surprised(lookout));
+        assertTrue(afterTurn.combatants().stream().filter(actor -> actor.characterId().equals(lookout)).findFirst().orElseThrow().reactionAvailable());
+
+        var goblins = new OpeningGroup(List.of(goblin, partner));
+        var skeletons = new OpeningGroup(List.of(skeleton, secondSkeleton));
+        var monsters = List.of(firstGoblin, new MonsterDeployment(partner, goblinRule, new Position(3, 1), 1),
+                new MonsterDeployment(skeleton, skeletonRule, new Position(4, 0), 1),
+                new MonsterDeployment(secondSkeleton, skeletonRule, new Position(4, 1), 1));
+        var ties = List.of(lookout, scout, secondSkeleton, skeleton, partner, goblin);
+        var grouped = Schema2CombatState.Command.start(characters, monsters, ties)
+                .withOpening(new OpeningInput(List.of(goblins), List.of(goblins, skeletons)));
+        var result = resolveOpening(combat, campaign, roster, grouped, List.of(8, 19, 2, 9, 9));
+        var battle = result.after();
+        assertEquals(List.of(lookout, scout, goblin, skeleton), result.rolls().stream()
+                .filter(roll -> roll.purpose().equals("INITIATIVE")).map(Schema2CombatState.Roll::subjectId).toList());
+        assertEquals(List.of(lookout, secondSkeleton, skeleton, partner, goblin, scout),
+                battle.initiative().stream().map(Schema2CombatState.Initiative::characterId).toList());
+        for (var group : List.of(goblins, skeletons)) for (UUID member : group.members()) {
+            var row = battle.initiative().stream().filter(entry -> entry.characterId().equals(member)).findFirst().orElseThrow();
+            assertEquals(group.members().getFirst(), row.rollSource());
+            expectNumber(9, row.d20());
+            expectNumber(11, row.total());
+        }
+        expectNumber(2, battle.observation().checks().size());
+        for (var hidden : battle.observation().checks()) {
+            assertEquals(goblin, hidden.rollSource());
+            expectNumber(14, hidden.roll().total());
+        }
+        assertTrue(!battle.surprised(lookout) && !Schema2ObservationRules.visible(battle, lookout, goblin));
+    }
+
+    private Schema2CombatRules.Context openingFighter(UUID campaign, UUID id, Schema2PreparationIdentity identity,
+            String exchangeWithWisdom) {
+        var plan = rules.initialPlan(campaign, id, identity, "fighter", "acolyte");
+        var abilities = new HashMap<>(ARRAY);
+        abilities.put("ability.wisdom", ARRAY.get(exchangeWithWisdom));
+        abilities.put(exchangeWithWisdom, ARRAY.get("ability.wisdom"));
+        var state = new Schema2CharacterProgressionRules().initial(rules.projection(), plan, UUID.randomUUID(), abilities,
+                rules.initialChoices("fighter"));
+        return new Schema2CombatRules.Context(rules.projection(), plan, state);
+    }
+
+    private static Schema2CombatState.Resolution resolveOpening(Schema2CombatRules combat, UUID campaign,
+            Map<UUID, Schema2CombatRules.Context> roster, Schema2CombatState.Command command, List<Integer> raw) {
+        var dice = new ArrayDeque<>(raw);
+        var prepared = combat.preflight(UUID.randomUUID(), UUID.randomUUID(), campaign, roster, null, command);
+        var result = combat.resolve(prepared, sides -> {
+            expectNumber(20, sides);
+            return dice.removeFirst();
+        });
+        assertTrue(dice.isEmpty());
+        return result;
     }
 
     private void verifyMonsterTurnMovement() {

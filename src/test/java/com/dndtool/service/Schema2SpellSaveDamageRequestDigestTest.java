@@ -85,6 +85,27 @@ class Schema2SpellSaveDamageRequestDigestTest {
         assertNotEquals(reaction, request(Command.monsterOpportunityAttack(id(4), bite, id(12), id(13), id(14), id(16))).digest());
     }
 
+    @Test void openingDigestBindsEachGroupAndItsRollSource() {
+        var comrades = new OpeningGroup(List.of(id(4), id(5)));
+        var reversed = new OpeningGroup(List.of(id(5), id(4)));
+        var independent = List.of(new OpeningGroup(List.of(id(4))), new OpeningGroup(List.of(id(5))));
+        var start = Command.reenter(id(4), List.of(id(4), id(5)));
+        assertEquals(request(start).digest(),
+                request(start.withOpening(new OpeningInput(List.of(), List.of()))).digest());
+
+        var shared = new OpeningInput(List.of(comrades), List.of(comrades));
+        String digest = request(start.withOpening(shared)).digest();
+        assertNotEquals(request(start).digest(), digest);
+        for (OpeningInput other : List.of(
+                new OpeningInput(independent, List.of(comrades)),
+                new OpeningInput(List.of(reversed), List.of(comrades)),
+                new OpeningInput(List.of(comrades), List.of(reversed)),
+                new OpeningInput(List.of(), List.of(comrades)),
+                new OpeningInput(List.of(comrades), List.of()))) {
+            assertNotEquals(digest, request(start.withOpening(other)).digest());
+        }
+    }
+
     private static Command choice(ContestSkill skill, Integer ordinal) {
         return Command.melee(Kind.CHOOSE_MELEE_DEFENSE, id(4), null, id(12), id(13),
                 new MeleeInput(null, ordinal, null, null, skill, null));

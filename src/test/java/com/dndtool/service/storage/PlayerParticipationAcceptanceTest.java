@@ -683,6 +683,207 @@ class PlayerParticipationAcceptanceTest {
         }
     }
 
+    @Test void openingSurpriseSurvivesReopenAndAllowsSameRoundPlayerReactionAfterOwnTurn() throws Exception {
+        var dice = new ScriptedDice();
+        var failAfterUpdate = new AtomicBoolean();
+        try (Fixture f = new Fixture("opening-surprise", dice, boundary -> {
+            if (boundary == CampaignStorageService.Boundary.AFTER_CHARACTER_UPDATE && failAfterUpdate.getAndSet(false))
+                throw new IllegalStateException("opening transaction failure");
+        })) {
+            UUID lower = f.character("察觉十三的战士", "PC"), higher = f.character("察觉十四的战士", "PC");
+            f.acquire(lower, true);
+            for (int level = 2; level <= 4; level++) {
+                var subclass = level == 3 ? f.rules.rule("character.subclass", "subclass.champion") : null;
+                var increases = level == 4 ? Map.of("ability.wisdom", 2) : Map.<String, Integer>of();
+                f.characterCommand(higher, new Schema2CharacterRuntime.Command("CHARACTER_ADVANCED", null, 0, null,
+                        "FIXED_AVERAGE", f.rules.rule("character.class", "class.fighter"),
+                        new Schema2CharacterRuntime.GrowthChoices(subclass, increases, null, Map.of())));
+            }
+            UUID world = PlayerSpaceFixture.placeAtWorld(f.storage, lower, higher);
+            String scoutName = "开场斥候", guardName = "只向观察玩家共享的伏兵";
+            UUID scout = f.monster(scoutName, "monster.goblin"), guard = f.monster(guardName, "monster.goblin");
+            UUID scene = f.createScene(world);
+            Position scoutStart = new Position(2, 1), guardStart = new Position(2, 3);
+            f.enterScene(scene, List.of(new Deployment(scout, scoutStart, 1), new Deployment(lower, new Position(2, 2), 0),
+                    new Deployment(guard, guardStart, 1), new Deployment(higher, new Position(8, 8), 0)));
+            Seat owner = f.approve("首轮错愕的玩家"), witness = f.approve("发现伏兵的玩家");
+            f.assign(lower, owner.member);
+            f.assign(higher, witness.member);
+            f.share(ShareKind.SCENE, scene, true, owner.member, witness.member);
+            f.share(ShareKind.MONSTER, scout, true, owner.member, witness.member);
+            f.share(ShareKind.MONSTER, guard, true, witness.member);
+            f.takeover(owner);
+            f.takeover(witness);
+
+            var ties = List.of(scout, lower, guard, higher);
+            var opener = Command.reenter(lower, ties).withOpening(new OpeningInput(
+                    List.of(new OpeningGroup(List.of(scout, guard))), List.of(new OpeningGroup(List.of(guard, scout)))));
+            var before = f.storage.accessSnapshot();
+            JsonObject openingInput = combatInput(before, opener);
+            String request = uuid();
+            var badGroup = opener.withOpening(new OpeningInput(List.of(new OpeningGroup(List.of(scout, higher))), List.of()));
+            rejectCombat(f, badGroup, null, "DOMAIN_REJECTED", "S2_COMBAT_OPENING_GROUP");
+            rejectCombat(f, opener, Actor.player(owner.member, lower), "PLAYER_COMMAND_FORBIDDEN", null);
+            assertEquals("STALE_REVISION", assertThrows(StorageException.class, () -> f.storage.domainCommand(
+                    uuid(), before.epoch(), before.revision() - 1, "combat-command", openingInput)).code());
+            assertEquals(before, f.storage.accessSnapshot());
+
+            failAfterUpdate.set(true);
+            dice.add(8, 15, 16, 6);
+            assertEquals("opening transaction failure", assertThrows(IllegalStateException.class, () ->
+                    f.storage.domainCommand(request, before.epoch(), before.revision(), "combat-command", openingInput)).getMessage());
+            assertTrue(dice.isEmpty());
+            assertEquals(before, f.storage.accessSnapshot());
+            Actor openerActor = CampaignParticipationCommands.actualActor(before.snapshot().domains(), "combat-command", openingInput);
+            assertTrue(f.storage.exactDomainReceipt(request, before.runId(), before.revision(), "combat-command",
+                    openingInput, openerActor, access -> {}).isEmpty());
+            dice.add(8, 15, 16, 6);
+            var accepted = f.storage.domainCommand(request, before.epoch(), before.revision(), "combat-command", openingInput);
+            assertFalse(accepted.lastCommand().replayed());
+            assertTrue(dice.isEmpty());
+            var committed = f.storage.accessSnapshot();
+            var openingRoot = lastRoot(f);
+            var openingEvent = f.state().combats().getFirst().events().getLast();
+            var replay = f.storage.domainCommand(request, before.epoch(), before.revision(), "combat-command", openingInput);
+            assertTrue(replay.lastCommand().replayed());
+            assertEquals(openingRoot, f.storage.exactDomainReceipt(request, before.runId(), before.revision(), "combat-command",
+                    openingInput, openerActor, access -> {}).orElseThrow());
+            assertEquals(committed, f.storage.accessSnapshot());
+            assertEquals(List.of(new Roll("OPENING_STEALTH", scout, 20, 8), new Roll("INITIATIVE", guard, 20, 15),
+                    new Roll("INITIATIVE", lower, 20, 16), new Roll("INITIATIVE", higher, 20, 6)), openingEvent.resolution().rolls());
+            assertEquals(List.of(8, 15, 16, 6), openingRoot.rolls().stream().map(CampaignSpaceData.Die::value).toList());
+            assertEquals(ties, f.battle().initiative().stream().map(Initiative::characterId).toList());
+            assertEquals(List.of(guard, lower, guard, higher), f.battle().initiative().stream().map(Initiative::rollSource).toList());
+            assertTrue(f.battle().surprised(lower));
+            assertFalse(f.battle().surprised(higher));
+            assertFalse(f.actor(lower).reactionAvailable());
+            var checks = f.battle().observation().checks();
+            assertEquals(List.of(scout, guard), checks.stream().map(ObservationCheck::actorId).toList());
+            for (var check : checks) {
+                assertEquals(scout, check.rollSource());
+                assertEquals(openingRoot.operationId(), check.openingOperationId());
+                assertEquals(14, check.roll().total());
+                assertTrue(check.contests().contains(new ObservationContest(lower, 13, null, true)));
+                assertTrue(check.contests().contains(new ObservationContest(higher, 14, null, false)));
+            }
+            var ownerView = f.view(owner);
+            assertObserverRow(ownerView, scoutName, scoutStart, true, false);
+            assertAbsent(ownerView, guardName, guard, "2, 3", "rollSource", "openingOperationId", "OPENING_STEALTH", "initiativeGroups");
+            var witnessView = f.view(witness);
+            assertObserverRow(witnessView, scoutName, scoutStart, false, true);
+            assertObserverRow(witnessView, guardName, guardStart, false, false);
+            assertAbsent(witnessView, "\"surprised\":true", "rollSource", "openingOperationId");
+            var forgedOpenings = forgedOpeningFiles(f, lower, guard);
+
+            Position revealed = new Position(4, 1);
+            f.combat(f.battle(), Command.move(scout, List.of(new Position(3, 1), revealed)));
+            assertNull(f.battle().activeFlow(), "the visible scout leaves reach before the surprised fighter has reacted");
+            assertObserverRow(f.view(owner), scoutName, revealed, false, true);
+            assertTrue(f.battle().surprised(lower), "visibility and the opening restriction advance independently");
+            f.endTurn();
+            assertEquals(lower, f.battle().activeActor());
+            assertTrue(f.battle().surprised(lower));
+            var budget = f.view(owner).getAsJsonArray("cards").get(0).getAsJsonObject().getAsJsonObject("turnBudget");
+            assertEquals(0, budget.get("actionsRemaining").getAsInt());
+            assertEquals(0, budget.get("bonusActionsRemaining").getAsInt());
+            assertFalse(budget.get("reactionAvailable").getAsBoolean());
+            assertEquals(0, budget.get("movementRemainingHalfFeet").getAsInt());
+            assertTrue(budget.get("surprised").getAsBoolean());
+            rejectCombat(f, Command.action(Kind.BEGIN_ATTACK, lower), null, "DOMAIN_REJECTED", "S2_COMBAT_ACTION_UNAVAILABLE");
+            rejectCombat(f, Command.action(Kind.SECOND_WIND, lower), null, "DOMAIN_REJECTED", "S2_COMBAT_BONUS_ACTION_UNAVAILABLE");
+            rejectCombat(f, Command.move(lower, List.of(new Position(1, 2))), null, "DOMAIN_REJECTED", "S2_COMBAT_MOVEMENT_ALLOWANCE");
+            rejectCombat(f, Command.action(Kind.DROP_PRONE, lower), null, "DOMAIN_REJECTED", "S2_COMBAT_ACTOR_SURPRISED");
+            assertTrue(labels(f.view(owner)).contains("结束我的回合"));
+            assertTrue(labels(f.view(owner)).stream().noneMatch(label -> label.startsWith("移动")
+                    || label.startsWith("开始攻击动作") || label.contains("回气") || label.contains("借机攻击")));
+
+            finishAndOpen(f, forgedOpenings);
+            assertTrue(f.battle().surprised(lower));
+            assertEquals(openingEvent, f.state().combats().getFirst().events().stream()
+                    .filter(event -> event.operationId().equals(openingEvent.operationId())).findFirst().orElseThrow());
+            f.endTurn();
+            assertEquals(1, f.battle().round());
+            assertEquals(guard, f.battle().activeActor());
+            assertFalse(f.battle().surprised(lower));
+            assertTrue(f.actor(lower).reactionAvailable());
+
+            finishAndOpen(f);
+            assertFalse(f.battle().surprised(lower));
+            assertTrue(f.actor(lower).reactionAvailable());
+            f.invitation = f.host("invite", object()).get("invitation").getAsString();
+            Seat restoredOwner = f.approve("重开后核对持剑玩家", owner.member);
+            Seat restoredWitness = f.approve("重开后核对观察玩家", witness.member);
+            f.takeover(restoredOwner);
+            f.takeover(restoredWitness);
+            f.share(ShareKind.MONSTER, guard, true, restoredOwner.member, restoredWitness.member);
+            f.combat(f.battle(), Command.move(guard, List.of(new Position(3, 3), new Position(4, 3))));
+            var reaction = f.battle().activeFlow().windows().getFirst().opportunities().getFirst();
+            assertEquals(lower, reaction.actorId());
+            var candidate = f.option(restoredOwner, "借机攻击");
+            assertTrue(labels(f.view(restoredWitness)).stream().noneMatch(label -> label.startsWith("借机攻击")));
+            var reactionRequest = f.command(restoredOwner, candidate);
+            dice.add(1);
+            var response = f.post(restoredOwner, "command", reactionRequest);
+            assertReceipt("ACCEPTED", response);
+            assertEquals(Actor.player(restoredOwner.member, lower), lastRoot(f).actor());
+            assertEquals(List.of(new CampaignSpaceData.Die(20, 1)), lastRoot(f).rolls());
+            assertFalse(f.actor(lower).reactionAvailable());
+            assertEquals(response.body().get("receipt"), f.post(restoredOwner, "receipt", receiptIdentity(reactionRequest)).body().get("receipt"));
+            assertAbsent(response.body(), guard, "openingOperationId", "OPENING_STEALTH", "rollSource");
+            var decided = f.battle().activeFlow();
+            f.combat(f.battle(), Command.continuation(guard, decided.flowKey(), decided.leafFrameKey(),
+                    decided.windows().getFirst().windowKey()));
+            f.combat(f.battle(), Command.action(Kind.END_COMBAT, guard));
+            dice.add(12, 13, 14, 15);
+            f.combat(f.battle(), Command.reenter(lower, ties));
+            assertTrue(f.battle().initiative().stream().noneMatch(Initiative::surprised));
+            assertTrue(f.battle().initiative().stream().allMatch(entry -> entry.characterId().equals(entry.rollSource())));
+            assertEquals(checks, f.battle().observation().checks());
+            assertTrue(dice.isEmpty());
+        }
+    }
+
+    private static List<byte[]> forgedOpeningFiles(Fixture f, UUID surprised, UUID leader) {
+        byte[] original = new CampaignCodec().encode(new CampaignData.Document(uuid(), f.storage.accessSnapshot().snapshot()));
+        List<byte[]> files = new ArrayList<>();
+        for (String field : List.of("surprised", "rollSource", "opposingScore", "rootRoll")) {
+            var forged = CampaignJson.read(original);
+            var domains = forged.getAsJsonObject("domains");
+            var history = domains.getAsJsonArray("combats").get(0).getAsJsonObject();
+            var after = history.getAsJsonArray("events").asList().getLast().getAsJsonObject()
+                    .getAsJsonObject("resolution").getAsJsonObject("after");
+            if (field.equals("rootRoll")) {
+                domains.getAsJsonArray("roots").asList().getLast().getAsJsonObject()
+                        .getAsJsonArray("rolls").get(0).getAsJsonObject().addProperty("value", "7");
+            } else {
+                for (var battle : List.of(history.getAsJsonObject("current"), after))
+                    forgeOpeningField(battle, field, surprised, leader);
+            }
+            var integrity = forged.remove("integrity").getAsJsonObject();
+            forged.addProperty("fileKey", uuid());
+            integrity.addProperty("digest", CampaignJson.digest(CampaignCodec.FILE_DIGEST_DOMAIN, CampaignJson.canonical(forged)));
+            forged.add("integrity", integrity);
+            files.add(CampaignJson.canonical(forged));
+        }
+        return files;
+    }
+
+    private static void forgeOpeningField(JsonObject battle, String field, UUID surprised, UUID leader) {
+        if (field.equals("opposingScore")) {
+            var checks = battle.getAsJsonObject("observation").getAsJsonArray("checks");
+            for (var check : checks.asList()) for (var contest : check.getAsJsonObject().getAsJsonArray("contests").asList()) {
+                var row = contest.getAsJsonObject();
+                if (row.get("counterpartId").getAsString().equals(surprised.toString())) row.addProperty(field, "12");
+            }
+        } else {
+            UUID subject = field.equals("surprised") ? surprised : leader;
+            var entry = battle.getAsJsonArray("initiative").asList().stream().map(JsonElement::getAsJsonObject)
+                    .filter(row -> row.get("characterId").getAsString().equals(subject.toString())).findFirst().orElseThrow();
+            if (field.equals("surprised")) entry.addProperty(field, false);
+            else entry.addProperty(field, surprised.toString());
+        }
+    }
+
     @Test void sharedClericTargetMustBeSeenAndAnUnseenMoverDoesNotOpenAnOpportunity() throws Exception {
         var dice = new ScriptedDice();
         try (Fixture f = new Fixture("observer-spell", dice)) {
@@ -1331,6 +1532,10 @@ class PlayerParticipationAcceptanceTest {
     }
 
     private static void finishAndOpen(Fixture f) throws Exception {
+        finishAndOpen(f, List.of());
+    }
+
+    private static void finishAndOpen(Fixture f, List<byte[]> forgedFiles) throws Exception {
         var before = f.storage.accessSnapshot();
         String manual = f.storage.save(uuid(), before.epoch(), before.revision()).fileKey();
         String ended = f.storage.end(uuid(), before.epoch(), before.revision()).fileKey();
@@ -1338,6 +1543,14 @@ class PlayerParticipationAcceptanceTest {
         var codec = new CampaignCodec();
         assertEquals(before.snapshot(), codec.decode(Files.readAllBytes(f.storage.savedFile(manual))).snapshot());
         assertEquals(before.snapshot(), codec.decode(Files.readAllBytes(f.storage.savedFile(ended))).snapshot());
+        if (!forgedFiles.isEmpty()) {
+            var legitimateFiles = f.storage.savedCampaigns();
+            for (byte[] forged : forgedFiles) {
+                assertEquals("INVALID_FILE", assertThrows(StorageException.class, () -> f.storage.importFile(forged)).code());
+                assertEquals("IDLE", f.storage.status().state());
+                assertEquals(legitimateFiles, f.storage.savedCampaigns());
+            }
+        }
         f.storage.open(ended);
         var reopened = f.storage.accessSnapshot();
         assertNotEquals(before.runId(), reopened.runId());
@@ -1556,6 +1769,12 @@ class PlayerParticipationAcceptanceTest {
             enterBattle(scene, placements.getFirst().characterId(), placements);
         }
         void enterBattle(UUID scene, UUID initiator, List<Deployment> placements) {
+            enterScene(scene, placements);
+            var roster = placements.stream().map(Deployment::characterId).toList();
+            combat(battle(), Command.reenter(initiator, roster));
+            assertEquals(roster.getFirst(), battle().activeActor());
+        }
+        void enterScene(UUID scene, List<Deployment> placements) {
             var state = storage.accessSnapshot().snapshot().domains();
             var subjects = new JsonArray();
             for (var placement : placements) {
@@ -1567,9 +1786,6 @@ class PlayerParticipationAcceptanceTest {
             var input = object("sceneId", scene.toString());
             input.add("subjects", subjects);
             send("scene-enter", input);
-            var roster = placements.stream().map(Deployment::characterId).toList();
-            combat(battle(), Command.reenter(initiator, roster));
-            assertEquals(roster.getFirst(), battle().activeActor());
         }
         void leaveBattle(UUID world, UUID... actors) {
             var battle = battle();

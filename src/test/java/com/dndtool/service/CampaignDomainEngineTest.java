@@ -63,6 +63,32 @@ class CampaignDomainEngineTest {
         assertThrows(IllegalArgumentException.class, () -> f.command(continuation, NO_DICE));
     }
 
+    @Test void reentryReservesTheExactEventSuffixForEndingCombatAndClosingTheScene() {
+        Fixture f = new Fixture();
+        f.start();
+        f.command(Schema2CombatState.Command.action(Kind.END_COMBAT, f.a), NO_DICE);
+        var edit = Schema2CombatState.Command.setObservationCell(new ObservationCellInput(new Position(0, 0), true, false, Cover.NONE));
+        int lastReentryPrefix = Schema2CombatHistory.MAX_EVENTS - 4;
+        while (f.combat.events().size() < lastReentryPrefix) f.command(edit, NO_DICE);
+
+        var validPrefix = f.combat;
+        f.command(edit, NO_DICE);
+        var tooLong = f.combat;
+        var reenter = Schema2CombatState.Command.reenter(f.a, List.of(f.a, f.b));
+        var rejected = assertThrows(IllegalArgumentException.class, () -> f.command(reenter, NO_DICE));
+        assertEquals("S2_COMBAT_CAPACITY", rejected.getMessage());
+        assertEquals(tooLong, f.combat);
+
+        f.combat = validPrefix;
+        f.command(reenter, sides -> 10);
+        f.command(Schema2CombatState.Command.action(Kind.END_COMBAT, f.a), NO_DICE);
+        f.command(Schema2CombatState.Command.sceneRoster(List.of(), List.of()), NO_DICE);
+        f.characters = List.of();
+        f.command(Schema2CombatState.Command.action(Kind.CLOSE_SCENE, null), NO_DICE);
+        assertEquals(Status.ENDED, f.combat.current().status());
+        assertEquals(Schema2CombatHistory.MAX_EVENTS, f.combat.events().size());
+    }
+
     @Test void actualDamageAndRoundClockHaveCompleteCausalChildren() {
         Fixture f = new Fixture(); f.start();
         f.command(Schema2CombatState.Command.action(Kind.BEGIN_ATTACK, f.a), NO_DICE);

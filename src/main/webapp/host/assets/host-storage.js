@@ -802,7 +802,8 @@
     return `${shot.distanceFeet} 尺（${band}）${shot.closeEnemy ? ' · 近身敌人造成劣势' : ''}`;
   }
   const coverNames = {NONE: '无掩护', HALF: '半掩护（AC +2）', THREE_QUARTERS: '四分之三掩护（AC +5）', TOTAL: '全掩护'};
-  const observationActions = {HIDE: '躲藏', SEARCH: '搜索', NIMBLE_HIDE: '灵巧逃脱（躲藏）', NIMBLE_DISENGAGE: '灵巧逃脱（撤离）'};
+  const observationActions = {HIDE: '躲藏', SEARCH: '搜索', NIMBLE_HIDE: '灵巧逃脱（躲藏）', NIMBLE_DISENGAGE: '灵巧逃脱（撤离）',
+    START: '开场隐匿', REENTER_COMBAT: '开场隐匿'};
   function attackSight(attack) {
     const details = [];
     if (!attack.attackerSeesTarget) details.push('攻击者看不见目标');
@@ -813,11 +814,14 @@
   }
   function observationResult(check) {
     const prefix = personName(check.actorId) + ' · ' + observationActions[check.kind];
-    if (!check.roll) return prefix;
-    const dice = [check.roll.firstD20, check.roll.secondD20].filter(value => value != null).join(' / ');
+    const roll = check.roll;
+    if (!roll) return prefix;
+    const dice = [roll.firstD20, roll.secondD20].filter(value => value != null).join(' / ');
     const results = check.contests.map(contest => personName(contest.counterpartId) + ' ' + contest.opposingScore
       + (contest.hiddenAfter ? '（仍未发现）' : '（已发现）'));
-    return [prefix, 'd20=' + dice + '，总值 ' + check.roll.total, ...results].join(' · ');
+    const source = check.rollSource && check.rollSource !== check.actorId ? `共用 ${personName(check.rollSource)} 的原骰` : null;
+    const modifiers = check.openingOperationId ? `，选用 ${roll.selectedD20}，属性修正 ${roll.abilityModifier}，技能加值 ${roll.skillBonus}` : '';
+    return [prefix, source, `d20=${dice}${modifiers}，总值 ${roll.total}`, ...results].filter(Boolean).join(' · ');
   }
   function renderObservation(box, battle) {
     const {cells, pairs, checks} = battle.observation;
@@ -857,8 +861,13 @@
     const before = event.before, after = event.resolution.after;
     const previous = before?.meleeControl, current = after.meleeControl;
     const details = [];
-    const check = after.observation.checks.find(record => record.operationId === event.operationId);
-    if (check) details.push(observationResult(check));
+    const opening = ['START', 'REENTER_COMBAT'].includes(event.command.kind);
+    for (const check of after.observation.checks) {
+      if (check.operationId === event.operationId || check.openingOperationId === event.operationId)
+        details.push(observationResult(check));
+    }
+    if (opening) for (const [name, total, dice, source, surprised] of initiativeRows(after))
+      details.push(`${name} · 先攻 ${total}（${dice}，${source}） · ${surprised}`);
     for (const contest of current?.contests || []) {
       const prior = previous?.contests.find(entry => entry.contestKey === contest.contestKey);
       if (!prior || prior.outcome !== contest.outcome) details.push(meleeContestResult(contest));
@@ -992,7 +1001,7 @@
     return {type: 'scene.Command', kind, actorId, targetId: null, itemId: null, path: [], deployments: [], tieBreakOrder: [],
       flowKey: null, leafKey: null, windowKey: null, opportunityKey: null, castInput: null, readyInput: null, readyKey: null,
       zoneInput: null, zoneKey: null, healthInput: null, seconds: '0', monsterDeployments: [], breathInput: null,
-      monsterRestInput: null, meleeInput: null, dragInput: null, monsterAttackInput: null, observationCell: null};
+      monsterRestInput: null, meleeInput: null, dragInput: null, monsterAttackInput: null, observationCell: null, opening: null};
   }
   function sendCombat(battle, command, expected = focusToken()) {
     if (!battle || battle.combatId !== focusedBattle()?.combatId || expected.generation !== focusToken().generation) {
@@ -1019,8 +1028,18 @@
     const drag = battle.flows.flatMap(flow => flow.movements).findLast(movement => movement.drag);
     if (drag) text(box, 'p', dragResult(drag, liveGrapples(battle).some(grapple => grapple.grappleKey === drag.drag.grappleKey)), 'drag-result');
   }
+  function initiativeRows(battle) {
+    const sizes = new Map();
+    for (const entry of battle.initiative) sizes.set(entry.rollSource, (sizes.get(entry.rollSource) || 0) + 1);
+    return battle.initiative.map(entry => [personName(entry.characterId), entry.total,
+      `d20=${entry.d20}，敏捷修正 ${entry.dexterityModifier}`,
+      sizes.get(entry.rollSource) > 1 ? `共用（${personName(entry.rollSource)}）` : '独立',
+      entry.surprised ? '开场受惊' : '开场警觉']);
+  }
   function renderCombat(state) {
-    const combats = state.combats || [], summary = byId('domain-combat-summary'), pending = byId('domain-pending'); summary.replaceChildren(); pending.replaceChildren();
+    const combats = state.combats || [], summary = byId('domain-combat-summary'), pending = byId('domain-pending');
+    const expandedOrders = new Set([...summary.querySelectorAll('.opening-initiative[open]')].map(order => order.dataset.combatId));
+    summary.replaceChildren(); pending.replaceChildren();
     const activeBattle = focusedBattle();
     for (const select of document.querySelectorAll('.combat-choice'))
       options(select, activeBattle ? [activeBattle.combatId] : [], id => spaceName({kind: 'SCENE', id}));
@@ -1031,13 +1050,21 @@
       const executing = battle.combatId === activeBattle?.combatId;
       text(box, 'h3', `${spaceName({kind: 'SCENE', id: battle.combatId})} · ${battleStatus(battle.status)} · ${executing ? '焦点' : '后台'}`);
       if (active && executing && battle.status === 'ACTIVE') text(box, 'p', `第 ${battle.round} 轮 · 当前 ${personName(active)}`);
+      if (battle.status === 'ACTIVE') {
+        const order = text(box, 'details', '', 'opening-initiative');
+        order.dataset.combatId = battle.combatId;
+        order.open = expandedOrders.has(battle.combatId);
+        text(order, 'summary', '先攻顺序与开场状态');
+        table(order, ['参与者', '先攻', '选用原骰与修正', '掷骰来源', '开场状态'], initiativeRows(battle));
+      }
       const grabbed = new Set(liveGrapples(battle).map(grapple => grapple.targetId));
       table(box, ['参与者', '格位', '阵营', '姿态', '剩余移动', '普通动作', '附赠动作', '反应', '攻击动作'], battle.combatants.map(actor => {
         const budget = history.turnBudgets?.[actor.characterId];
         return [personName(actor.characterId), `${actor.position.x}, ${actor.position.y}`, actor.side,
-          (actor.prone ? '倒地' : '站立') + (grabbed.has(actor.characterId) ? ' · 受擒（速度 0）' : ''),
+          (actor.prone ? '倒地' : '站立') + (grabbed.has(actor.characterId) ? ' · 受擒（速度 0）' : '')
+            + (budget?.surprised ? ' · 受惊（至首回合结束）' : ''),
           budget ? `${budget.movementRemainingHalfFeet / 2} 尺` : '—', budget?.actionsRemaining ?? '—', budget?.bonusActionsRemaining ?? '—',
-          budget ? (budget.reactionAvailable ? '可用' : '已用') : '—',
+          budget ? (budget.surprised ? '受惊时不可用' : budget.reactionAvailable ? '可用' : '已用') : '—',
           actor.sequence ? `已攻击 ${actor.sequence.performed}/${actor.sequence.limit} · 剩余 ${actor.sequence.limit - actor.sequence.performed - actor.sequence.forfeited}${actor.sequence.forfeited ? ` · 已放弃 ${actor.sequence.forfeited}` : ''}` : '未开始'];
       }));
       renderGrapples(box, battle, executing);
@@ -1161,14 +1188,97 @@
     const start = actor.position, end = target.position;
     return {type: 'scene.Position', x: String(end.x + Math.sign(end.x - start.x)), y: String(end.y + Math.sign(end.y - start.y))};
   }
+  function openingChoice(parent, id, label, className, values, labelFor) {
+    const field = text(parent, 'div', '', 'opening-choice');
+    const caption = text(field, 'label', label);
+    const select = text(field, 'select', '', className);
+    caption.htmlFor = select.id = `${className}-${id}`;
+    options(select, values, labelFor);
+    return select;
+  }
+  function refreshOpeningForm(battle, kind) {
+    const section = byId('domain-opening'), list = byId('domain-opening-roster');
+    section.hidden = kind !== 'REENTER_COMBAT';
+    if (battle?.status !== 'EXPLORATION') {
+      section.open = false;
+      list.replaceChildren();
+      delete list.dataset.scope;
+    }
+    if (section.hidden) return;
+    const participants = battle.combatants.map(actor => {
+      const id = actor.characterId, monster = battle.monsters.find(entry => entry.monsterId === id);
+      const character = roster().find(entry => entry.id === id);
+      return {id, name: personName(id), side: actor.side, position: actor.position,
+        living: monster ? !monster.dead : character && character.hitPoints > 0 && !character.state.health.dead,
+        monster: monster ? ruleValue(monster.monster) : null, monsterName: monster ? ruleName(monster.monster) : null};
+    });
+    const scope = JSON.stringify([workspaceScope, battle.combatId, participants]);
+    if (list.dataset.scope === scope) return;
+    list.dataset.scope = scope;
+    list.replaceChildren();
+    const ranks = participants.map((_, index) => String(index + 1));
+    for (const [index, participant] of participants.entries()) {
+      const {id, name, side, position, living, monster, monsterName} = participant;
+      const row = text(list, 'div', '', 'opening-participant');
+      row.dataset.participantId = id;
+      text(row, 'strong', name);
+      text(row, 'small', [monsterName, `阵营 ${side}`, `格位 ${position.x}, ${position.y}`].filter(Boolean).join(' · '));
+      const choices = text(row, 'div', '', 'opening-choices');
+      const allies = participants.filter(other => other.side === side);
+      if (living) {
+        const stealthGroups = ranks.slice(0, Math.floor(allies.filter(other => other.living).length / 2));
+        const stealth = openingChoice(choices, id, '开场隐匿', 'opening-stealth', ['', 'solo', ...stealthGroups],
+          value => !value ? '不尝试隐匿' : value === 'solo' ? '独立隐匿' : `共同隐匿 · 组 ${value}`);
+        stealth.dataset.partition = String(side);
+      }
+      const sameMonsters = monster ? allies.filter(other => other.monster === monster) : [];
+      if (sameMonsters.length > 1) {
+        const initiativeGroups = ranks.slice(0, Math.floor(sameMonsters.length / 2));
+        const initiative = openingChoice(choices, id, '先攻掷骰', 'opening-initiative-group', ['', ...initiativeGroups],
+          value => value ? `共同先攻 · 组 ${value}` : '独立先攻');
+        initiative.dataset.partition = `${side}/${monster}`;
+      }
+      const rank = openingChoice(choices, id, '同分顺位', 'opening-rank', ranks, value => value);
+      rank.dataset.rank = rank.value = ranks[index];
+      rank.addEventListener('change', () => {
+        const other = [...list.querySelectorAll('.opening-rank')].find(choice => choice.dataset.rank === rank.value);
+        if (other && other !== rank) other.dataset.rank = other.value = rank.dataset.rank;
+        rank.dataset.rank = rank.value;
+      });
+    }
+  }
+  function readOpening(command) {
+    const rows = [...byId('domain-opening-roster').children];
+    command.tieBreakOrder = rows.map(row => ({id: row.dataset.participantId, rank: Number(row.querySelector('.opening-rank').value)}))
+      .sort((left, right) => left.rank - right.rank).map(entry => entry.id);
+    function groups(selector, description) {
+      const grouped = new Map();
+      for (const row of rows) {
+        const choice = row.querySelector(selector), id = row.dataset.participantId;
+        if (!choice?.value) continue;
+        const key = choice.value === 'solo' ? id : `${choice.dataset.partition}/${choice.value}`;
+        if (!grouped.has(key)) grouped.set(key, {type: 'scene.OpeningGroup', members: []});
+        grouped.get(key).members.push(id);
+      }
+      for (const [key, group] of grouped) {
+        if (group.members.length === 1 && key !== group.members[0])
+          throw new Error(`${description}至少需要两名同组成员。请补充 ${personName(group.members[0])} 的组员或改为独立。`);
+      }
+      return [...grouped.values()];
+    }
+    const stealthGroups = groups('.opening-stealth', '共同隐匿'), initiativeGroups = groups('.opening-initiative-group', '共同先攻');
+    if (stealthGroups.length || initiativeGroups.length)
+      command.opening = {type: 'scene.OpeningInput', stealthGroups, initiativeGroups};
+  }
   function refreshCombatForm() {
     const form = byId('domain-combat'), battle = battleFor(form.elements.combatId.value);
     const monster = battle?.monsters.find(m => m.monsterId === form.elements.actorId.value);
     const nimble = monster && ruleFromValue(ruleValue(monster.monster))?.nimbleEscape;
+    const surprised = battleHistory(form.elements.combatId.value)?.turnBudgets?.[battle?.initiative[battle?.activeOrdinal]?.characterId]?.surprised;
     const exploration = ['DROP_PRONE', 'STAND_UP', 'EXPLORATION_MOVE', 'EXPLORATION_ADVANCE_TIME', 'END_CONCENTRATION', 'REENTER_COMBAT'];
     const actions = battle?.status === 'EXPLORATION' ? exploration : battle?.status === 'ACTIVE'
       ? [...combatActions.keys()].filter(kind => !kind.startsWith('EXPLORATION_') && kind !== 'REENTER_COMBAT'
-        && (!kind.startsWith('NIMBLE_') || nimble)) : [];
+        && (!kind.startsWith('NIMBLE_') || nimble) && (!surprised || ['END_TURN', 'END_COMBAT', 'END_CONCENTRATION'].includes(kind))) : [];
     options(form.elements.kind, actions, kind => combatActions.get(kind));
     form.elements.kind.disabled = actions.length === 0;
     const kind = form.elements.kind.value;
@@ -1177,6 +1287,7 @@
         || (kind === 'STAND_UP' && actor.prone && battle.monsters.some(monster => monster.monsterId === actor.characterId && !monster.dead)));
       options(form.elements.actorId, occupants.map(actor => actor.characterId), personName);
     }
+    refreshOpeningForm(battle, kind);
     const pending = battle?.flows.some(flow => flow.status === 'ACTIVE');
     const actor = battle?.combatants.find(actor => actor.characterId === form.elements.actorId.value);
     const replacement = replacementKinds.includes(kind), shove = kind === 'SHOVE_PUSH', drag = kind === 'DRAG_GRAPPLE';
@@ -1190,10 +1301,12 @@
       const grapple = grapples.find(entry => entry.grappleKey === id);
       return `${personName(drag ? grapple.targetId : grapple.grapplerId)} · ${locationName(grapple.hand)}`;
     });
-    form.querySelector('button').disabled = actions.length === 0 || pending
+    form.querySelector('button').disabled = actions.length === 0 || pending || (kind === 'REENTER_COMBAT' && battle.combatants.length < 2)
       || (replacement && (!sequence || sequence.closed)) || ((drag || escape) && !grapples.length);
     byId('domain-combat-note').textContent = pending ? '请先在上方处理反应或继续结算，再进行下一次行动。'
       : !battle ? '请先安排参与者并开始战斗。' : battle.status === 'ENDED' ? '此场景已关闭，可以开始新的战斗。'
+      : surprised && kind === 'END_TURN' ? '当前行动者受惊。结束其首个回合后，即可在本轮余下的时间使用反应。'
+      : kind === 'REENTER_COMBAT' ? (battle.combatants.length < 2 ? '请先安排至少两名参与者进入场景。' : '按场景名册开始战斗，由规则判定受惊并掷先攻。')
       : kind === 'BEGIN_ATTACK' ? '消耗一次动作，按已取得的能力开始攻击序列。每次攻击可使用武器，或改为擒抱或推撞。'
       : kind === 'ATTACK' ? '选择目标和持用的武器。每击使用一次攻击额度，短弓须双手持用且每次射击消耗一支携带的箭。'
       : kind === 'HIDE' || kind === 'NIMBLE_HIDE' ? '在允许躲藏的格位掷一次隐匿，分别与敌人的被动察觉比较。'
@@ -1978,7 +2091,14 @@
       } catch (failure) { message(failure.message); return; }
     }
     if (values.kind === 'EXPLORATION_ADVANCE_TIME') value.seconds = values.seconds;
-    if (values.kind === 'REENTER_COMBAT') value.tieBreakOrder = battle.combatants.map(actor => actor.characterId);
+    if (values.kind === 'REENTER_COMBAT') {
+      try { readOpening(value); }
+      catch (failure) {
+        byId('domain-opening').open = true;
+        message(failure.message);
+        return;
+      }
+    }
     sendCombat(battle, value);
   });
   byId('domain-cast').addEventListener('submit', event => {
